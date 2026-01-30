@@ -513,7 +513,7 @@
             sigma.renderers.def = sigma.renderers.canvas
             sigma.parsers.json("${docroot}/scanviz?id=" + instanceId + "&gexf=0", {
                 container: 'graph-container'
-            }, function(s) { 
+            }, function(s) {
                 if (s.renderers[0].nodesOnScreen.length == 0) {
                     $("#graph-container").append("<div class='alert alert-danger'>Insufficient data to produce a graph.</div>");
                     $("#loader").hide();
