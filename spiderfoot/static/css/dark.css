@@ -1872,6 +1872,29 @@ tr.active td {
 }
 
 /* ============================================
+   Settings Page - Import/Export API Keys Buttons
+   Modern gradient purple style
+   ============================================ */
+#btn-import-config,
+#btn-opt-export {
+  background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 15px var(--glow-purple);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  font-weight: 600;
+}
+
+#btn-import-config:hover,
+#btn-import-config:focus,
+#btn-opt-export:hover,
+#btn-opt-export:focus {
+  background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%) !important;
+  box-shadow: 0 0 25px var(--glow-purple), 0 4px 15px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+/* ============================================
    Settings Page Sidebar Navigation - Modern Toolbar Style
    ============================================ */
 /* Container - large rounded dark grey background */
@@ -1882,7 +1905,7 @@ tr.active td {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-/* Each button - dark with bright white glowing text */
+/* Each button - dark with bold white text */
 .tabs-left .nav-pills.nav-stacked > li > a {
   background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%) !important;
   color: #ffffff !important;
@@ -1890,20 +1913,21 @@ tr.active td {
   border-radius: 8px !important;
   padding: 10px 14px;
   margin: 4px 0;
-  font-weight: 500;
+  font-weight: 700;
   font-family: var(--font-sans);
   transition: all 0.2s ease;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5), 0 0 15px rgba(255, 255, 255, 0.3);
+  text-shadow: none;
 }
 
-/* Hover state - darker blue button style with lift effect */
+/* Hover state - bold text with glow effect */
 .tabs-left .nav-pills.nav-stacked > li > a:hover {
-  background: linear-gradient(135deg, var(--accent-blue) 0%, #2563eb 100%) !important;
+  background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%) !important;
   color: white !important;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  font-weight: 700;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.5), 0 0 30px rgba(255, 255, 255, 0.3);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 0 15px var(--glow-blue);
-  border-color: var(--accent-blue) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
 /* Active/selected state - lighter blue button (like Save Changes brighter style) */
@@ -1915,6 +1939,7 @@ tr.active td {
   border: none !important;
   box-shadow: 0 0 20px var(--glow-blue), 0 0 40px rgba(59, 130, 246, 0.3);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  font-weight: 700;
   transform: none;
 }
 
