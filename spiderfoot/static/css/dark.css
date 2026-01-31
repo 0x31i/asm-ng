@@ -552,10 +552,20 @@ tr.danger td {
   border-color: var(--glass-border) !important;
   border-bottom: 1px solid var(--glass-border) !important;
   border-radius: var(--radius-md) var(--radius-md) 0 0 !important;
-  color: var(--text-primary) !important;
-  font-weight: 500;
-  font-family: var(--font-sans);
+  color: #ffffff !important;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
   padding: 14px 18px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5), 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+.panel-default > .panel-heading .glyphicon {
+  color: #ffffff !important;
+  margin-right: 8px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 }
 
 .panel-body {
