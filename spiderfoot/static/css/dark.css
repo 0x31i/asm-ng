@@ -766,19 +766,25 @@ tr.danger td {
   color: var(--text-muted);
 }
 
-/* Breadcrumb links and text - neon green */
+/* Breadcrumb links and text - code font with glow */
 .breadcrumb > li,
 .breadcrumb > li > a {
   color: var(--accent-green) !important;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.5px;
 }
 
 .breadcrumb > li > a:hover {
   color: var(--accent-green-light) !important;
-  text-shadow: 0 0 8px var(--glow-green);
+  text-shadow: 0 0 10px var(--glow-green), 0 0 20px var(--glow-green);
 }
 
 .breadcrumb > .active {
   color: var(--accent-green) !important;
+  text-shadow: 0 0 8px var(--glow-green);
 }
 
 /* ============================================
@@ -789,18 +795,24 @@ tr.danger td {
 }
 
 .nav-tabs > li > a {
-  color: var(--text-secondary);
-  font-family: var(--font-sans);
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   border: none;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   padding: 12px 20px;
   transition: all var(--transition-fast);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }
 
 .nav-tabs > li > a:hover {
   background: var(--bg-tertiary);
   border-color: transparent;
-  color: var(--text-primary);
+  color: #ffffff;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.4);
 }
 
 .nav-tabs > li.active > a,
@@ -808,8 +820,9 @@ tr.danger td {
 .nav-tabs > li.active > a:focus {
   background: var(--bg-tertiary);
   border: none;
-  border-bottom: 2px solid var(--accent-blue);
-  color: var(--text-primary);
+  border-bottom: 2px solid var(--accent-green);
+  color: var(--accent-green);
+  text-shadow: 0 0 10px var(--glow-green);
 }
 
 /* ============================================
@@ -1284,11 +1297,15 @@ pre.table-border-bg-inherit {
 .btn-toolbar .btn-group > .btn.btn-default {
   background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  color: #e0e0e0 !important;
-  font-weight: 600;
-  padding: 6px 12px;
+  color: #ffffff !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px 14px;
   transition: all 0.2s ease;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }
 
 .btn-toolbar .btn-group > .btn.btn-default:hover {
@@ -1296,6 +1313,7 @@ pre.table-border-bg-inherit {
   color: #ffffff !important;
   border-color: rgba(255, 255, 255, 0.2) !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.4);
 }
 
 .btn-toolbar .btn-group > .btn.btn-default.active {
@@ -1303,7 +1321,7 @@ pre.table-border-bg-inherit {
   color: white !important;
   border-color: #22c55e !important;
   box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
 }
 
 /* Glyphicon colors - White for visibility */
@@ -1704,19 +1722,25 @@ tr.active td {
 #customtabview .btn-default {
   background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  color: #e0e0e0 !important;
+  color: #ffffff !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700;
+  text-transform: uppercase;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }
 
 #customtabview .btn-default:hover {
   background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%) !important;
   color: #ffffff !important;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.4);
 }
 
 #customtabview .btn-default.active {
-  background: linear-gradient(135deg, var(--accent-blue) 0%, #2563eb 100%) !important;
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
   color: white !important;
-  border-color: var(--accent-blue) !important;
-  box-shadow: 0 0 15px var(--glow-blue);
+  border-color: var(--accent-green) !important;
+  box-shadow: 0 0 15px var(--glow-green);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
 }
 
 /* ============================================
@@ -2127,12 +2151,12 @@ div[id*="Help"].alert-info {
 
 .asm-ng-sidebar .sidebar-nav > li > a:hover {
   background: rgba(255, 255, 255, 0.05);
-  border-bottom-color: var(--accent-cyan);
+  border-bottom-color: var(--accent-green);
 }
 
 .asm-ng-sidebar .sidebar-nav > li.active > a {
-  background: rgba(34, 211, 238, 0.1);
-  border-bottom-color: var(--accent-cyan);
+  background: rgba(34, 197, 94, 0.1);
+  border-bottom-color: var(--accent-green);
 }
 
 /* Menu icons */
@@ -2147,13 +2171,13 @@ div[id*="Help"].alert-info {
 }
 
 .asm-ng-sidebar .sidebar-nav > li > a:hover .nav-icon {
-  color: var(--accent-cyan);
-  text-shadow: 0 0 15px var(--glow-cyan), 0 0 30px var(--glow-cyan);
+  color: var(--accent-green);
+  text-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green);
 }
 
 .asm-ng-sidebar .sidebar-nav > li.active > a .nav-icon {
-  color: var(--accent-cyan);
-  text-shadow: 0 0 15px var(--glow-cyan), 0 0 30px var(--glow-cyan);
+  color: var(--accent-green);
+  text-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green);
 }
 
 /* Menu text - Always visible */
@@ -2171,13 +2195,13 @@ div[id*="Help"].alert-info {
 }
 
 .asm-ng-sidebar .sidebar-nav > li > a:hover .nav-text {
-  color: var(--accent-cyan);
-  text-shadow: 0 0 15px var(--glow-cyan), 0 0 30px var(--glow-cyan);
+  color: var(--accent-green);
+  text-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green);
 }
 
 .asm-ng-sidebar .sidebar-nav > li.active > a .nav-text {
-  color: var(--accent-cyan);
-  text-shadow: 0 0 10px var(--glow-cyan);
+  color: var(--accent-green);
+  text-shadow: 0 0 10px var(--glow-green);
 }
 
 /* Dark Mode Toggle - Right side of menu */
