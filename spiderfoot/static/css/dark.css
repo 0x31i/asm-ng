@@ -2485,10 +2485,13 @@ footer .footer {
 [class*="selection"],
 .fixed-bottom-bar,
 div[style*="fixed"][style*="bottom"] {
-  background: linear-gradient(180deg, #0a0a0a 0%, #000000 100%) !important;
-  border: 1px solid var(--glass-border) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.5) !important;
   border-radius: 0 !important;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.8) !important;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
   padding: 12px 20px !important;
 }
 
@@ -2517,8 +2520,8 @@ div[style*="fixed"][style*="bottom"] {
   font-size: 11px !important;
   text-transform: uppercase !important;
   letter-spacing: 0.5px !important;
-  color: #ffffff !important;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5) !important;
+  color: #1a1a1a !important;
+  text-shadow: none !important;
 }
 
 /* All buttons in floating toolbar - sharp style */
