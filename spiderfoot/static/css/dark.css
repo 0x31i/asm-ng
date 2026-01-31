@@ -648,41 +648,60 @@ tr.danger td {
 }
 
 /* ============================================
-   Dropdowns - Clean Dark
+   Dropdowns - Sharp Modern Style
    ============================================ */
 .dropdown-menu {
-  background: var(--bg-secondary) !important;
+  background: linear-gradient(180deg, #0a0a0a 0%, #000000 100%) !important;
   border: 1px solid var(--glass-border) !important;
-  border-radius: var(--radius-md) !important;
-  box-shadow: var(--shadow-lg) !important;
-  padding: 4px 0;
+  border-radius: 0 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8) !important;
+  padding: 0;
+  margin-top: 0;
 }
 
 .dropdown-menu > li > a {
-  color: var(--text-secondary) !important;
-  font-family: var(--font-sans);
-  padding: 8px 16px;
-  transition: all var(--transition-fast);
+  color: #ffffff !important;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 20px;
+  transition: all 0.2s ease;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  border-left: 3px solid transparent;
 }
 
 .dropdown-menu > li > a:hover,
 .dropdown-menu > li > a:focus {
-  background: var(--bg-tertiary) !important;
-  color: var(--text-primary) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--accent-green) !important;
+  border-left-color: var(--accent-green);
+  text-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green);
+}
+
+.dropdown-menu > li.active > a,
+.dropdown-menu > li.active > a:hover {
+  background: rgba(34, 197, 94, 0.1) !important;
+  color: var(--accent-green) !important;
+  border-left-color: var(--accent-green);
+  text-shadow: 0 0 10px var(--glow-green);
 }
 
 .dropdown-menu .divider {
   background-color: var(--glass-border);
-  margin: 8px 0;
+  margin: 0;
 }
 
 .dropdown-header {
   color: var(--text-muted) !important;
-  font-size: 11px;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 8px 16px;
+  letter-spacing: 1px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--glass-border);
 }
 
 /* ============================================
@@ -1296,48 +1315,53 @@ pre.table-border-bg-inherit {
   max-width: 200px;
 }
 
-/* Container for the nav tabs - toolbar-like background */
+/* Container for the nav tabs - sharp modern style like main menu */
 .btn-toolbar > .btn-group:first-child {
-  background: linear-gradient(180deg, #1e1e1e 0%, #151515 100%);
-  border-radius: 12px;
-  padding: 6px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .btn-toolbar .btn-group > .btn.btn-default {
-  background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 3px solid transparent !important;
+  border-radius: 0 !important;
   color: #ffffff !important;
   font-family: var(--font-mono) !important;
   font-weight: 700;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding: 8px 14px;
+  padding: 12px 20px;
   transition: all 0.2s ease;
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }
 
 .btn-toolbar .btn-group > .btn.btn-default:hover {
-  background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%) !important;
-  color: #ffffff !important;
-  border-color: rgba(255, 255, 255, 0.2) !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  text-shadow: 0 0 12px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--accent-green) !important;
+  border-bottom-color: var(--accent-green) !important;
+  box-shadow: none;
+  text-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green);
 }
 
 .btn-toolbar .btn-group > .btn.btn-default.active {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
-  color: white !important;
-  border-color: #22c55e !important;
-  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+  background: rgba(34, 197, 94, 0.1) !important;
+  color: var(--accent-green) !important;
+  border-bottom-color: var(--accent-green) !important;
+  box-shadow: none;
+  text-shadow: 0 0 10px var(--glow-green);
 }
 
 /* Glyphicon colors - White for visibility */
 .btn-toolbar .btn-group > .btn.btn-default .glyphicon {
   color: white;
-  margin-right: 4px;
+  margin-right: 6px;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  transition: all 0.2s ease;
 }
 
 /* All glyphicons default to white */
@@ -1352,11 +1376,13 @@ pre.table-border-bg-inherit {
 }
 
 .btn-toolbar .btn-group > .btn.btn-default:hover .glyphicon {
-  color: #ffffff;
+  color: var(--accent-green) !important;
+  text-shadow: 0 0 15px var(--glow-green);
 }
 
 .btn-toolbar .btn-group > .btn.btn-default.active .glyphicon {
-  color: white;
+  color: var(--accent-green) !important;
+  text-shadow: 0 0 10px var(--glow-green);
 }
 
 /* ============================================
@@ -1690,67 +1716,106 @@ tr.active td {
   margin-left: 8px;
 }
 
-/* Search input container toolbar styling */
+/* Search input container - sharp modern style */
 #btn-search {
-  background: linear-gradient(180deg, #1e1e1e 0%, #151515 100%);
-  border-radius: 12px;
-  padding: 6px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  border: 1px solid var(--glass-border);
   width: 100%;
 }
 
 #btn-search .form-control {
-  background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  border-radius: 6px 0 0 6px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
   width: 120px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #ffffff !important;
 }
 
-/* Search button - purple */
+#btn-search .form-control::placeholder {
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+/* Search button - green accent */
 .input-group-btn .btn-primary {
-  background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%) !important;
-  box-shadow: 0 0 12px var(--glow-purple);
-  border-radius: 0 6px 6px 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-left: 1px solid var(--glass-border) !important;
+  border-radius: 0 !important;
+  box-shadow: none;
+  color: #ffffff !important;
+  transition: all 0.2s ease;
+}
+
+.input-group-btn .btn-primary:hover {
+  background: rgba(34, 197, 94, 0.1) !important;
+  color: var(--accent-green) !important;
+}
+
+.input-group-btn .btn-primary .glyphicon {
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+.input-group-btn .btn-primary:hover .glyphicon {
+  color: var(--accent-green) !important;
+  text-shadow: 0 0 15px var(--glow-green);
 }
 
 /* Download buttons styling */
 .download-button {
-  background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: transparent !important;
+  border: none !important;
+  border-left: 1px solid var(--glass-border) !important;
 }
 
 /* ============================================
-   View Toggle Toolbar Container
+   View Toggle Toolbar Container - Sharp Modern Style
    ============================================ */
 #customtabview {
-  background: linear-gradient(180deg, #1e1e1e 0%, #151515 100%);
-  border-radius: 12px;
-  padding: 6px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  border: 1px solid var(--glass-border);
 }
 
 #customtabview .btn-default {
-  background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: transparent !important;
+  border: none !important;
+  border-right: 1px solid var(--glass-border) !important;
+  border-radius: 0 !important;
   color: #ffffff !important;
   font-family: var(--font-mono) !important;
   font-weight: 700;
+  font-size: 11px;
   text-transform: uppercase;
+  padding: 10px 14px;
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  transition: all 0.2s ease;
+}
+
+#customtabview .btn-default:last-child {
+  border-right: none !important;
 }
 
 #customtabview .btn-default:hover {
-  background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%) !important;
-  color: #ffffff !important;
-  text-shadow: 0 0 12px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--accent-green) !important;
+  text-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green);
 }
 
 #customtabview .btn-default.active {
-  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
-  color: white !important;
-  border-color: var(--accent-green) !important;
-  box-shadow: 0 0 15px var(--glow-green);
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+  background: rgba(34, 197, 94, 0.1) !important;
+  color: var(--accent-green) !important;
+  border-bottom: 3px solid var(--accent-green) !important;
+  box-shadow: none;
+  text-shadow: 0 0 10px var(--glow-green);
 }
 
 /* ============================================
