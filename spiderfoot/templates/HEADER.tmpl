@@ -33,7 +33,16 @@
 
   <body>
 
-<!-- ASM-NG Vertical Sidebar Menu -->
+<!-- ASM-NG Logo Banner -->
+<div class="asm-ng-logo-container">
+  <div class="asm-ng-logo-wrapper">
+    <a href="${docroot}/">
+      <img src="${docroot}/static/img/asm-ng-logo.png" alt="ASM-NG" class="asm-ng-logo" />
+    </a>
+  </div>
+</div>
+
+<!-- ASM-NG Navigation Menu -->
 <nav class="asm-ng-sidebar">
   <ul class="sidebar-nav">
     <li
@@ -87,29 +96,6 @@
     <span id="toggler-text">Dark Mode</span>
   </div>
 </nav>
-
-<!-- ASM-NG Logo Banner with Parallax -->
-<div class="asm-ng-logo-container parallax-active">
-  <div class="asm-ng-logo-wrapper">
-    <a href="${docroot}/">
-      <img src="${docroot}/static/img/asm-ng-logo.png" alt="ASM-NG" class="asm-ng-logo" id="parallax-logo" />
-    </a>
-  </div>
-</div>
-
-<!-- Parallax Script -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  var logo = document.getElementById('parallax-logo');
-  if (logo) {
-    window.addEventListener('scroll', function() {
-      var scrolled = window.pageYOffset;
-      var rate = scrolled * 0.3;
-      logo.style.transform = 'translateY(' + rate + 'px)';
-    });
-  }
-});
-</script>
 
     <!-- Placed at the end of the document so the pages load faster -->
     <script>var docroot = '${docroot}';</script>
