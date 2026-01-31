@@ -1356,23 +1356,42 @@ pre.table-border-bg-inherit {
   text-shadow: 0 0 10px var(--glow-green);
 }
 
-/* Glyphicon colors - White for visibility */
+/* Glyphicon colors - White, larger, closer to text */
 .btn-toolbar .btn-group > .btn.btn-default .glyphicon {
   color: white;
-  margin-right: 6px;
+  font-size: 16px;
+  margin-right: 8px;
+  vertical-align: middle;
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
   transition: all 0.2s ease;
 }
 
-/* All glyphicons default to white */
+/* All glyphicons default to white and larger */
 .glyphicon {
   color: white !important;
+  font-size: 16px;
 }
 
 .btn .glyphicon,
 .btn-default .glyphicon,
 .btn-group .glyphicon {
   color: white !important;
+  font-size: 16px;
+  vertical-align: middle;
+}
+
+/* Icon-only buttons - perfect centering */
+.btn-toolbar .btn-group > .btn.btn-default:only-of-type,
+.btn-toolbar .btn-group:not(:first-child) > .btn.btn-default {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 10px 16px !important;
+}
+
+.btn-toolbar .btn-group:not(:first-child) > .btn.btn-default .glyphicon {
+  margin-right: 0 !important;
+  font-size: 18px;
 }
 
 .btn-toolbar .btn-group > .btn.btn-default:hover .glyphicon {
@@ -1742,29 +1761,34 @@ tr.active td {
   text-transform: uppercase;
 }
 
-/* Search button - green accent */
+/* Search button - purple with glow */
 .input-group-btn .btn-primary {
-  background: transparent !important;
+  background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%) !important;
   border: none !important;
-  border-left: 1px solid var(--glass-border) !important;
   border-radius: 0 !important;
-  box-shadow: none;
+  box-shadow: 0 0 12px var(--glow-purple);
   color: #ffffff !important;
   transition: all 0.2s ease;
+  padding: 10px 16px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .input-group-btn .btn-primary:hover {
-  background: rgba(34, 197, 94, 0.1) !important;
-  color: var(--accent-green) !important;
+  background: linear-gradient(135deg, var(--accent-purple-light) 0%, var(--accent-purple) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-purple);
 }
 
 .input-group-btn .btn-primary .glyphicon {
+  font-size: 16px;
+  margin: 0 !important;
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }
 
 .input-group-btn .btn-primary:hover .glyphicon {
-  color: var(--accent-green) !important;
-  text-shadow: 0 0 15px var(--glow-green);
+  color: white !important;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
 }
 
 /* Download buttons styling */
@@ -1795,9 +1819,17 @@ tr.active td {
   font-weight: 700;
   font-size: 11px;
   text-transform: uppercase;
-  padding: 10px 14px;
+  padding: 10px 16px;
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
   transition: all 0.2s ease;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#customtabview .btn-default .glyphicon {
+  font-size: 16px;
+  margin: 0 !important;
 }
 
 #customtabview .btn-default:last-child {
