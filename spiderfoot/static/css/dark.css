@@ -1994,3 +1994,56 @@ td > code:hover {
   color: var(--accent-cyan) !important;
 }
 
+/* ============================================
+   Hide Footer Informational Bar
+   ============================================ */
+footer.navbar-fixed-bottom,
+.navbar-fixed-bottom,
+footer .footer {
+  display: none !important;
+}
+
+/* ============================================
+   Hide Tip Alerts
+   ============================================ */
+#scanIdHelp,
+div[id*="Help"].alert-info {
+  display: none !important;
+}
+
+/* Hide all tip-style info alerts */
+.alert.alert-info.alert-dismissible,
+.modal-body .alert.alert-info {
+  display: none !important;
+}
+
+/* ============================================
+   Table Pager Fixes
+   ============================================ */
+.ts-pager {
+  background: var(--bg-secondary) !important;
+  padding: 12px 15px !important;
+  border: 1px solid var(--glass-border) !important;
+  border-top: none !important;
+  border-radius: 0 0 var(--radius-md) var(--radius-md) !important;
+  margin-top: -1px;
+}
+
+/* Pager container inside table */
+.tablesorter-pager,
+.pager {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-top: none !important;
+  padding: 12px 15px !important;
+}
+
+/* Fix table bottom border when pager is present */
+.tablesorter {
+  border-bottom: none !important;
+}
+
+.tablesorter + .ts-pager,
+.tablesorter + .pager {
+  border-top: 1px solid var(--glass-border) !important;
+}
