@@ -2049,94 +2049,181 @@ div[id*="Help"].alert-info {
 }
 
 /* ============================================
-   ASM-NG Logo Banner
+   ASM-NG Logo Banner - 500px Centered with Parallax
    ============================================ */
 .asm-ng-logo-container {
   background: #000000;
   width: 100%;
-  text-align: center;
-  padding: 10px 0;
+  height: 500px;
+  overflow: hidden;
   position: relative;
-  z-index: 1040;
+  z-index: 1;
+}
+
+.asm-ng-logo-wrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: auto;
 }
 
 .asm-ng-logo {
-  max-height: 2000px;
-  width: auto;
-  max-width: 100%;
-  display: inline-block;
+  width: 100%;
+  height: auto;
+  display: block;
+  transform: translateY(0);
+  transition: transform 0.1s ease-out;
+}
+
+/* Parallax effect via JS will update this */
+.parallax-active .asm-ng-logo {
+  will-change: transform;
 }
 
 /* ============================================
-   ASM-NG Navbar - Centered Menu
+   ASM-NG Vertical Sidebar Menu
    ============================================ */
-.asm-ng-navbar {
-  position: sticky !important;
-  top: 0 !important;
+.asm-ng-sidebar {
+  position: fixed;
+  top: 0;
   left: 0;
-  right: 0;
-  z-index: 1030;
-  background: var(--bg-secondary) !important;
-  border: none !important;
-  border-bottom: 1px solid var(--glass-border) !important;
-}
-
-/* Remove fixed-top positioning from old navbar */
-.navbar-fixed-top {
-  position: sticky !important;
-  top: 0 !important;
-}
-
-/* Center the main navigation */
-.asm-ng-navbar .navbar-nav.navbar-center {
+  height: 100vh;
+  width: 70px;
+  background: linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
+  border-right: 1px solid var(--glass-border);
+  z-index: 1050;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
   display: flex;
-  justify-content: center;
-  float: none;
-  margin: 0 auto;
+  flex-direction: column;
 }
 
-.asm-ng-navbar .navbar-collapse {
+.asm-ng-sidebar:hover {
+  width: 240px;
+}
+
+/* Sidebar menu list */
+.asm-ng-sidebar .sidebar-nav {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex: 1;
+  padding-top: 20px;
+}
+
+.asm-ng-sidebar .sidebar-nav > li {
+  position: relative;
+}
+
+.asm-ng-sidebar .sidebar-nav > li > a {
+  display: flex;
+  align-items: center;
+  padding: 18px 20px;
+  color: #ffffff;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.asm-ng-sidebar .sidebar-nav > li > a:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-left-color: var(--accent-cyan);
+}
+
+.asm-ng-sidebar .sidebar-nav > li.active > a {
+  background: rgba(34, 211, 238, 0.1);
+  border-left-color: var(--accent-cyan);
+}
+
+/* Menu icons - Large and glowing */
+.asm-ng-sidebar .sidebar-nav > li > a .nav-icon {
+  font-size: 24px;
+  width: 30px;
+  min-width: 30px;
   text-align: center;
-}
-
-.asm-ng-navbar .navbar-nav {
-  display: inline-flex;
-  float: none;
-}
-
-/* Menu items - All caps, code font, bold, glowing white */
-.asm-ng-navbar .navbar-nav > li > a {
-  font-family: var(--font-mono) !important;
-  font-weight: 700 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 1px;
-  color: #ffffff !important;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.5), 0 0 30px rgba(255, 255, 255, 0.3);
-  padding: 15px 20px;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.6), 0 0 20px rgba(255, 255, 255, 0.3);
   transition: all 0.2s ease;
 }
 
-.asm-ng-navbar .navbar-nav > li > a:hover {
-  color: #ffffff !important;
-  text-shadow: 0 0 15px rgba(255, 255, 255, 1), 0 0 30px rgba(255, 255, 255, 0.8), 0 0 45px rgba(255, 255, 255, 0.5);
-  background: transparent !important;
-}
-
-.asm-ng-navbar .navbar-nav > li.active > a,
-.asm-ng-navbar .navbar-nav > li.active > a:hover,
-.asm-ng-navbar .navbar-nav > li.active > a:focus {
-  color: var(--accent-cyan) !important;
+.asm-ng-sidebar .sidebar-nav > li > a:hover .nav-icon {
+  color: var(--accent-cyan);
   text-shadow: 0 0 15px var(--glow-cyan), 0 0 30px var(--glow-cyan);
-  background: transparent !important;
+  transform: scale(1.1);
 }
 
-/* Glyphicons in menu - inherit glow */
-.asm-ng-navbar .navbar-nav > li > a .glyphicon {
-  color: inherit !important;
+.asm-ng-sidebar .sidebar-nav > li.active > a .nav-icon {
+  color: var(--accent-cyan);
+  text-shadow: 0 0 15px var(--glow-cyan), 0 0 30px var(--glow-cyan);
+}
+
+/* Menu text - Hidden until hover */
+.asm-ng-sidebar .sidebar-nav > li > a .nav-text {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-left: 15px;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: all 0.2s ease;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.asm-ng-sidebar:hover .sidebar-nav > li > a .nav-text {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.asm-ng-sidebar .sidebar-nav > li.active > a .nav-text {
+  color: var(--accent-cyan);
+  text-shadow: 0 0 10px var(--glow-cyan);
+}
+
+/* Dark Mode Toggle in Sidebar */
+.sidebar-toggle-container {
+  padding: 20px;
+  border-top: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.asm-ng-sidebar:hover .sidebar-toggle-container {
+  justify-content: flex-start;
+}
+
+.sidebar-toggle-container #toggler-text {
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  margin-right: 10px;
+  font-size: 11px;
+  opacity: 0;
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
+}
+
+.asm-ng-sidebar:hover .sidebar-toggle-container #toggler-text {
+  opacity: 1;
+}
+
+/* Hide old navbar */
+.asm-ng-navbar,
+.navbar-fixed-top,
+.navbar-default:not(.asm-ng-sidebar) {
+  display: none !important;
 }
 
 /* ============================================
-   Dark Mode Toggle - Fixed Alignment
+   Dark Mode Toggle - Sidebar Version
    ============================================ */
 .theme-toggle-container {
   display: flex !important;
@@ -2161,6 +2248,7 @@ div[id*="Help"].alert-info {
   height: 26px;
   margin: 0;
   vertical-align: middle;
+  flex-shrink: 0;
 }
 
 .switch input {
@@ -2215,7 +2303,7 @@ div[id*="Help"].alert-info {
 .ngs-footer {
   position: fixed;
   bottom: 0;
-  left: 0;
+  left: 70px;
   right: 0;
   background: #000000;
   padding: 15px 0;
@@ -2234,16 +2322,30 @@ div[id*="Help"].alert-info {
 }
 
 /* ============================================
-   Main Content Area - Adjust for New Layout
+   Main Content Area - Adjust for Sidebar Layout
    ============================================ */
 #mainbody {
+  margin-left: 70px !important;
   margin-top: 20px !important;
   padding-bottom: 80px !important;
+  transition: margin-left 0.3s ease;
 }
 
 body {
   padding-top: 0 !important;
   padding-bottom: 60px;
+  overflow-x: hidden;
+}
+
+/* Logo container also needs sidebar margin */
+.asm-ng-logo-container {
+  margin-left: 70px;
+  width: calc(100% - 70px);
+}
+
+/* Container adjustments */
+.container {
+  max-width: calc(100% - 40px);
 }
 
 /* Hide old footer styles */
