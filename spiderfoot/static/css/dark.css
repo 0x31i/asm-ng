@@ -1852,6 +1852,26 @@ tr.active td {
 }
 
 /* ============================================
+   Settings Page - Save Changes Button
+   Brighter blue with white text and drop shadow
+   ============================================ */
+#btn-save-changes {
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 15px var(--glow-blue);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  font-weight: 600;
+}
+
+#btn-save-changes:hover,
+#btn-save-changes:focus {
+  background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%) !important;
+  box-shadow: 0 0 25px var(--glow-blue), 0 4px 15px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+/* ============================================
    Settings Page Sidebar Navigation - Modern Toolbar Style
    ============================================ */
 /* Container - large rounded dark grey background */
@@ -1862,39 +1882,39 @@ tr.active td {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-/* Each button - black with white text */
+/* Each button - dark with bright white glowing text */
 .tabs-left .nav-pills.nav-stacked > li > a {
   background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%) !important;
   color: #ffffff !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   border-radius: 8px !important;
   padding: 10px 14px;
-  margin: 2px 0;
+  margin: 4px 0;
   font-weight: 500;
   font-family: var(--font-sans);
   transition: all 0.2s ease;
-  text-shadow: none;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5), 0 0 15px rgba(255, 255, 255, 0.3);
 }
 
-/* Hover state - neon green glowing text, lift with drop shadow */
+/* Hover state - darker blue button style with lift effect */
 .tabs-left .nav-pills.nav-stacked > li > a:hover {
-  background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%) !important;
-  color: var(--accent-green) !important;
-  text-shadow: 0 0 10px var(--glow-green), 0 0 20px var(--glow-green);
+  background: linear-gradient(135deg, var(--accent-blue) 0%, #2563eb 100%) !important;
+  color: white !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(34, 197, 94, 0.2);
-  border-color: rgba(34, 197, 94, 0.3) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 0 15px var(--glow-blue);
+  border-color: var(--accent-blue) !important;
 }
 
-/* Active/selected state - neon green button with glow */
+/* Active/selected state - lighter blue button (like Save Changes brighter style) */
 .tabs-left .nav-pills.nav-stacked > li.active > a,
 .tabs-left .nav-pills.nav-stacked > li.active > a:hover,
 .tabs-left .nav-pills.nav-stacked > li.active > a:focus {
-  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
-  color: #000000 !important;
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%) !important;
+  color: white !important;
   border: none !important;
-  box-shadow: 0 0 20px var(--glow-green), 0 0 40px rgba(34, 197, 94, 0.3);
-  text-shadow: none;
+  box-shadow: 0 0 20px var(--glow-blue), 0 0 40px rgba(59, 130, 246, 0.3);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   transform: none;
 }
 
@@ -1905,6 +1925,6 @@ tr.active td {
 }
 
 .tabs-left .nav-pills.nav-stacked > li.active > a .glyphicon-lock {
-  color: #000000 !important;
-  opacity: 0.8;
+  color: white !important;
+  opacity: 0.9;
 }
