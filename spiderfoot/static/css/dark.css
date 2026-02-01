@@ -896,12 +896,28 @@ div[class*="pull-right"]:has(.glyphicon-repeat) {
   white-space: nowrap !important;
 }
 
-/* FP controls icons */
+/* FP controls icons - tighter spacing */
 .breadcrumb .pull-right .glyphicon,
 .panel-heading .pull-right .glyphicon,
-.glyphicon-ban-circle,
-.glyphicon-repeat {
+.pull-right .glyphicon-ban-circle,
+.pull-right .glyphicon-repeat {
   font-size: 12px !important;
+  margin-right: -2px !important;
+}
+
+/* Stored False Positives icon - Orange with glow for dark mode */
+.pull-right .glyphicon-repeat.text-warning,
+.text-warning.glyphicon-repeat {
+  color: var(--accent-orange) !important;
+  text-shadow: 0 0 8px var(--glow-orange) !important;
+  margin-right: 2px !important;
+}
+
+/* Stored False Positives text - Orange with glow for dark mode */
+.stored-fps-text {
+  color: var(--accent-orange) !important;
+  text-shadow: 0 0 8px var(--glow-orange) !important;
+  margin-left: 2px !important;
 }
 
 /* Modern checkbox styling for FP controls */
