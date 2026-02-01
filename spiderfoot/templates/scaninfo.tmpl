@@ -75,17 +75,19 @@
 
   <!-- Floating Selection Toolbar - Modern horizontal design -->
   <div id="selection-toolbar" class="toolbar-bottom" style="display: none !important;">
-    <!-- Left snap button -->
+    <!-- Left snap button (horizontal mode only) -->
     <div class="toolbar-snap-btn toolbar-snap-left" onclick="snapToolbar('left')" title="Snap to left">
       <i class="glyphicon glyphicon-chevron-left"></i>
-      <span class="snap-label">SNAP LEFT</span>
     </div>
 
     <div class="toolbar-content">
-      <!-- Selection count -->
-      <div class="selection-count-display">
-        <span class="count-number" id="selection-count">0</span>
-        <span>selected</span>
+      <!-- Header row with count and close button -->
+      <div class="toolbar-header">
+        <div class="selection-count-display">
+          <span class="count-number" id="selection-count">0</span>
+          <span>SELECTED</span>
+        </div>
+        <button type="button" class="close-btn" onclick="clearSelection()">&times;</button>
       </div>
 
       <!-- Match buttons section -->
@@ -120,13 +122,15 @@
         </button>
       </div>
 
-      <!-- Close button -->
-      <button type="button" class="close-btn" onclick="clearSelection()">&times;</button>
+      <!-- Undo snap button (vertical mode only) -->
+      <div class="toolbar-undo-snap" onclick="snapToolbar('bottom')">
+        <i class="glyphicon glyphicon-chevron-down"></i>
+        <span>UNDO SNAP</span>
+      </div>
     </div>
 
-    <!-- Right snap button -->
+    <!-- Right snap button (horizontal mode only) -->
     <div class="toolbar-snap-btn toolbar-snap-right" onclick="snapToolbar('right')" title="Snap to right">
-      <span class="snap-label">SNAP RIGHT</span>
       <i class="glyphicon glyphicon-chevron-right"></i>
     </div>
   </div>
@@ -372,13 +376,6 @@
 
         function snapToolbar(position) {
             var toolbar = document.getElementById('selection-toolbar');
-
-            // If already on left/right and clicking the remaining snap button, go to bottom
-            if (toolbarPosition === 'left' && position === 'right') {
-                position = 'bottom';
-            } else if (toolbarPosition === 'right' && position === 'left') {
-                position = 'bottom';
-            }
 
             // Remove all position classes
             toolbar.classList.remove('toolbar-bottom', 'toolbar-left', 'toolbar-right');

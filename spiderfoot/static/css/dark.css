@@ -2650,19 +2650,32 @@ footer .footer {
   display: none;
   position: fixed !important;
   z-index: 1050 !important;
+  flex-direction: row !important;
+  align-items: stretch !important;
+}
+
+/* Toolbar header (count + close button) */
+#selection-toolbar .toolbar-header {
+  display: flex !important;
   align-items: center !important;
-  gap: 0 !important;
+  gap: 12px !important;
 }
 
 #selection-toolbar .toolbar-content {
-  flex: 0 1 auto !important;
   display: flex !important;
   align-items: center !important;
-  gap: 16px !important;
-  padding: 0 10px !important;
+  gap: 12px !important;
+  padding: 8px 12px !important;
 }
 
-/* Bottom position (default - horizontal) */
+/* Hide undo snap by default (shown in vertical modes) */
+#selection-toolbar .toolbar-undo-snap {
+  display: none !important;
+}
+
+/* ============================================
+   BOTTOM POSITION (Horizontal)
+   ============================================ */
 #selection-toolbar.toolbar-bottom {
   bottom: 20px !important;
   left: 50% !important;
@@ -2670,115 +2683,193 @@ footer .footer {
   top: auto !important;
   right: auto !important;
   flex-direction: row !important;
-  width: fit-content !important;
-  max-width: 95vw !important;
-  height: auto !important;
 }
 
 #selection-toolbar.toolbar-bottom .toolbar-content {
   flex-direction: row !important;
+  align-items: center !important;
 }
 
-/* Left position (vertical) */
-#selection-toolbar.toolbar-left {
-  left: 0 !important;
+#selection-toolbar.toolbar-bottom .toolbar-header {
+  flex-direction: row !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.15) !important;
+  padding-right: 12px !important;
+}
+
+#selection-toolbar.toolbar-bottom .match-section {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+#selection-toolbar.toolbar-bottom .match-buttons {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 8px !important;
+}
+
+#selection-toolbar.toolbar-bottom .toolbar-actions {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 8px !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.15) !important;
+  padding-left: 12px !important;
+}
+
+/* Hide close button in header for bottom mode (keep in actions) */
+#selection-toolbar.toolbar-bottom .toolbar-header .close-btn {
+  display: none !important;
+}
+
+/* ============================================
+   LEFT/RIGHT POSITION (Vertical)
+   ============================================ */
+#selection-toolbar.toolbar-left,
+#selection-toolbar.toolbar-right {
   top: 50% !important;
   transform: translateY(-50%) !important;
   bottom: auto !important;
+  flex-direction: column !important;
+  width: 220px !important;
+}
+
+#selection-toolbar.toolbar-left {
+  left: 0 !important;
   right: auto !important;
-  flex-direction: column !important;
-  width: auto !important;
-  max-width: 280px !important;
-  height: fit-content !important;
-  max-height: 90vh !important;
-  border-left: none !important;
-  border-radius: 0 !important;
 }
 
-#selection-toolbar.toolbar-left .toolbar-content {
+#selection-toolbar.toolbar-right {
+  right: 0 !important;
+  left: auto !important;
+}
+
+#selection-toolbar.toolbar-left .toolbar-content,
+#selection-toolbar.toolbar-right .toolbar-content {
   flex-direction: column !important;
   align-items: stretch !important;
-  gap: 10px !important;
-  padding: 10px !important;
-}
-
-#selection-toolbar.toolbar-left .match-section {
-  flex-direction: column !important;
-  align-items: stretch !important;
-}
-
-#selection-toolbar.toolbar-left .match-buttons {
-  flex-direction: column !important;
-}
-
-#selection-toolbar.toolbar-left .toolbar-actions {
-  flex-direction: column !important;
+  gap: 8px !important;
+  padding: 12px !important;
   width: 100% !important;
 }
 
-#selection-toolbar.toolbar-left .toolbar-actions .btn {
+/* Header in vertical mode - count left, X right */
+#selection-toolbar.toolbar-left .toolbar-header,
+#selection-toolbar.toolbar-right .toolbar-header {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  padding-bottom: 8px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
+  margin-bottom: 4px !important;
+}
+
+#selection-toolbar.toolbar-left .toolbar-header .close-btn,
+#selection-toolbar.toolbar-right .toolbar-header .close-btn {
+  display: flex !important;
+}
+
+/* Match section vertical */
+#selection-toolbar.toolbar-left .match-section,
+#selection-toolbar.toolbar-right .match-section {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 6px !important;
+  width: 100% !important;
+}
+
+#selection-toolbar.toolbar-left .match-section label,
+#selection-toolbar.toolbar-right .match-section label {
+  text-align: center !important;
+  margin-bottom: 4px !important;
+}
+
+#selection-toolbar.toolbar-left .match-buttons,
+#selection-toolbar.toolbar-right .match-buttons {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  width: 100% !important;
+}
+
+#selection-toolbar.toolbar-left .match-btn-wrapper,
+#selection-toolbar.toolbar-right .match-btn-wrapper {
+  width: 100% !important;
+}
+
+#selection-toolbar.toolbar-left .match-btn-wrapper .btn,
+#selection-toolbar.toolbar-right .match-btn-wrapper .btn {
   width: 100% !important;
   justify-content: center !important;
 }
 
-/* Right position (vertical) */
-#selection-toolbar.toolbar-right {
-  right: 0 !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  bottom: auto !important;
-  left: auto !important;
-  flex-direction: column !important;
-  width: auto !important;
-  max-width: 280px !important;
-  height: fit-content !important;
-  max-height: 90vh !important;
-  border-right: none !important;
-  border-radius: 0 !important;
-}
-
-#selection-toolbar.toolbar-right .toolbar-content {
-  flex-direction: column !important;
-  align-items: stretch !important;
-  gap: 10px !important;
-  padding: 10px !important;
-}
-
-#selection-toolbar.toolbar-right .match-section {
-  flex-direction: column !important;
-  align-items: stretch !important;
-}
-
-#selection-toolbar.toolbar-right .match-buttons {
-  flex-direction: column !important;
-}
-
+/* Actions vertical */
+#selection-toolbar.toolbar-left .toolbar-actions,
 #selection-toolbar.toolbar-right .toolbar-actions {
+  display: flex !important;
   flex-direction: column !important;
+  gap: 6px !important;
   width: 100% !important;
+  padding-top: 8px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
+  margin-top: 4px !important;
 }
 
+#selection-toolbar.toolbar-left .toolbar-actions .btn,
 #selection-toolbar.toolbar-right .toolbar-actions .btn {
   width: 100% !important;
   justify-content: center !important;
 }
 
+/* Hide side snap buttons in vertical mode */
+#selection-toolbar.toolbar-left .toolbar-snap-btn,
+#selection-toolbar.toolbar-right .toolbar-snap-btn {
+  display: none !important;
+}
+
+/* Show undo snap in vertical mode */
+#selection-toolbar.toolbar-left .toolbar-undo-snap,
+#selection-toolbar.toolbar-right .toolbar-undo-snap {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  padding: 10px !important;
+  cursor: pointer !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  transition: all 0.2s ease !important;
+  margin-top: 8px !important;
+}
+
+#selection-toolbar.toolbar-left .toolbar-undo-snap:hover,
+#selection-toolbar.toolbar-right .toolbar-undo-snap:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+}
+
 /* ============================================
-   Snap Buttons
+   Snap Buttons (horizontal mode only)
    ============================================ */
 .toolbar-snap-btn {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  padding: 8px 6px !important;
+  padding: 0 10px !important;
   cursor: pointer !important;
   background: rgba(255, 255, 255, 0.05) !important;
   border: none !important;
   transition: all 0.2s ease !important;
   color: rgba(255, 255, 255, 0.4) !important;
-  align-self: stretch !important;
-  min-height: 40px !important;
-  gap: 4px !important;
+  min-width: 32px !important;
 }
 
 .toolbar-snap-btn:hover {
@@ -2786,20 +2877,8 @@ footer .footer {
   color: rgba(255, 255, 255, 1) !important;
 }
 
-.toolbar-snap-btn .snap-label {
-  display: none !important;
-  font-size: 9px !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.5px !important;
-  white-space: nowrap !important;
-}
-
-.toolbar-snap-btn:hover .snap-label {
-  display: inline !important;
-}
-
 .toolbar-snap-btn .glyphicon {
-  font-size: 12px !important;
+  font-size: 14px !important;
 }
 
 .toolbar-snap-left {
@@ -2808,53 +2887,6 @@ footer .footer {
 
 .toolbar-snap-right {
   border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
-/* Hide snap buttons based on current position */
-#selection-toolbar.toolbar-left .toolbar-snap-left,
-#selection-toolbar.toolbar-right .toolbar-snap-right {
-  display: none !important;
-}
-
-/* Change snap button icons/labels based on position */
-#selection-toolbar.toolbar-left .toolbar-snap-right .glyphicon:before {
-  content: "\e258" !important; /* chevron-down for "snap to bottom" */
-}
-
-#selection-toolbar.toolbar-right .toolbar-snap-left .glyphicon:before {
-  content: "\e258" !important; /* chevron-down for "snap to bottom" */
-}
-
-/* Vertical layout adjustments for snap buttons */
-#selection-toolbar.toolbar-left,
-#selection-toolbar.toolbar-right {
-  flex-direction: column !important;
-}
-
-#selection-toolbar.toolbar-left .toolbar-snap-btn,
-#selection-toolbar.toolbar-right .toolbar-snap-btn {
-  width: 100% !important;
-  border-left: none !important;
-  border-right: none !important;
-  padding: 10px !important;
-  justify-content: center !important;
-}
-
-#selection-toolbar.toolbar-left .toolbar-snap-right,
-#selection-toolbar.toolbar-right .toolbar-snap-left {
-  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-  border-bottom: none !important;
-}
-
-/* Reorder for vertical layouts */
-#selection-toolbar.toolbar-left .toolbar-snap-left,
-#selection-toolbar.toolbar-right .toolbar-snap-right {
-  order: -1 !important;
-}
-
-#selection-toolbar.toolbar-left .toolbar-snap-right,
-#selection-toolbar.toolbar-right .toolbar-snap-left {
-  order: 1 !important;
 }
 
 /* ============================================
