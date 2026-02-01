@@ -259,8 +259,14 @@ a:hover {
 
 .btn-primary:hover,
 .btn-primary:focus {
-  background: linear-gradient(135deg, var(--accent-cyan-light) 0%, var(--accent-cyan) 100%) !important;
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, #0891b2 100%) !important;
   box-shadow: 0 0 25px var(--glow-cyan), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.btn-primary:hover .glyphicon,
+.btn-primary:focus .glyphicon {
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
 }
 
 /* Default button - Subtle gradient */
@@ -287,8 +293,14 @@ a:hover {
 
 .btn-success:hover,
 .btn-success:focus {
-  background: linear-gradient(135deg, var(--accent-green-light) 0%, var(--accent-green) 100%) !important;
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
   box-shadow: 0 0 25px var(--glow-green), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.btn-success:hover .glyphicon,
+.btn-success:focus .glyphicon {
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
 }
 
 /* Warning button - Orange gradient with glow */
@@ -329,8 +341,14 @@ a:hover {
 
 .btn-info:hover,
 .btn-info:focus {
-  background: linear-gradient(135deg, var(--accent-blue-light) 0%, var(--accent-blue) 100%) !important;
+  background: linear-gradient(135deg, var(--accent-blue) 0%, #2563eb 100%) !important;
   box-shadow: 0 0 25px var(--glow-blue), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.btn-info:hover .glyphicon,
+.btn-info:focus .glyphicon {
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
 }
 
 /* Button groups */
@@ -3039,8 +3057,18 @@ th.th-source-highlight {
 .scans-toolbar .btn-success:hover,
 #btn-refresh:hover,
 .btn[title*="Refresh"]:hover {
-  background: linear-gradient(135deg, var(--accent-green-light) 0%, var(--accent-green) 100%) !important;
-  box-shadow: 0 0 20px var(--glow-green) !important;
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
+  box-shadow: 0 0 25px var(--glow-green) !important;
+}
+
+/* Green button icons turn white on hover */
+#scanlist-toolbar .btn-success:hover .glyphicon,
+#scanlist .btn-toolbar .btn-success:hover .glyphicon,
+.scans-toolbar .btn-success:hover .glyphicon,
+#btn-refresh:hover .glyphicon,
+.btn[title*="Refresh"]:hover .glyphicon {
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
 }
 
 /* Download/Export button - Purple */
@@ -3063,8 +3091,19 @@ th.th-source-highlight {
 #btn-export:hover,
 .btn[title*="Export"]:hover,
 .btn[title*="Download"]:hover {
-  background: linear-gradient(135deg, var(--accent-purple-light) 0%, var(--accent-purple) 100%) !important;
-  box-shadow: 0 0 20px var(--glow-purple) !important;
+  background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%) !important;
+  box-shadow: 0 0 25px var(--glow-purple) !important;
+}
+
+/* Purple button icons turn white on hover */
+#scanlist-toolbar .btn-info:hover .glyphicon,
+#scanlist .btn-toolbar .btn-info:hover .glyphicon,
+.scans-toolbar .btn-info:hover .glyphicon,
+#btn-export:hover .glyphicon,
+.btn[title*="Export"]:hover .glyphicon,
+.btn[title*="Download"]:hover .glyphicon {
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
 }
 
 /* Filter dropdown - Dark with border */
