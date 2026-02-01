@@ -1846,24 +1846,29 @@ select:focus {
 }
 
 /* ============================================
-   Selected Row Glow
+   Selected Row Highlight - Light grey for visibility
    ============================================ */
 .table > tbody > tr.selected,
 .table > tbody > tr:has(input[type="checkbox"]:checked) {
-  background: rgba(255, 255, 255, 0.08) !important;  /* Neutral grey */
+  background: rgba(0, 0, 0, 0.06) !important;  /* Light grey on white background */
   box-shadow: none;
 }
 
-/* Info/highlight rows - neutral grey instead of blue */
+.table > tbody > tr.selected:hover,
+.table > tbody > tr:has(input[type="checkbox"]:checked):hover {
+  background: rgba(0, 0, 0, 0.1) !important;  /* Slightly darker on hover */
+}
+
+/* Info/highlight rows - neutral grey */
 tr.info,
 .table > tbody > tr.info,
 .table-striped > tbody > tr.info {
-  background: rgba(255, 255, 255, 0.08) !important;  /* Neutral grey */
+  background: rgba(0, 0, 0, 0.06) !important;  /* Light grey */
 }
 
 tr.info:hover,
 .table > tbody > tr.info:hover {
-  background: rgba(255, 255, 255, 0.12) !important;  /* Slightly brighter on hover */
+  background: rgba(0, 0, 0, 0.1) !important;  /* Slightly darker on hover */
 }
 
 /* ============================================
@@ -2863,6 +2868,7 @@ footer .footer {
 /* Data Element header - Green button style (exact match to toolbar) */
 table th.th-data-highlight,
 .table th.th-data-highlight,
+.table > thead > tr > th.th-data-highlight,
 #scansummary-content th.th-data-highlight,
 thead th.th-data-highlight,
 th.th-data-highlight {
@@ -2883,6 +2889,7 @@ th.th-data-highlight {
 /* Source Data Element header - Purple button style (exact match to toolbar) */
 table th.th-source-highlight,
 .table th.th-source-highlight,
+.table > thead > tr > th.th-source-highlight,
 #scansummary-content th.th-source-highlight,
 thead th.th-source-highlight,
 th.th-source-highlight {
