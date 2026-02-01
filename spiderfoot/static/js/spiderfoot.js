@@ -11,14 +11,11 @@
 // Toggler for theme
 document.addEventListener("DOMContentLoaded", () => {
   const themeToggler = document.getElementById("theme-toggler");
-  const togglerText = document.getElementById("toggler-text");
 
   // Set initial toggle state based on current theme
   if (localStorage.getItem("theme") === "dark-theme") {
-    togglerText.innerText = "Light Mode";
     themeToggler.checked = true;
   } else {
-    togglerText.innerText = "Dark Mode";
     themeToggler.checked = false;
   }
 
@@ -26,11 +23,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (localStorage.getItem("theme") === "dark-theme") {
       // Switch to light theme
       localStorage.removeItem("theme");
-      localStorage.setItem("mode", "Dark Mode");
     } else {
       // Switch to dark theme
       localStorage.setItem("theme", "dark-theme");
-      localStorage.setItem("mode", "Light Mode");
     }
     // Reload to apply new theme
     location.reload();
