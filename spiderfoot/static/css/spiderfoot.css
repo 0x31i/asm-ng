@@ -3356,39 +3356,51 @@ th.th-source-highlight {
 }
 
 /* Icons in scans toolbar - always white */
-#scanlist-toolbar .btn .glyphicon,
-#scanlist .btn-toolbar .btn .glyphicon,
-.scans-toolbar .btn .glyphicon {
+#btn-delete .glyphicon,
+#btn-refresh .glyphicon,
+#btn-export .glyphicon,
+#btn-rerun .glyphicon,
+#btn-stop .glyphicon,
+#scancontent .btn-toolbar .btn-danger .glyphicon,
+#scancontent .btn-toolbar .btn-success .glyphicon,
+#scancontent .btn-toolbar .btn-info .glyphicon,
+.btn-toolbar .btn-danger .glyphicon,
+.btn-toolbar .btn-success .glyphicon,
+.btn-toolbar .btn-info .glyphicon {
   color: #ffffff !important;
   transition: all 0.2s ease !important;
 }
 
 /* Hover effect for toolbar buttons - lift and glow */
-#scanlist-toolbar .btn-danger:hover,
-#scanlist .btn-toolbar .btn-danger:hover,
-.scans-toolbar .btn-danger:hover {
+#btn-delete:hover,
+#scancontent .btn-toolbar .btn-danger:hover,
+.btn-toolbar .btn-danger:hover {
   transform: translateY(-2px) !important;
   box-shadow: 0 4px 20px var(--glow-red), 0 0 30px var(--glow-red) !important;
 }
 
-#scanlist-toolbar .btn-success:hover,
-#scanlist .btn-toolbar .btn-success:hover,
-.scans-toolbar .btn-success:hover {
+#btn-refresh:hover,
+#scancontent .btn-toolbar .btn-success:hover,
+.btn-toolbar .btn-success:not(.btn-default):hover {
   transform: translateY(-2px) !important;
   box-shadow: 0 4px 20px var(--glow-green), 0 0 30px var(--glow-green) !important;
 }
 
-#scanlist-toolbar .btn-info:hover,
-#scanlist .btn-toolbar .btn-info:hover,
-.scans-toolbar .btn-info:hover {
+#btn-export:hover,
+#scancontent .btn-toolbar .btn-info:hover,
+.btn-toolbar .download-button:hover {
   transform: translateY(-2px) !important;
   box-shadow: 0 4px 20px var(--glow-purple), 0 0 30px var(--glow-purple) !important;
 }
 
 /* Icon glow on hover */
-#scanlist-toolbar .btn:hover .glyphicon,
-#scanlist .btn-toolbar .btn:hover .glyphicon,
-.scans-toolbar .btn:hover .glyphicon {
+#btn-delete:hover .glyphicon,
+#btn-refresh:hover .glyphicon,
+#btn-export:hover .glyphicon,
+#scancontent .btn-toolbar .btn:hover .glyphicon,
+.btn-toolbar .btn-danger:hover .glyphicon,
+.btn-toolbar .btn-success:hover .glyphicon,
+.btn-toolbar .btn-info:hover .glyphicon {
   color: #ffffff !important;
   text-shadow: 0 0 15px rgba(255, 255, 255, 1), 0 0 25px rgba(255, 255, 255, 0.8) !important;
 }
