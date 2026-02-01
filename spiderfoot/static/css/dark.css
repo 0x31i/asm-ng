@@ -1400,7 +1400,7 @@ pre.table-border-bg-inherit {
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }
 
-.btn-toolbar .btn-group > .btn.btn-default:hover {
+.btn-toolbar .btn-group > .btn.btn-default:not(.btn-success):not(.btn-warning):not(.btn-danger):not(.btn-primary):not(.btn-info):hover {
   background: rgba(255, 255, 255, 0.05) !important;
   color: var(--accent-green) !important;
   border-bottom-color: var(--accent-green) !important;
@@ -1408,7 +1408,7 @@ pre.table-border-bg-inherit {
   text-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green);
 }
 
-.btn-toolbar .btn-group > .btn.btn-default.active {
+.btn-toolbar .btn-group > .btn.btn-default:not(.btn-success):not(.btn-warning):not(.btn-danger):not(.btn-primary):not(.btn-info).active {
   background: rgba(34, 197, 94, 0.1) !important;
   color: var(--accent-green) !important;
   border-bottom-color: var(--accent-green) !important;
@@ -1454,7 +1454,7 @@ pre.table-border-bg-inherit {
   font-size: 18px;
 }
 
-.btn-toolbar .btn-group > .btn.btn-default:hover .glyphicon {
+.btn-toolbar .btn-group > .btn.btn-default:not(.btn-success):not(.btn-warning):not(.btn-danger):not(.btn-primary):not(.btn-info):hover .glyphicon {
   color: var(--accent-green) !important;
   text-shadow: 0 0 15px var(--glow-green);
 }
@@ -1913,13 +1913,13 @@ tr.active td {
   border-right: none !important;
 }
 
-#customtabview .btn-default:hover {
+#customtabview .btn-default:not(.btn-success):not(.btn-warning):not(.btn-danger):not(.btn-primary):not(.btn-info):hover {
   background: rgba(255, 255, 255, 0.05) !important;
   color: var(--accent-green) !important;
   text-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green);
 }
 
-#customtabview .btn-default.active {
+#customtabview .btn-default:not(.btn-success):not(.btn-warning):not(.btn-danger):not(.btn-primary):not(.btn-info).active {
   background: rgba(34, 197, 94, 0.1) !important;
   color: var(--accent-green) !important;
   border-bottom: 3px solid var(--accent-green) !important;
