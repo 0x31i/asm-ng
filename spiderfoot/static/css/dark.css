@@ -347,26 +347,40 @@ a:hover {
 
 /* ============================================
    Global: White icons/text for ALL colored buttons
+   NUCLEAR OPTION - Forces white on ALL children
    ============================================ */
-.btn-primary .glyphicon,
-.btn-success .glyphicon,
-.btn-warning .glyphicon,
-.btn-danger .glyphicon,
-.btn-info .glyphicon,
-.btn-primary:hover .glyphicon,
-.btn-success:hover .glyphicon,
-.btn-warning:hover .glyphicon,
-.btn-danger:hover .glyphicon,
-.btn-info:hover .glyphicon {
-  color: #ffffff !important;
-}
 
-/* White text for colored buttons - hover states */
+/* Force ALL content inside colored buttons to be white */
+.btn-primary,
+.btn-primary *,
 .btn-primary:hover,
+.btn-primary:hover *,
+.btn-primary:focus,
+.btn-primary:focus *,
+.btn-success,
+.btn-success *,
 .btn-success:hover,
+.btn-success:hover *,
+.btn-success:focus,
+.btn-success:focus *,
+.btn-warning,
+.btn-warning *,
 .btn-warning:hover,
+.btn-warning:hover *,
+.btn-warning:focus,
+.btn-warning:focus *,
+.btn-danger,
+.btn-danger *,
 .btn-danger:hover,
-.btn-info:hover {
+.btn-danger:hover *,
+.btn-danger:focus,
+.btn-danger:focus *,
+.btn-info,
+.btn-info *,
+.btn-info:hover,
+.btn-info:hover *,
+.btn-info:focus,
+.btn-info:focus * {
   color: #ffffff !important;
 }
 
@@ -377,12 +391,6 @@ a:hover {
 .btn-danger::after,
 .btn-info::after {
   background-color: #ffffff !important;
-}
-
-.btn-info:hover .glyphicon,
-.btn-info:focus .glyphicon {
-  color: #ffffff !important;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
 }
 
 /* Button groups */
@@ -3766,4 +3774,50 @@ button[data-target="#createWorkspaceModal"]:hover,
 .breadcrumb + .row,
 .breadcrumb ~ .row:first-of-type {
   margin-top: 15px !important;
+}
+
+/* ============================================
+   FINAL OVERRIDE: White content on colored buttons
+   This MUST be at the END of the file to win cascade
+   ============================================ */
+
+/* ANY element inside a colored button MUST be white */
+.btn-primary, .btn-primary *,
+.btn-success, .btn-success *,
+.btn-warning, .btn-warning *,
+.btn-danger, .btn-danger *,
+.btn-info, .btn-info *,
+.btn-primary:hover, .btn-primary:hover *,
+.btn-success:hover, .btn-success:hover *,
+.btn-warning:hover, .btn-warning:hover *,
+.btn-danger:hover, .btn-danger:hover *,
+.btn-info:hover, .btn-info:hover *,
+.btn-primary:focus, .btn-primary:focus *,
+.btn-success:focus, .btn-success:focus *,
+.btn-warning:focus, .btn-warning:focus *,
+.btn-danger:focus, .btn-danger:focus *,
+.btn-info:focus, .btn-info:focus *,
+.btn-primary:active, .btn-primary:active *,
+.btn-success:active, .btn-success:active *,
+.btn-warning:active, .btn-warning:active *,
+.btn-danger:active, .btn-danger:active *,
+.btn-info:active, .btn-info:active * {
+  color: #fff !important;
+}
+
+/* Target specific icon classes explicitly */
+.btn-primary .glyphicon, .btn-primary i, .btn-primary span,
+.btn-success .glyphicon, .btn-success i, .btn-success span,
+.btn-warning .glyphicon, .btn-warning i, .btn-warning span,
+.btn-danger .glyphicon, .btn-danger i, .btn-danger span,
+.btn-info .glyphicon, .btn-info i, .btn-info span {
+  color: #fff !important;
+}
+
+/* Buttons with background colors via inline styles */
+.btn[style*="background"],
+.btn[style*="background"] *,
+.btn[style*="background"]:hover,
+.btn[style*="background"]:hover * {
+  color: #fff !important;
 }
