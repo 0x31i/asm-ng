@@ -2199,11 +2199,10 @@ div[id*="Help"].alert-info {
 
 .asm-ng-logo-wrapper {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  top: 0;
+  left: 0;
   width: 100%;
-  height: auto;
+  height: 100%;
 }
 
 .asm-ng-logo {
@@ -2215,16 +2214,17 @@ div[id*="Help"].alert-info {
 /* ASM-NG Logo Video Styles */
 .asm-ng-logo-video {
   width: 100%;
-  height: auto;
+  height: 100%;
   display: block;
-  object-fit: contain;
-  max-height: 300px;
+  object-fit: cover;
+  object-position: center;
 }
 
-/* Ensure video link has no default styling */
+/* Ensure video link fills container */
 .asm-ng-logo-wrapper a {
   display: block;
-  line-height: 0;
+  width: 100%;
+  height: 100%;
 }
 
 /* ============================================
