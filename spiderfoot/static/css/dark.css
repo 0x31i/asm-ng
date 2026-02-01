@@ -890,9 +890,10 @@ div[class*="pull-right"]:has(.glyphicon-repeat) {
   text-transform: uppercase !important;
   letter-spacing: 0.5px !important;
   color: #ffffff !important;
-  display: flex !important;
+  display: inline-flex !important;
   align-items: center !important;
-  gap: 8px !important;
+  gap: 4px !important;
+  white-space: nowrap !important;
 }
 
 /* FP controls icons */
@@ -900,7 +901,7 @@ div[class*="pull-right"]:has(.glyphicon-repeat) {
 .panel-heading .pull-right .glyphicon,
 .glyphicon-ban-circle,
 .glyphicon-repeat {
-  font-size: 14px !important;
+  font-size: 12px !important;
 }
 
 /* Modern checkbox styling for FP controls */
@@ -910,15 +911,15 @@ input[type="checkbox"]#hidefps {
   -webkit-appearance: none !important;
   -moz-appearance: none !important;
   appearance: none !important;
-  width: 18px !important;
-  height: 18px !important;
+  width: 16px !important;
+  height: 16px !important;
   border: 2px solid var(--text-muted) !important;
   border-radius: 0 !important;
   background: var(--bg-tertiary) !important;
   cursor: pointer !important;
   position: relative !important;
   vertical-align: middle !important;
-  margin: 0 4px !important;
+  margin: 0 2px !important;
   transition: all 0.2s ease !important;
 }
 
@@ -938,7 +939,7 @@ input[type="checkbox"]#hidefps:checked::after {
   left: 50% !important;
   transform: translate(-50%, -50%) !important;
   color: #ffffff !important;
-  font-size: 12px !important;
+  font-size: 10px !important;
   font-weight: 700 !important;
 }
 
