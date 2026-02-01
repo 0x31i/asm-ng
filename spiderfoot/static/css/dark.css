@@ -2759,12 +2759,12 @@ th.th-data-highlight {
   background-color: #22c55e !important;
   background-image: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
   color: #ffffff !important;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace !important;
+  font-family: var(--font-mono) !important;
   font-weight: 700 !important;
-  font-size: 12px !important;
+  font-size: 14px !important;
   text-transform: uppercase !important;
   letter-spacing: 0.5px !important;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.4) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
   border: 1px solid #16a34a !important;
   transition: all 0.3s ease !important;
 }
@@ -2779,12 +2779,12 @@ th.th-source-highlight {
   background-color: #a855f7 !important;
   background-image: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%) !important;
   color: #ffffff !important;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace !important;
+  font-family: var(--font-mono) !important;
   font-weight: 700 !important;
-  font-size: 12px !important;
+  font-size: 14px !important;
   text-transform: uppercase !important;
   letter-spacing: 0.5px !important;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.4) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
   border: 1px solid #7c3aed !important;
   transition: all 0.3s ease !important;
 }
