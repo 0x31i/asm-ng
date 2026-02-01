@@ -236,10 +236,11 @@
                 // Remove the !important and show with fixed positioning
                 // Preserve custom position if user has dragged the toolbar
                 var toolbar = document.getElementById('selection-toolbar');
+                var baseStyles = 'display: flex; position: fixed; z-index: 1050; width: fit-content; max-width: 95vw; height: auto;';
                 if (toolbarDragState.customPosition && toolbar.style.left) {
-                    $("#selection-toolbar").attr('style', 'display: flex; position: fixed; z-index: 1050; left: ' + toolbar.style.left + '; top: ' + toolbar.style.top + ';');
+                    $("#selection-toolbar").attr('style', baseStyles + ' left: ' + toolbar.style.left + '; top: ' + toolbar.style.top + ';');
                 } else {
-                    $("#selection-toolbar").attr('style', 'display: flex; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1050;');
+                    $("#selection-toolbar").attr('style', baseStyles + ' bottom: 20px; left: 50%; transform: translateX(-50%);');
                 }
 
                 // Collect ALL unique Data Elements and Source Elements from ALL selected rows
