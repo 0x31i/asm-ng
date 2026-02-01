@@ -992,9 +992,40 @@ tr.danger td {
 }
 
 .tooltip-inner {
-  background: var(--bg-elevated);
+  background: #1a1a1a !important;
+  color: #ffffff !important;
   border-radius: var(--radius-sm);
   padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tooltip.top .tooltip-arrow,
+.tooltip.bottom .tooltip-arrow,
+.tooltip.left .tooltip-arrow,
+.tooltip.right .tooltip-arrow {
+  border-top-color: #1a1a1a !important;
+  border-bottom-color: #1a1a1a !important;
+  border-left-color: #1a1a1a !important;
+  border-right-color: #1a1a1a !important;
+}
+
+.tooltip.top .tooltip-arrow {
+  border-top-color: #1a1a1a !important;
+}
+
+.tooltip.bottom .tooltip-arrow {
+  border-bottom-color: #1a1a1a !important;
+}
+
+.tooltip.left .tooltip-arrow {
+  border-left-color: #1a1a1a !important;
+}
+
+.tooltip.right .tooltip-arrow {
+  border-right-color: #1a1a1a !important;
 }
 
 /* ============================================
@@ -1036,9 +1067,31 @@ svg text {
 /* ============================================
    Scan List & Specific Components
    ============================================ */
-#scanlist .alert-info {
+/* Alert boxes only (not badges) */
+#scanlist .alert.alert-info:not(.badge) {
   background: var(--bg-secondary) !important;
   border-left: 4px solid var(--accent-blue);
+}
+
+/* Correlation badges in scan list - ensure proper colors */
+#scanlist .badge.alert-info {
+  background: var(--accent-blue) !important;
+  color: #ffffff !important;
+}
+
+#scanlist .badge.alert-success {
+  background: var(--accent-green) !important;
+  color: #000000 !important;
+}
+
+#scanlist .badge.alert-warning {
+  background: var(--accent-yellow) !important;
+  color: #000000 !important;
+}
+
+#scanlist .badge.alert-danger {
+  background: var(--accent-red) !important;
+  color: #ffffff !important;
 }
 
 /* Counter badges in scan summary */
@@ -3306,7 +3359,38 @@ th.th-source-highlight {
 #scanlist-toolbar .btn .glyphicon,
 #scanlist .btn-toolbar .btn .glyphicon,
 .scans-toolbar .btn .glyphicon {
-  color: var(--text-primary) !important;
+  color: #ffffff !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Hover effect for toolbar buttons - lift and glow */
+#scanlist-toolbar .btn-danger:hover,
+#scanlist .btn-toolbar .btn-danger:hover,
+.scans-toolbar .btn-danger:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 20px var(--glow-red), 0 0 30px var(--glow-red) !important;
+}
+
+#scanlist-toolbar .btn-success:hover,
+#scanlist .btn-toolbar .btn-success:hover,
+.scans-toolbar .btn-success:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 20px var(--glow-green), 0 0 30px var(--glow-green) !important;
+}
+
+#scanlist-toolbar .btn-info:hover,
+#scanlist .btn-toolbar .btn-info:hover,
+.scans-toolbar .btn-info:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 20px var(--glow-purple), 0 0 30px var(--glow-purple) !important;
+}
+
+/* Icon glow on hover */
+#scanlist-toolbar .btn:hover .glyphicon,
+#scanlist .btn-toolbar .btn:hover .glyphicon,
+.scans-toolbar .btn:hover .glyphicon {
+  color: #ffffff !important;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 1), 0 0 25px rgba(255, 255, 255, 0.8) !important;
 }
 
 /* Filter dropdown - Light with dark text for light theme */
