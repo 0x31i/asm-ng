@@ -15,31 +15,17 @@
     <link href="${docroot}/static/node_modules/tablesorter/dist/css/jquery.tablesorter.pager.min.css" rel="stylesheet">
     <link href="${docroot}/static/node_modules/alertifyjs/build/css/alertify.min.css" rel="stylesheet">
 
-    <!-- Theme: use media attribute for reliable toggling -->
-    <link id="theme-light" href="${docroot}/static/css/spiderfoot.css" rel="stylesheet" media="all">
-    <link id="theme-dark" href="${docroot}/static/css/dark.css" rel="stylesheet" media="not all">
+    <!-- Theme CSS - only load the one we need based on localStorage -->
     <script>
-        // Toggle themes using media attribute (more reliable than disabled)
-        (function() {
-            var isDark = localStorage.getItem("theme") === "dark-theme";
-            var light = document.getElementById("theme-light");
-            var dark = document.getElementById("theme-dark");
-            if (isDark) {
-                light.media = "not all";
-                dark.media = "all";
-            }
-        })();
-        // Handle bfcache restoration
-        window.addEventListener('pageshow', function(e) {
-            if (e.persisted) {
-                var isDark = localStorage.getItem("theme") === "dark-theme";
-                var light = document.getElementById("theme-light");
-                var dark = document.getElementById("theme-dark");
-                light.media = isDark ? "not all" : "all";
-                dark.media = isDark ? "all" : "not all";
-            }
-        });
+        // Synchronously write the correct theme stylesheet
+        var isDark = localStorage.getItem("theme") === "dark-theme";
+        var cssFile = isDark ? "dark.css" : "spiderfoot.css";
+        var cacheBust = "?v=" + Date.now();
+        document.write('<link id="theme-css" href="${docroot}/static/css/' + cssFile + cacheBust + '" rel="stylesheet">');
     </script>
+    <noscript>
+        <link href="${docroot}/static/css/spiderfoot.css" rel="stylesheet">
+    </noscript>
   </head>
 
   <body>
