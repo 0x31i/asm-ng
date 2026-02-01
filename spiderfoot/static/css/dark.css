@@ -2212,6 +2212,21 @@ div[id*="Help"].alert-info {
   display: block;
 }
 
+/* ASM-NG Logo Video Styles */
+.asm-ng-logo-video {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  max-height: 300px;
+}
+
+/* Ensure video link has no default styling */
+.asm-ng-logo-wrapper a {
+  display: block;
+  line-height: 0;
+}
+
 /* ============================================
    ASM-NG Horizontal Centered Menu
    ============================================ */
