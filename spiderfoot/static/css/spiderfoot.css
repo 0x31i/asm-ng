@@ -1,510 +1,3937 @@
+/* ============================================
+   SpiderFoot Light Theme - Clean Modern Aesthetic
+   Light backgrounds with subtle shadows
+   ============================================ */
+
+/* Google Fonts Import */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* ============================================
+   CSS Variables - LIGHT THEME
+   ============================================ */
+:root {
+  /* Fonts */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
+
+  /* Base colors - Light grays and white */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #e9ecef;
+  --bg-elevated: #ffffff;
+
+  /* Glass effects - Light version */
+  --glass-bg: #f8f9fa;
+  --glass-border: rgba(0, 0, 0, 0.1);
+
+  /* Text - Dark for readability */
+  --text-primary: #e8e8e8;
+  --text-secondary: #4a4a4a;
+  --text-muted: #6b7280;
+
+  /* Accent colors - Slightly darker for light backgrounds */
+  --accent-green: #16a34a;
+  --accent-green-light: #22c55e;
+  --accent-yellow: #d97706;
+  --accent-orange: #ea580c;
+  --accent-red: #dc2626;
+  --accent-red-dark: #b91c1c;
+  --accent-blue: #2563eb;
+  --accent-blue-light: #3b82f6;
+  --accent-purple: #7c3aed;
+  --accent-purple-light: #8b5cf6;
+  --accent-cyan: #0891b2;
+  --accent-cyan-light: #06b6d4;
+
+  /* Shadow colors instead of glows for light theme */
+  --glow-green: rgba(22, 163, 74, 0.25);
+  --glow-blue: rgba(37, 99, 235, 0.25);
+  --glow-purple: rgba(124, 58, 237, 0.25);
+  --glow-yellow: rgba(217, 119, 6, 0.25);
+  --glow-red: rgba(220, 38, 38, 0.25);
+  --glow-cyan: rgba(8, 145, 178, 0.25);
+  --glow-orange: rgba(234, 88, 12, 0.25);
+
+  /* Shadows - Lighter for light theme */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
+
+  /* Smaller, cleaner radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+
+  /* Simple transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+}
+
+/* ============================================
+   Base Styles
+   ============================================ */
 body {
-  padding-top: 60px; /* 60px to make the container go all the way to the bottom of the topbar */
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  min-height: 100vh;
 }
 
-.navbar-brand {
-  image-rendering: -o-crisp-edges; /* Opera */
-  image-rendering: -webkit-optimize-contrast; /* Webkit (non-standard naming) */
-  image-rendering: crisp-edges;
-  -ms-interpolation-mode: nearest-neighbor; /* IE (non-standard property) */
-  margin-top: -10px;
+/* ============================================
+   Scan Title (h1, h2) - Uppercase, Code Font, Bold, Prominent Glow
+   ============================================ */
+h1, h2 {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-shadow:
+    0 0 10px rgba(255, 255, 255, 0.5),
+    0 0 20px rgba(255, 255, 255, 0.4),
+    0 0 40px rgba(255, 255, 255, 0.3),
+    0 0 60px rgba(255, 255, 255, 0.2);
 }
 
-.brand-logo {
-  display: block;
-  float: left;
-  padding-top: 5px;
-  padding-right: 20px;
+/* Scan target/directory text - Neon Green */
+h1 .label, h2 .label,
+h1 small, h2 small,
+h1 span.target, h2 span.target {
+  color: var(--accent-green) !important;
+  text-shadow: 0 0 10px var(--glow-green), 0 0 20px var(--glow-green);
 }
 
-.spiderfoot-header-image {
-  height: 35px;
-  padding-top: 5px;
-  image-rendering: auto;
+/* Section titles (h3, h4, h5) - Larger and consistent */
+h3 {
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 22px;
+  margin-bottom: 15px;
 }
 
-table {
-  border-collapse: collapse;
-  width: 100%;
+h4 {
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 18px;
+  margin-bottom: 12px;
 }
 
-table td {
-  word-wrap: break-word;
+h5 {
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 10px;
 }
 
-table td input {
-  display: block;
-  width: 100%;
-  padding: 10px;
-  box-sizing: border-box;
+/* Show dark logo, hide light */
+.dark { display: inline !important; }
+.light { display: none !important; }
+
+/* ============================================
+   Links - Neon Green (Hacker Style)
+   ============================================ */
+a {
+  color: var(--accent-green);
+  text-decoration: none;
+  transition: color var(--transition-fast);
 }
 
-table pre {
-  white-space: pre-wrap;
-  word-wrap: break-word;
+a:hover {
+  color: var(--accent-green-light);
+  text-decoration: none;
+  text-shadow: 0 0 8px var(--glow-green);
 }
 
-.help-block {
-  font-size: 10px;
+/* ============================================
+   Navigation Bar - Flat Dark
+   ============================================ */
+.navbar-default {
+  background: var(--bg-secondary) !important;
+  border: none !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+  box-shadow: none;
 }
 
-.graph-container {
-  height: 650px;
-  width: 100%;
+.navbar-default .navbar-brand {
+  color: var(--text-primary) !important;
+  font-family: var(--font-sans);
 }
 
+.navbar-default .navbar-nav > li > a {
+  color: var(--text-secondary) !important;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  padding: 15px 18px;
+  border-radius: var(--radius-sm);
+  margin: 5px 2px;
+  transition: all var(--transition-fast);
+}
+
+.navbar-default .navbar-nav > li > a:hover {
+  color: var(--text-primary) !important;
+  background: var(--bg-tertiary) !important;
+}
+
+.navbar-default .navbar-nav > li.active > a,
+.navbar-default .navbar-nav > li.active > a:hover,
+.navbar-default .navbar-nav > li.active > a:focus {
+  color: var(--text-primary) !important;
+  background: var(--bg-tertiary) !important;
+}
+
+.navbar-default .navbar-nav > .open > a,
+.navbar-default .navbar-nav > .open > a:hover,
+.navbar-default .navbar-nav > .open > a:focus {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Mobile navbar toggle */
+.navbar-default .navbar-toggle {
+  border-color: var(--glass-border);
+}
+
+.navbar-default .navbar-toggle .icon-bar {
+  background-color: var(--text-secondary);
+}
+
+.navbar-default .navbar-toggle:hover,
+.navbar-default .navbar-toggle:focus {
+  background-color: var(--bg-tertiary);
+}
+
+/* Theme toggler */
+#toggler-text {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* ============================================
+   Container & Main Content
+   ============================================ */
+.container {
+  max-width: 1400px;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding-left: 15px;
+  padding-right: 15px;
+}
+
+#mainbody {
+  padding-top: 20px;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* ============================================
+   Buttons - Colorful with Glow Effects
+   ============================================ */
+.btn {
+  font-weight: 600;
+  font-family: var(--font-sans);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  transition: all 0.2s ease;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+/* Primary button - Cyan gradient with glow */
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, #06b6d4 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 0 15px var(--glow-cyan);
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, #0891b2 100%) !important;
+  box-shadow: 0 0 25px var(--glow-cyan), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.btn-primary:hover .glyphicon,
+.btn-primary:focus .glyphicon {
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Default button - Subtle gradient */
+.btn-default {
+  background: linear-gradient(135deg, #d5d5d5 0%, #e5e5e5 100%) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.btn-default:hover,
+.btn-default:focus {
+  background: linear-gradient(135deg, #c5c5c5 0%, #d5d5d5 100%) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Success button - Green gradient with glow */
+.btn-success {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 0 15px var(--glow-green);
+}
+
+.btn-success:hover,
+.btn-success:focus {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
+  box-shadow: 0 0 25px var(--glow-green), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.btn-success:hover .glyphicon,
+.btn-success:focus .glyphicon {
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Warning button - Orange gradient with glow */
+.btn-warning {
+  background: linear-gradient(135deg, var(--accent-yellow) 0%, var(--accent-orange) 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 0 15px var(--glow-yellow);
+}
+
+.btn-warning:hover,
+.btn-warning:focus {
+  background: linear-gradient(135deg, #fbbf24 0%, var(--accent-yellow) 100%) !important;
+  box-shadow: 0 0 25px var(--glow-orange), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Danger button - Red gradient with glow */
+.btn-danger {
+  background: linear-gradient(135deg, var(--accent-red) 0%, var(--accent-red-dark) 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 15px var(--glow-red);
+}
+
+.btn-danger:hover,
+.btn-danger:focus {
+  background: linear-gradient(135deg, #f87171 0%, var(--accent-red) 100%) !important;
+  box-shadow: 0 0 25px var(--glow-red), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Info button - Blue gradient with glow */
+.btn-info {
+  background: linear-gradient(135deg, var(--accent-blue) 0%, #2563eb 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 15px var(--glow-blue);
+}
+
+.btn-info:hover,
+.btn-info:focus {
+  background: linear-gradient(135deg, var(--accent-blue) 0%, #2563eb 100%) !important;
+  box-shadow: 0 0 25px var(--glow-blue), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   Global: White icons/text for ALL colored buttons
+   NUCLEAR OPTION - Forces white on ALL children
+   ============================================ */
+
+/* Force ALL content inside colored buttons to be white */
+.btn-primary,
+.btn-primary *,
+.btn-primary:hover,
+.btn-primary:hover *,
+.btn-primary:focus,
+.btn-primary:focus *,
+.btn-success,
+.btn-success *,
+.btn-success:hover,
+.btn-success:hover *,
+.btn-success:focus,
+.btn-success:focus *,
+.btn-warning,
+.btn-warning *,
+.btn-warning:hover,
+.btn-warning:hover *,
+.btn-warning:focus,
+.btn-warning:focus *,
+.btn-danger,
+.btn-danger *,
+.btn-danger:hover,
+.btn-danger:hover *,
+.btn-danger:focus,
+.btn-danger:focus *,
+.btn-info,
+.btn-info *,
+.btn-info:hover,
+.btn-info:hover *,
+.btn-info:focus,
+.btn-info:focus * {
+  color: #ffffff !important;
+}
+
+/* White underline/highlight for colored buttons */
+.btn-primary::after,
+.btn-success::after,
+.btn-warning::after,
+.btn-danger::after,
+.btn-info::after {
+  background-color: #ffffff !important;
+}
+
+/* Button groups */
+.btn-group > .btn {
+  border-radius: 0;
+}
+
+.btn-group > .btn:first-child {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.btn-group > .btn:last-child,
+.btn-group > .dropdown-toggle {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.btn-group > .btn + .btn,
+.btn-group > .btn + .dropdown-toggle {
+  border-left: 1px solid var(--glass-border) !important;
+}
+
+/* ============================================
+   Forms & Inputs
+   ============================================ */
+.form-control {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-sans);
+  padding: 10px 14px;
+  transition: all var(--transition-fast);
+}
+
+.form-control:focus {
+  border-color: var(--text-muted) !important;
+  box-shadow: none !important;
+  outline: none;
+}
+
+.form-control::placeholder {
+  color: var(--text-muted);
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+input[type="search"],
+textarea,
+select {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  padding: 10px 14px;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--text-muted);
+  box-shadow: none;
+  outline: none;
+}
+
+/* Checkboxes */
+input[type="checkbox"] {
+  accent-color: var(--accent-green);
+}
+
+/* ============================================
+   Tables - Clean Minimal
+   ============================================ */
+.table {
+  background: transparent;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.table > thead > tr > th {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  font-weight: 600;
+  font-size: 14px;
+  font-family: var(--font-sans);
+  border-bottom: 1px solid var(--glass-border) !important;
+  padding: 14px 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* Widen columns that tend to wrap */
+.table th:nth-child(1),
+.table th:nth-child(2) {
+  min-width: 160px;
+}
+
+.table > tbody > tr {
+  background: transparent !important;
+  transition: background var(--transition-fast);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.table > tbody > tr:hover {
+  background: rgba(255, 255, 255, 0.05) !important;  /* Neutral brighter grey */
+}
+
+.table > tbody > tr > td {
+  border-color: var(--glass-border) !important;
+  border-top: none !important;
+  color: var(--text-primary);
+  padding: 12px;
+  vertical-align: middle;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+/* Remove striping for cleaner look */
+.table-striped > tbody > tr:nth-of-type(odd),
+.table-striped > tbody > tr:nth-of-type(even) {
+  background: transparent !important;
+}
+
+.table-striped > tbody > tr:hover {
+  background: rgba(255, 255, 255, 0.05) !important;  /* Neutral brighter grey */
+}
+
+.table-bordered {
+  border: 1px solid var(--glass-border) !important;
+}
+
+.table-bordered > thead > tr > th,
+.table-bordered > tbody > tr > td {
+  border: 1px solid var(--glass-border) !important;
+}
+
+/* Table inside code/pre */
 .table-border-bg-inherit {
-  border: 0px;
-  background-color: inherit;
+  color: var(--text-primary) !important;
+  background: transparent !important;
 }
 
-.font-size-90-percent {
-  font-size: 90%;
+/* ============================================
+   Nested/Child Tables (Expandable Rows)
+   ============================================ */
+.table .table,
+table table,
+td > table,
+tr > td > table,
+.child-table,
+.nested-table {
+  background: var(--bg-tertiary) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--radius-sm);
+  margin: 8px 0;
 }
 
-#scanlist {
-  margin-top: 1rem;
+.table .table thead th,
+table table thead th,
+td > table thead th {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 12px;
 }
 
-.vertical-align-top {
-  vertical-align: top;
+.table .table tbody tr,
+table table tbody tr,
+td > table tbody tr {
+  background: var(--bg-tertiary) !important;
 }
 
-.vertical-align-bottom {
-  vertical-align: bottom;
+.table .table tbody tr:hover,
+table table tbody tr:hover,
+td > table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.08) !important;  /* Brighter grey for nested */
 }
 
-a.link:hover {
-  cursor: pointer;
+.table .table tbody td,
+table table tbody td,
+td > table tbody td {
+  background: transparent !important;
+  color: var(--text-primary) !important;
+  border-color: var(--glass-border) !important;
 }
 
-.dend-node circle {
-  fill: #fff;
-  stroke: steelblue;
-  stroke-width: 1.5px;
+/* Danger rows (errors) */
+tr.danger {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: var(--text-primary) !important;
 }
 
-.dend-node {
-  font: 10px sans-serif;
+tr.danger td {
+  color: var(--text-primary) !important;
 }
 
-.dend-link {
-  fill: none;
-  stroke: #ccc;
-  stroke-width: 1.5px;
+/* ============================================
+   Panels & Cards - Clean Flat
+   ============================================ */
+.panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: none;
+}
+
+.panel-default {
+  background: var(--bg-secondary) !important;
+  border-color: var(--glass-border) !important;
+}
+
+.panel-default > .panel-heading {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--glass-border) !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+  border-radius: var(--radius-md) var(--radius-md) 0 0 !important;
+  color: #ffffff !important;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 14px 18px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5), 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+.panel-default > .panel-heading .glyphicon {
+  color: #ffffff !important;
+  margin-right: 8px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.panel-body {
+  padding: 18px;
+}
+
+/* ============================================
+   Alerts
+   ============================================ */
+.alert {
+  border-radius: var(--radius-md);
+  border: none;
+  padding: 16px 20px;
+  font-family: var(--font-sans);
+}
+
+.alert-info {
+  background: rgba(59, 130, 246, 0.15) !important;
+  border-left: 4px solid var(--accent-blue) !important;
+  color: var(--text-primary) !important;
+}
+
+.alert-success {
+  background: rgba(34, 197, 94, 0.15) !important;
+  border-left: 4px solid var(--accent-green) !important;
+  color: var(--text-primary) !important;
+}
+
+.alert-warning {
+  background: rgba(245, 158, 11, 0.15) !important;
+  border-left: 4px solid var(--accent-yellow) !important;
+  color: var(--text-primary) !important;
+}
+
+.alert-danger {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-left: 4px solid var(--accent-red) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ============================================
+   Badges - Pill Style
+   ============================================ */
+.badge {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-weight: 500;
+  font-size: 11px;
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge.alert-success {
+  background: var(--accent-green) !important;
+  color: #000 !important;
+}
+
+.badge.alert-info {
+  background: var(--accent-blue) !important;
+  color: white !important;
+}
+
+.badge.alert-warning {
+  background: var(--accent-yellow) !important;
+  color: #000 !important;
+}
+
+.badge.alert-danger {
+  background: var(--accent-red) !important;
+  color: white !important;
+}
+
+/* Correlation count badges in scan list */
+#scanlist .badge {
+  min-width: 24px;
+  padding: 4px 8px;
+  font-size: 11px;
+  margin: 1px;
+}
+
+/* ============================================
+   Dropdowns - Sharp Modern Style
+   ============================================ */
+.dropdown-menu {
+  background: linear-gradient(180deg, #f0f0f0 0%, #ffffff 100%) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 0 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8) !important;
+  padding: 0;
+  margin-top: 0;
+}
+
+.dropdown-menu > li > a {
+  color: #ffffff !important;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 20px;
+  transition: all 0.2s ease;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  border-left: 3px solid transparent;
+}
+
+.dropdown-menu > li > a:hover,
+.dropdown-menu > li > a:focus {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--accent-green) !important;
+  border-left-color: var(--accent-green);
+  text-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green);
+}
+
+.dropdown-menu > li.active > a,
+.dropdown-menu > li.active > a:hover {
+  background: rgba(34, 197, 94, 0.1) !important;
+  color: var(--accent-green) !important;
+  border-left-color: var(--accent-green);
+  text-shadow: 0 0 10px var(--glow-green);
+}
+
+.dropdown-menu .divider {
+  background-color: var(--glass-border);
+  margin: 0;
+}
+
+.dropdown-header {
+  color: var(--text-muted) !important;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* ============================================
+   Modals
+   ============================================ */
+.modal-content {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-xl) !important;
+}
+
+.modal-header {
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--glass-border) !important;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 18px 24px;
+}
+
+.modal-header .close {
+  color: var(--text-secondary);
+  opacity: 1;
+  text-shadow: none;
+}
+
+.modal-header .close:hover {
+  color: var(--accent-red);
+}
+
+.modal-title {
+  color: var(--text-primary) !important;
+  font-weight: 600;
+  font-family: var(--font-sans);
+}
+
+.modal-body {
+  color: var(--text-secondary);
+  padding: 24px;
+}
+
+.modal-footer {
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--glass-border) !important;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  padding: 16px 24px;
+}
+
+.fade.in {
+  background: rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Alertify modals */
+.ajs-dimmer {
+  background-color: rgba(0, 0, 0, 0.8) !important;
+}
+
+.ajs-dialog {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-xl) !important;
+}
+
+.ajs-header {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
+}
+
+.ajs-body {
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+}
+
+.ajs-footer {
+  background: var(--bg-tertiary) !important;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg) !important;
+}
+
+/* ============================================
+   Breadcrumbs
+   ============================================ */
+.breadcrumb {
+  background: var(--bg-tertiary) !important;
+  border-radius: var(--radius-md);
+  padding: 12px 18px;
+  margin-bottom: 20px;
+}
+
+.breadcrumb > li + li:before {
+  color: var(--text-muted);
+}
+
+/* Breadcrumb links and text - code font with glow */
+.breadcrumb > li,
+.breadcrumb > li > a {
+  color: var(--accent-green) !important;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+.breadcrumb > li > a:hover {
+  color: var(--accent-green-light) !important;
+  text-shadow: 0 0 10px var(--glow-green), 0 0 20px var(--glow-green);
+}
+
+.breadcrumb > .active {
+  color: var(--accent-green) !important;
+  text-shadow: 0 0 8px var(--glow-green);
+}
+
+/* ============================================
+   Tabs
+   ============================================ */
+.nav-tabs {
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.nav-tabs > li > a {
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  padding: 12px 20px;
+  transition: all var(--transition-fast);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+.nav-tabs > li > a:hover {
+  background: var(--bg-tertiary);
+  border-color: transparent;
+  color: #ffffff;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.4);
+}
+
+.nav-tabs > li.active > a,
+.nav-tabs > li.active > a:hover,
+.nav-tabs > li.active > a:focus {
+  background: var(--bg-tertiary);
+  border: none;
+  border-bottom: 2px solid var(--accent-green);
+  color: var(--accent-green);
+  text-shadow: 0 0 10px var(--glow-green);
+}
+
+/* ============================================
+   Popovers & Tooltips
+   ============================================ */
+.popover {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.popover-title {
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.popover-content {
+  color: var(--text-secondary);
+}
+
+.popover.bottom > .arrow:after {
+  border-bottom-color: var(--bg-secondary);
+}
+
+.tooltip-inner {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+
+/* ============================================
+   Progress Bars
+   ============================================ */
+.progress {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-xl);
+  height: 10px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  background: var(--accent-blue);
+  border-radius: var(--radius-xl);
+}
+
+/* ============================================
+   Charts & Visualizations
+   ============================================ */
+svg text {
+  fill: var(--text-primary) !important;
 }
 
 .axis path,
 .axis line {
-  fill: none;
-  stroke: #000;
-  shape-rendering: crispEdges;
+  fill: var(--text-secondary);
+  stroke: var(--text-secondary);
 }
 
 .bar {
-  fill: #79a8d0;
+  fill: var(--accent-blue);
 }
 
 .bar:hover {
-  fill: #07aef1;
+  fill: var(--accent-blue-light);
 }
 
-.x.axis path {
-  display: none;
+/* ============================================
+   Scan List & Specific Components
+   ============================================ */
+#scanlist .alert-info {
+  background: var(--bg-secondary) !important;
+  border-left: 4px solid var(--accent-blue);
 }
 
-.fade.in {
-  background: #fff;
+/* Counter badges in scan summary */
+#errors, #status, #ucounter, #tcounter,
+#corr-high, #corr-medium, #corr-low, #corr-info {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  border-radius: var(--radius-sm);
 }
 
+/* ============================================
+   Well components
+   ============================================ */
+.well {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+
+/* ============================================
+   Labels
+   ============================================ */
+.label {
+  border-radius: 9999px;
+  font-weight: 500;
+  padding: 4px 10px;
+  font-family: var(--font-sans);
+}
+
+.label-default {
+  background: var(--bg-elevated);
+}
+
+.label-primary {
+  background: var(--accent-blue);
+}
+
+.label-success {
+  background: var(--accent-green);
+  color: #000;
+}
+
+.label-warning {
+  background: var(--accent-yellow);
+  color: #000;
+}
+
+.label-danger {
+  background: var(--accent-red);
+}
+
+.label-info {
+  background: var(--accent-purple);
+}
+
+/* ============================================
+   Code & Pre - Monospace
+   ============================================ */
+code {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+pre {
+  background: var(--bg-tertiary) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary) !important;
+  font-family: var(--font-mono);
+  padding: 12px 16px;
+}
+
+/* ============================================
+   Scrollbars (Webkit)
+   ============================================ */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-elevated);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ============================================
+   Footer
+   ============================================ */
+.footer {
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  padding: 20px;
+  text-align: center;
+}
+
+.footer a {
+  color: var(--accent-blue);
+}
+
+/* ============================================
+   Graph container
+   ============================================ */
+.graph-container {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+}
+
+/* ============================================
+   Tablesorter theme override
+   ============================================ */
+.tablesorter-default {
+  background: transparent;
+}
+
+.tablesorter-default th,
+.tablesorter-default thead td {
+  background: var(--bg-secondary) !important;
+  color: var(--text-secondary) !important;
+  font-weight: 500;
+}
+
+.tablesorter-default .header,
+.tablesorter-default .tablesorter-header {
+  background-color: var(--bg-secondary);
+  background-image: url(data:image/gif;base64,R0lGODlhFQAJAIAAACMtMP///yH5BAEAAAEALAAAAAAVAAkAAAIXjI+AywnaYnhUMoqt3gZXPmVg94yJVQAAOw==);
+  color: var(--text-secondary);
+}
+
+.tablesorter-default td {
+  border-color: var(--glass-border) !important;
+}
+
+.tablesorter-default input.tablesorter-filter,
+.tablesorter-default select.tablesorter-filter {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+}
+
+/* ============================================
+   Responsive adjustments
+   ============================================ */
+@media (max-width: 768px) {
+  .navbar-collapse {
+    background: var(--bg-secondary);
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    margin-top: 10px;
+    padding: 10px;
+  }
+
+  .navbar-nav > li > a {
+    padding: 12px 15px !important;
+  }
+}
+
+/* ============================================
+   Scan ID Badges - Technical data styling
+   ============================================ */
+#scanlist code {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-secondary) !important;
+  border: 1px solid var(--glass-border) !important;
+  padding: 4px 8px !important;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  border-radius: var(--radius-sm);
+}
+
+#scanlist code:hover {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ============================================
+   TableSorter Pager
+   ============================================ */
+.ts-pager {
+  background: var(--bg-tertiary) !important;
+  padding: 10px 15px !important;
+}
+
+.ts-pager .btn-group .btn,
+.ts-pager .btn-default,
+.ts-pager .btn {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--glass-border) !important;
+  padding: 6px 10px;
+}
+
+.ts-pager .btn-group .btn:hover,
+.ts-pager .btn-default:hover,
+.ts-pager .btn:hover {
+  background: var(--accent-blue) !important;
+  color: white !important;
+  border-color: var(--accent-blue) !important;
+}
+
+.ts-pager select.pagesize,
+.ts-pager select.pagenum,
+.ts-pager .form-control {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--glass-border) !important;
+  padding: 6px 10px;
+  height: auto;
+}
+
+.ts-pager .pagedisplay {
+  color: var(--text-secondary) !important;
+  font-size: 13px;
+}
+
+/* ============================================
+   Workspace Action Buttons
+   ============================================ */
+.table td .btn-group {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+}
+
+.table td .btn-group .btn-sm,
+.table td .btn-sm {
+  padding: 5px 8px !important;
+  font-size: 12px;
+}
+
+/* ============================================
+   View Toggle Buttons (Browse page)
+   ============================================ */
+#customtabview .btn-default {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-secondary) !important;
+  border: 1px solid var(--glass-border) !important;
+}
+
+#customtabview .btn-default:hover {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+}
+
+#customtabview .btn-default.active {
+  background: var(--accent-blue) !important;
+  color: white !important;
+  border-color: var(--accent-blue) !important;
+}
+
+/* ============================================
+   Additional Table Improvements
+   ============================================ */
+.table > tbody > tr > td {
+  color: var(--text-primary) !important;
+}
+
+/* Pre elements in tables */
+.table pre,
+pre.table-border-bg-inherit {
+  margin: 0;
+  padding: 4px 8px;
+  background: transparent !important;
+  border: none !important;
+  color: var(--text-primary) !important;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Source data element cells */
+.table td pre {
+  color: var(--text-primary) !important;
+}
+
+/* ============================================
+   Glyphicon improvements
+   ============================================ */
+.glyphicon {
+  color: inherit;
+}
+
+.text-muted .glyphicon,
+.glyphicon.text-muted {
+  color: var(--text-muted);
+}
+
+.text-warning .glyphicon,
+.glyphicon.text-warning {
+  color: var(--accent-yellow);
+}
+
+/* ============================================
+   Action icons in tables
+   ============================================ */
+.table .btn-link {
+  color: var(--text-secondary);
+}
+
+.table .btn-link:hover {
+  color: var(--accent-blue-light);
+}
+
+/* Delete/trash icons */
+.table .glyphicon-trash {
+  color: var(--text-muted);
+}
+
+.table .glyphicon-trash:hover {
+  color: var(--accent-red);
+}
+
+/* Refresh icons */
+.table .glyphicon-refresh {
+  color: var(--text-muted);
+}
+
+.table .glyphicon-refresh:hover {
+  color: var(--accent-blue);
+}
+
+/* ============================================
+   Technical Data - Monospace styling
+   ============================================ */
+.technical-data {
+  font-family: var(--font-mono);
+  background: var(--bg-tertiary) !important;
+  color: var(--text-secondary) !important;
+}
+
+/* ============================================
+   Scan Detail Navigation Tabs - Modern Toolbar Style
+   ============================================ */
+/* Toolbar flex layout for proper alignment */
+.btn-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Prevent all button groups from wrapping internally */
+.btn-toolbar .btn-group {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+/* Secondary toolbar row - FP and view toggle on right */
+.btn-toolbar:not(:first-child),
+.btn-toolbar + .btn-toolbar {
+  justify-content: flex-start;
+}
+
+/* FP button styling */
+#btn-setfp {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+/* View toggle toolbar */
+#customtabview {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Push search bar to right side and constrain width */
+.search-group {
+  margin-left: auto;
+  flex-shrink: 1;
+  min-width: 150px;
+  max-width: 200px;
+}
+
+/* Container for the nav tabs - sharp modern style like main menu */
+.btn-toolbar > .btn-group:first-child {
+  background: linear-gradient(180deg, #f0f0f0 0%, #ffffff 100%);
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.btn-toolbar .btn-group > .btn.btn-default {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 3px solid transparent !important;
+  border-radius: 0 !important;
+  color: #ffffff !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 20px;
+  transition: all 0.2s ease;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+.btn-toolbar .btn-group > .btn.btn-default:not(.btn-success):not(.btn-warning):not(.btn-danger):not(.btn-primary):not(.btn-info):hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--accent-green) !important;
+  border-bottom-color: var(--accent-green) !important;
+  box-shadow: none;
+  text-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green);
+}
+
+.btn-toolbar .btn-group > .btn.btn-default:not(.btn-success):not(.btn-warning):not(.btn-danger):not(.btn-primary):not(.btn-info).active {
+  background: rgba(34, 197, 94, 0.1) !important;
+  color: var(--accent-green) !important;
+  border-bottom-color: var(--accent-green) !important;
+  box-shadow: none;
+  text-shadow: 0 0 10px var(--glow-green);
+}
+
+/* Glyphicon colors - White, larger, closer to text */
+.btn-toolbar .btn-group > .btn.btn-default .glyphicon {
+  color: white;
+  font-size: 16px;
+  margin-right: 8px;
+  vertical-align: middle;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  transition: all 0.2s ease;
+}
+
+/* All glyphicons default to dark for light theme */
+.glyphicon {
+  color: var(--text-primary) !important;
+  font-size: 16px;
+}
+
+/* Glyphicons in default buttons - dark text */
+.btn-default .glyphicon,
+.btn-group .btn-default .glyphicon {
+  color: var(--text-primary) !important;
+  font-size: 16px;
+  vertical-align: middle;
+}
+
+/* Glyphicons in colored buttons - keep white */
+.btn-primary .glyphicon,
+.btn-success .glyphicon,
+.btn-warning .glyphicon,
+.btn-danger .glyphicon,
+.btn-info .glyphicon {
+  color: #fff !important;
+  font-size: 16px;
+  vertical-align: middle;
+}
+
+/* Icon-only buttons - perfect centering */
+.btn-toolbar .btn-group > .btn.btn-default:only-of-type,
+.btn-toolbar .btn-group:not(:first-child) > .btn.btn-default {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 10px 16px !important;
+}
+
+.btn-toolbar .btn-group:not(:first-child) > .btn.btn-default .glyphicon {
+  margin-right: 0 !important;
+  font-size: 18px;
+}
+
+.btn-toolbar .btn-group > .btn.btn-default:not(.btn-success):not(.btn-warning):not(.btn-danger):not(.btn-primary):not(.btn-info):hover .glyphicon {
+  color: var(--accent-green) !important;
+  text-shadow: 0 0 15px var(--glow-green);
+}
+
+/* Colored buttons (success, primary) - icon turns white on hover, not green */
+.btn-toolbar .btn-group > .btn.btn-success:hover .glyphicon,
+.btn-toolbar .btn-group > .btn.btn-primary:hover .glyphicon,
+.btn-toolbar .btn-success:hover .glyphicon,
+.btn-toolbar .btn-primary:hover .glyphicon,
+.btn-group .btn-success:hover .glyphicon,
+.btn-group .btn-primary:hover .glyphicon {
+  color: #ffffff !important;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.8) !important;
+}
+
+.btn-toolbar .btn-group > .btn.btn-default.active .glyphicon {
+  color: var(--accent-green) !important;
+  text-shadow: 0 0 10px var(--glow-green);
+}
+
+/* ============================================
+   Secondary Button - For labels/badges
+   ============================================ */
+.btn-secondary {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--glass-border) !important;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-tertiary) !important;
+}
+
+.btn-secondary.disabled,
+.btn-secondary:disabled {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+  opacity: 1;
+}
+
+/* ============================================
+   Workspace/Table Action Buttons - With Glow
+   ============================================ */
+.btn-group .btn-info,
+.table .btn-info {
+  background: linear-gradient(135deg, var(--accent-blue) 0%, #2563eb 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 12px var(--glow-blue);
+}
+
+.btn-group .btn-info:hover,
+.table .btn-info:hover {
+  background: linear-gradient(135deg, var(--accent-blue-light) 0%, var(--accent-blue) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-blue);
+}
+
+.btn-group .btn-primary,
+.table .btn-primary {
+  background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 12px var(--glow-purple);
+}
+
+.btn-group .btn-primary:hover,
+.table .btn-primary:hover {
+  background: linear-gradient(135deg, var(--accent-purple-light) 0%, var(--accent-purple) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-purple);
+}
+
+.btn-group .btn-success,
+.table .btn-success {
+  box-shadow: 0 0 12px var(--glow-green);
+}
+
+.btn-group .btn-success:hover,
+.table .btn-success:hover {
+  box-shadow: 0 0 20px var(--glow-green);
+}
+
+.btn-group .btn-warning,
+.table .btn-warning {
+  box-shadow: 0 0 12px var(--glow-yellow);
+}
+
+.btn-group .btn-warning:hover,
+.table .btn-warning:hover {
+  box-shadow: 0 0 20px var(--glow-orange);
+}
+
+.btn-group .btn-danger,
+.table .btn-danger {
+  box-shadow: 0 0 12px var(--glow-red);
+}
+
+.btn-group .btn-danger:hover,
+.table .btn-danger:hover {
+  box-shadow: 0 0 20px var(--glow-red);
+}
+
+/* Icons in btn-group and table buttons - always white */
+.btn-group .btn .glyphicon,
+.table .btn .glyphicon {
+  color: #ffffff !important;
+}
+
+/* ============================================
+   Checkbox Glow Effects
+   ============================================ */
 input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  margin: 0px;
-  display: inline;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent-green);
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.dark {
-  display: none;
+input[type="checkbox"]:checked {
+  box-shadow: 0 0 12px var(--glow-green), 0 0 4px var(--glow-green);
 }
 
-/* THEME TOGGLER PROPERTIES */
-
-#toggler-text{
-  padding-left: 15px;
+.table input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
 }
+
+.table input[type="checkbox"]:checked {
+  box-shadow: 0 0 15px var(--glow-green), 0 0 6px var(--glow-green);
+}
+
+/* ============================================
+   Radio Buttons - Modern Square Style (like checkboxes)
+   ============================================ */
+input[type="radio"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--glass-border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  vertical-align: middle;
+}
+
+input[type="radio"]:hover {
+  border-color: var(--accent-green);
+  box-shadow: 0 0 8px var(--glow-green);
+}
+
+input[type="radio"]:checked {
+  background: var(--accent-green);
+  border-color: var(--accent-green);
+  box-shadow: 0 0 15px var(--glow-green), 0 0 6px var(--glow-green);
+}
+
+/* Checkmark for checked radio */
+input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 1px;
+  width: 6px;
+  height: 11px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* Table-specific radio styling */
+.table input[type="radio"],
+#usetable input[type="radio"] {
+  width: 22px;
+  height: 22px;
+}
+
+#usetable input[type="radio"]:checked::after {
+  left: 6px;
+  top: 2px;
+  width: 6px;
+  height: 12px;
+}
+
+/* ============================================
+   Badge Glow Effects
+   ============================================ */
+.badge.alert-success {
+  background: var(--accent-green) !important;
+  color: #000 !important;
+  box-shadow: 0 0 12px var(--glow-green);
+}
+
+.badge.alert-info {
+  background: var(--accent-blue) !important;
+  color: white !important;
+  box-shadow: 0 0 12px var(--glow-blue);
+}
+
+.badge.alert-warning {
+  background: var(--accent-yellow) !important;
+  color: #000 !important;
+  box-shadow: 0 0 12px var(--glow-yellow);
+}
+
+.badge.alert-danger {
+  background: var(--accent-red) !important;
+  color: white !important;
+  box-shadow: 0 0 12px var(--glow-red);
+}
+
+/* ============================================
+   Label Glow Effects
+   ============================================ */
+.label-success {
+  background: var(--accent-green) !important;
+  box-shadow: 0 0 10px var(--glow-green);
+}
+
+.label-primary {
+  background: var(--accent-blue) !important;
+  box-shadow: 0 0 10px var(--glow-blue);
+}
+
+.label-info {
+  background: var(--accent-purple) !important;
+  box-shadow: 0 0 10px var(--glow-purple);
+}
+
+.label-warning {
+  background: var(--accent-yellow) !important;
+  box-shadow: 0 0 10px var(--glow-yellow);
+}
+
+.label-danger {
+  background: var(--accent-red) !important;
+  box-shadow: 0 0 10px var(--glow-red);
+}
+
+/* ============================================
+   Form Input Glow on Focus
+   ============================================ */
+.form-control:focus,
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent-blue) !important;
+  box-shadow: 0 0 12px var(--glow-blue) !important;
+  outline: none;
+}
+
+/* ============================================
+   Progress Bar Glow
+   ============================================ */
+.progress-bar {
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan)) !important;
+  box-shadow: 0 0 10px var(--glow-blue);
+}
+
+/* ============================================
+   Selected Row Glow
+   ============================================ */
+.table > tbody > tr.selected,
+.table > tbody > tr:has(input[type="checkbox"]:checked) {
+  background: rgba(255, 255, 255, 0.08) !important;  /* Neutral grey */
+  box-shadow: none;
+}
+
+/* Info/highlight rows - neutral grey instead of blue */
+tr.info,
+.table > tbody > tr.info,
+.table-striped > tbody > tr.info {
+  background: rgba(255, 255, 255, 0.08) !important;  /* Neutral grey */
+}
+
+tr.info:hover,
+.table > tbody > tr.info:hover {
+  background: rgba(255, 255, 255, 0.12) !important;  /* Slightly brighter on hover */
+}
+
+/* ============================================
+   Remove All Blue Hover/Focus Effects
+   ============================================ */
+/* TableSorter row highlights - neutral grey */
+.tablesorter-default tbody tr.odd:hover,
+.tablesorter-default tbody tr.even:hover,
+.tablesorter-default tbody > tr:hover,
+.tablesorter-default tbody > tr:hover > td,
+.tablesorter .filtered,
+.tablesorter tr.filtered {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.tablesorter-default .tablesorter-filter-row td {
+  background: var(--bg-secondary) !important;
+}
+
+/* Remove focus outlines and blue states globally */
+*:focus {
+  outline: none !important;
+}
+
+a:focus,
+a:active,
+td a:focus,
+td a:active,
+.table a:focus,
+.table a:active {
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Table cells - no focus background */
+td:focus,
+td:active,
+tr:focus,
+tr:active,
+.table td:focus,
+.table tr:focus {
+  outline: none !important;
+  background: transparent !important;
+}
+
+/* Bootstrap table-hover override */
+.table-hover > tbody > tr:hover,
+.table-hover > tbody > tr:hover > td,
+.table-hover > tbody > tr:hover > th {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Text selection - neutral instead of blue */
+::selection {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--text-primary);
+}
+
+::-moz-selection {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--text-primary);
+}
+
+/* Any remaining active states */
+.table > tbody > tr.active,
+.table > tbody > tr.active > td,
+.table > tbody > tr.active > th,
+tr.active,
+tr.active td {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Force table cell backgrounds to inherit */
+.table tbody tr td {
+  background: inherit !important;
+}
+
+/* ============================================
+   Search Button Glow
+   ============================================ */
+.input-group-btn .btn {
+  box-shadow: 0 0 10px var(--glow-purple);
+}
+
+.input-group-btn .btn:hover {
+  box-shadow: 0 0 18px var(--glow-purple);
+}
+
+/* ============================================
+   False Positive Button - Orange with Glow
+   ============================================ */
+#btn-setfp,
+.btn-fp-action {
+  background: linear-gradient(135deg, var(--accent-orange) 0%, #ea580c 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 15px var(--glow-orange);
+}
+
+#btn-setfp:hover,
+.btn-fp-action:hover {
+  background: linear-gradient(135deg, #fb923c 0%, var(--accent-orange) 100%) !important;
+  box-shadow: 0 0 25px var(--glow-orange);
+}
+
+/* ============================================
+   Refresh Button - Green with Glow
+   ============================================ */
+#btn-refresh {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 15px var(--glow-green);
+}
+
+#btn-refresh:hover {
+  background: linear-gradient(135deg, var(--accent-green-light) 0%, var(--accent-green) 100%) !important;
+  box-shadow: 0 0 25px var(--glow-green);
+}
+
+/* ============================================
+   Secondary Toolbar Container - Remove background for alignment
+   ============================================ */
+.btn-toolbar > .btn-group.pull-right {
+  background: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  margin-left: 8px;
+}
+
+/* Search input container - sharp modern style */
+#btn-search {
+  background: linear-gradient(180deg, #f0f0f0 0%, #ffffff 100%);
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  border: 1px solid var(--glass-border);
+  width: 100%;
+}
+
+#btn-search .form-control {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  width: 120px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #ffffff !important;
+}
+
+#btn-search .form-control::placeholder {
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+/* Search button - purple with glow */
+.input-group-btn .btn-primary {
+  background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%) !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: 0 0 12px var(--glow-purple);
+  color: #ffffff !important;
+  transition: all 0.2s ease;
+  padding: 10px 16px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.input-group-btn .btn-primary:hover {
+  background: linear-gradient(135deg, var(--accent-purple-light) 0%, var(--accent-purple) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-purple);
+}
+
+.input-group-btn .btn-primary .glyphicon {
+  font-size: 16px;
+  margin: 0 !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+.input-group-btn .btn-primary:hover .glyphicon {
+  color: white !important;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
+}
+
+/* Download buttons styling */
+.download-button {
+  background: transparent !important;
+  border: none !important;
+  border-left: 1px solid var(--glass-border) !important;
+}
+
+/* ============================================
+   View Toggle Toolbar Container - Sharp Modern Style
+   ============================================ */
+#customtabview {
+  background: linear-gradient(180deg, #f0f0f0 0%, #ffffff 100%);
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  border: 1px solid var(--glass-border);
+}
+
+#customtabview .btn-default {
+  background: transparent !important;
+  border: none !important;
+  border-right: 1px solid var(--glass-border) !important;
+  border-radius: 0 !important;
+  color: #ffffff !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  padding: 10px 16px;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  transition: all 0.2s ease;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#customtabview .btn-default .glyphicon {
+  font-size: 16px;
+  margin: 0 !important;
+}
+
+#customtabview .btn-default:last-child {
+  border-right: none !important;
+}
+
+#customtabview .btn-default:not(.btn-success):not(.btn-warning):not(.btn-danger):not(.btn-primary):not(.btn-info):hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--accent-green) !important;
+  text-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green);
+}
+
+#customtabview .btn-default:not(.btn-success):not(.btn-warning):not(.btn-danger):not(.btn-primary):not(.btn-info).active {
+  background: rgba(34, 197, 94, 0.1) !important;
+  color: var(--accent-green) !important;
+  border-bottom: 3px solid var(--accent-green) !important;
+  box-shadow: none;
+  text-shadow: 0 0 10px var(--glow-green);
+}
+
+/* ============================================
+   Correlation Severity Buttons - Count Buttons
+   ============================================ */
+/* The count buttons next to severity (High, Medium, Low, Info) */
+.btn-group > .btn-secondary,
+.btn-group > .btn-default:not(:first-child),
+.panel-body .btn-group > .btn:last-child {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--glass-border) !important;
+}
+
+/* Correlation panel btn-groups */
+.panel-body .btn-group {
+  margin-right: 10px;
+  margin-bottom: 10px;
+}
+
+.panel-body .btn-group > .btn {
+  padding: 8px 16px;
+  font-weight: 600;
+}
+
+/* Ensure severity buttons have proper colors and glow */
+.panel-body .btn-group > .btn-danger {
+  background: linear-gradient(135deg, var(--accent-red) 0%, var(--accent-red-dark) 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 12px var(--glow-red);
+}
+
+.panel-body .btn-group > .btn-warning {
+  background: linear-gradient(135deg, var(--accent-yellow) 0%, var(--accent-orange) 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 0 12px var(--glow-yellow);
+}
+
+.panel-body .btn-group > .btn-info {
+  background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 12px var(--glow-purple);
+}
+
+.panel-body .btn-group > .btn-success {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 12px var(--glow-green);
+}
+
+/* ============================================
+   Summary Page Correlation Buttons
+   Bright glow colors and compact sizing
+   ============================================ */
+/* Container for correlation buttons - flex wrap to fit */
+.panel-body .btn-toolbar.text-center {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px;
+}
+
+/* Correlation button groups - compact sizing */
+.panel-body .btn-toolbar .btn-group {
+  float: none !important;
+  padding: 2px !important;
+  margin: 2px !important;
+  flex-shrink: 0;
+}
+
+/* Correlation severity and count buttons - smaller size */
+.panel-body .btn-toolbar .btn-group > .btn {
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+  font-weight: 600;
+}
+
+/* Correlation HIGH button - Bright red with strong glow */
+.panel-body .btn-toolbar .btn-group > .btn-danger,
+.panel-body .btn-toolbar .btn-group > .btn-danger.disabled,
+.panel-body .btn-toolbar .btn-group > .btn-danger:disabled {
+  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.7), 0 0 30px rgba(239, 68, 68, 0.4) !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Correlation MEDIUM button - Bright orange/yellow with strong glow */
+.panel-body .btn-toolbar .btn-group > .btn-warning,
+.panel-body .btn-toolbar .btn-group > .btn-warning.disabled,
+.panel-body .btn-toolbar .btn-group > .btn-warning:disabled {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.7), 0 0 30px rgba(245, 158, 11, 0.4) !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Correlation LOW button - Bright purple with strong glow */
+.panel-body .btn-toolbar .btn-group > .btn-primary,
+.panel-body .btn-toolbar .btn-group > .btn-primary.disabled,
+.panel-body .btn-toolbar .btn-group > .btn-primary:disabled {
+  background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.7), 0 0 30px rgba(139, 92, 246, 0.4) !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Correlation INFO button - Bright green with strong glow */
+.panel-body .btn-toolbar .btn-group > .btn-success,
+.panel-body .btn-toolbar .btn-group > .btn-success.disabled,
+.panel-body .btn-toolbar .btn-group > .btn-success:disabled {
+  background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 0 15px rgba(34, 197, 94, 0.7), 0 0 30px rgba(34, 197, 94, 0.4) !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Correlation count buttons - neutral dark with subtle glow */
+.panel-body .btn-toolbar .btn-group > .btn-default,
+.panel-body .btn-toolbar .btn-group > .btn-default.disabled,
+.panel-body .btn-toolbar .btn-group > .btn-default:disabled {
+  background: linear-gradient(135deg, #d5d5d5 0%, #e5e5e5 100%) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  opacity: 1 !important;
+}
+
+/* ============================================
+   Settings Page - Save Changes Button
+   Brighter blue with white text and drop shadow
+   ============================================ */
+#btn-save-changes {
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 15px var(--glow-blue);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  font-weight: 600;
+}
+
+#btn-save-changes:hover,
+#btn-save-changes:focus {
+  background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%) !important;
+  box-shadow: 0 0 25px var(--glow-blue), 0 4px 15px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+/* ============================================
+   Settings Page - Import/Export API Keys Buttons
+   Modern gradient purple style
+   ============================================ */
+#btn-import-config,
+#btn-opt-export {
+  background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 15px var(--glow-purple);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  font-weight: 600;
+}
+
+#btn-import-config:hover,
+#btn-import-config:focus,
+#btn-opt-export:hover,
+#btn-opt-export:focus {
+  background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%) !important;
+  box-shadow: 0 0 25px var(--glow-purple), 0 4px 15px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+/* ============================================
+   Settings Page Sidebar Navigation - Modern Toolbar Style
+   ============================================ */
+/* Container - large rounded dark grey background */
+.tabs-left .nav-pills.nav-stacked {
+  background: linear-gradient(180deg, #e0e0e0 0%, #f0f0f0 100%);
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Each button - dark with bold white text */
+.tabs-left .nav-pills.nav-stacked > li > a {
+  background: linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+  padding: 10px 14px;
+  margin: 8px 0;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  transition: all 0.2s ease;
+  text-shadow: none;
+}
+
+/* Hover state - bold text with glow effect */
+.tabs-left .nav-pills.nav-stacked > li > a:hover {
+  background: linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%) !important;
+  color: white !important;
+  font-weight: 700;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.5), 0 0 30px rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Active/selected state - lighter blue button (like Save Changes brighter style) */
+.tabs-left .nav-pills.nav-stacked > li.active > a,
+.tabs-left .nav-pills.nav-stacked > li.active > a:hover,
+.tabs-left .nav-pills.nav-stacked > li.active > a:focus {
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 20px var(--glow-blue), 0 0 40px rgba(59, 130, 246, 0.3);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  font-weight: 700;
+  transform: none;
+}
+
+/* Lock icon styling */
+.tabs-left .nav-pills.nav-stacked > li > a .glyphicon-lock {
+  color: inherit !important;
+  opacity: 0.7;
+}
+
+.tabs-left .nav-pills.nav-stacked > li.active > a .glyphicon-lock {
+  color: white !important;
+  opacity: 0.9;
+}
+
+/* ============================================
+   Workspace Details Page - Scan ID Fix
+   Override inline styles for dark mode
+   ============================================ */
+.table td code,
+.table-responsive code,
+#scans-tab code,
+td > code {
+  background: var(--bg-tertiary) !important;
+  color: var(--accent-cyan) !important;
+  border: 1px solid var(--glass-border) !important;
+  padding: 6px 10px !important;
+  font-size: 12px !important;
+  font-family: var(--font-mono) !important;
+  border-radius: 6px !important;
+  display: inline-block;
+  transition: all 0.2s ease;
+}
+
+.table td code:hover,
+.table-responsive code:hover,
+#scans-tab code:hover,
+td > code:hover {
+  background: var(--bg-elevated) !important;
+  color: var(--accent-cyan-light) !important;
+  box-shadow: 0 0 10px var(--glow-cyan);
+}
+
+/* Copy icon in scan ID */
+.table td code .fa-copy,
+.table td code i {
+  color: var(--text-muted) !important;
+  margin-left: 6px !important;
+}
+
+.table td code:hover .fa-copy,
+.table td code:hover i {
+  color: var(--accent-cyan) !important;
+}
+
+/* ============================================
+   Hide Footer Informational Bar
+   ============================================ */
+footer.navbar-fixed-bottom,
+.navbar-fixed-bottom,
+footer .footer {
+  display: none !important;
+}
+
+/* ============================================
+   Hide Tip Alerts
+   ============================================ */
+#scanIdHelp,
+div[id*="Help"].alert-info {
+  display: none !important;
+}
+
+/* Hide all tip-style info alerts */
+.alert.alert-info.alert-dismissible,
+.modal-body .alert.alert-info {
+  display: none !important;
+}
+
+/* ============================================
+   Table Pager Fixes
+   ============================================ */
+.ts-pager {
+  background: var(--bg-secondary) !important;
+  padding: 12px 15px !important;
+  border: 1px solid var(--glass-border) !important;
+  border-top: none !important;
+  border-radius: 0 0 var(--radius-md) var(--radius-md) !important;
+  margin-top: -1px;
+}
+
+/* Pager container inside table */
+.tablesorter-pager,
+.pager {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-top: none !important;
+  padding: 12px 15px !important;
+}
+
+/* Fix table bottom border when pager is present */
+.tablesorter {
+  border-bottom: none !important;
+}
+
+.tablesorter + .ts-pager,
+.tablesorter + .pager {
+  border-top: 1px solid var(--glass-border) !important;
+}
+
+/* ============================================
+   ASM-NG Logo Banner - 300px Centered
+   ============================================ */
+.asm-ng-logo-container {
+  background: #ffffff;
+  width: 100%;
+  height: 300px;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.asm-ng-logo-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.asm-ng-logo {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* ASM-NG Logo Video Styles */
+.asm-ng-logo-video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Ensure video link fills container */
+.asm-ng-logo-wrapper a {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ============================================
+   ASM-NG Horizontal Centered Menu
+   ============================================ */
+.asm-ng-sidebar {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  background: linear-gradient(180deg, #f0f0f0 0%, #ffffff 100%);
+  border-bottom: 1px solid var(--glass-border);
+  z-index: 1050;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+}
+
+/* Menu list - horizontal */
+.asm-ng-sidebar .sidebar-nav {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.asm-ng-sidebar .sidebar-nav > li {
+  position: relative;
+}
+
+.asm-ng-sidebar .sidebar-nav > li > a {
+  display: flex;
+  align-items: center;
+  padding: 15px 25px;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border-bottom: 3px solid transparent;
+}
+
+.asm-ng-sidebar .sidebar-nav > li > a:hover {
+  background: rgba(0, 0, 0, 0.05);
+  border-bottom-color: var(--accent-green);
+}
+
+.asm-ng-sidebar .sidebar-nav > li.active > a {
+  background: rgba(34, 197, 94, 0.1);
+  border-bottom-color: var(--accent-green);
+}
+
+/* Menu icons */
+.asm-ng-sidebar .sidebar-nav > li > a .nav-icon {
+  font-size: 18px;
+  width: 24px;
+  min-width: 24px;
+  text-align: center;
+  color: var(--text-primary);
+  text-shadow: none;
+  transition: all 0.2s ease;
+}
+
+.asm-ng-sidebar .sidebar-nav > li > a:hover .nav-icon {
+  color: var(--accent-green);
+  text-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green);
+}
+
+.asm-ng-sidebar .sidebar-nav > li.active > a .nav-icon {
+  color: var(--accent-green);
+  text-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green);
+}
+
+/* Menu text - Always visible */
+.asm-ng-sidebar .sidebar-nav > li > a .nav-text {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-left: 10px;
+  white-space: nowrap;
+  color: var(--text-primary);
+  text-shadow: none;
+  transition: all 0.2s ease;
+}
+
+.asm-ng-sidebar .sidebar-nav > li > a:hover .nav-text {
+  color: var(--accent-green);
+  text-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green);
+}
+
+.asm-ng-sidebar .sidebar-nav > li.active > a .nav-text {
+  color: var(--accent-green);
+  text-shadow: 0 0 10px var(--glow-green);
+}
+
+/* Dark Mode Toggle - Right side of menu */
+.sidebar-toggle-container {
+  position: absolute;
+  right: 20px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-toggle-container #toggler-text {
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  margin-right: 10px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* Hide old navbar */
+.asm-ng-navbar,
+.navbar-fixed-top,
+.navbar-default:not(.asm-ng-sidebar) {
+  display: none !important;
+}
+
+/* ============================================
+   Dark Mode Toggle - Sidebar Version
+   ============================================ */
+.theme-toggle-container {
+  display: flex !important;
+  align-items: center !important;
+  padding: 10px 15px !important;
+}
+
+#toggler-text {
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.5);
+  margin-right: 10px;
+  font-size: 12px;
+}
+
 .switch {
   position: relative;
   display: inline-block;
-  width: 42px;
-  height: 21px;
-  margin-top: 1.3rem;
-  
+  width: 50px;
+  height: 26px;
+  margin: 0;
+  vertical-align: middle;
+  flex-shrink: 0;
 }
 
-.switch input { 
+.switch input {
   opacity: 0;
   width: 0;
   height: 0;
 }
 
-.slider {
+.switch .slider {
   position: absolute;
   cursor: pointer;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #ccc;
-  -webkit-transition: .4s;
-  transition: .4s;
+  background-color: var(--bg-tertiary);
+  transition: 0.3s;
+  border: 1px solid var(--glass-border);
 }
 
-.slider:before {
+.switch .slider:before {
   position: absolute;
   content: "";
-  height: 14px;
-  width: 14px;
-  left: 4px;
-  bottom: 4px;
+  height: 20px;
+  width: 20px;
+  left: 2px;
+  bottom: 2px;
   background-color: white;
-  -webkit-transition: .4s;
-  transition: .4s;
+  transition: 0.3s;
 }
 
-input:checked + .slider {
-  background-color: #059CD7;
+.switch input:checked + .slider {
+  background-color: var(--accent-green);
+  box-shadow: 0 0 15px var(--glow-green);
 }
 
-input:focus + .slider {
-  box-shadow: 0 0 1px #059CD7;
+.switch input:checked + .slider:before {
+  transform: translateX(24px);
 }
 
-input:checked + .slider:before {
-  -webkit-transform: translateX(20px);
-  -ms-transform: translateX(20px);
-  transform: translateX(20px);
+.switch .slider.round {
+  border-radius: 26px;
 }
 
-.slider.round {
-  border-radius: 31px;
-}
-
-.slider.round:before {
+.switch .slider.round:before {
   border-radius: 50%;
 }
 
-.footer {
-  padding: 10px;
-}
-
-.download-button {
-  padding: 6px 12px !important;
-}
-
-/* Media Queries for Responsiveness */
-@media (max-width: 1200px) {
-  body {
-    font-size: 0.9rem;
-  }
-}
-
-@media (max-width: 992px) {
-  body {
-    font-size: 0.8rem;
-  }
-}
-
-@media (max-width: 768px) {
-  body {
-    font-size: 0.7rem;
-  }
-}
-
-@media (max-width: 576px) {
-  body {
-    font-size: 0.6rem;
-  }
-}
-
 /* ============================================
-   Improved Checkbox Styling for Bulk Selection
+   NGS Footer
    ============================================ */
-
-/* Make checkbox cells easier to click */
-#scansummary-content td:first-child {
-  cursor: pointer;
-  min-width: 40px;
-  padding: 8px !important;
-}
-
-/* Larger checkboxes */
-#scansummary-content input[type="checkbox"],
-#checkall {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  margin: 0 auto;
-}
-
-/* Make entire first cell clickable for checkbox toggle */
-#scansummary-content td:first-child:hover {
-  background-color: rgba(255, 255, 255, 0.08);
-}
-
-/* Highlight rows with matching saved FPs */
-#scansummary-content tr:has(.glyphicon-repeat.text-warning) {
-  background-color: rgba(255, 193, 7, 0.08);
-}
-
-/* Selected row highlighting */
-#scansummary-content tr:has(input[type="checkbox"]:checked) {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-}
-
-/* Header checkbox styling */
-#scansummary-content thead th:first-child {
-  min-width: 40px;
-  text-align: center;
-}
-
-/* ============================================
-   Selection Toolbar - Modern Floating Design
-   ============================================ */
-
-#selection-toolbar {
-  display: none;
+.ngs-footer {
   position: fixed;
-  bottom: 30px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1050;
-
-  /* Dark semi-transparent background with blur */
-  background: rgba(33, 37, 41, 0.95);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-
-  /* Soft rounded corners */
-  border-radius: 16px;
-
-  /* Large soft shadow */
-  box-shadow:
-    0 10px 40px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.1);
-
-  /* Horizontal layout padding */
-  padding: 16px 24px;
-
-  /* Ensure it doesn't get too wide */
-  max-width: 95%;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  padding: 15px 0;
+  z-index: 1000;
+  border-top: 1px solid var(--glass-border);
 }
 
-/* Main horizontal container */
-#selection-toolbar .toolbar-content {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: nowrap;
+.ngs-footer-text {
+  font-family: var(--font-mono) !important;
+  font-weight: 700;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.5), 0 0 30px rgba(255, 255, 255, 0.3);
+}
+
+/* ============================================
+   Main Content Area - Adjust for Horizontal Layout
+   ============================================ */
+#mainbody {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  margin-top: 20px !important;
+  padding-bottom: 80px !important;
+}
+
+body {
+  padding-top: 0 !important;
+  padding-bottom: 60px;
+  overflow-x: hidden;
+}
+
+/* Logo container - full width */
+.asm-ng-logo-container {
+  margin-left: 0;
+  width: 100%;
+}
+
+/* Hide old footer styles */
+footer.navbar-fixed-bottom:not(.ngs-footer),
+.navbar-fixed-bottom:not(.ngs-footer),
+footer .footer {
+  display: none !important;
+}
+
+/* ============================================
+   Hide SpiderFoot Branding Elements
+   ============================================ */
+.brand-logo,
+.navbar-brand,
+.spiderfoot-header-image {
+  display: none !important;
+}
+
+/* ============================================
+   Floating Selection Toolbar (FP Actions)
+   Sharp Modern Style
+   ============================================ */
+#selection-toolbar {
+  background: rgba(0, 0, 0, 0.65) !important;
+  backdrop-filter: blur(16px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(150%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 0 !important;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.6), 0 8px 60px rgba(0, 0, 0, 0.4) !important;
+  padding: 12px 20px !important;
+  /* Prevent toolbar from expanding */
+  width: fit-content !important;
+  width: -moz-fit-content !important;
+  max-width: 95vw !important;
+  height: auto !important;
+  min-height: unset !important;
+  max-height: fit-content !important;
 }
 
 /* Selection count badge */
-#selection-toolbar .selection-count-display {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  font-size: 15px;
-  color: #ffffff;
-  white-space: nowrap;
-  padding-right: 16px;
-  border-right: 1px solid rgba(255, 255, 255, 0.2);
+#selection-toolbar .badge {
+  background: var(--accent-purple) !important;
+  color: white !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  border-radius: 0 !important;
+  padding: 6px 12px !important;
+  box-shadow: 0 0 10px var(--glow-purple) !important;
 }
 
-#selection-toolbar .selection-count-display .count-number {
-  background: linear-gradient(135deg, #17a2b8, #138496);
-  color: white;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 14px;
-  min-width: 30px;
-  text-align: center;
+/* Selection text labels */
+#selection-toolbar span {
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.4) !important;
 }
 
-/* Match section - horizontal */
-#selection-toolbar .match-section {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-#selection-toolbar .match-section label {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 13px;
-  font-weight: 500;
-  margin: 0;
-  white-space: nowrap;
-}
-
-/* Match buttons container */
-#selection-toolbar .match-buttons {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-#selection-toolbar .match-btn-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Base button styles - larger and more prominent */
+/* All buttons in floating toolbar - sharp style */
 #selection-toolbar .btn {
-  font-size: 14px;
-  font-weight: 600;
-  padding: 10px 18px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  padding: 10px 16px !important;
+  border: none !important;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
 }
 
-#selection-toolbar .btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-#selection-toolbar .btn:active {
-  transform: translateY(0);
-}
-
-/* Data Element button - Cyan/Teal */
+/* Green buttons (Data Element) */
+#selection-toolbar .btn-success,
 #selection-toolbar .btn-data-match {
-  background: linear-gradient(135deg, #17a2b8, #0dcaf0);
-  color: white;
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 12px var(--glow-green) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
+#selection-toolbar .btn-success:hover,
 #selection-toolbar .btn-data-match:hover {
-  background: linear-gradient(135deg, #138496, #17a2b8);
+  background: linear-gradient(135deg, var(--accent-green-light) 0%, var(--accent-green) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-green) !important;
 }
 
-/* Source Element button - Purple */
+/* Blue/Purple buttons (Source Element) */
+#selection-toolbar .btn-info,
 #selection-toolbar .btn-source-match {
-  background: linear-gradient(135deg, #6f42c1, #9461fb);
-  color: white;
+  background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 12px var(--glow-purple) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
+#selection-toolbar .btn-info:hover,
 #selection-toolbar .btn-source-match:hover {
-  background: linear-gradient(135deg, #5a32a3, #6f42c1);
+  background: linear-gradient(135deg, var(--accent-purple-light) 0%, var(--accent-purple) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-purple) !important;
 }
 
-/* Match count badge */
-#selection-toolbar .match-count-badge {
-  background: rgba(255, 255, 255, 0.25);
-  color: white;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 700;
+/* ============================================
+   Table Header Highlights (when toolbar active)
+   ============================================ */
+/* Data Element header - Green button style (exact match to toolbar) */
+table th.th-data-highlight,
+.table th.th-data-highlight,
+#scansummary-content th.th-data-highlight,
+thead th.th-data-highlight,
+th.th-data-highlight {
+  background: #22c55e !important;
+  background-color: #22c55e !important;
+  background-image: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
+  color: #ffffff !important;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.4) !important;
+  border: 1px solid #16a34a !important;
+  transition: all 0.3s ease !important;
 }
 
-/* Preview text */
-#selection-toolbar .match-preview {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* Source Data Element header - Purple button style (exact match to toolbar) */
+table th.th-source-highlight,
+.table th.th-source-highlight,
+#scansummary-content th.th-source-highlight,
+thead th.th-source-highlight,
+th.th-source-highlight {
+  background: #a855f7 !important;
+  background-color: #a855f7 !important;
+  background-image: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%) !important;
+  color: #ffffff !important;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', 'Courier New', monospace !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.4) !important;
+  border: 1px solid #7c3aed !important;
+  transition: all 0.3s ease !important;
 }
 
-/* Divider before actions */
-#selection-toolbar .toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-left: 16px;
-  border-left: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-/* Mark as FP button - Orange/Warning */
+/* Orange/Warning buttons (Mark as FP) */
+#selection-toolbar .btn-warning,
 #selection-toolbar .btn-fp-action {
-  background: linear-gradient(135deg, #fd7e14, #ffc107);
-  color: #212529;
-  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent-orange) 0%, #ea580c 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 12px var(--glow-orange) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
+#selection-toolbar .btn-warning:hover,
 #selection-toolbar .btn-fp-action:hover {
-  background: linear-gradient(135deg, #e96b02, #fd7e14);
+  background: linear-gradient(135deg, #fb923c 0%, var(--accent-orange) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-orange) !important;
 }
 
-/* Clear button - subtle */
+/* Default/Grey buttons (Clear) */
+#selection-toolbar .btn-default,
 #selection-toolbar .btn-clear {
-  background: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.9);
+  background: linear-gradient(135deg, #d5d5d5 0%, #e8e8e8 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--glass-border) !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5) !important;
 }
 
+#selection-toolbar .btn-default:hover,
 #selection-toolbar .btn-clear:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: linear-gradient(135deg, #c5c5c5 0%, #d5d5d5 100%) !important;
+  color: var(--accent-green) !important;
+  text-shadow: 0 0 15px var(--glow-green) !important;
 }
 
-/* Close button */
+/* Close button (X) */
+#selection-toolbar .close,
 #selection-toolbar .close-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 18px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  margin-left: 8px;
+  background: linear-gradient(135deg, #d5d5d5 0%, #e8e8e8 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 0 !important;
+  width: 36px !important;
+  height: 36px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 1 !important;
+  font-size: 18px !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5) !important;
+  transition: all 0.2s ease !important;
 }
 
+#selection-toolbar .close:hover,
 #selection-toolbar .close-btn:hover {
-  background: rgba(220, 53, 69, 0.8);
-  color: white;
+  background: linear-gradient(135deg, var(--accent-red) 0%, var(--accent-red-dark) 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 15px var(--glow-red) !important;
 }
 
-/* Hide the old header structure - we'll use inline layout */
-#selection-toolbar .toolbar-header {
+/* Button badges/counts inside buttons */
+#selection-toolbar .btn .badge,
+#selection-toolbar .match-count-badge {
+  background: rgba(0, 0, 0, 0.3) !important;
+  color: white !important;
+  font-size: 10px !important;
+  padding: 4px 8px !important;
+  margin-left: 6px !important;
+  box-shadow: none !important;
+}
+
+/* Icons in floating toolbar - always white */
+#selection-toolbar .btn .glyphicon,
+#selection-toolbar .btn i {
+  font-size: 14px !important;
+  margin-right: 6px !important;
+  color: #ffffff !important;
+}
+
+/* ============================================
+   Toolbar Snap Positions
+   ============================================ */
+
+/* Base toolbar layout */
+#selection-toolbar {
   display: none;
+  position: fixed !important;
+  z-index: 1050 !important;
+  flex-direction: row !important;
+  align-items: center !important;
 }
 
-/* Responsive - stack on smaller screens */
-@media (max-width: 900px) {
-  #selection-toolbar {
-    padding: 14px 18px;
-    bottom: 15px;
-  }
+/* Toolbar header (count + close button) */
+#selection-toolbar .toolbar-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
 
-  #selection-toolbar .toolbar-content {
-    flex-wrap: wrap;
-    gap: 12px;
-  }
+#selection-toolbar .toolbar-content {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 8px 12px !important;
+}
 
-  #selection-toolbar .selection-count-display {
-    border-right: none;
-    padding-right: 0;
-  }
+/* Hide undo snap by default (shown in vertical modes) */
+#selection-toolbar .toolbar-undo-snap {
+  display: none !important;
+}
 
-  #selection-toolbar .toolbar-actions {
-    border-left: none;
-    padding-left: 0;
-    width: 100%;
-    justify-content: center;
-  }
+/* ============================================
+   BOTTOM POSITION (Horizontal)
+   ============================================ */
+#selection-toolbar.toolbar-bottom {
+  bottom: 20px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  top: auto !important;
+  right: auto !important;
+  flex-direction: row !important;
+}
 
-  #selection-toolbar .match-section {
-    flex-wrap: wrap;
-  }
+#selection-toolbar.toolbar-bottom .toolbar-content {
+  flex-direction: row !important;
+  align-items: center !important;
+}
+
+#selection-toolbar.toolbar-bottom .toolbar-header {
+  flex-direction: row !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.15) !important;
+  padding-right: 12px !important;
+}
+
+#selection-toolbar.toolbar-bottom .match-section {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+/* Match section label styling (all modes) */
+#selection-toolbar .match-section label {
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+}
+
+#selection-toolbar.toolbar-bottom .match-buttons {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 8px !important;
+}
+
+#selection-toolbar.toolbar-bottom .toolbar-actions {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 8px !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.15) !important;
+  padding-left: 12px !important;
+}
+
+/* Hide close button in header for bottom mode (keep in actions) */
+#selection-toolbar.toolbar-bottom .toolbar-header .close-btn {
+  display: none !important;
+}
+
+/* Snap buttons in bottom mode - explicit size constraints */
+#selection-toolbar.toolbar-bottom .toolbar-snap-btn {
+  height: 44px !important;
+  max-height: 44px !important;
+  min-height: 44px !important;
+  align-self: center !important;
+  flex: 0 0 auto !important;
+}
+
+/* ============================================
+   LEFT/RIGHT POSITION (Vertical)
+   ============================================ */
+#selection-toolbar.toolbar-left,
+#selection-toolbar.toolbar-right {
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  bottom: auto !important;
+  flex-direction: column !important;
+  width: 280px !important;
+}
+
+#selection-toolbar.toolbar-left {
+  left: 0 !important;
+  right: auto !important;
+}
+
+#selection-toolbar.toolbar-right {
+  right: 0 !important;
+  left: auto !important;
+}
+
+#selection-toolbar.toolbar-left .toolbar-content,
+#selection-toolbar.toolbar-right .toolbar-content {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 10px !important;
+  padding: 14px !important;
+  width: 100% !important;
+}
+
+/* Header in vertical mode - count left, X right */
+#selection-toolbar.toolbar-left .toolbar-header,
+#selection-toolbar.toolbar-right .toolbar-header {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  padding-bottom: 10px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
+  margin-bottom: 6px !important;
+}
+
+#selection-toolbar.toolbar-left .toolbar-header .close-btn,
+#selection-toolbar.toolbar-right .toolbar-header .close-btn {
+  display: flex !important;
+}
+
+/* Match section vertical */
+#selection-toolbar.toolbar-left .match-section,
+#selection-toolbar.toolbar-right .match-section {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+#selection-toolbar.toolbar-left .match-section label,
+#selection-toolbar.toolbar-right .match-section label {
+  text-align: center !important;
+  margin-bottom: 6px !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+#selection-toolbar.toolbar-left .match-buttons,
+#selection-toolbar.toolbar-right .match-buttons {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+#selection-toolbar.toolbar-left .match-btn-wrapper,
+#selection-toolbar.toolbar-right .match-btn-wrapper {
+  width: 100% !important;
+}
+
+/* Uniform button sizing in vertical mode - ALL buttons same size */
+#selection-toolbar.toolbar-left .match-btn-wrapper .btn,
+#selection-toolbar.toolbar-right .match-btn-wrapper .btn,
+#selection-toolbar.toolbar-left .toolbar-actions .btn,
+#selection-toolbar.toolbar-right .toolbar-actions .btn,
+#selection-toolbar.toolbar-left .btn-fp-action,
+#selection-toolbar.toolbar-right .btn-fp-action,
+#selection-toolbar.toolbar-left .btn-clear,
+#selection-toolbar.toolbar-right .btn-clear,
+#selection-toolbar.toolbar-left .btn-data-match,
+#selection-toolbar.toolbar-right .btn-data-match,
+#selection-toolbar.toolbar-left .btn-source-match,
+#selection-toolbar.toolbar-right .btn-source-match {
+  width: 100% !important;
+  justify-content: center !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  max-height: 48px !important;
+  padding: 12px 16px !important;
+  box-sizing: border-box !important;
+}
+
+/* Actions vertical - same styling as match-buttons */
+#selection-toolbar.toolbar-left .toolbar-actions,
+#selection-toolbar.toolbar-right .toolbar-actions {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+}
+
+/* Hide side snap buttons in vertical mode */
+#selection-toolbar.toolbar-left .toolbar-snap-btn,
+#selection-toolbar.toolbar-right .toolbar-snap-btn {
+  display: none !important;
+}
+
+/* Show undo snap in vertical mode - small arrow only */
+#selection-toolbar.toolbar-left .toolbar-undo-snap,
+#selection-toolbar.toolbar-right .toolbar-undo-snap {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 6px !important;
+  cursor: pointer !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: rgba(255, 255, 255, 0.4) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  transition: all 0.2s ease !important;
+  margin-top: 8px !important;
+}
+
+#selection-toolbar.toolbar-left .toolbar-undo-snap:hover,
+#selection-toolbar.toolbar-right .toolbar-undo-snap:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+}
+
+/* ============================================
+   Snap Buttons (horizontal mode only)
+   ============================================ */
+.toolbar-snap-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  align-self: center !important;
+  padding: 0 10px !important;
+  cursor: pointer !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: none !important;
+  transition: all 0.2s ease !important;
+  color: rgba(255, 255, 255, 0.4) !important;
+  min-width: 32px !important;
+  width: auto !important;
+  height: 44px !important;
+  max-height: 44px !important;
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+.toolbar-snap-btn:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: rgba(255, 255, 255, 1) !important;
+}
+
+.toolbar-snap-btn .glyphicon {
+  font-size: 14px !important;
+}
+
+.toolbar-snap-left {
+  border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.toolbar-snap-right {
+  border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ============================================
+   Scans Page Toolbar Buttons - Colored & Sharp
+   ============================================ */
+/* All toolbar buttons on scans page - sharp square style */
+#scanlist-toolbar .btn,
+#scanlist .btn-toolbar .btn,
+.scans-toolbar .btn {
+  border-radius: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 10px 14px !important;
+  transition: all 0.2s ease !important;
+  border: none !important;
+}
+
+/* Trash/Delete button - Red */
+#scanlist-toolbar .btn-danger,
+#scanlist .btn-toolbar .btn-danger,
+.scans-toolbar .btn-danger,
+#btn-delete,
+.btn[title*="Delete"],
+.btn[onclick*="delete"],
+.btn .glyphicon-trash {
+  background: linear-gradient(135deg, var(--accent-red) 0%, var(--accent-red-dark) 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 12px var(--glow-red) !important;
+  border-radius: 0 !important;
+}
+
+#scanlist-toolbar .btn-danger:hover,
+#scanlist .btn-toolbar .btn-danger:hover,
+.scans-toolbar .btn-danger:hover,
+#btn-delete:hover,
+.btn[title*="Delete"]:hover {
+  background: linear-gradient(135deg, #f87171 0%, var(--accent-red) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-red) !important;
+}
+
+/* Refresh button - Green */
+#scanlist-toolbar .btn-success,
+#scanlist .btn-toolbar .btn-success,
+.scans-toolbar .btn-success,
+#btn-refresh,
+.btn[title*="Refresh"],
+.btn[onclick*="refresh"] {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 12px var(--glow-green) !important;
+  border-radius: 0 !important;
+}
+
+#scanlist-toolbar .btn-success:hover,
+#scanlist .btn-toolbar .btn-success:hover,
+.scans-toolbar .btn-success:hover,
+#btn-refresh:hover,
+.btn[title*="Refresh"]:hover {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
+  box-shadow: 0 0 25px var(--glow-green) !important;
+}
+
+/* Green button icons turn white on hover */
+#scanlist-toolbar .btn-success:hover .glyphicon,
+#scanlist .btn-toolbar .btn-success:hover .glyphicon,
+.scans-toolbar .btn-success:hover .glyphicon,
+#btn-refresh:hover .glyphicon,
+.btn[title*="Refresh"]:hover .glyphicon {
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Download/Export button - Purple */
+#scanlist-toolbar .btn-info,
+#scanlist .btn-toolbar .btn-info,
+.scans-toolbar .btn-info,
+#btn-export,
+.btn[title*="Export"],
+.btn[title*="Download"],
+.btn[onclick*="export"] {
+  background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 12px var(--glow-purple) !important;
+  border-radius: 0 !important;
+}
+
+#scanlist-toolbar .btn-info:hover,
+#scanlist .btn-toolbar .btn-info:hover,
+.scans-toolbar .btn-info:hover,
+#btn-export:hover,
+.btn[title*="Export"]:hover,
+.btn[title*="Download"]:hover {
+  background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%) !important;
+  box-shadow: 0 0 25px var(--glow-purple) !important;
+}
+
+/* Purple button icons turn white on hover */
+#scanlist-toolbar .btn-info:hover .glyphicon,
+#scanlist .btn-toolbar .btn-info:hover .glyphicon,
+.scans-toolbar .btn-info:hover .glyphicon,
+#btn-export:hover .glyphicon,
+.btn[title*="Export"]:hover .glyphicon,
+.btn[title*="Download"]:hover .glyphicon {
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Icons in scans toolbar - always white */
+#scanlist-toolbar .btn .glyphicon,
+#scanlist .btn-toolbar .btn .glyphicon,
+.scans-toolbar .btn .glyphicon {
+  color: #ffffff !important;
+}
+
+/* Filter dropdown - Dark with border */
+#scanlist-toolbar .btn-default,
+#scanlist .btn-toolbar .btn-default,
+.scans-toolbar .btn-default,
+.filter-dropdown .btn {
+  background: linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  font-size: 11px !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5) !important;
+}
+
+#scanlist-toolbar .btn-default:hover,
+#scanlist .btn-toolbar .btn-default:hover,
+.scans-toolbar .btn-default:hover {
+  background: linear-gradient(135deg, #d5d5d5 0%, #e8e8e8 100%) !important;
+  color: var(--accent-green) !important;
+  text-shadow: 0 0 15px var(--glow-green) !important;
+}
+
+/* ============================================
+   Workspaces Page - Square Buttons
+   ============================================ */
+/* Create Workspace button - Green, Sharp */
+.btn-create-workspace,
+.workspace-create-btn,
+a[href*="newworkspace"] .btn,
+.panel-heading .btn-success,
+#workspaces .btn-success {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: 0 0 12px var(--glow-green) !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  font-size: 11px !important;
+  padding: 10px 20px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.btn-create-workspace:hover,
+.workspace-create-btn:hover,
+a[href*="newworkspace"] .btn:hover,
+.panel-heading .btn-success:hover,
+#workspaces .btn-success:hover {
+  background: linear-gradient(135deg, var(--accent-green-light) 0%, var(--accent-green) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-green) !important;
+}
+
+/* All workspace action buttons - Square */
+#workspaces .btn,
+.workspace-actions .btn,
+#workspaces .btn-group .btn,
+.workspaces-table .btn,
+table .btn-group .btn {
+  border-radius: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 8px 12px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+}
+
+/* Workspace action button colors */
+/* View - Cyan */
+#workspaces .btn-info,
+.workspace-actions .btn-info,
+table .btn-group .btn-info {
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, #06b6d4 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 0 10px var(--glow-cyan) !important;
+}
+
+#workspaces .btn-info:hover,
+.workspace-actions .btn-info:hover,
+table .btn-group .btn-info:hover {
+  background: linear-gradient(135deg, var(--accent-cyan-light) 0%, var(--accent-cyan) 100%) !important;
+  box-shadow: 0 0 18px var(--glow-cyan) !important;
+}
+
+/* Edit - Orange */
+#workspaces .btn-warning,
+.workspace-actions .btn-warning,
+table .btn-group .btn-warning {
+  background: linear-gradient(135deg, var(--accent-orange) 0%, #ea580c 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 10px var(--glow-orange) !important;
+}
+
+#workspaces .btn-warning:hover,
+.workspace-actions .btn-warning:hover,
+table .btn-group .btn-warning:hover {
+  background: linear-gradient(135deg, #fb923c 0%, var(--accent-orange) 100%) !important;
+  box-shadow: 0 0 18px var(--glow-orange) !important;
+}
+
+/* Add - Green */
+#workspaces .btn-success,
+.workspace-actions .btn-success,
+table .btn-group .btn-success:not(.panel-heading .btn-success) {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 10px var(--glow-green) !important;
+}
+
+#workspaces .btn-success:hover,
+.workspace-actions .btn-success:hover,
+table .btn-group .btn-success:hover {
+  background: linear-gradient(135deg, var(--accent-green-light) 0%, var(--accent-green) 100%) !important;
+  box-shadow: 0 0 18px var(--glow-green) !important;
+}
+
+/* Primary - Purple */
+#workspaces .btn-primary,
+.workspace-actions .btn-primary,
+table .btn-group .btn-primary {
+  background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 10px var(--glow-purple) !important;
+}
+
+#workspaces .btn-primary:hover,
+.workspace-actions .btn-primary:hover,
+table .btn-group .btn-primary:hover {
+  background: linear-gradient(135deg, var(--accent-purple-light) 0%, var(--accent-purple) 100%) !important;
+  box-shadow: 0 0 18px var(--glow-purple) !important;
+}
+
+/* Delete - Red */
+#workspaces .btn-danger,
+.workspace-actions .btn-danger,
+table .btn-group .btn-danger {
+  background: linear-gradient(135deg, var(--accent-red) 0%, var(--accent-red-dark) 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 0 10px var(--glow-red) !important;
+}
+
+#workspaces .btn-danger:hover,
+.workspace-actions .btn-danger:hover,
+table .btn-group .btn-danger:hover {
+  background: linear-gradient(135deg, #f87171 0%, var(--accent-red) 100%) !important;
+  box-shadow: 0 0 18px var(--glow-red) !important;
+}
+
+/* Default/Grey buttons */
+#workspaces .btn-default,
+.workspace-actions .btn-default,
+table .btn-group .btn-default {
+  background: linear-gradient(135deg, #d5d5d5 0%, #e8e8e8 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--glass-border) !important;
+}
+
+#workspaces .btn-default:hover,
+.workspace-actions .btn-default:hover,
+table .btn-group .btn-default:hover {
+  background: linear-gradient(135deg, #c5c5c5 0%, #d5d5d5 100%) !important;
+  color: var(--accent-green) !important;
+}
+
+/* Workspace badges - Sharp */
+#workspaces .badge,
+.workspaces-table .badge {
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  padding: 6px 10px !important;
+}
+
+/* ============================================
+   Workspace Detail/Edit Page - Sharp Modern Style
+   ============================================ */
+/* Action buttons row (Edit, Add Target, Import Scans, etc.) */
+.workspace-actions-row .btn,
+.workspace-header .btn,
+.workspace-toolbar .btn,
+h1 + .btn-toolbar .btn,
+h2 + .btn-toolbar .btn,
+.page-header .btn,
+.page-header + .btn-toolbar .btn {
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  padding: 10px 18px !important;
+  border: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Edit button - Grey/Default */
+.workspace-actions-row .btn-default,
+.workspace-header .btn-default {
+  background: linear-gradient(135deg, #d5d5d5 0%, #e8e8e8 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--glass-border) !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5) !important;
+}
+
+.workspace-actions-row .btn-default:hover,
+.workspace-header .btn-default:hover {
+  background: linear-gradient(135deg, #c5c5c5 0%, #d5d5d5 100%) !important;
+  color: var(--accent-green) !important;
+  text-shadow: 0 0 15px var(--glow-green) !important;
+}
+
+/* Add Target button - Green */
+.workspace-actions-row .btn-success,
+.workspace-header .btn-success,
+.btn[href*="addtarget"],
+.btn[onclick*="addTarget"] {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 12px var(--glow-green) !important;
+}
+
+.workspace-actions-row .btn-success:hover,
+.workspace-header .btn-success:hover {
+  background: linear-gradient(135deg, var(--accent-green-light) 0%, var(--accent-green) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-green) !important;
+}
+
+/* Import/Info buttons - Blue */
+.workspace-actions-row .btn-info,
+.workspace-header .btn-info,
+.btn[href*="import"],
+.btn[onclick*="import"] {
+  background: linear-gradient(135deg, var(--accent-blue) 0%, #2563eb 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 12px var(--glow-blue) !important;
+}
+
+.workspace-actions-row .btn-info:hover,
+.workspace-header .btn-info:hover {
+  background: linear-gradient(135deg, var(--accent-blue-light) 0%, var(--accent-blue) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-blue) !important;
+}
+
+/* Primary buttons - Purple */
+.workspace-actions-row .btn-primary,
+.workspace-header .btn-primary {
+  background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 12px var(--glow-purple) !important;
+}
+
+.workspace-actions-row .btn-primary:hover,
+.workspace-header .btn-primary:hover {
+  background: linear-gradient(135deg, var(--accent-purple-light) 0%, var(--accent-purple) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-purple) !important;
+}
+
+/* Warning/Schedule buttons - Orange */
+.workspace-actions-row .btn-warning,
+.workspace-header .btn-warning,
+.btn[href*="schedule"],
+.btn[onclick*="schedule"] {
+  background: linear-gradient(135deg, var(--accent-orange) 0%, #ea580c 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 12px var(--glow-orange) !important;
+}
+
+.workspace-actions-row .btn-warning:hover,
+.workspace-header .btn-warning:hover {
+  background: linear-gradient(135deg, #fb923c 0%, var(--accent-orange) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-orange) !important;
+}
+
+/* Danger/Remove buttons - Red */
+.workspace-actions-row .btn-danger,
+.workspace-header .btn-danger,
+.btn-remove,
+.btn[onclick*="remove"],
+table .btn-danger {
+  background: linear-gradient(135deg, var(--accent-red) 0%, var(--accent-red-dark) 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 12px var(--glow-red) !important;
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  font-size: 11px !important;
+}
+
+.workspace-actions-row .btn-danger:hover,
+.workspace-header .btn-danger:hover,
+.btn-remove:hover,
+table .btn-danger:hover {
+  background: linear-gradient(135deg, #f87171 0%, var(--accent-red) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-red) !important;
+}
+
+/* ============================================
+   Workspace Stat Cards - Sharp Modern Style
+   ============================================ */
+.workspace-stat-card,
+.stat-card,
+.summary-card,
+.panel.workspace-panel,
+.workspace-stats .panel,
+.col-md-3 > .panel,
+.col-sm-3 > .panel,
+.stats-panel {
+  border-radius: 0 !important;
+  border: 1px solid var(--glass-border) !important;
+  overflow: hidden;
+}
+
+/* Card headers - Sharp with colors */
+.workspace-stat-card .panel-heading,
+.stat-card .panel-heading,
+.summary-card .panel-heading,
+.workspace-stats .panel-heading,
+.stats-panel .panel-heading {
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  padding: 12px 16px !important;
+  border-bottom: none !important;
+}
+
+/* Targets card - Green header */
+.panel-heading[style*="green"],
+.panel-success > .panel-heading,
+.workspace-stats .panel:nth-child(1) .panel-heading {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
+  color: white !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Scans card - Yellow/Orange header */
+.panel-heading[style*="yellow"],
+.panel-heading[style*="olive"],
+.panel-warning > .panel-heading,
+.workspace-stats .panel:nth-child(2) .panel-heading {
+  background: linear-gradient(135deg, var(--accent-yellow) 0%, #d97706 100%) !important;
+  color: #000 !important;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Correlations card - Red/Coral header */
+.panel-heading[style*="coral"],
+.panel-heading[style*="red"],
+.panel-danger > .panel-heading,
+.workspace-stats .panel:nth-child(3) .panel-heading {
+  background: linear-gradient(135deg, #f87171 0%, var(--accent-red) 100%) !important;
+  color: white !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Created card - Blue header */
+.panel-heading[style*="lightblue"],
+.panel-heading[style*="blue"],
+.panel-info > .panel-heading,
+.workspace-stats .panel:nth-child(4) .panel-heading {
+  background: linear-gradient(135deg, var(--accent-blue-light) 0%, var(--accent-blue) 100%) !important;
+  color: white !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Card body - Dark background */
+.workspace-stat-card .panel-body,
+.stat-card .panel-body,
+.summary-card .panel-body,
+.workspace-stats .panel-body,
+.stats-panel .panel-body {
+  background: var(--bg-secondary) !important;
+  text-align: center;
+  padding: 20px !important;
+}
+
+/* Large stat numbers */
+.workspace-stat-card .stat-number,
+.stat-card h2,
+.summary-card h2,
+.workspace-stats .panel-body h2,
+.stats-panel .panel-body h2,
+.panel-body > h2:first-child,
+.panel-body > .h2 {
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 48px !important;
+  color: #ffffff !important;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3) !important;
+  margin: 10px 0 !important;
+}
+
+/* Stat labels */
+.workspace-stat-card .stat-label,
+.stat-card p,
+.summary-card p,
+.workspace-stats .panel-body p,
+.stats-panel .panel-body p {
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  color: var(--text-muted) !important;
+  margin: 0 !important;
+}
+
+/* ============================================
+   Workspace Tabs - Sharp Modern Style
+   ============================================ */
+.workspace-tabs .nav-tabs,
+.workspace-detail .nav-tabs {
+  border-bottom: 1px solid var(--glass-border) !important;
+  background: linear-gradient(180deg, #f0f0f0 0%, #ffffff 100%);
+}
+
+.workspace-tabs .nav-tabs > li > a,
+.workspace-detail .nav-tabs > li > a {
+  border-radius: 0 !important;
+  border: none !important;
+  border-bottom: 3px solid transparent !important;
+  background: transparent !important;
+  color: #ffffff !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  padding: 14px 24px !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5) !important;
+  transition: all 0.2s ease !important;
+}
+
+.workspace-tabs .nav-tabs > li > a:hover,
+.workspace-detail .nav-tabs > li > a:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--accent-green) !important;
+  border-bottom-color: var(--accent-green) !important;
+  text-shadow: 0 0 15px var(--glow-green) !important;
+}
+
+.workspace-tabs .nav-tabs > li.active > a,
+.workspace-detail .nav-tabs > li.active > a,
+.workspace-tabs .nav-tabs > li.active > a:hover,
+.workspace-detail .nav-tabs > li.active > a:hover {
+  background: rgba(34, 197, 94, 0.1) !important;
+  color: var(--accent-green) !important;
+  border-bottom-color: var(--accent-green) !important;
+  text-shadow: 0 0 10px var(--glow-green) !important;
+}
+
+/* ============================================
+   Type Labels/Badges - Sharp Style
+   ============================================ */
+.label,
+.badge,
+.tag,
+.type-label {
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 10px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  padding: 6px 12px !important;
+}
+
+/* Purple label for types like INTERNET_NAME */
+.label-primary,
+.label-default,
+.badge-primary,
+.badge-default {
+  background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 8px var(--glow-purple) !important;
+}
+
+/* All global buttons - ensure sharp */
+.btn {
+  border-radius: 0 !important;
+}
+
+/* Ensure tables on workspace page have sharp buttons */
+.workspace-detail table .btn,
+.workspace-tabs table .btn,
+.tab-content table .btn {
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  padding: 8px 16px !important;
+}
+
+/* ============================================
+   Workspace Create Button - White Glow Text
+   ============================================ */
+/* Create Workspace button text styling */
+.workspace-panel-heading .btn-primary,
+#createWorkspaceModal .btn-primary,
+button[data-target="#createWorkspaceModal"],
+.panel-heading .btn-primary,
+.panel-heading .btn-sm {
+  text-transform: uppercase !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  letter-spacing: 0.5px !important;
+  color: white !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.5), 0 0 30px rgba(255, 255, 255, 0.3) !important;
+}
+
+.workspace-panel-heading .btn-primary:hover,
+button[data-target="#createWorkspaceModal"]:hover,
+.panel-heading .btn-primary:hover,
+.panel-heading .btn-sm:hover {
+  text-shadow: 0 0 15px rgba(255, 255, 255, 1), 0 0 30px rgba(255, 255, 255, 0.7), 0 0 45px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* ============================================
+   Workspace Panel Titles - All Caps White Glow
+   ============================================ */
+/* Panel heading titles - all caps with white glow */
+.panel-heading .panel-title,
+.panel-heading h3.panel-title,
+.panel-title,
+.workspace-stats .panel-title,
+.panel-primary .panel-title,
+.panel-success .panel-title,
+.panel-warning .panel-title,
+.panel-info .panel-title,
+.panel-danger .panel-title {
+  text-transform: uppercase !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  letter-spacing: 1px !important;
+  color: white !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.5), 0 0 30px rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Panel heading icons - also white glow */
+.panel-heading .panel-title i,
+.panel-heading .panel-title .fa,
+.panel-heading .panel-title .glyphicon {
+  color: white !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* ============================================
+   Workspace Details Page Spacing
+   ============================================ */
+/* Add padding above the stats modules row */
+.container-fluid > .row:has(.panel-primary),
+.container-fluid > .row:has(.panel-success),
+.container-fluid > .row:has(.panel-warning),
+.container-fluid > .row:has(.col-md-3 > .panel) {
+  margin-top: 30px !important;
+}
+
+/* Fallback for browsers without :has() support */
+/* Stats row - add top margin */
+.page-header + .row,
+.page-header ~ .row:first-of-type {
+  margin-top: 30px !important;
+}
+
+/* Add padding above the menu buttons (page-header) */
+.page-header {
+  margin-top: 25px !important;
+  padding-top: 15px !important;
+}
+
+/* Workspace detail page specific spacing */
+.container-fluid > .row:first-child + .row {
+  margin-top: 20px !important;
+}
+
+/* Additional spacing for workspace details page */
+.breadcrumb + .row,
+.breadcrumb ~ .row:first-of-type {
+  margin-top: 15px !important;
+}
+
+/* ============================================
+   FINAL OVERRIDE: White content on colored buttons
+   This MUST be at the END of the file to win cascade
+   ============================================ */
+
+/* ANY element inside a colored button MUST be white */
+.btn-primary, .btn-primary *,
+.btn-success, .btn-success *,
+.btn-warning, .btn-warning *,
+.btn-danger, .btn-danger *,
+.btn-info, .btn-info *,
+.btn-primary:hover, .btn-primary:hover *,
+.btn-success:hover, .btn-success:hover *,
+.btn-warning:hover, .btn-warning:hover *,
+.btn-danger:hover, .btn-danger:hover *,
+.btn-info:hover, .btn-info:hover *,
+.btn-primary:focus, .btn-primary:focus *,
+.btn-success:focus, .btn-success:focus *,
+.btn-warning:focus, .btn-warning:focus *,
+.btn-danger:focus, .btn-danger:focus *,
+.btn-info:focus, .btn-info:focus *,
+.btn-primary:active, .btn-primary:active *,
+.btn-success:active, .btn-success:active *,
+.btn-warning:active, .btn-warning:active *,
+.btn-danger:active, .btn-danger:active *,
+.btn-info:active, .btn-info:active * {
+  color: #fff !important;
+}
+
+/* Target specific icon classes explicitly */
+.btn-primary .glyphicon, .btn-primary i, .btn-primary span,
+.btn-success .glyphicon, .btn-success i, .btn-success span,
+.btn-warning .glyphicon, .btn-warning i, .btn-warning span,
+.btn-danger .glyphicon, .btn-danger i, .btn-danger span,
+.btn-info .glyphicon, .btn-info i, .btn-info span {
+  color: #fff !important;
+}
+
+/* Buttons with background colors via inline styles */
+.btn[style*="background"],
+.btn[style*="background"] *,
+.btn[style*="background"]:hover,
+.btn[style*="background"]:hover * {
+  color: #fff !important;
+}
+
+/* ============================================
+   MISSING: glyphicon-white class (Bootstrap 2 legacy)
+   The HTML uses this class but it was never defined!
+   ============================================ */
+.glyphicon-white,
+.glyphicon.glyphicon-white,
+i.glyphicon-white {
+  color: #fff !important;
+}
+
+/* ============================================
+   FIX: Buttons with BOTH btn-default AND color class
+   e.g., "btn btn-success btn-default"
+   ============================================ */
+.btn-success.btn-default,
+.btn-success.btn-default *,
+.btn-success.btn-default:hover,
+.btn-success.btn-default:hover *,
+.btn-warning.btn-default,
+.btn-warning.btn-default *,
+.btn-warning.btn-default:hover,
+.btn-warning.btn-default:hover *,
+.btn-danger.btn-default,
+.btn-danger.btn-default *,
+.btn-danger.btn-default:hover,
+.btn-danger.btn-default:hover *,
+.btn-primary.btn-default,
+.btn-primary.btn-default *,
+.btn-primary.btn-default:hover,
+.btn-primary.btn-default:hover *,
+.btn-info.btn-default,
+.btn-info.btn-default *,
+.btn-info.btn-default:hover,
+.btn-info.btn-default:hover * {
+  color: #fff !important;
+}
+
+/* Ensure glyphicon-white ALWAYS works */
+.glyphicon.glyphicon-white,
+.btn .glyphicon-white,
+.btn-default .glyphicon-white,
+.btn-group .glyphicon-white,
+i.glyphicon-white,
+.dropdown-toggle .glyphicon-white {
+  color: #fff !important;
 }
