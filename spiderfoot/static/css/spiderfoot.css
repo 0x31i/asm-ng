@@ -1970,13 +1970,13 @@ tr.active td {
   border: none !important;
   border-right: 1px solid var(--glass-border) !important;
   border-radius: 0 !important;
-  color: #ffffff !important;
+  color: var(--text-primary) !important;
   font-family: var(--font-mono) !important;
   font-weight: 700;
   font-size: 11px;
   text-transform: uppercase;
   padding: 10px 16px;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  text-shadow: none;
   transition: all 0.2s ease;
   display: inline-flex !important;
   align-items: center !important;
@@ -1986,6 +1986,7 @@ tr.active td {
 #customtabview .btn-default .glyphicon {
   font-size: 16px;
   margin: 0 !important;
+  color: var(--text-primary) !important;
 }
 
 #customtabview .btn-default:last-child {
