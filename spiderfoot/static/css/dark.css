@@ -2570,23 +2570,37 @@ footer .footer {
 /* ============================================
    Table Header Highlights (when toolbar active)
    ============================================ */
-/* Data Element header - Green gradient */
+/* Data Element header - Green button style */
 th.th-data-highlight {
   background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
   color: white !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
-  box-shadow: 0 0 15px var(--glow-green), inset 0 0 20px rgba(255, 255, 255, 0.1) !important;
-  border-color: var(--accent-green) !important;
+  box-shadow: 0 0 20px var(--glow-green), inset 0 0 30px rgba(255, 255, 255, 0.15) !important;
+  border: none !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.2) !important;
   transition: all 0.3s ease !important;
 }
 
-/* Source Data Element header - Purple gradient */
+/* Source Data Element header - Purple button style */
 th.th-source-highlight {
   background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%) !important;
   color: white !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
-  box-shadow: 0 0 15px var(--glow-purple), inset 0 0 20px rgba(255, 255, 255, 0.1) !important;
-  border-color: var(--accent-purple) !important;
+  box-shadow: 0 0 20px var(--glow-purple), inset 0 0 30px rgba(255, 255, 255, 0.15) !important;
+  border: none !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.2) !important;
   transition: all 0.3s ease !important;
 }
 
