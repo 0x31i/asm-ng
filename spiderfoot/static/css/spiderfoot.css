@@ -1187,10 +1187,11 @@ pre {
 .ts-pager .btn-group .btn,
 .ts-pager .btn-default,
 .ts-pager .btn {
-  background: var(--bg-elevated) !important;
+  background: var(--bg-tertiary) !important;
   color: var(--text-primary) !important;
-  border: 1px solid var(--glass-border) !important;
+  border: 1px solid rgba(0, 0, 0, 0.2) !important;
   padding: 6px 10px;
+  font-weight: 600 !important;
 }
 
 .ts-pager .btn-group .btn:hover,
@@ -1199,6 +1200,16 @@ pre {
   background: var(--accent-blue) !important;
   color: white !important;
   border-color: var(--accent-blue) !important;
+}
+
+/* Pagination buttons with glyphicons */
+.ts-pager .btn .glyphicon,
+.ts-pager .glyphicon {
+  color: var(--text-primary) !important;
+}
+
+.ts-pager .btn:hover .glyphicon {
+  color: white !important;
 }
 
 .ts-pager select.pagesize,
@@ -1212,8 +1223,9 @@ pre {
 }
 
 .ts-pager .pagedisplay {
-  color: var(--text-secondary) !important;
+  color: var(--text-primary) !important;
   font-size: 13px;
+  font-weight: 500;
 }
 
 /* ============================================
@@ -3244,20 +3256,20 @@ th.th-source-highlight {
   color: #ffffff !important;
 }
 
-/* Filter dropdown - Dark with border */
+/* Filter dropdown - Light with dark text for light theme */
 #scanlist-toolbar .btn-default,
 #scanlist .btn-toolbar .btn-default,
 .scans-toolbar .btn-default,
 .filter-dropdown .btn {
   background: linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%) !important;
-  color: #ffffff !important;
+  color: var(--text-primary) !important;
   border: 1px solid var(--glass-border) !important;
   border-radius: 0 !important;
   font-family: var(--font-mono) !important;
   font-weight: 700 !important;
   text-transform: uppercase !important;
   font-size: 11px !important;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5) !important;
+  text-shadow: none !important;
 }
 
 #scanlist-toolbar .btn-default:hover,
@@ -3265,7 +3277,7 @@ th.th-source-highlight {
 .scans-toolbar .btn-default:hover {
   background: linear-gradient(135deg, #d5d5d5 0%, #e8e8e8 100%) !important;
   color: var(--accent-green) !important;
-  text-shadow: 0 0 15px var(--glow-green) !important;
+  text-shadow: none !important;
 }
 
 /* ============================================
