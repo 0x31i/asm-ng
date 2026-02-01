@@ -994,7 +994,7 @@ tr.danger td {
 .tooltip-inner {
   background: #1a1a1a !important;
   color: #ffffff !important;
-  border-radius: var(--radius-sm);
+  border-radius: 0 !important;
   padding: 8px 12px;
   font-family: var(--font-mono);
   font-size: 11px;
@@ -1959,7 +1959,7 @@ tr.active td {
 #btn-setfp,
 .btn-fp-action {
   background: linear-gradient(135deg, var(--accent-orange) 0%, #ea580c 100%) !important;
-  color: var(--text-primary) !important;
+  color: #ffffff !important;
   border: none !important;
   box-shadow: 0 0 15px var(--glow-orange);
 }
@@ -1970,12 +1970,19 @@ tr.active td {
   box-shadow: 0 0 25px var(--glow-orange);
 }
 
+#btn-setfp .glyphicon,
+.btn-fp-action .glyphicon,
+#btn-setfp i,
+.btn-fp-action i {
+  color: #ffffff !important;
+}
+
 /* ============================================
    Refresh Button - Green with Glow
    ============================================ */
 #btn-refresh {
   background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
-  color: var(--text-primary) !important;
+  color: #ffffff !important;
   border: none !important;
   box-shadow: 0 0 15px var(--glow-green);
 }
@@ -1983,6 +1990,11 @@ tr.active td {
 #btn-refresh:hover {
   background: linear-gradient(135deg, var(--accent-green-light) 0%, var(--accent-green) 100%) !important;
   box-shadow: 0 0 25px var(--glow-green);
+}
+
+#btn-refresh .glyphicon,
+#btn-refresh i {
+  color: #ffffff !important;
 }
 
 /* ============================================
@@ -2044,11 +2056,12 @@ tr.active td {
 .input-group-btn .btn-primary .glyphicon {
   font-size: 16px;
   margin: 0 !important;
+  color: #ffffff !important;
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }
 
 .input-group-btn .btn-primary:hover .glyphicon {
-  color: white !important;
+  color: #ffffff !important;
   text-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
 }
 
@@ -2777,7 +2790,7 @@ footer .footer {
 /* Selection count badge */
 #selection-toolbar .badge {
   background: var(--accent-purple) !important;
-  color: var(--text-primary) !important;
+  color: #ffffff !important;
   font-family: var(--font-mono) !important;
   font-weight: 700 !important;
   font-size: 12px !important;
@@ -2793,7 +2806,7 @@ footer .footer {
   font-size: 11px !important;
   text-transform: uppercase !important;
   letter-spacing: 0.5px !important;
-  color: var(--text-primary) !important;
+  color: #ffffff !important;
   text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.4) !important;
 }
 
@@ -2905,25 +2918,25 @@ th.th-source-highlight {
 /* Default/Grey buttons (Clear) */
 #selection-toolbar .btn-default,
 #selection-toolbar .btn-clear {
-  background: linear-gradient(135deg, #d5d5d5 0%, #e8e8e8 100%) !important;
-  color: var(--text-primary) !important;
-  border: 1px solid var(--glass-border) !important;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5) !important;
+  background: linear-gradient(135deg, #3a3a3a 0%, #4a4a4a 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  text-shadow: none !important;
 }
 
 #selection-toolbar .btn-default:hover,
 #selection-toolbar .btn-clear:hover {
-  background: linear-gradient(135deg, #c5c5c5 0%, #d5d5d5 100%) !important;
-  color: var(--accent-green) !important;
-  text-shadow: 0 0 15px var(--glow-green) !important;
+  background: linear-gradient(135deg, #4a4a4a 0%, #5a5a5a 100%) !important;
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5) !important;
 }
 
 /* Close button (X) */
 #selection-toolbar .close,
 #selection-toolbar .close-btn {
-  background: linear-gradient(135deg, #d5d5d5 0%, #e8e8e8 100%) !important;
-  color: var(--text-primary) !important;
-  border: 1px solid var(--glass-border) !important;
+  background: linear-gradient(135deg, #3a3a3a 0%, #4a4a4a 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
   border-radius: 0 !important;
   width: 36px !important;
   height: 36px !important;
@@ -2932,14 +2945,14 @@ th.th-source-highlight {
   justify-content: center !important;
   opacity: 1 !important;
   font-size: 18px !important;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5) !important;
+  text-shadow: none !important;
   transition: all 0.2s ease !important;
 }
 
 #selection-toolbar .close:hover,
 #selection-toolbar .close-btn:hover {
   background: linear-gradient(135deg, var(--accent-red) 0%, var(--accent-red-dark) 100%) !important;
-  color: var(--text-primary) !important;
+  color: #ffffff !important;
   box-shadow: 0 0 15px var(--glow-red) !important;
 }
 
@@ -2947,7 +2960,7 @@ th.th-source-highlight {
 #selection-toolbar .btn .badge,
 #selection-toolbar .match-count-badge {
   background: rgba(0, 0, 0, 0.3) !important;
-  color: var(--text-primary) !important;
+  color: #ffffff !important;
   font-size: 10px !important;
   padding: 4px 8px !important;
   margin-left: 6px !important;
@@ -2959,7 +2972,7 @@ th.th-source-highlight {
 #selection-toolbar .btn i {
   font-size: 14px !important;
   margin-right: 6px !important;
-  color: var(--text-primary) !important;
+  color: #ffffff !important;
 }
 
 /* ============================================
