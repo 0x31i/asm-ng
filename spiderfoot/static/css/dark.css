@@ -2651,7 +2651,7 @@ footer .footer {
   position: fixed !important;
   z-index: 1050 !important;
   flex-direction: row !important;
-  align-items: stretch !important;
+  align-items: center !important;
 }
 
 /* Toolbar header (count + close button) */
@@ -2880,6 +2880,7 @@ footer .footer {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  align-self: center !important;
   padding: 0 10px !important;
   cursor: pointer !important;
   background: rgba(255, 255, 255, 0.05) !important;
@@ -2887,6 +2888,8 @@ footer .footer {
   transition: all 0.2s ease !important;
   color: rgba(255, 255, 255, 0.4) !important;
   min-width: 32px !important;
+  height: 44px !important;
+  flex-shrink: 0 !important;
 }
 
 .toolbar-snap-btn:hover {
