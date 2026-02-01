@@ -11,13 +11,12 @@
     <script type='text/javascript' src='${docroot}/static/js/spiderfoot.js'></script>
     <script type='text/javascript' src='${docroot}/static/js/viz.js'></script>
 
-    <link href="${docroot}/static/css/spiderfoot.css" rel="stylesheet">
     <link href="${docroot}/static/node_modules/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="${docroot}/static/node_modules/tablesorter/dist/css/jquery.tablesorter.pager.min.css" rel="stylesheet">
     <link href="${docroot}/static/node_modules/alertifyjs/build/css/alertify.min.css" rel="stylesheet">
 
     <script>
-        // Load themes before the page body loads
+        // Load theme CSS AFTER Bootstrap so our styles take precedence
         var head = document.getElementsByTagName('HEAD')[0];
         var link = document.createElement('link');
         link.rel = 'stylesheet';
@@ -25,7 +24,7 @@
         if (localStorage.getItem("theme") === "dark-theme") {
             link.href = "${docroot}/static/css/dark.css";
         } else {
-            link.href = "${docroot}/static/node_modules/tablesorter/dist/css/theme.default.min.css";
+            link.href = "${docroot}/static/css/spiderfoot.css";
         }
         head.appendChild(link);
     </script>
