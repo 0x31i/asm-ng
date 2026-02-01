@@ -125,7 +125,7 @@
       <!-- Undo snap button (vertical mode only) -->
       <div class="toolbar-undo-snap" onclick="snapToolbar('bottom')">
         <i class="glyphicon glyphicon-chevron-down"></i>
-        <span>UNDOCK</span>
+        <span>RETURN</span>
       </div>
     </div>
 
@@ -238,8 +238,8 @@
             $("#selection-count").text(selectedCount);
 
             if (selectedCount > 0) {
-                // Show toolbar - CSS classes handle positioning
-                $("#selection-toolbar").show();
+                // Show toolbar with flex display - jQuery .show() uses block which breaks flex layout
+                $("#selection-toolbar").css('display', 'flex');
 
                 // Collect ALL unique Data Elements and Source Elements from ALL selected rows
                 selectedDataElements = [];
