@@ -2488,6 +2488,13 @@ footer .footer {
   border-radius: 0 !important;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.6), 0 8px 60px rgba(0, 0, 0, 0.4) !important;
   padding: 12px 20px !important;
+  /* Prevent toolbar from expanding */
+  width: fit-content !important;
+  width: -moz-fit-content !important;
+  max-width: 95vw !important;
+  height: auto !important;
+  min-height: unset !important;
+  max-height: fit-content !important;
 }
 
 /* Selection count badge */
@@ -2641,16 +2648,23 @@ footer .footer {
   display: flex !important;
   align-items: center !important;
   gap: 0 !important;
+  flex-wrap: nowrap !important;
 }
 
 #selection-toolbar .toolbar-content {
-  flex: 1 !important;
+  flex: 0 1 auto !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 20px !important;
+  flex-wrap: nowrap !important;
 }
 
 .toolbar-drag-handle {
   width: 24px !important;
-  height: 100% !important;
-  min-height: 50px !important;
+  min-width: 24px !important;
+  flex: 0 0 24px !important;
+  height: auto !important;
+  min-height: 40px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -2659,6 +2673,7 @@ footer .footer {
   border: none !important;
   transition: all 0.2s ease !important;
   color: rgba(255, 255, 255, 0.4) !important;
+  align-self: stretch !important;
 }
 
 .toolbar-drag-handle:hover {
