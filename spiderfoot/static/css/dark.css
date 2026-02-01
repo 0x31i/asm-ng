@@ -1587,6 +1587,62 @@ input[type="checkbox"]:checked {
 }
 
 /* ============================================
+   Radio Buttons - Modern Square Style (like checkboxes)
+   ============================================ */
+input[type="radio"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--glass-border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  vertical-align: middle;
+}
+
+input[type="radio"]:hover {
+  border-color: var(--accent-green);
+  box-shadow: 0 0 8px var(--glow-green);
+}
+
+input[type="radio"]:checked {
+  background: var(--accent-green);
+  border-color: var(--accent-green);
+  box-shadow: 0 0 15px var(--glow-green), 0 0 6px var(--glow-green);
+}
+
+/* Checkmark for checked radio */
+input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 1px;
+  width: 6px;
+  height: 11px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* Table-specific radio styling */
+.table input[type="radio"],
+#usetable input[type="radio"] {
+  width: 22px;
+  height: 22px;
+}
+
+#usetable input[type="radio"]:checked::after {
+  left: 6px;
+  top: 2px;
+  width: 6px;
+  height: 12px;
+}
+
+/* ============================================
    Badge Glow Effects
    ============================================ */
 .badge.alert-success {
