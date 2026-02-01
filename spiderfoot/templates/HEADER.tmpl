@@ -33,11 +33,15 @@
 
   <body>
 
-<!-- ASM-NG Logo Banner -->
+<!-- ASM-NG Logo Banner (Video) -->
 <div class="asm-ng-logo-container">
   <div class="asm-ng-logo-wrapper">
     <a href="${docroot}/">
-      <img src="${docroot}/static/img/asm-ng-logo.png" alt="ASM-NG" class="asm-ng-logo" />
+      <video class="asm-ng-logo-video" autoplay loop muted playsinline>
+        <source src="${docroot}/static/img/asm-ng-logo.mp4" type="video/mp4">
+        <!-- Fallback to image if video not supported -->
+        <img src="${docroot}/static/img/asm-ng-logo.png" alt="ASM-NG" class="asm-ng-logo" />
+      </video>
     </a>
   </div>
 </div>
