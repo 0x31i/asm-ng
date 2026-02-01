@@ -929,6 +929,83 @@ tr.danger td {
 }
 
 /* ============================================
+   False Positives Controls Area
+   ============================================ */
+/* Container for FP controls (Hide FPs, Match saved FPs) */
+.breadcrumb .pull-right,
+.panel-heading .pull-right,
+div[class*="pull-right"]:has(.glyphicon-ban-circle),
+div[class*="pull-right"]:has(.glyphicon-repeat) {
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  color: var(--text-primary) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+/* FP controls icons */
+.breadcrumb .pull-right .glyphicon,
+.panel-heading .pull-right .glyphicon,
+.glyphicon-ban-circle,
+.glyphicon-repeat {
+  font-size: 14px !important;
+}
+
+/* Modern checkbox styling for FP controls */
+.breadcrumb input[type="checkbox"],
+.panel-heading input[type="checkbox"],
+input[type="checkbox"]#hidefps {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  width: 18px !important;
+  height: 18px !important;
+  border: 2px solid var(--text-muted) !important;
+  border-radius: 0 !important;
+  background: var(--bg-primary) !important;
+  cursor: pointer !important;
+  position: relative !important;
+  vertical-align: middle !important;
+  margin: 0 4px !important;
+  transition: all 0.2s ease !important;
+}
+
+.breadcrumb input[type="checkbox"]:checked,
+.panel-heading input[type="checkbox"]:checked,
+input[type="checkbox"]#hidefps:checked {
+  background: var(--accent-green) !important;
+  border-color: var(--accent-green) !important;
+}
+
+.breadcrumb input[type="checkbox"]:checked::after,
+.panel-heading input[type="checkbox"]:checked::after,
+input[type="checkbox"]#hidefps:checked::after {
+  content: '✓' !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  color: #ffffff !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.breadcrumb input[type="checkbox"]:hover,
+.panel-heading input[type="checkbox"]:hover,
+input[type="checkbox"]#hidefps:hover {
+  border-color: var(--accent-green) !important;
+}
+
+/* Warning text style for match saved FPs */
+.text-warning {
+  color: var(--accent-orange) !important;
+}
+
+/* ============================================
    Tabs
    ============================================ */
 .nav-tabs {
@@ -2865,7 +2942,7 @@ footer .footer {
 /* ============================================
    Table Header Highlights (when toolbar active)
    ============================================ */
-/* Data Element header - Green button style (exact match to toolbar) */
+/* Data Element header - Green button style */
 table th.th-data-highlight,
 .table th.th-data-highlight,
 .table > thead > tr > th.th-data-highlight,
@@ -2886,7 +2963,17 @@ th.th-data-highlight {
   transition: all 0.3s ease !important;
 }
 
-/* Source Data Element header - Purple button style (exact match to toolbar) */
+/* Force white text on all children of green highlight header */
+th.th-data-highlight,
+th.th-data-highlight *,
+.table th.th-data-highlight,
+.table th.th-data-highlight *,
+.table > thead > tr > th.th-data-highlight,
+.table > thead > tr > th.th-data-highlight * {
+  color: #ffffff !important;
+}
+
+/* Source Data Element header - Purple button style */
 table th.th-source-highlight,
 .table th.th-source-highlight,
 .table > thead > tr > th.th-source-highlight,
@@ -2905,6 +2992,16 @@ th.th-source-highlight {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
   border: 1px solid #7c3aed !important;
   transition: all 0.3s ease !important;
+}
+
+/* Force white text on all children of purple highlight header */
+th.th-source-highlight,
+th.th-source-highlight *,
+.table th.th-source-highlight,
+.table th.th-source-highlight *,
+.table > thead > tr > th.th-source-highlight,
+.table > thead > tr > th.th-source-highlight * {
+  color: #ffffff !important;
 }
 
 /* Orange/Warning buttons (Mark as FP) */
