@@ -15,16 +15,18 @@
     <link href="${docroot}/static/node_modules/tablesorter/dist/css/jquery.tablesorter.pager.min.css" rel="stylesheet">
     <link href="${docroot}/static/node_modules/alertifyjs/build/css/alertify.min.css" rel="stylesheet">
 
-    <!-- Both theme stylesheets - JavaScript enables the correct one -->
+    <!-- Both theme stylesheets - dark disabled by default, JS enables correct one -->
     <link id="theme-light" href="${docroot}/static/css/spiderfoot.css" rel="stylesheet">
-    <link id="theme-dark" href="${docroot}/static/css/dark.css" rel="stylesheet">
+    <link id="theme-dark" href="${docroot}/static/css/dark.css" rel="stylesheet" disabled>
     <script>
-        // Immediately enable correct theme, disable the other
-        // This runs synchronously before page renders
+        // Immediately enable correct theme based on localStorage
+        // Dark is disabled by default in HTML, so light theme shows first
         (function() {
             var isDark = localStorage.getItem("theme") === "dark-theme";
-            document.getElementById("theme-light").disabled = isDark;
-            document.getElementById("theme-dark").disabled = !isDark;
+            if (isDark) {
+                document.getElementById("theme-light").disabled = true;
+                document.getElementById("theme-dark").disabled = false;
+            }
         })();
         // Also handle bfcache restoration (back/forward navigation)
         window.addEventListener('pageshow', function(e) {
