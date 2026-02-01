@@ -15,25 +15,28 @@
     <link href="${docroot}/static/node_modules/tablesorter/dist/css/jquery.tablesorter.pager.min.css" rel="stylesheet">
     <link href="${docroot}/static/node_modules/alertifyjs/build/css/alertify.min.css" rel="stylesheet">
 
-    <!-- Both theme stylesheets - dark disabled by default, JS enables correct one -->
-    <link id="theme-light" href="${docroot}/static/css/spiderfoot.css" rel="stylesheet">
-    <link id="theme-dark" href="${docroot}/static/css/dark.css" rel="stylesheet" disabled>
+    <!-- Theme: use media attribute for reliable toggling -->
+    <link id="theme-light" href="${docroot}/static/css/spiderfoot.css" rel="stylesheet" media="all">
+    <link id="theme-dark" href="${docroot}/static/css/dark.css" rel="stylesheet" media="not all">
     <script>
-        // Immediately enable correct theme based on localStorage
-        // Dark is disabled by default in HTML, so light theme shows first
+        // Toggle themes using media attribute (more reliable than disabled)
         (function() {
             var isDark = localStorage.getItem("theme") === "dark-theme";
+            var light = document.getElementById("theme-light");
+            var dark = document.getElementById("theme-dark");
             if (isDark) {
-                document.getElementById("theme-light").disabled = true;
-                document.getElementById("theme-dark").disabled = false;
+                light.media = "not all";
+                dark.media = "all";
             }
         })();
-        // Also handle bfcache restoration (back/forward navigation)
+        // Handle bfcache restoration
         window.addEventListener('pageshow', function(e) {
             if (e.persisted) {
                 var isDark = localStorage.getItem("theme") === "dark-theme";
-                document.getElementById("theme-light").disabled = isDark;
-                document.getElementById("theme-dark").disabled = !isDark;
+                var light = document.getElementById("theme-light");
+                var dark = document.getElementById("theme-dark");
+                light.media = isDark ? "not all" : "all";
+                dark.media = isDark ? "all" : "not all";
             }
         });
     </script>

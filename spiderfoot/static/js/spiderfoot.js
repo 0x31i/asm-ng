@@ -30,15 +30,15 @@ document.addEventListener("DOMContentLoaded", () => {
       localStorage.removeItem("theme");
       localStorage.setItem("mode", "Dark Mode");
       togglerText.innerText = "Dark Mode";
-      themeLight.disabled = false;
-      themeDark.disabled = true;
+      themeLight.media = "all";
+      themeDark.media = "not all";
     } else {
       // Switch to dark theme
       localStorage.setItem("theme", "dark-theme");
       localStorage.setItem("mode", "Light Mode");
       togglerText.innerText = "Light Mode";
-      themeLight.disabled = true;
-      themeDark.disabled = false;
+      themeLight.media = "not all";
+      themeDark.media = "all";
     }
   });
 });
