@@ -2703,6 +2703,18 @@ footer .footer {
   gap: 8px !important;
 }
 
+/* Match section label styling (all modes) */
+#selection-toolbar .match-section label {
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+}
+
 #selection-toolbar.toolbar-bottom .match-buttons {
   display: flex !important;
   flex-direction: row !important;
@@ -2731,7 +2743,7 @@ footer .footer {
   transform: translateY(-50%) !important;
   bottom: auto !important;
   flex-direction: column !important;
-  width: 220px !important;
+  width: 280px !important;
 }
 
 #selection-toolbar.toolbar-left {
@@ -2748,8 +2760,8 @@ footer .footer {
 #selection-toolbar.toolbar-right .toolbar-content {
   flex-direction: column !important;
   align-items: stretch !important;
-  gap: 8px !important;
-  padding: 12px !important;
+  gap: 10px !important;
+  padding: 14px !important;
   width: 100% !important;
 }
 
@@ -2761,9 +2773,9 @@ footer .footer {
   justify-content: space-between !important;
   align-items: center !important;
   width: 100% !important;
-  padding-bottom: 8px !important;
+  padding-bottom: 10px !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
-  margin-bottom: 4px !important;
+  margin-bottom: 6px !important;
 }
 
 #selection-toolbar.toolbar-left .toolbar-header .close-btn,
@@ -2777,21 +2789,27 @@ footer .footer {
   display: flex !important;
   flex-direction: column !important;
   align-items: stretch !important;
-  gap: 6px !important;
+  gap: 8px !important;
   width: 100% !important;
 }
 
 #selection-toolbar.toolbar-left .match-section label,
 #selection-toolbar.toolbar-right .match-section label {
   text-align: center !important;
-  margin-bottom: 4px !important;
+  margin-bottom: 6px !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
 }
 
 #selection-toolbar.toolbar-left .match-buttons,
 #selection-toolbar.toolbar-right .match-buttons {
   display: flex !important;
   flex-direction: column !important;
-  gap: 6px !important;
+  gap: 8px !important;
   width: 100% !important;
 }
 
@@ -2800,10 +2818,15 @@ footer .footer {
   width: 100% !important;
 }
 
+/* Uniform button sizing in vertical mode */
 #selection-toolbar.toolbar-left .match-btn-wrapper .btn,
-#selection-toolbar.toolbar-right .match-btn-wrapper .btn {
+#selection-toolbar.toolbar-right .match-btn-wrapper .btn,
+#selection-toolbar.toolbar-left .toolbar-actions .btn,
+#selection-toolbar.toolbar-right .toolbar-actions .btn {
   width: 100% !important;
   justify-content: center !important;
+  min-height: 44px !important;
+  padding: 12px 16px !important;
 }
 
 /* Actions vertical */
@@ -2811,17 +2834,11 @@ footer .footer {
 #selection-toolbar.toolbar-right .toolbar-actions {
   display: flex !important;
   flex-direction: column !important;
-  gap: 6px !important;
+  gap: 8px !important;
   width: 100% !important;
-  padding-top: 8px !important;
+  padding-top: 10px !important;
   border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
-  margin-top: 4px !important;
-}
-
-#selection-toolbar.toolbar-left .toolbar-actions .btn,
-#selection-toolbar.toolbar-right .toolbar-actions .btn {
-  width: 100% !important;
-  justify-content: center !important;
+  margin-top: 6px !important;
 }
 
 /* Hide side snap buttons in vertical mode */
