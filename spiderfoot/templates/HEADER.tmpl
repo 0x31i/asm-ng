@@ -15,13 +15,25 @@
     <link href="${docroot}/static/node_modules/tablesorter/dist/css/jquery.tablesorter.pager.min.css" rel="stylesheet">
     <link href="${docroot}/static/node_modules/alertifyjs/build/css/alertify.min.css" rel="stylesheet">
 
+    <!-- Both theme stylesheets - JavaScript enables the correct one -->
+    <link id="theme-light" href="${docroot}/static/css/spiderfoot.css" rel="stylesheet">
+    <link id="theme-dark" href="${docroot}/static/css/dark.css" rel="stylesheet">
     <script>
-        // Load theme CSS AFTER Bootstrap so our styles take precedence
-        // Using document.write for SYNCHRONOUS loading - prevents flash of unstyled content
-        var themeCss = localStorage.getItem("theme") === "dark-theme"
-            ? "${docroot}/static/css/dark.css"
-            : "${docroot}/static/css/spiderfoot.css";
-        document.write('<link rel="stylesheet" type="text/css" href="' + themeCss + '">');
+        // Immediately enable correct theme, disable the other
+        // This runs synchronously before page renders
+        (function() {
+            var isDark = localStorage.getItem("theme") === "dark-theme";
+            document.getElementById("theme-light").disabled = isDark;
+            document.getElementById("theme-dark").disabled = !isDark;
+        })();
+        // Also handle bfcache restoration (back/forward navigation)
+        window.addEventListener('pageshow', function(e) {
+            if (e.persisted) {
+                var isDark = localStorage.getItem("theme") === "dark-theme";
+                document.getElementById("theme-light").disabled = isDark;
+                document.getElementById("theme-dark").disabled = !isDark;
+            }
+        });
     </script>
   </head>
 

@@ -11,39 +11,34 @@
 // Toggler for theme
 document.addEventListener("DOMContentLoaded", () => {
   const themeToggler = document.getElementById("theme-toggler");
-  const head = document.getElementsByTagName("HEAD")[0];
   const togglerText = document.getElementById("toggler-text");
-  let link = document.createElement("link");
+  const themeLight = document.getElementById("theme-light");
+  const themeDark = document.getElementById("theme-dark");
 
-  if (localStorage.getItem("mode") === "Light Mode") {
-    togglerText.innerText = "Dark Mode";
-    document.getElementById("theme-toggler").checked = true; // ensure theme toggle is set to dark
-  } else { // initial mode ist null
+  // Set initial toggle state based on current theme
+  if (localStorage.getItem("theme") === "dark-theme") {
     togglerText.innerText = "Light Mode";
-    document.getElementById("theme-toggler").checked = false; // ensure theme toggle is set to light
+    themeToggler.checked = true;
+  } else {
+    togglerText.innerText = "Dark Mode";
+    themeToggler.checked = false;
   }
 
   themeToggler.addEventListener("click", () => {
-    togglerText.innerText = "Light Mode";
-
     if (localStorage.getItem("theme") === "dark-theme") {
+      // Switch to light theme
       localStorage.removeItem("theme");
       localStorage.setItem("mode", "Dark Mode");
-      link.rel = "stylesheet";
-      link.type = "text/css";
-      link.href = "${docroot}/static/css/spiderfoot.css";
-
-      head.appendChild(link);
-      location.reload();
+      togglerText.innerText = "Dark Mode";
+      themeLight.disabled = false;
+      themeDark.disabled = true;
     } else {
+      // Switch to dark theme
       localStorage.setItem("theme", "dark-theme");
       localStorage.setItem("mode", "Light Mode");
-      link.rel = "stylesheet";
-      link.type = "text/css";
-      link.href = "${docroot}/static/css/dark.css";
-
-      head.appendChild(link);
-      location.reload();
+      togglerText.innerText = "Light Mode";
+      themeLight.disabled = true;
+      themeDark.disabled = false;
     }
   });
 });
