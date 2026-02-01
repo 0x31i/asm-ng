@@ -2849,16 +2849,16 @@ footer .footer {
   box-sizing: border-box !important;
 }
 
-/* Actions vertical */
+/* Actions vertical - same styling as match-buttons */
 #selection-toolbar.toolbar-left .toolbar-actions,
 #selection-toolbar.toolbar-right .toolbar-actions {
   display: flex !important;
   flex-direction: column !important;
   gap: 8px !important;
   width: 100% !important;
-  padding-top: 10px !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
-  margin-top: 6px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
 }
 
 /* Hide side snap buttons in vertical mode */
@@ -2867,21 +2867,16 @@ footer .footer {
   display: none !important;
 }
 
-/* Show undo snap in vertical mode */
+/* Show undo snap in vertical mode - small arrow only */
 #selection-toolbar.toolbar-left .toolbar-undo-snap,
 #selection-toolbar.toolbar-right .toolbar-undo-snap {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 8px !important;
-  padding: 10px !important;
+  padding: 6px !important;
   cursor: pointer !important;
   background: rgba(255, 255, 255, 0.05) !important;
-  color: rgba(255, 255, 255, 0.6) !important;
-  font-size: 10px !important;
-  font-weight: 700 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.5px !important;
+  color: rgba(255, 255, 255, 0.4) !important;
   border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
   transition: all 0.2s ease !important;
   margin-top: 8px !important;
