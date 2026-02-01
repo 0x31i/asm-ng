@@ -80,6 +80,58 @@ body {
 }
 
 /* ============================================
+   LIGHT THEME: Force dark text everywhere
+   (except links which stay green, and colored buttons)
+   ============================================ */
+* {
+  color: inherit;
+}
+
+/* Ensure all text elements are dark */
+body, p, span, div, label, th, td, li, dt, dd,
+.btn-default, .btn-default .glyphicon,
+.form-control, input, select, textarea,
+.dropdown-menu, .dropdown-menu li, .dropdown-menu a,
+.panel, .panel-heading, .panel-body, .panel-title,
+.modal, .modal-header, .modal-body, .modal-footer,
+.alert, .well, .jumbotron,
+.nav > li > a, .navbar-nav > li > a,
+.breadcrumb, .breadcrumb > li,
+.list-group-item, .media-body,
+small, strong, em, b, i:not(.glyphicon):not(.fa),
+.text-muted, .text-primary, .text-secondary,
+.help-block, .control-label,
+code, pre, kbd, samp {
+  color: var(--text-primary);
+}
+
+/* Keep links green */
+a, a:visited,
+.table a, .list-group-item a,
+td a, .panel-body a {
+  color: var(--accent-green) !important;
+}
+
+a:hover, a:focus {
+  color: var(--accent-green-light) !important;
+}
+
+/* Keep white text on colored buttons */
+.btn-success, .btn-danger, .btn-warning, .btn-info, .btn-primary,
+.btn-success *, .btn-danger *, .btn-warning *, .btn-info *, .btn-primary *,
+.label-success, .label-danger, .label-warning, .label-info, .label-primary,
+.badge.alert-success, .badge.alert-danger, .badge.alert-warning, .badge.alert-info,
+.bg-success, .bg-danger, .bg-warning, .bg-info, .bg-primary {
+  color: #ffffff !important;
+}
+
+/* Glyphicons in colored buttons stay white */
+.btn-success .glyphicon, .btn-danger .glyphicon, .btn-warning .glyphicon,
+.btn-info .glyphicon, .btn-primary .glyphicon {
+  color: #ffffff !important;
+}
+
+/* ============================================
    Scan Title (h1, h2) - Uppercase, Code Font, Bold, Prominent Glow
    ============================================ */
 h1, h2 {
