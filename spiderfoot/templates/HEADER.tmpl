@@ -17,16 +17,11 @@
 
     <script>
         // Load theme CSS AFTER Bootstrap so our styles take precedence
-        var head = document.getElementsByTagName('HEAD')[0];
-        var link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.type = 'text/css';
-        if (localStorage.getItem("theme") === "dark-theme") {
-            link.href = "${docroot}/static/css/dark.css";
-        } else {
-            link.href = "${docroot}/static/css/spiderfoot.css";
-        }
-        head.appendChild(link);
+        // Using document.write for SYNCHRONOUS loading - prevents flash of unstyled content
+        var themeCss = localStorage.getItem("theme") === "dark-theme"
+            ? "${docroot}/static/css/dark.css"
+            : "${docroot}/static/css/spiderfoot.css";
+        document.write('<link rel="stylesheet" type="text/css" href="' + themeCss + '">');
     </script>
   </head>
 
