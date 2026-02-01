@@ -240,6 +240,9 @@
                 // Show toolbar with flex display - jQuery .show() uses block which breaks flex layout
                 $("#selection-toolbar").css('display', 'flex');
 
+                // Highlight table headers to match toolbar buttons
+                highlightTableHeaders(true);
+
                 // Collect ALL unique Data Elements and Source Elements from ALL selected rows
                 selectedDataElements = [];
                 selectedSourceElements = [];
@@ -299,7 +302,30 @@
                 }
             } else {
                 $("#selection-toolbar").hide();
+                // Remove table header highlights
+                highlightTableHeaders(false);
             }
+        }
+
+        // Highlight or unhighlight table headers when toolbar is shown/hidden
+        function highlightTableHeaders(highlight) {
+            // Find headers by text content
+            $("#scansummary-content thead th").each(function() {
+                var headerText = $(this).text().trim();
+                if (headerText === "Data Element") {
+                    if (highlight) {
+                        $(this).addClass('th-data-highlight');
+                    } else {
+                        $(this).removeClass('th-data-highlight');
+                    }
+                } else if (headerText === "Source Data Element") {
+                    if (highlight) {
+                        $(this).addClass('th-source-highlight');
+                    } else {
+                        $(this).removeClass('th-source-highlight');
+                    }
+                }
+            });
         }
 
         // Select all rows matching ANY of the selected Data Elements
@@ -482,8 +508,9 @@
             $("#customtabview").hide();
             $("#customvizview").hide();
             $("#modifyactions").hide();
-            // Hide selection toolbar when navigating away
+            // Hide selection toolbar and remove header highlights when navigating away
             $("#selection-toolbar").attr('style', 'display: none !important;');
+            highlightTableHeaders(false);
             currentSection = target
             dataloaders = []
         }
