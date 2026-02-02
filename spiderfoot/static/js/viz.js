@@ -269,7 +269,7 @@ function sf_viz_dendrogram(targetId, data) {
         });
     }
 
-    // Mark a node as false positive
+    // Mark a node as false positive (persists to future scans)
     function markAsFalsePositive(nodeName, setFp) {
         var nodeData = dataMap[nodeName];
         if (!nodeData || !nodeData[8]) return; // No hash available
@@ -278,12 +278,13 @@ function sf_viz_dendrogram(targetId, data) {
         var fpValue = setFp ? "1" : "0";
 
         $.ajax({
-            url: docroot + '/resultsetfp',
+            url: docroot + '/resultsetfppersist',
             type: 'GET',
             data: {
                 id: scanId,
                 resultids: JSON.stringify([hash]),
-                fp: fpValue
+                fp: fpValue,
+                persist: "1"  // Apply to future scans as well
             },
             success: function(response) {
                 var result = JSON.parse(response);
@@ -428,23 +429,34 @@ function sf_viz_dendrogram(targetId, data) {
         }
         displayData = displayData.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+        // Detect dark mode for styling
+        var isDarkMode = document.body.classList.contains('dark-mode') ||
+                         document.documentElement.getAttribute('data-theme') === 'dark' ||
+                         window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        var textColor = isDarkMode ? '#f3f4f6' : '#1f2937';
+        var labelColor = isDarkMode ? '#9ca3af' : '#4b5563';
+        var preBackground = isDarkMode ? 'rgba(55, 65, 81, 0.5)' : 'rgba(243, 244, 246, 1)';
+        var preTextColor = isDarkMode ? '#e5e7eb' : '#1f2937';
+        var borderColor = isDarkMode ? 'rgba(75, 85, 99, 0.5)' : 'rgba(209, 213, 219, 1)';
+
         // Close button at top right
-        var message = "<div style='position:relative;text-align:left;'>";
+        var message = "<div style='position:relative;text-align:left;color:" + textColor + ";'>";
         message += "<button onclick='window.dendroCloseInfoPanel()' style='position:absolute;top:-8px;right:-8px;background:#6b7280;color:white;border:none;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1;'>&times;</button>";
-        message += "<table style='margin-bottom:10px;'>";
-        message += "<tr><td><b>Type:</b></td><td>" + data[10] + "</td></tr>";
-        message += "<tr><td><b>Source Module:</b></td><td>" + data[3] + "</td></tr>";
-        message += "<tr><td><b>Data:</b></td><td><pre style='max-width:300px;overflow:auto;'>" + sf.remove_sfurltag(displayData) + "</pre></td></tr>";
+        message += "<table style='margin-bottom:10px;color:" + textColor + ";'>";
+        message += "<tr><td style='color:" + labelColor + ";padding-right:10px;'><b>Type:</b></td><td style='color:" + textColor + ";'>" + data[10] + "</td></tr>";
+        message += "<tr><td style='color:" + labelColor + ";padding-right:10px;'><b>Source Module:</b></td><td style='color:" + textColor + ";'>" + data[3] + "</td></tr>";
+        message += "<tr><td style='color:" + labelColor + ";padding-right:10px;vertical-align:top;'><b>Data:</b></td><td><pre style='max-width:300px;overflow:auto;background:" + preBackground + ";color:" + preTextColor + ";padding:8px;border-radius:4px;border:1px solid " + borderColor + ";margin:0;'>" + sf.remove_sfurltag(displayData) + "</pre></td></tr>";
         message += "</table>";
 
         // Don't show FP button for synthetic nodes (like "Discovery Paths")
         if (data[8] && data[8] !== 'discovery_paths') {
-            message += "<div style='border-top:1px solid rgba(128,128,128,0.3);padding-top:8px;margin-top:5px;'>";
+            message += "<div style='border-top:1px solid " + borderColor + ";padding-top:10px;margin-top:5px;'>";
             if (isFp) {
-                message += "<button onclick='window.dendroUnsetFp(\"" + nodeName.replace(/"/g, '\\"') + "\")' style='background:#dc2626;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;margin-right:5px;'>Marked as False Positive</button>";
-                message += "<button onclick='window.dendroUnsetFp(\"" + nodeName.replace(/"/g, '\\"') + "\")' style='background:#6b7280;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;'>Undo</button>";
+                message += "<span style='display:inline-block;background:#dc2626;color:white;padding:6px 12px;border-radius:4px;margin-right:8px;font-weight:500;'>Marked as False Positive</span>";
+                message += "<button onclick='window.dendroUnsetFp(\"" + nodeName.replace(/"/g, '\\"') + "\")' style='background:#6b7280;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;'>Unset False Positive</button>";
             } else {
-                message += "<button onclick='window.dendroSetFp(\"" + nodeName.replace(/"/g, '\\"') + "\")' style='background:#f59e0b;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;'>Mark as False Positive</button>";
+                message += "<button onclick='window.dendroSetFp(\"" + nodeName.replace(/"/g, '\\"') + "\")' style='background:#f59e0b;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:500;'>Mark as False Positive</button>";
             }
             message += "</div>";
         }
