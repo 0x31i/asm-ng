@@ -918,7 +918,7 @@
                     }
                     table += "<td><span class='badge " + statusy + "'>" + data[i][3] + "</span></td>";
                     table += "<td>" + data[i][7] + "</td>";
-                    table += "</tr><tr class='hidden' id='corrwell_tr_" + data[i][0] + "'><td colspan=3 id='corrwell_td_" + data[i][0] + "'></td></tr>";
+                    table += "</tr><tr class='hidden tablesorter-childRow' id='corrwell_tr_" + data[i][0] + "'><td colspan=3 id='corrwell_td_" + data[i][0] + "'></td></tr>";
                 }
             } catch (e) {
                 console.error("Error processing correlation data:", e, data);
@@ -931,17 +931,21 @@
             table += "</tbody></table>";
             $("#loader").fadeOut(500);
             $("#mainbody").append(table);
-            $.tablesorter.addParser({ 
-                id: 'criticality', 
-                is: function(s) { 
-                    return false; 
-                }, 
-                format: function(s) { 
-                    return s.toLowerCase().replace(/high/,3).replace(/medium/,2).replace(/low/,1).replace(/info/,0); 
-                }, 
-                type: 'numeric' 
+            $.tablesorter.addParser({
+                id: 'criticality',
+                is: function(s) {
+                    return false;
+                },
+                format: function(s) {
+                    return s.toLowerCase().replace(/high/,3).replace(/medium/,2).replace(/low/,1).replace(/info/,0);
+                },
+                type: 'numeric'
             });
-            $("#scansummary-content").tablesorter({ headers: { 1: { sorter: 'criticality' } } });
+            $("#scansummary-content").tablesorter({
+                headers: { 1: { sorter: 'criticality' } },
+                cssChildRow: 'tablesorter-childRow',
+                sortList: [[1, 1]]  // Sort by Risk column (1) in descending order (1) - HIGH first
+            });
             sf.updateTooltips();
         }
 
