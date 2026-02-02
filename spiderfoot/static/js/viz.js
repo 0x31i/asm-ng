@@ -235,6 +235,21 @@ function sf_viz_dendrogram(targetId, data) {
         return path;
     }
 
+    // Function to get all descendants of a node (children, grandchildren, etc.)
+    function getDescendants(node) {
+        var descendants = [];
+        function traverse(n) {
+            if (n.children) {
+                n.children.forEach(function(child) {
+                    descendants.push(child);
+                    traverse(child);
+                });
+            }
+        }
+        traverse(node);
+        return descendants;
+    }
+
     // Function to highlight path
     function highlightPath(node) {
         // Clear previous highlights
@@ -307,20 +322,63 @@ function sf_viz_dendrogram(targetId, data) {
                 }
 
                 if (result[0] === "SUCCESS") {
+                    // Find the clicked node and all its descendants
+                    var clickedNode = null;
+                    var descendantNames = [];
+                    svg.selectAll(".dend-node").each(function(d) {
+                        if (d.name === nodeName) {
+                            clickedNode = d;
+                        }
+                    });
+
+                    // Get all descendant node names
+                    if (clickedNode) {
+                        var descendants = getDescendants(clickedNode);
+                        descendantNames = descendants.map(function(d) { return d.name; });
+                    }
+
                     if (setFp) {
+                        // Mark the node and all descendants as FP
                         sessionFpNodes[nodeName] = true;
-                        // Mark the node visually as FP (red)
+                        descendantNames.forEach(function(name) {
+                            sessionFpNodes[name] = true;
+                        });
+
+                        // Mark all nodes visually as FP (red)
                         svg.selectAll(".dend-node").each(function(d) {
-                            if (d.name === nodeName) {
+                            if (d.name === nodeName || descendantNames.indexOf(d.name) !== -1) {
                                 d3.select(this).classed("dend-node-fp", true);
                             }
                         });
+
+                        // Also highlight the links to descendants
+                        svg.selectAll(".dend-link").each(function(linkData) {
+                            var sourceIsFp = linkData.source.name === nodeName || descendantNames.indexOf(linkData.source.name) !== -1;
+                            var targetIsFp = linkData.target.name === nodeName || descendantNames.indexOf(linkData.target.name) !== -1;
+                            if (sourceIsFp && targetIsFp) {
+                                d3.select(this).classed("dend-link-fp", true);
+                            }
+                        });
                     } else {
+                        // Remove FP marking from node and all descendants
                         delete sessionFpNodes[nodeName];
-                        // Remove FP marking
+                        descendantNames.forEach(function(name) {
+                            delete sessionFpNodes[name];
+                        });
+
+                        // Remove FP visual marking
                         svg.selectAll(".dend-node").each(function(d) {
-                            if (d.name === nodeName) {
+                            if (d.name === nodeName || descendantNames.indexOf(d.name) !== -1) {
                                 d3.select(this).classed("dend-node-fp", false);
+                            }
+                        });
+
+                        // Remove FP link styling
+                        svg.selectAll(".dend-link").each(function(linkData) {
+                            var sourceWasFp = linkData.source.name === nodeName || descendantNames.indexOf(linkData.source.name) !== -1;
+                            var targetWasFp = linkData.target.name === nodeName || descendantNames.indexOf(linkData.target.name) !== -1;
+                            if (sourceWasFp && targetWasFp) {
+                                d3.select(this).classed("dend-link-fp", false);
                             }
                         });
                     }
@@ -434,10 +492,11 @@ function sf_viz_dendrogram(targetId, data) {
             displayData = displayData.substring(0, 200) + "...";
         }
         displayData = displayData.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        var message = "<table>";
-        message += "<tr><td><b>Type:</b></td><td>" + data[10] + "</td></tr>";
-        message += "<tr><td><b>Source Module:</b></td><td>" + data[3] + "</td></tr>";
-        message += "<tr><td><b>Data:</b></td><td><pre>" + sf.remove_sfurltag(displayData);
+        // Use explicit white text colors to override global CSS rules
+        var message = "<table style='color:white;'>";
+        message += "<tr><td style='color:white;'><b>Type:</b></td><td style='color:white;'>" + data[10] + "</td></tr>";
+        message += "<tr><td style='color:white;'><b>Source Module:</b></td><td style='color:white;'>" + data[3] + "</td></tr>";
+        message += "<tr><td style='color:white;'><b>Data:</b></td><td style='color:white;'><pre style='color:white !important;background:rgba(255,255,255,0.1);padding:4px 8px;border-radius:4px;margin:0;'>" + sf.remove_sfurltag(displayData);
         message += "</pre></td></tr>";
         message += "</table>";
         message += "<div style='font-size:10px;color:#888;margin-top:5px;'>Click for more options</div>";
