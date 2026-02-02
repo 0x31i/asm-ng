@@ -729,8 +729,9 @@ class SpiderFootHelpers():
                 ret.append({"name": c, "children": get_children(c, haystack)})
             return ret
 
-        # Find the element with no parents, that's our root.
-        root = None
+        # Find ALL elements with no parents - these are our potential roots.
+        # There may be multiple discovery paths that don't share a common ancestor.
+        roots = []
         for k in list(data.keys()):
             if data[k] is None:
                 continue
@@ -742,15 +743,25 @@ class SpiderFootHelpers():
 
                 if k in data[ck]:
                     contender = False
+                    break
 
             if contender:
-                root = k
-                break
+                roots.append(k)
 
-        if root is None:
+        if not roots:
             return {}
 
-        return {"name": root, "children": get_children(root, data)}
+        # If there's only one root, return the tree rooted at it
+        if len(roots) == 1:
+            return {"name": roots[0], "children": get_children(roots[0], data)}
+
+        # If there are multiple roots (multiple independent discovery paths),
+        # create a synthetic parent that contains all of them
+        children = []
+        for root in roots:
+            children.append({"name": root, "children": get_children(root, data)})
+
+        return {"name": "Discovery Paths", "children": children}
 
     @staticmethod
     def validLEI(lei: str) -> bool:

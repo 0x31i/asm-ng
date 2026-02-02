@@ -2515,6 +2515,28 @@ class SpiderFootWebUi:
         # Delete the ROOT key as it adds no value from a viz perspective
         del pc['ROOT']
         retdata['tree'] = SpiderFootHelpers.dataParentChildToTree(pc)
+
+        # Add a synthetic entry for "Discovery Paths" node if multiple roots exist
+        # This provides tooltip data for the synthetic parent node
+        if retdata['tree'].get('name') == 'Discovery Paths':
+            datamap['Discovery Paths'] = [
+                0,  # generated timestamp
+                'Discovery Paths',  # data (display name)
+                '',  # source_data
+                'SpiderFoot',  # module
+                'ROOT',  # type
+                100,  # confidence
+                100,  # visibility
+                0,  # risk
+                'discovery_paths',  # hash
+                'ROOT',  # source_event_hash
+                'Discovery Paths',  # event_descr
+                'ROOT',  # event_type
+                '',  # scan_instance_id
+                0,  # false_positive
+                0   # parent_fp
+            ]
+
         retdata['data'] = datamap
 
         return retdata
