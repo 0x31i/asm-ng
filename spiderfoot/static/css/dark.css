@@ -2486,6 +2486,11 @@ div[id*="Help"].alert-info {
   left: 0;
   width: 100%;
   height: 100%;
+  pointer-events: none;
+}
+
+.asm-ng-logo-wrapper a {
+  pointer-events: auto;
 }
 
 .asm-ng-logo {
