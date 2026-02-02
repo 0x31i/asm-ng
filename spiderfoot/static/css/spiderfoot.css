@@ -3733,6 +3733,22 @@ table .btn-group .btn-default:hover {
   padding: 6px 10px !important;
 }
 
+/* Workspace action button icons - ALL white */
+#workspaces .btn .glyphicon,
+#workspaces .btn-group .btn .glyphicon,
+.workspaces-table .btn .glyphicon,
+table .btn-group .btn .glyphicon,
+.panel-heading .btn-success .glyphicon,
+.panel-heading .btn .glyphicon,
+#workspaces .btn-info .glyphicon,
+#workspaces .btn-warning .glyphicon,
+#workspaces .btn-success .glyphicon,
+#workspaces .btn-primary .glyphicon,
+#workspaces .btn-danger .glyphicon,
+#workspaces .btn-default .glyphicon {
+  color: #ffffff !important;
+}
+
 /* ============================================
    Workspace Detail/Edit Page - Sharp Modern Style
    ============================================ */
