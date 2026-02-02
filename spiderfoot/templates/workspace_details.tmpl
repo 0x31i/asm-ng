@@ -128,73 +128,52 @@
                     
                     <!-- Targets Tab -->
                     <div role="tabpanel" class="tab-pane active" id="targets-tab">
-                        <!-- Debug: Show raw targets data -->
-                        <div class="alert alert-warning" style="font-family: monospace; font-size: 12px;">
-                            <strong>Debug - Targets count:</strong> ${len(workspace.targets) if workspace.targets else 0}<br>
-                            <strong>Raw targets:</strong> ${workspace.targets}
-                        </div>
                         % if workspace.targets:
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Target</th>
-                                            <th>Type</th>
-                                            <th>Added</th>
-                                            <th>Actions</th>                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        % for target in workspace.targets:
-                                            <tr>
-                                                <td><strong>${target['value']}</strong></td>
-                                                <td><span class="label label-info">${target['type']}</span></td>
-                                                <td>
-                                                    <script>
-                                                        // Handle both epoch timestamp and date string formats for target added time
-                                                        var addedValue = '${target.get('added_time', '')}';
-                                                        var addedDate;
-                                                        
-                                                        if (addedValue && addedValue !== 'Unknown' && addedValue !== '') {
-                                                            // Check if it's a numeric timestamp (epoch)
-                                                            if (!isNaN(addedValue) && addedValue.length > 0) {
-                                                                // Convert epoch timestamp to milliseconds if needed
-                                                                var timestamp = parseInt(addedValue);
-                                                                if (timestamp < 10000000000) {
-                                                                    timestamp *= 1000; // Convert to milliseconds
-                                                                }
-                                                                addedDate = new Date(timestamp);
-                                                            } else {
-                                                                // Try to parse as date string
-                                                                addedDate = new Date(addedValue);
-                                                            }
-                                                            
-                                                            // Display formatted date
-                                                            if (addedDate && !isNaN(addedDate.getTime())) {
-                                                                document.write(addedDate.toLocaleDateString('en-US', {
-                                                                    year: 'numeric',
-                                                                    month: 'short',
-                                                                    day: 'numeric',
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit'
-                                                                }));
-                                                            } else {
-                                                                document.write('Invalid Date');
-                                                            }
-                                                        } else {
-                                                            document.write('Unknown');
-                                                        }
-                                                    </script>
-                                                </td>
-                                                <td>
-                                                    <button class="btn btn-xs btn-danger" onclick="removeTarget('${workspace.workspace_id}', '${target['target_id']}')">
-                                                        <i class="fa fa-trash"></i> Remove
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        % endfor
-                                    </tbody>
-                                </table>
-                            </div>
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Target</th>
+                                        <th>Type</th>
+                                        <th>Added</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    % for target in workspace.targets:
+                                    <tr>
+                                        <td><strong>${target['value']}</strong></td>
+                                        <td><span class="label label-info">${target['type']}</span></td>
+                                        <td class="target-added-time" data-timestamp="${target.get('added_time', '')}">Loading...</td>
+                                        <td>
+                                            <button class="btn btn-xs btn-danger" onclick="removeTarget('${workspace.workspace_id}', '${target['target_id']}')">
+                                                <i class="fa fa-trash"></i> Remove
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    % endfor
+                                </tbody>
+                            </table>
+                            <script>
+                            // Format all target added times after DOM is ready
+                            document.querySelectorAll('.target-added-time').forEach(function(el) {
+                                var timestamp = el.getAttribute('data-timestamp');
+                                if (timestamp && timestamp !== '' && timestamp !== 'Unknown') {
+                                    var ts = parseFloat(timestamp);
+                                    if (ts < 10000000000) ts *= 1000;
+                                    var date = new Date(ts);
+                                    if (!isNaN(date.getTime())) {
+                                        el.textContent = date.toLocaleDateString('en-US', {
+                                            year: 'numeric', month: 'short', day: 'numeric',
+                                            hour: '2-digit', minute: '2-digit'
+                                        });
+                                    } else {
+                                        el.textContent = 'Invalid Date';
+                                    }
+                                } else {
+                                    el.textContent = 'Unknown';
+                                }
+                            });
+                            </script>
                         % else:
                             <div class="alert alert-info">
                                 <i class="fa fa-info-circle"></i> No targets added yet. 
