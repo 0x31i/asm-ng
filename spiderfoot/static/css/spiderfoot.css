@@ -3908,41 +3908,47 @@ table .btn-danger:hover {
   border-bottom: none !important;
 }
 
-/* Targets card - Green header */
-.panel-heading[style*="green"],
+/* Targets card - Blue header (panel-primary) */
+.panel-primary > .panel-heading,
+.panel-primary > .panel-heading *,
+.panel-primary > .panel-heading .panel-title {
+  background: linear-gradient(135deg, var(--accent-blue) 0%, #2563eb 100%) !important;
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Scans card - Green header (panel-success) */
 .panel-success > .panel-heading,
-.workspace-stats .panel:nth-child(1) .panel-heading {
+.panel-success > .panel-heading *,
+.panel-success > .panel-heading .panel-title {
   background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
   color: #ffffff !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
-/* Scans card - Yellow/Orange header */
-.panel-heading[style*="yellow"],
-.panel-heading[style*="olive"],
+/* Correlations card - Orange header (panel-warning) */
 .panel-warning > .panel-heading,
-.workspace-stats .panel:nth-child(2) .panel-heading {
-  background: linear-gradient(135deg, var(--accent-yellow) 0%, #d97706 100%) !important;
+.panel-warning > .panel-heading *,
+.panel-warning > .panel-heading .panel-title {
+  background: linear-gradient(135deg, var(--accent-orange) 0%, #d97706 100%) !important;
   color: #ffffff !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
-/* Correlations card - Red/Coral header */
-.panel-heading[style*="coral"],
-.panel-heading[style*="red"],
-.panel-danger > .panel-heading,
-.workspace-stats .panel:nth-child(3) .panel-heading {
-  background: linear-gradient(135deg, #f87171 0%, var(--accent-red) 100%) !important;
-  color: #ffffff !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
-}
-
-/* Created card - Blue header */
-.panel-heading[style*="lightblue"],
-.panel-heading[style*="blue"],
+/* Created card - Light Blue header (panel-info) */
 .panel-info > .panel-heading,
-.workspace-stats .panel:nth-child(4) .panel-heading {
+.panel-info > .panel-heading *,
+.panel-info > .panel-heading .panel-title {
   background: linear-gradient(135deg, var(--accent-blue-light) 0%, var(--accent-blue) 100%) !important;
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Danger card - Red header (panel-danger) */
+.panel-danger > .panel-heading,
+.panel-danger > .panel-heading *,
+.panel-danger > .panel-heading .panel-title {
+  background: linear-gradient(135deg, #f87171 0%, var(--accent-red) 100%) !important;
   color: #ffffff !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
