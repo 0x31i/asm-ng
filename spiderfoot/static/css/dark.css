@@ -905,18 +905,16 @@ div[class*="pull-right"]:has(.glyphicon-repeat) {
   margin-right: -2px !important;
 }
 
-/* Stored False Positives icon - Orange with glow for dark mode */
+/* Marked False Positives icon - Green for dark mode */
 .pull-right .glyphicon-repeat.text-warning,
 .text-warning.glyphicon-repeat {
-  color: var(--accent-orange) !important;
-  text-shadow: 0 0 8px var(--glow-orange) !important;
+  color: var(--accent-green) !important;
   margin-right: 2px !important;
 }
 
-/* Stored False Positives text - Orange with glow for dark mode */
+/* Marked False Positives text - Green for dark mode */
 .stored-fps-text {
-  color: var(--accent-orange) !important;
-  text-shadow: 0 0 8px var(--glow-orange) !important;
+  color: var(--accent-green) !important;
   margin-left: 2px !important;
 }
 
