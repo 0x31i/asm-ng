@@ -119,18 +119,22 @@ sf.fetchData = function (url, postData, postFunc) {
 };
 
 sf.updateTooltips = function () {
-  $(document).ready(function () {
-    if ($("[rel=tooltip]").length) {
-      $("[rel=tooltip]").tooltip({ container: "body" });
-      // Hide tooltips when dropdowns are shown to prevent tooltip persistence
-      $(document).on('show.bs.dropdown', function () {
-        $("[rel=tooltip]").tooltip('hide');
-      });
-      // Also hide on click for dropdown toggles
-      $('.dropdown-toggle[rel=tooltip]').on('click', function () {
-        $(this).tooltip('hide');
-      });
-    }
+  if ($("[rel=tooltip]").length) {
+    // Destroy existing tooltips to prevent duplicates
+    $("[rel=tooltip]").tooltip('destroy');
+    // Initialize tooltips with trigger on hover only
+    $("[rel=tooltip]").tooltip({
+      container: "body",
+      trigger: "hover"
+    });
+    // Hide tooltip immediately on any click
+    $("[rel=tooltip]").on('click mousedown', function () {
+      $(this).tooltip('hide');
+    });
+  }
+  // Global handler to hide all tooltips when any dropdown opens
+  $(document).off('show.bs.dropdown.tooltipfix').on('show.bs.dropdown.tooltipfix', function () {
+    $("[rel=tooltip]").tooltip('hide');
   });
 };
 
