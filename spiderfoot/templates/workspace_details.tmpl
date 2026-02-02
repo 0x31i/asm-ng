@@ -1115,26 +1115,48 @@ $(document).ready(function() {
         var format = $('#reportFormat').val();
         var scope = $('input[name="reportScope"]:checked').val();
         var includeMetadata = $('#includeMetadata').is(':checked');
-        
+
         // Get workspace details to get scan IDs
         $.get('${docroot}/workspaceget', { workspace_id: workspaceId }, function(data) {
             if (data.success && data.scans && data.scans.length > 0) {
-                var scanIds = data.scans.map(function(scan) { return scan.scan_id; }).join(',');
-                
-                // Generate report
-                var reportParams = {
-                    scan_ids: scanIds,
-                    format: format,
-                    scope: scope,
-                    include_metadata: includeMetadata
-                };
-                
-                // Create download link
-                var downloadUrl = '${docroot}/scanexport?' + $.param(reportParams);
-                window.open(downloadUrl, '_blank');
-                
-                alertify.success('Report generation started');
+                var scanIds = data.scans.map(function(scan) { return scan.scan_id; });
+
+                var downloadUrl;
+                if (scope === 'correlations') {
+                    // Export correlations only (use first scan ID for now, could be enhanced for multiple)
+                    downloadUrl = '${docroot}/scancorrelationsexport?id=' + scanIds[0] + '&filetype=' + format;
+                } else if (scope === 'summary') {
+                    // Summary exports events data
+                    if (scanIds.length === 1) {
+                        downloadUrl = '${docroot}/scaneventresultexport?id=' + scanIds[0] + '&type=ALL&filetype=' + format;
+                    } else {
+                        downloadUrl = '${docroot}/scaneventresultexportmulti?ids=' + scanIds.join(',') + '&filetype=' + format;
+                    }
+                } else {
+                    // Export all data (scope === 'all')
+                    if (format === 'json') {
+                        downloadUrl = '${docroot}/scanexportjsonmulti?ids=' + scanIds.join(',');
+                    } else if (format === 'gexf') {
+                        downloadUrl = '${docroot}/scanvizmulti?ids=' + scanIds.join(',');
+                    } else {
+                        downloadUrl = '${docroot}/scaneventresultexportmulti?ids=' + scanIds.join(',') + '&filetype=' + format;
+                    }
+                }
+
                 $('#generateReportModal').modal('hide');
+
+                // Create hidden iframe for download
+                var iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = downloadUrl;
+                document.body.appendChild(iframe);
+
+                // Remove iframe after download starts
+                setTimeout(function() {
+                    document.body.removeChild(iframe);
+                }, 3000);
+
+                alertify.success('Report download initiated. Check your downloads folder.');
             } else {
                 $('#generateReportModal').modal('hide');
                 alertify.confirm(
