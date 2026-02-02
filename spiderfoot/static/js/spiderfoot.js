@@ -128,6 +128,10 @@ sf.updateTooltips = function () {
       if ($el.data('bs.tooltip')) {
         $el.tooltip('destroy');
       }
+      // Convert data-title to title for Bootstrap tooltip compatibility
+      if ($el.attr('data-title') && !$el.attr('title')) {
+        $el.attr('title', $el.attr('data-title'));
+      }
     });
     // Initialize tooltips with trigger on hover only
     tooltipElements.tooltip({
