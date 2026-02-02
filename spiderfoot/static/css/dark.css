@@ -1134,6 +1134,51 @@ svg text {
   fill: var(--accent-blue-light);
 }
 
+/* Dendrogram (Discovery Path) Visualization */
+.dend-link {
+  fill: none;
+  stroke: var(--text-secondary);
+  stroke-width: 1px;
+  stroke-opacity: 0.5;
+}
+
+.dend-node circle {
+  fill: var(--accent-green);
+  stroke: var(--bg-primary);
+  stroke-width: 2px;
+}
+
+.dend-node text {
+  font-size: 11px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  paint-order: stroke fill;
+  stroke: var(--bg-primary);
+  stroke-width: 4px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: var(--text-primary);
+}
+
+.dend-node-hover circle {
+  fill: var(--accent-yellow);
+}
+
+.dend-node-hover text {
+  fill: var(--accent-green);
+  font-weight: 600;
+}
+
+/* Sigma.js Graph Visualization */
+.graph-container {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+}
+
+.graph-container canvas {
+  background: var(--bg-primary) !important;
+}
+
 /* ============================================
    Scan List & Specific Components
    ============================================ */

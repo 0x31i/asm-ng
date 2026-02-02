@@ -219,11 +219,11 @@ function sf_viz_dendrogram(targetId, data) {
         .attr("class", "dend-node")
         .attr("transform", function(d) { return "translate(" + d.y + "," + d.x + ")"; })
         .on("mouseover", function(d, i) {
-            d3.select(this).style("fill", "silver");
+            d3.select(this).classed("dend-node-hover", true);
             showToolTip(buildPopupMessage(dataMap[d.name]), d3.event.pageX+10, d3.event.pageY+10,true);
         })
         .on("mouseout", function() {
-            d3.select(this).style("fill", "black");
+            d3.select(this).classed("dend-node-hover", false);
             showToolTip(" ",0,0,false);
         });
 

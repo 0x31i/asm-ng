@@ -613,10 +613,34 @@
                     return;
                 }
                 sharedSigma = s;
+
+                // Detect dark mode and use appropriate colors
+                var isDarkMode = document.body.classList.contains('dark-mode') ||
+                                 document.documentElement.getAttribute('data-theme') === 'dark' ||
+                                 window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+                var edgeColor = isDarkMode ? 'rgba(100, 200, 150, 0.4)' : 'rgba(100, 100, 100, 0.3)';
+                var defaultNodeColor = isDarkMode ? '#4ade80' : '#3b82f6';
+
+                // Update node colors for better visibility
+                s.graph.nodes().forEach(function(n) {
+                    if (n.color === '#000' || n.color === '#000000') {
+                        n.color = defaultNodeColor;
+                    }
+                });
+
                 s.settings({
                     edgeColor: 'default',
-                    defaultEdgeColor: '#aaa',
-                    maxNodeSize: 5
+                    defaultEdgeColor: edgeColor,
+                    maxNodeSize: 5,
+                    minEdgeSize: 0.5,
+                    maxEdgeSize: 1,
+                    defaultLabelColor: isDarkMode ? '#e5e7eb' : '#1f2937',
+                    labelThreshold: 5,
+                    fontStyle: 'bold',
+                    defaultLabelSize: 11,
+                    labelSize: 'proportional',
+                    labelSizeRatio: 1.5
                 });
                 sigma.plugins.dragNodes(s, s.renderers[0])
                 s.refresh()
