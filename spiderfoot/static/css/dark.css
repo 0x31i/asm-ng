@@ -3820,14 +3820,20 @@ table .btn-danger:hover {
   margin: 10px 0 !important;
 }
 
-/* Created date - smaller to fit in card */
+/* Created date - sized to match other stat numbers */
 .created-date {
   font-family: var(--font-mono) !important;
   font-weight: 700 !important;
-  font-size: 18px !important;
+  font-size: 28px !important;
   color: #ffffff !important;
-  margin: 15px 0 !important;
-  line-height: 1.4 !important;
+  margin: 10px 0 !important;
+  line-height: 1.2 !important;
+}
+
+/* Workspace page - reduce top spacing */
+.container-fluid > .row:first-child .page-header {
+  margin-top: -10px !important;
+  padding-top: 0 !important;
 }
 
 /* Stat labels */
