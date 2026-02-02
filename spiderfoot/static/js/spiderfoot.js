@@ -119,16 +119,23 @@ sf.fetchData = function (url, postData, postFunc) {
 };
 
 sf.updateTooltips = function () {
-  if ($("[rel=tooltip]").length) {
-    // Destroy existing tooltips to prevent duplicates
-    $("[rel=tooltip]").tooltip('destroy');
+  var tooltipElements = $("[rel=tooltip]");
+  if (tooltipElements.length) {
+    // Safely destroy existing tooltips to prevent duplicates
+    tooltipElements.each(function() {
+      var $el = $(this);
+      // Only destroy if tooltip was previously initialized
+      if ($el.data('bs.tooltip')) {
+        $el.tooltip('destroy');
+      }
+    });
     // Initialize tooltips with trigger on hover only
-    $("[rel=tooltip]").tooltip({
+    tooltipElements.tooltip({
       container: "body",
       trigger: "hover"
     });
-    // Hide tooltip immediately on any click
-    $("[rel=tooltip]").on('click mousedown', function () {
+    // Hide tooltip immediately on any click (use off first to prevent duplicates)
+    tooltipElements.off('click.tooltipfix mousedown.tooltipfix').on('click.tooltipfix mousedown.tooltipfix', function () {
       $(this).tooltip('hide');
     });
   }
