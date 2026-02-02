@@ -1,14 +1,15 @@
 ```
-# Stop SpiderFoot first (Ctrl+C)
+1. Check if workspace data exists in the database:
 
-# Delete Python cache files
-find /home/user/spiderfoot -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
-find /home/user/spiderfoot -name "*.pyc" -delete 2>/dev/null
+sqlite3 /home/kali/Desktop/ASM-TEST/spiderfoot/data/spiderfoot.db "SELECT * FROM tbl_workspaces;"
 
-# Pull latest changes
-cd /home/user/spiderfoot
-git pull
+2. Check if the table exists:
 
-# Restart SpiderFoot
-python3 ./sf.py -l 127.0.0.1:5001
+sqlite3 /home/kali/Desktop/ASM-TEST/spiderfoot/data/spiderfoot.db ".tables"
+
+3. Check for any errors in browser console:
+
+Open browser DevTools (F12)
+Go to Console tab
+Look for any JavaScript errors when loading the Workspaces page
 ```
