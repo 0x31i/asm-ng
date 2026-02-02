@@ -2475,7 +2475,7 @@ div[id*="Help"].alert-info {
   background: #000000;
   width: 100%;
   height: 300px;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
   z-index: 1;
 }
@@ -2485,7 +2485,7 @@ div[id*="Help"].alert-info {
   top: 0;
   left: 0;
   width: 100%;
-  height: 100%;
+  height: calc(100% + 54px);
 }
 
 .asm-ng-logo {
@@ -2500,7 +2500,7 @@ div[id*="Help"].alert-info {
   height: 100%;
   display: block;
   object-fit: cover;
-  object-position: center;
+  object-position: center top;
 }
 
 /* Ensure video link fills container */
@@ -2529,7 +2529,6 @@ div[id*="Help"].alert-info {
   align-items: center;
   justify-content: center;
   padding: 0 20px;
-  margin-top: -54px;
 }
 
 /* Menu list - horizontal */
