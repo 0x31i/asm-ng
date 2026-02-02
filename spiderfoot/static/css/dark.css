@@ -2485,7 +2485,7 @@ div[id*="Help"].alert-info {
   top: 0;
   left: 0;
   width: 100%;
-  height: calc(100% + 54px);
+  height: 100%;
 }
 
 .asm-ng-logo {
@@ -2497,17 +2497,17 @@ div[id*="Help"].alert-info {
 /* ASM-NG Logo Video Styles */
 .asm-ng-logo-video {
   width: 100%;
-  height: 100%;
+  height: calc(100% + 54px);
   display: block;
   object-fit: cover;
-  object-position: center top;
+  object-position: center center;
 }
 
-/* Ensure video link fills container */
+/* Ensure video link fills container and allows video to extend */
 .asm-ng-logo-wrapper a {
   display: block;
   width: 100%;
-  height: 100%;
+  height: calc(100% + 54px);
 }
 
 /* ============================================
