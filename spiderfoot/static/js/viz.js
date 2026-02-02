@@ -278,7 +278,7 @@ function sf_viz_dendrogram(targetId, data) {
         var fpValue = setFp ? "1" : "0";
 
         $.ajax({
-            url: sf.docroot + '/resultsetfp',
+            url: docroot + '/resultsetfp',
             type: 'GET',
             data: {
                 id: scanId,
