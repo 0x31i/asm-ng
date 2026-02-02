@@ -1107,9 +1107,7 @@ function displayWorkspaces(workspaces) {
         html = '<div class="alert alert-info">No workspaces found. Create your first workspace to get started.</div>';
     } else {
         console.log('Building table with', workspaces.length, 'workspaces');
-        // Add a visible test element first
-        html = '<div style="background: red; color: white; padding: 20px; font-size: 24px; font-weight: bold;">TABLE SHOULD APPEAR BELOW THIS RED BOX</div>';
-        html += '<div class="table-responsive"><table class="table table-striped table-hover">';
+        html = '<div class="table-responsive"><table class="table table-striped table-hover">';
         html += '<thead><tr>';
         html += '<th>Name</th>';
         html += '<th>Description</th>';
@@ -1122,11 +1120,12 @@ function displayWorkspaces(workspaces) {
             var createdDate = new Date(workspace.created_time * 1000).toLocaleDateString();
             var targetCount = workspace.target_count || 0;
             var scanCount = workspace.scan_count || 0;
-            
-            html += '<tr>';
-            html += '<td><strong>' + escapeHtml(workspace.name) + '</strong></td>';
-            html += '<td>' + escapeHtml(workspace.description || '') + '</td>';
-            html += '<td>' + createdDate + '</td>';
+
+            // Added explicit inline styles to ensure visibility
+            html += '<tr style="background-color: inherit !important; color: inherit !important;">';
+            html += '<td style="color: #333 !important;"><strong>' + escapeHtml(workspace.name) + '</strong></td>';
+            html += '<td style="color: #333 !important;">' + escapeHtml(workspace.description || '') + '</td>';
+            html += '<td style="color: #333 !important;">' + createdDate + '</td>';
             html += '<td><span class="badge">' + targetCount + '</span></td>';
             html += '<td><span class="badge">' + scanCount + '</span></td>';
             html += '<td>';            html += '<div class="btn-group" role="group">';
