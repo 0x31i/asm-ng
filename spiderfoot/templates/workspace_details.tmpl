@@ -1,38 +1,37 @@
 <%include file="HEADER.tmpl"/>
     <div class="container-fluid">
+        <!-- Action Buttons - Centered above title -->
         <div class="row">
             <div class="col-md-12">
-                <ol class="breadcrumb">
-                    <li><a href="${docroot}/">Home</a></li>
-                    <li><a href="${docroot}/workspaces">Workspaces</a></li>
-                    <li class="active">${workspace.name}</li>
-                </ol>
+                <div class="workspace-action-bar text-center" style="margin: 20px 0 30px 0;">
+                    <button class="btn btn-primary" onclick="editWorkspace('${workspace.workspace_id}')">
+                        <i class="fa fa-edit"></i> Edit
+                    </button>
+                    <button class="btn btn-success" onclick="addTarget('${workspace.workspace_id}')">
+                        <i class="fa fa-plus"></i> Add Target
+                    </button>
+                    <button class="btn btn-info" onclick="importScans('${workspace.workspace_id}')">
+                        <i class="fa fa-download"></i> Import Scans
+                    </button>
+                    <button class="btn btn-primary" onclick="multiTargetScan('${workspace.workspace_id}')">
+                        <i class="fa fa-play"></i> Multi-Target Scan
+                    </button>
+                    <button class="btn btn-warning" onclick="schedulePeriodicScan('${workspace.workspace_id}')">
+                        <i class="fa fa-clock-o"></i> Schedule Periodic Scan
+                    </button>
+                    <button class="btn btn-danger" onclick="generateReport('${workspace.workspace_id}')">
+                        <i class="fa fa-file-text"></i> Generate Report
+                    </button>
+                </div>
             </div>
         </div>
-        
+
+        <!-- Workspace Title -->
         <div class="row">
             <div class="col-md-12">
-                <div class="page-header">
-                    <h1>${workspace.name} 
-                        <small>${workspace.description}</small>                        <span class="pull-right">
-                            <button class="btn btn-primary" onclick="editWorkspace('${workspace.workspace_id}')">
-                                <i class="fa fa-edit"></i> Edit
-                            </button>
-                            <button class="btn btn-success" onclick="addTarget('${workspace.workspace_id}')">
-                                <i class="fa fa-plus"></i> Add Target
-                            </button>
-                            <button class="btn btn-info" onclick="importScans('${workspace.workspace_id}')">
-                                <i class="fa fa-download"></i> Import Scans
-                            </button>                            <button class="btn btn-primary" onclick="multiTargetScan('${workspace.workspace_id}')">
-                                <i class="fa fa-play"></i> Multi-Target Scan
-                            </button>
-                            <button class="btn btn-info" onclick="schedulePeriodicScan('${workspace.workspace_id}')">
-                                <i class="fa fa-clock-o"></i> Schedule Periodic Scan
-                            </button>
-                            <button class="btn btn-warning" onclick="generateReport('${workspace.workspace_id}')">
-                                <i class="fa fa-file-text"></i> Generate Report
-                            </button>
-                        </span>
+                <div class="page-header text-center" style="border-bottom: none; margin-top: 0;">
+                    <h1>${workspace.name}
+                        <small>${workspace.description}</small>
                     </h1>
                 </div>
             </div>

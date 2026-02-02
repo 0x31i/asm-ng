@@ -3752,6 +3752,35 @@ table .btn-group .btn .glyphicon,
 /* ============================================
    Workspace Detail/Edit Page - Sharp Modern Style
    ============================================ */
+/* Centered action bar above title */
+.workspace-action-bar {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  padding: 15px 0 !important;
+}
+
+.workspace-action-bar .btn {
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  padding: 12px 20px !important;
+  border: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  transition: all 0.2s ease !important;
+}
+
+.workspace-action-bar .btn .fa,
+.workspace-action-bar .btn .glyphicon {
+  color: #ffffff !important;
+}
+
 /* Action buttons row (Edit, Add Target, Import Scans, etc.) */
 .workspace-actions-row .btn,
 .workspace-header .btn,
