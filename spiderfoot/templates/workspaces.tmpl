@@ -1107,7 +1107,38 @@ function displayWorkspaces(workspaces) {
         html = '<div class="alert alert-info">No workspaces found. Create your first workspace to get started.</div>';
     } else {
         console.log('Building table with', workspaces.length, 'workspaces');
-        html = '<div class="table-responsive"><table class="table table-striped table-hover">';
+
+        // Build rows array first for debugging
+        var rows = [];
+        workspaces.forEach(function(workspace, index) {
+            console.log('Processing workspace ' + index + ':', workspace);
+            var createdDate = new Date(workspace.created_time * 1000).toLocaleDateString();
+            var targetCount = workspace.target_count || 0;
+            var scanCount = workspace.scan_count || 0;
+            var name = escapeHtml(workspace.name);
+            var desc = escapeHtml(workspace.description || '');
+            var wsId = workspace.workspace_id;
+
+            var row = '<tr>';
+            row += '<td><strong>' + name + '</strong></td>';
+            row += '<td>' + desc + '</td>';
+            row += '<td>' + createdDate + '</td>';
+            row += '<td><span class="badge">' + targetCount + '</span></td>';
+            row += '<td><span class="badge">' + scanCount + '</span></td>';
+            row += '<td>';
+            row += '<div class="btn-group" role="group">';
+            row += '<button class="btn btn-sm btn-info" onclick="viewWorkspace(\'' + wsId + '\')" title="View"><i class="glyphicon glyphicon-eye-open"></i></button>';
+            row += '<button class="btn btn-sm btn-warning" onclick="editWorkspace(\'' + wsId + '\')" title="Edit"><i class="glyphicon glyphicon-edit"></i></button>';
+            row += '<button class="btn btn-sm btn-success" onclick="addTarget(\'' + wsId + '\')" title="Add Target"><i class="glyphicon glyphicon-plus"></i></button>';
+            row += '<button class="btn btn-sm btn-danger" onclick="deleteWorkspace(\'' + wsId + '\')" title="Delete"><i class="glyphicon glyphicon-trash"></i></button>';
+            row += '</div>';
+            row += '</td>';
+            row += '</tr>';
+            console.log('Row ' + index + ' HTML:', row);
+            rows.push(row);
+        });
+
+        html = '<table class="table table-striped table-hover">';
         html += '<thead><tr>';
         html += '<th>Name</th>';
         html += '<th>Description</th>';
@@ -1115,45 +1146,11 @@ function displayWorkspaces(workspaces) {
         html += '<th>Targets</th>';
         html += '<th>Scans</th>';
         html += '<th>Actions</th>';
-        html += '</tr></thead><tbody>';
-          workspaces.forEach(function(workspace) {
-            var createdDate = new Date(workspace.created_time * 1000).toLocaleDateString();
-            var targetCount = workspace.target_count || 0;
-            var scanCount = workspace.scan_count || 0;
+        html += '</tr></thead>';
+        html += '<tbody>' + rows.join('') + '</tbody>';
+        html += '</table>';
 
-            // Added explicit inline styles to ensure visibility
-            html += '<tr style="background-color: inherit !important; color: inherit !important;">';
-            html += '<td style="color: #333 !important;"><strong>' + escapeHtml(workspace.name) + '</strong></td>';
-            html += '<td style="color: #333 !important;">' + escapeHtml(workspace.description || '') + '</td>';
-            html += '<td style="color: #333 !important;">' + createdDate + '</td>';
-            html += '<td><span class="badge">' + targetCount + '</span></td>';
-            html += '<td><span class="badge">' + scanCount + '</span></td>';
-            html += '<td>';            html += '<div class="btn-group" role="group">';
-            html += '<button class="btn btn-sm btn-info" onclick="viewWorkspace(\'' + workspace.workspace_id + '\')" title="View Details">';
-            html += '<i class="glyphicon glyphicon-eye-open"></i></button>';
-            html += '<button class="btn btn-sm btn-warning" onclick="editWorkspace(\'' + workspace.workspace_id + '\')" title="Edit">';
-            html += '<i class="glyphicon glyphicon-edit"></i></button>';            html += '<button class="btn btn-sm btn-success" onclick="addTarget(\'' + workspace.workspace_id + '\')" title="Add Target">';
-            html += '<i class="glyphicon glyphicon-plus"></i></button>';
-            html += '<button class="btn btn-sm btn-primary" onclick="importScans(\'' + workspace.workspace_id + '\')" title="Import Scans">';
-            html += '<i class="glyphicon glyphicon-import"></i></button>';
-            // Only show multi-scan button if workspace has targets
-            if (targetCount > 0) {
-                html += '<button class="btn btn-sm btn-success" onclick="startMultiTargetScan(\'' + workspace.workspace_id + '\')" title="Start Multi-Target Scan">';
-                html += '<i class="glyphicon glyphicon-play"></i></button>';
-            }
-            // Only show generate report button if workspace has scans
-            if (scanCount > 0) {
-                html += '<button class="btn btn-sm btn-info" onclick="generateReport(\'' + workspace.workspace_id + '\')" title="Generate Report">';
-                html += '<i class="glyphicon glyphicon-file"></i></button>';
-            }
-            html += '<button class="btn btn-sm btn-danger" onclick="deleteWorkspace(\'' + workspace.workspace_id + '\')" title="Delete">';
-            html += '<i class="glyphicon glyphicon-trash"></i></button>';
-            html += '</div>';
-            html += '</td>';
-            html += '</tr>';
-        });
-        
-        html += '</tbody></table></div>';
+        console.log('Final table HTML:', html);
     }
 
     console.log('Setting #workspaceList HTML, length:', html.length);
