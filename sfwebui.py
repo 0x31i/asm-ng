@@ -1624,13 +1624,14 @@ class SpiderFootWebUi:
         return True
 
     @cherrypy.expose
-    def resultsetfp(self: 'SpiderFootWebUi', id: str, resultids: str, fp: str) -> str:
+    def resultsetfp(self: 'SpiderFootWebUi', id: str, resultids: str, fp: str, force: str = "0") -> str:
         """Set a bunch of results (hashes) as false positive.
 
         Args:
             id (str): scan ID
             resultids (str): comma separated list of result IDs
             fp (str): 0 or 1
+            force (str): 0 or 1 - bypass parent element check when unsetting
 
         Returns:
             str: set false positive status as JSON
@@ -1659,19 +1660,23 @@ class SpiderFootWebUi:
             ]).encode('utf-8')
 
         # Make sure the user doesn't set something as non-FP when the
-        # parent is set as an FP.
-        if fp == "0":
+        # parent is set as an FP (unless force is set).
+        if fp == "0" and force != "1":
             data = dbh.scanElementSourcesDirect(id, ids)
             for row in data:
                 if str(row[14]) == "1":
                     return json.dumps([
                         "WARNING",
-                        f"Cannot unset element {id} as False Positive if a parent element is still False Positive."
+                        f"Cannot unset element {id} as False Positive if a parent element is still False Positive. Use force option to override."
                     ]).encode('utf-8')
 
         # Set all the children as FPs too.. it's only logical afterall, right?
-        childs = dbh.scanElementChildrenAll(id, ids)
-        allIds = ids + childs
+        # When force unsetting, only unset the selected items, not children
+        if force == "1" and fp == "0":
+            allIds = ids
+        else:
+            childs = dbh.scanElementChildrenAll(id, ids)
+            allIds = ids + childs
 
         ret = dbh.scanResultsUpdateFP(id, allIds, fp)
         if ret:
@@ -1680,7 +1685,7 @@ class SpiderFootWebUi:
         return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
 
     @cherrypy.expose
-    def resultsetfppersist(self: 'SpiderFootWebUi', id: str, resultids: str, fp: str, persist: str = "0") -> str:
+    def resultsetfppersist(self: 'SpiderFootWebUi', id: str, resultids: str, fp: str, persist: str = "0", force: str = "0") -> str:
         """Set results as false positive with optional target-level persistence.
 
         This extends resultsetfp to optionally persist false positives at the target level,
@@ -1691,6 +1696,7 @@ class SpiderFootWebUi:
             resultids (str): comma separated list of result IDs
             fp (str): 0 or 1
             persist (str): 0 or 1 - whether to persist at target level
+            force (str): 0 or 1 - bypass parent element check when unsetting
 
         Returns:
             str: set false positive status as JSON
@@ -1721,19 +1727,23 @@ class SpiderFootWebUi:
         target = status[1]  # seed_target
 
         # Make sure the user doesn't set something as non-FP when the
-        # parent is set as an FP.
-        if fp == "0":
+        # parent is set as an FP (unless force is set).
+        if fp == "0" and force != "1":
             data = dbh.scanElementSourcesDirect(id, ids)
             for row in data:
                 if str(row[14]) == "1":
                     return json.dumps([
                         "WARNING",
-                        f"Cannot unset element {id} as False Positive if a parent element is still False Positive."
+                        f"Cannot unset element {id} as False Positive if a parent element is still False Positive. Use force option to override."
                     ]).encode('utf-8')
 
         # Set all the children as FPs too.. it's only logical afterall, right?
-        childs = dbh.scanElementChildrenAll(id, ids)
-        allIds = ids + childs
+        # When force unsetting, only unset the selected items, not children
+        if force == "1" and fp == "0":
+            allIds = ids
+        else:
+            childs = dbh.scanElementChildrenAll(id, ids)
+            allIds = ids + childs
 
         ret = dbh.scanResultsUpdateFP(id, allIds, fp)
 
