@@ -3913,7 +3913,7 @@ table .btn-danger:hover {
 .panel-success > .panel-heading,
 .workspace-stats .panel:nth-child(1) .panel-heading {
   background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
-  color: var(--text-primary) !important;
+  color: #ffffff !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
@@ -3923,8 +3923,8 @@ table .btn-danger:hover {
 .panel-warning > .panel-heading,
 .workspace-stats .panel:nth-child(2) .panel-heading {
   background: linear-gradient(135deg, var(--accent-yellow) 0%, #d97706 100%) !important;
-  color: #000 !important;
-  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* Correlations card - Red/Coral header */
@@ -3933,7 +3933,7 @@ table .btn-danger:hover {
 .panel-danger > .panel-heading,
 .workspace-stats .panel:nth-child(3) .panel-heading {
   background: linear-gradient(135deg, #f87171 0%, var(--accent-red) 100%) !important;
-  color: var(--text-primary) !important;
+  color: #ffffff !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
@@ -3943,7 +3943,7 @@ table .btn-danger:hover {
 .panel-info > .panel-heading,
 .workspace-stats .panel:nth-child(4) .panel-heading {
   background: linear-gradient(135deg, var(--accent-blue-light) 0%, var(--accent-blue) 100%) !important;
-  color: var(--text-primary) !important;
+  color: #ffffff !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
