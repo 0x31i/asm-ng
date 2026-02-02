@@ -1097,15 +1097,24 @@ input[type="checkbox"]#hidefps:hover,
   border-bottom-color: var(--bg-secondary);
 }
 
+/* Bootstrap tooltip wrapper - remove any default styling */
+.tooltip {
+  border: none !important;
+  box-shadow: none !important;
+}
+
 .tooltip-inner {
   background: #1a1a1a !important;
   color: #ffffff !important;
-  border-radius: 0 !important;
+  border: none !important;
+  border-radius: 4px !important;
   padding: 8px 12px;
   font-family: var(--font-mono);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  box-shadow: none !important;
+  max-width: 250px;
 }
 
 .tooltip.top .tooltip-arrow,
