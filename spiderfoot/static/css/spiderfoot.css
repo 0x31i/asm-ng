@@ -1269,6 +1269,25 @@ svg text {
   opacity: 0.7;
 }
 
+/* False positive link styling - red connecting lines */
+.dend-link-fp {
+  stroke: var(--accent-red) !important;
+  stroke-opacity: 0.6;
+  stroke-width: 2px;
+  filter: drop-shadow(0 0 3px var(--glow-red));
+}
+
+/* Dendrogram hover tooltip - ensure white text on dark background */
+#messageToolTipDiv,
+#messageToolTipDiv * {
+  color: white !important;
+}
+
+#messageToolTipDiv pre {
+  color: white !important;
+  background: rgba(255, 255, 255, 0.1);
+}
+
 /* Sigma.js Graph Visualization */
 .graph-container {
   background: var(--bg-secondary);
