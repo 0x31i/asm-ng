@@ -3752,13 +3752,13 @@ table .btn-group .btn .glyphicon,
 /* ============================================
    Workspace Detail/Edit Page - Sharp Modern Style
    ============================================ */
-/* Centered action bar above title */
+/* Centered action bar below title */
 .workspace-action-bar {
   display: flex !important;
   flex-wrap: wrap !important;
   justify-content: center !important;
-  gap: 10px !important;
-  padding: 15px 0 !important;
+  gap: 8px !important;
+  padding: 0 !important;
 }
 
 .workspace-action-bar .btn {
