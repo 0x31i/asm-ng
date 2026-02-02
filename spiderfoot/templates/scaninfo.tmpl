@@ -629,6 +629,22 @@
                     }
                 });
 
+                // Store original colors for reset
+                var originalNodeColors = {};
+                var originalEdgeColors = {};
+                var selectedNodeId = null;
+                var highlightColor = isDarkMode ? '#22d3ee' : '#0891b2'; // cyan
+                var pathColor = isDarkMode ? '#4ade80' : '#3b82f6'; // green/blue
+                var dimmedNodeColor = isDarkMode ? 'rgba(74, 222, 128, 0.15)' : 'rgba(59, 130, 246, 0.2)';
+                var dimmedEdgeColor = isDarkMode ? 'rgba(100, 200, 150, 0.08)' : 'rgba(100, 100, 100, 0.08)';
+
+                s.graph.nodes().forEach(function(n) {
+                    originalNodeColors[n.id] = n.color;
+                });
+                s.graph.edges().forEach(function(e) {
+                    originalEdgeColors[e.id] = e.color || edgeColor;
+                });
+
                 s.settings({
                     edgeColor: 'default',
                     defaultEdgeColor: edgeColor,
@@ -642,6 +658,69 @@
                     labelSize: 'proportional',
                     labelSizeRatio: 1.5
                 });
+
+                // Click handler for node path highlighting
+                s.bind('clickNode', function(e) {
+                    var clickedNodeId = e.data.node.id;
+
+                    // If clicking the same node, deselect
+                    if (selectedNodeId === clickedNodeId) {
+                        resetHighlighting();
+                        return;
+                    }
+
+                    selectedNodeId = clickedNodeId;
+
+                    // Get all edges connected to the clicked node
+                    var connectedNodeIds = {};
+                    connectedNodeIds[clickedNodeId] = true;
+
+                    s.graph.edges().forEach(function(edge) {
+                        if (edge.source === clickedNodeId || edge.target === clickedNodeId) {
+                            connectedNodeIds[edge.source] = true;
+                            connectedNodeIds[edge.target] = true;
+                        }
+                    });
+
+                    // Highlight connected nodes and dim others
+                    s.graph.nodes().forEach(function(n) {
+                        if (n.id === clickedNodeId) {
+                            n.color = highlightColor;
+                        } else if (connectedNodeIds[n.id]) {
+                            n.color = pathColor;
+                        } else {
+                            n.color = dimmedNodeColor;
+                        }
+                    });
+
+                    // Highlight connected edges and dim others
+                    s.graph.edges().forEach(function(edge) {
+                        if (edge.source === clickedNodeId || edge.target === clickedNodeId) {
+                            edge.color = highlightColor;
+                        } else {
+                            edge.color = dimmedEdgeColor;
+                        }
+                    });
+
+                    s.refresh();
+                });
+
+                // Click on background to reset
+                s.bind('clickStage', function(e) {
+                    resetHighlighting();
+                });
+
+                function resetHighlighting() {
+                    selectedNodeId = null;
+                    s.graph.nodes().forEach(function(n) {
+                        n.color = originalNodeColors[n.id] || defaultNodeColor;
+                    });
+                    s.graph.edges().forEach(function(edge) {
+                        edge.color = originalEdgeColors[edge.id] || edgeColor;
+                    });
+                    s.refresh();
+                }
+
                 sigma.plugins.dragNodes(s, s.renderers[0])
                 s.refresh()
                 $("#loader").hide();

@@ -213,11 +213,66 @@ function sf_viz_dendrogram(targetId, data) {
         .attr("class", "dend-link")
         .attr("d", diagonal);
 
+    // Track currently selected node for path highlighting
+    var selectedNode = null;
+
+    // Function to get path from node to root
+    function getPathToRoot(node) {
+        var path = [];
+        var current = node;
+        while (current) {
+            path.push(current);
+            current = current.parent;
+        }
+        return path;
+    }
+
+    // Function to highlight path
+    function highlightPath(node) {
+        // Clear previous highlights
+        svg.selectAll(".dend-link").classed("dend-link-highlighted", false).classed("dend-link-dimmed", false);
+        svg.selectAll(".dend-node").classed("dend-node-selected", false).classed("dend-node-path", false).classed("dend-node-dimmed", false);
+        d3.select(targetId).classed("path-active", false);
+
+        if (selectedNode === node) {
+            // Clicking same node deselects
+            selectedNode = null;
+            return;
+        }
+
+        selectedNode = node;
+        var pathNodes = getPathToRoot(node);
+
+        // Mark container as having active path selection
+        d3.select(targetId).classed("path-active", true);
+
+        // Highlight nodes in path, dim others
+        svg.selectAll(".dend-node").each(function(d) {
+            var inPath = pathNodes.indexOf(d) !== -1;
+            d3.select(this).classed("dend-node-path", inPath);
+            d3.select(this).classed("dend-node-selected", d === node);
+            d3.select(this).classed("dend-node-dimmed", !inPath);
+        });
+
+        // Highlight links in path, dim others
+        svg.selectAll(".dend-link").each(function(d) {
+            var sourceInPath = pathNodes.indexOf(d.source) !== -1;
+            var targetInPath = pathNodes.indexOf(d.target) !== -1;
+            var linkInPath = sourceInPath && targetInPath;
+            d3.select(this).classed("dend-link-highlighted", linkInPath);
+            d3.select(this).classed("dend-link-dimmed", !linkInPath);
+        });
+    }
+
     var node = svg.selectAll(".node")
         .data(nodes)
         .enter().append("g")
         .attr("class", "dend-node")
         .attr("transform", function(d) { return "translate(" + d.y + "," + d.x + ")"; })
+        .on("click", function(d) {
+            d3.event.stopPropagation();
+            highlightPath(d);
+        })
         .on("mouseover", function(d, i) {
             d3.select(this).classed("dend-node-hover", true);
             showToolTip(buildPopupMessage(dataMap[d.name]), d3.event.pageX+10, d3.event.pageY+10,true);
@@ -226,6 +281,14 @@ function sf_viz_dendrogram(targetId, data) {
             d3.select(this).classed("dend-node-hover", false);
             showToolTip(" ",0,0,false);
         });
+
+    // Click on background to deselect
+    d3.select(targetId).on("click", function() {
+        selectedNode = null;
+        svg.selectAll(".dend-link").classed("dend-link-highlighted", false).classed("dend-link-dimmed", false);
+        svg.selectAll(".dend-node").classed("dend-node-selected", false).classed("dend-node-path", false).classed("dend-node-dimmed", false);
+        d3.select(targetId).classed("path-active", false);
+    });
 
     node.append("circle")
         .attr("r", 4.5);
