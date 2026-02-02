@@ -122,6 +122,14 @@ sf.updateTooltips = function () {
   $(document).ready(function () {
     if ($("[rel=tooltip]").length) {
       $("[rel=tooltip]").tooltip({ container: "body" });
+      // Hide tooltips when dropdowns are shown to prevent tooltip persistence
+      $(document).on('show.bs.dropdown', function () {
+        $("[rel=tooltip]").tooltip('hide');
+      });
+      // Also hide on click for dropdown toggles
+      $('.dropdown-toggle[rel=tooltip]').on('click', function () {
+        $(this).tooltip('hide');
+      });
     }
   });
 };
