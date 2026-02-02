@@ -3,7 +3,7 @@
         <!-- Workspace Title -->
         <div class="row">
             <div class="col-md-12">
-                <div class="page-header text-center" style="border-bottom: none; margin: 15px 0 10px 0; padding: 0;">
+                <div class="page-header text-center" style="border-bottom: none; margin: 0 0 10px 0; padding: 10px 0 0 0;">
                     <h1>${workspace.name}
                         <small>${workspace.description}</small>
                     </h1>
@@ -14,7 +14,7 @@
         <!-- Action Buttons - Centered below title -->
         <div class="row">
             <div class="col-md-12">
-                <div class="workspace-action-bar text-center" style="margin: 0 0 20px 0;">
+                <div class="workspace-action-bar text-center" style="margin: 0 0 15px 0;">
                     <button class="btn btn-primary" onclick="editWorkspace('${workspace.workspace_id}')">
                         <i class="fa fa-edit"></i> Edit
                     </button>
@@ -78,17 +78,15 @@
                         <h3 class="panel-title"><i class="fa fa-calendar"></i> Created</h3>
                     </div>
                     <div class="panel-body text-center">
-                        <h2>
+                        <div class="created-date">
                             <script>
                                 document.write(new Date(${workspace.created_time} * 1000).toLocaleDateString('en-US', {
                                     year: 'numeric',
-                                    month: 'long',
-                                    day: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
+                                    month: 'short',
+                                    day: 'numeric'
                                 }));
                             </script>
-                        </h2>
+                        </div>
                         <p>Workspace Created</p>
                     </div>
                 </div>

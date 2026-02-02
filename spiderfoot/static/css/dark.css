@@ -3820,6 +3820,16 @@ table .btn-danger:hover {
   margin: 10px 0 !important;
 }
 
+/* Created date - smaller to fit in card */
+.created-date {
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 18px !important;
+  color: #ffffff !important;
+  margin: 15px 0 !important;
+  line-height: 1.4 !important;
+}
+
 /* Stat labels */
 .workspace-stat-card .stat-label,
 .stat-card p,
