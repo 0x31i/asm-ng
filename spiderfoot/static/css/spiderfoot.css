@@ -2629,6 +2629,7 @@ div[id*="Help"].alert-info {
   align-items: center;
   justify-content: center;
   padding: 0 20px;
+  margin-top: -54px;
 }
 
 /* Menu list - horizontal */
@@ -2845,7 +2846,7 @@ div[id*="Help"].alert-info {
 #mainbody {
   margin-left: auto !important;
   margin-right: auto !important;
-  margin-top: 20px !important;
+  margin-top: 30px !important;
   padding-bottom: 80px !important;
 }
 
