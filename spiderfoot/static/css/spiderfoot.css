@@ -901,6 +901,10 @@ tr.danger td {
   border-radius: var(--radius-md);
   padding: 12px 18px;
   margin-bottom: 20px;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
 }
 
 .breadcrumb > li + li:before {
@@ -931,7 +935,7 @@ tr.danger td {
 /* ============================================
    False Positives Controls Area
    ============================================ */
-/* Container for FP controls (Hide FPs, Stored FPs) */
+/* Container for FP controls (Hide FPs, Marked FPs) */
 .breadcrumb .pull-right,
 .panel-heading .pull-right,
 div[class*="pull-right"]:has(.glyphicon-ban-circle),
@@ -946,6 +950,8 @@ div[class*="pull-right"]:has(.glyphicon-repeat) {
   align-items: center !important;
   gap: 4px !important;
   white-space: nowrap !important;
+  float: none !important;
+  margin-left: auto !important;
 }
 
 /* FP controls icons - tighter spacing */
