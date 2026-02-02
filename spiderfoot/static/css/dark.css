@@ -1140,12 +1140,18 @@ svg text {
   stroke: var(--text-secondary);
   stroke-width: 1px;
   stroke-opacity: 0.5;
+  transition: all var(--transition-fast);
+}
+
+.dend-node {
+  cursor: pointer;
 }
 
 .dend-node circle {
   fill: var(--accent-green);
   stroke: var(--bg-primary);
   stroke-width: 2px;
+  transition: all var(--transition-fast);
 }
 
 .dend-node text {
@@ -1166,6 +1172,51 @@ svg text {
 .dend-node-hover text {
   fill: var(--accent-green);
   font-weight: 600;
+}
+
+/* Path highlighting with glow effect */
+.dend-link-highlighted {
+  stroke: var(--accent-cyan);
+  stroke-width: 3px;
+  stroke-opacity: 1;
+  filter: drop-shadow(0 0 6px var(--accent-cyan)) drop-shadow(0 0 12px var(--glow-cyan));
+}
+
+.dend-node-selected circle {
+  fill: var(--accent-cyan);
+  stroke: var(--bg-primary);
+  stroke-width: 3px;
+  filter: drop-shadow(0 0 8px var(--accent-cyan)) drop-shadow(0 0 16px var(--glow-cyan));
+}
+
+.dend-node-selected text {
+  fill: var(--accent-cyan);
+  font-weight: 700;
+}
+
+.dend-node-path circle {
+  fill: var(--accent-green);
+  stroke: var(--bg-primary);
+  stroke-width: 2px;
+  filter: drop-shadow(0 0 4px var(--glow-green));
+}
+
+.dend-node-path text {
+  fill: var(--accent-green-light);
+  font-weight: 600;
+}
+
+/* Dimmed state for non-highlighted elements */
+.dend-link-dimmed {
+  stroke-opacity: 0.1;
+}
+
+.dend-node-dimmed circle {
+  opacity: 0.2;
+}
+
+.dend-node-dimmed text {
+  opacity: 0.25;
 }
 
 /* Sigma.js Graph Visualization */
