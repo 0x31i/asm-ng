@@ -2619,16 +2619,17 @@ div[id*="Help"].alert-info {
   left: 0;
   right: 0;
   width: 100%;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   z-index: 1050;
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: center;
   padding: 0 20px;
+  margin-top: -54px;
 }
 
 /* Menu list - horizontal */
@@ -2650,14 +2651,14 @@ div[id*="Help"].alert-info {
   display: flex;
   align-items: center;
   padding: 15px 25px;
-  color: #ffffff;
+  color: #1a1a1a;
   text-decoration: none;
   transition: all 0.2s ease;
   border-bottom: 3px solid transparent;
 }
 
 .asm-ng-sidebar .sidebar-nav > li > a:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.05);
   border-bottom-color: var(--accent-green);
 }
 
@@ -2672,7 +2673,7 @@ div[id*="Help"].alert-info {
   width: 24px;
   min-width: 24px;
   text-align: center;
-  color: #ffffff;
+  color: #1a1a1a;
   text-shadow: none;
   transition: all 0.2s ease;
 }
@@ -2696,7 +2697,7 @@ div[id*="Help"].alert-info {
   letter-spacing: 1px;
   margin-left: 10px;
   white-space: nowrap;
-  color: #ffffff;
+  color: #1a1a1a;
   text-shadow: none;
   transition: all 0.2s ease;
 }
@@ -2821,12 +2822,12 @@ div[id*="Help"].alert-info {
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   padding: 15px 0;
   z-index: 1000;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .ngs-footer-text {
@@ -2835,8 +2836,8 @@ div[id*="Help"].alert-info {
   font-size: 14px;
   text-transform: uppercase;
   letter-spacing: 2px;
-  color: #ffffff;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.5), 0 0 30px rgba(255, 255, 255, 0.3);
+  color: #000000;
+  text-shadow: none;
 }
 
 /* ============================================
