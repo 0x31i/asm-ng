@@ -496,7 +496,7 @@ function sf_viz_dendrogram(targetId, data) {
         var message = "<table style='color:white;'>";
         message += "<tr><td style='color:white;'><b>Type:</b></td><td style='color:white;'>" + data[10] + "</td></tr>";
         message += "<tr><td style='color:white;'><b>Source Module:</b></td><td style='color:white;'>" + data[3] + "</td></tr>";
-        message += "<tr><td style='color:white;'><b>Data:</b></td><td style='color:white;'><pre style='color:white !important;background:rgba(255,255,255,0.1);padding:4px 8px;border-radius:4px;margin:0;'>" + sf.remove_sfurltag(displayData);
+        message += "<tr><td style='color:white;'><b>Data:</b></td><td style='color:white;'><pre style='color:#1f2937;background:#e5e7eb;padding:4px 8px;border-radius:4px;margin:0;'>" + sf.remove_sfurltag(displayData);
         message += "</pre></td></tr>";
         message += "</table>";
         message += "<div style='font-size:10px;color:#888;margin-top:5px;'>Click for more options</div>";
