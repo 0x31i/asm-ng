@@ -182,6 +182,7 @@ function sf_viz_vbar_type(d) {
 function sf_viz_dendrogram(targetId, data) {
     var plotData = data['tree'];
     var dataMap = data['data'];
+    var scanId = data['scanId'];
     var width = sf_viz_countLevels([plotData], 0, 0)[1] * 170;
     var height = sf_viz_countTailNodes([plotData]) * 20;
 
@@ -190,7 +191,7 @@ function sf_viz_dendrogram(targetId, data) {
     }
     if (height < 600) {
         height = 600;
-    }  
+    }
 
     var cluster = d3.layout.cluster()
         .size([height, width - 160]);
@@ -215,6 +216,10 @@ function sf_viz_dendrogram(targetId, data) {
 
     // Track currently selected node for path highlighting
     var selectedNode = null;
+    // Track which node has the info panel open
+    var infoPanelNode = null;
+    // Track nodes marked as FP in this session (for undo capability)
+    var sessionFpNodes = {};
 
     // Function to get path from node to root
     function getPathToRoot(node) {
@@ -264,6 +269,65 @@ function sf_viz_dendrogram(targetId, data) {
         });
     }
 
+    // Mark a node as false positive
+    function markAsFalsePositive(nodeName, setFp) {
+        var nodeData = dataMap[nodeName];
+        if (!nodeData || !nodeData[8]) return; // No hash available
+
+        var hash = nodeData[8];
+        var fpValue = setFp ? "1" : "0";
+
+        $.ajax({
+            url: sf.docroot + '/resultsetfp',
+            type: 'GET',
+            data: {
+                id: scanId,
+                resultids: JSON.stringify([hash]),
+                fp: fpValue
+            },
+            success: function(response) {
+                var result = JSON.parse(response);
+                if (result[0] === "SUCCESS") {
+                    if (setFp) {
+                        sessionFpNodes[nodeName] = true;
+                        // Mark the node visually as FP (red)
+                        svg.selectAll(".dend-node").each(function(d) {
+                            if (d.name === nodeName) {
+                                d3.select(this).classed("dend-node-fp", true);
+                            }
+                        });
+                    } else {
+                        delete sessionFpNodes[nodeName];
+                        // Remove FP marking
+                        svg.selectAll(".dend-node").each(function(d) {
+                            if (d.name === nodeName) {
+                                d3.select(this).classed("dend-node-fp", false);
+                            }
+                        });
+                    }
+                    // Update the info panel if it's still open
+                    if (infoPanelNode && infoPanelNode.name === nodeName) {
+                        updateInfoPanel(infoPanelNode);
+                    }
+                } else if (result[0] === "WARNING") {
+                    alert(result[1]);
+                } else {
+                    alert("Error setting false positive: " + result[1]);
+                }
+            },
+            error: function() {
+                alert("Failed to communicate with server");
+            }
+        });
+    }
+
+    // Update info panel content
+    function updateInfoPanel(d) {
+        var nodeData = dataMap[d.name];
+        var isFp = sessionFpNodes[d.name] || false;
+        showInfoPanel(buildInfoPanelMessage(nodeData, d.name, isFp), d3.event ? d3.event.pageX : 100, d3.event ? d3.event.pageY : 100, true);
+    }
+
     var node = svg.selectAll(".node")
         .data(nodes)
         .enter().append("g")
@@ -271,20 +335,46 @@ function sf_viz_dendrogram(targetId, data) {
         .attr("transform", function(d) { return "translate(" + d.y + "," + d.x + ")"; })
         .on("click", function(d) {
             d3.event.stopPropagation();
+
+            // If clicking the same node with info panel open, close it and deselect
+            if (infoPanelNode === d) {
+                hideInfoPanel();
+                infoPanelNode = null;
+                selectedNode = null;
+                svg.selectAll(".dend-link").classed("dend-link-highlighted", false).classed("dend-link-dimmed", false);
+                svg.selectAll(".dend-node").classed("dend-node-selected", false).classed("dend-node-path", false).classed("dend-node-dimmed", false);
+                d3.select(targetId).classed("path-active", false);
+                return;
+            }
+
+            // Highlight path
             highlightPath(d);
+
+            // Show persistent info panel
+            infoPanelNode = d;
+            var nodeData = dataMap[d.name];
+            var isFp = sessionFpNodes[d.name] || false;
+            showInfoPanel(buildInfoPanelMessage(nodeData, d.name, isFp), d3.event.pageX + 10, d3.event.pageY + 10, true);
         })
         .on("mouseover", function(d, i) {
             d3.select(this).classed("dend-node-hover", true);
-            showToolTip(buildPopupMessage(dataMap[d.name]), d3.event.pageX+10, d3.event.pageY+10,true);
+            // Only show hover tooltip if no info panel is open
+            if (!infoPanelNode) {
+                showToolTip(buildPopupMessage(dataMap[d.name]), d3.event.pageX+10, d3.event.pageY+10, true);
+            }
         })
         .on("mouseout", function() {
             d3.select(this).classed("dend-node-hover", false);
-            showToolTip(" ",0,0,false);
+            if (!infoPanelNode) {
+                showToolTip(" ", 0, 0, false);
+            }
         });
 
-    // Click on background to deselect
+    // Click on background to deselect and close info panel
     d3.select(targetId).on("click", function() {
         selectedNode = null;
+        infoPanelNode = null;
+        hideInfoPanel();
         svg.selectAll(".dend-link").classed("dend-link-highlighted", false).classed("dend-link-dimmed", false);
         svg.selectAll(".dend-node").classed("dend-node-selected", false).classed("dend-node-path", false).classed("dend-node-dimmed", false);
         d3.select(targetId).classed("path-active", false);
@@ -294,16 +384,16 @@ function sf_viz_dendrogram(targetId, data) {
         .attr("r", 4.5);
 
     node.append("text")
-        .attr("dx", function(d) { 
-            if (d.depth == 0) { 
+        .attr("dx", function(d) {
+            if (d.depth == 0) {
                 return 50;
             }
 
-            return d.children ? -8 : 8; 
+            return d.children ? -8 : 8;
         })
         .attr("dy", 3)
         .style("text-anchor", function(d) { return d.children ? "end" : "start"; })
-        .text(function(d) { 
+        .text(function(d) {
             if (dataMap[d.name][1].length > 20) {
                 return sf.remove_sfurltag(dataMap[d.name][1].substring(0, 20) + "...");
             } else {
@@ -313,29 +403,91 @@ function sf_viz_dendrogram(targetId, data) {
 
     d3.select(targetId).style("height", height + "px");
 
+    // Simple hover tooltip (brief info)
     function buildPopupMessage(data) {
-        if (data[1].length > 200) {
-            data[1] = data[1].substring(0, 200) + "...";
+        var displayData = data[1];
+        if (displayData.length > 200) {
+            displayData = displayData.substring(0, 200) + "...";
         }
-        data[1] = data[1].replace("<", "&lt;").replace(">", "&gt;");
-        message = "<table>";
+        displayData = displayData.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        var message = "<table>";
         message += "<tr><td><b>Type:</b></td><td>" + data[10] + "</td></tr>";
         message += "<tr><td><b>Source Module:</b></td><td>" + data[3] + "</td></tr>";
-        message += "<tr><td><b>Data:</b></td><td><pre>" + sf.remove_sfurltag(data[1])
+        message += "<tr><td><b>Data:</b></td><td><pre>" + sf.remove_sfurltag(displayData);
         message += "</pre></td></tr>";
         message += "</table>";
+        message += "<div style='font-size:10px;color:#888;margin-top:5px;'>Click for more options</div>";
         return message;
     }
 
-    function showToolTip(pMessage,pX,pY,pShow) {
-        if (typeof(tooltipDivID)=="undefined") {
-            tooltipDivID =$('<div id="messageToolTipDiv" style="position:absolute;display:block;z-index:10000;border:2px solid black;background-color:rgba(0,0,0,0.8);margin:auto;padding:3px 5px 3px 5px;color:white;font-size:12px;font-family:arial;border-radius: 5px;vertical-align: middle;text-align: center;min-width:50px;overflow:auto;"></div>');
+    // Persistent info panel with FP button (detailed info + actions)
+    function buildInfoPanelMessage(data, nodeName, isFp) {
+        var displayData = data[1];
+        if (displayData.length > 300) {
+            displayData = displayData.substring(0, 300) + "...";
+        }
+        displayData = displayData.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+        var message = "<div style='text-align:left;'>";
+        message += "<table style='margin-bottom:10px;'>";
+        message += "<tr><td><b>Type:</b></td><td>" + data[10] + "</td></tr>";
+        message += "<tr><td><b>Source Module:</b></td><td>" + data[3] + "</td></tr>";
+        message += "<tr><td><b>Data:</b></td><td><pre style='max-width:300px;overflow:auto;'>" + sf.remove_sfurltag(displayData) + "</pre></td></tr>";
+        message += "</table>";
+
+        // Don't show FP button for synthetic nodes (like "Discovery Paths")
+        if (data[8] && data[8] !== 'discovery_paths') {
+            message += "<div style='border-top:1px solid #444;padding-top:8px;margin-top:5px;'>";
+            if (isFp) {
+                message += "<button onclick='window.dendroUnsetFp(\"" + nodeName.replace(/"/g, '\\"') + "\")' style='background:#dc2626;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;margin-right:5px;'>Marked as False Positive</button>";
+                message += "<button onclick='window.dendroUnsetFp(\"" + nodeName.replace(/"/g, '\\"') + "\")' style='background:#374151;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;'>Undo</button>";
+            } else {
+                message += "<button onclick='window.dendroSetFp(\"" + nodeName.replace(/"/g, '\\"') + "\")' style='background:#f59e0b;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;'>Mark as False Positive</button>";
+            }
+            message += "</div>";
+        }
+        message += "</div>";
+        return message;
+    }
+
+    // Expose FP functions globally for button onclick
+    window.dendroSetFp = function(nodeName) {
+        markAsFalsePositive(nodeName, true);
+    };
+    window.dendroUnsetFp = function(nodeName) {
+        markAsFalsePositive(nodeName, false);
+    };
+
+    function showToolTip(pMessage, pX, pY, pShow) {
+        if (typeof(tooltipDivID) == "undefined") {
+            tooltipDivID = $('<div id="messageToolTipDiv" style="position:absolute;display:block;z-index:10000;border:2px solid black;background-color:rgba(0,0,0,0.9);margin:auto;padding:8px 12px;color:white;font-size:12px;font-family:arial;border-radius:5px;vertical-align:middle;text-align:center;min-width:50px;overflow:auto;max-width:400px;"></div>');
             $('body').append(tooltipDivID);
         }
-        if (!pShow) { tooltipDivID.hide(); return;}
-            tooltipDivID.html(pMessage);
-            tooltipDivID.css({top:pY,left:pX});
-            tooltipDivID.show();
+        if (!pShow) { tooltipDivID.hide(); return; }
+        tooltipDivID.html(pMessage);
+        tooltipDivID.css({top: pY, left: pX});
+        tooltipDivID.show();
+    }
+
+    function showInfoPanel(pMessage, pX, pY, pShow) {
+        if (typeof(infoPanelDivID) == "undefined") {
+            infoPanelDivID = $('<div id="infoPanelDiv" style="position:absolute;display:block;z-index:10001;border:2px solid #06b6d4;background-color:rgba(0,0,0,0.95);margin:auto;padding:12px 16px;color:white;font-size:12px;font-family:arial;border-radius:8px;vertical-align:middle;min-width:200px;max-width:450px;box-shadow:0 0 20px rgba(6,182,212,0.3);"></div>');
+            $('body').append(infoPanelDivID);
+        }
+        if (!pShow) { infoPanelDivID.hide(); return; }
+        // Hide hover tooltip when showing info panel
+        if (typeof(tooltipDivID) != "undefined") {
+            tooltipDivID.hide();
+        }
+        infoPanelDivID.html(pMessage);
+        infoPanelDivID.css({top: pY, left: pX});
+        infoPanelDivID.show();
+    }
+
+    function hideInfoPanel() {
+        if (typeof(infoPanelDivID) != "undefined") {
+            infoPanelDivID.hide();
+        }
     }
 }
 

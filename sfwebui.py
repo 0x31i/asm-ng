@@ -2490,12 +2490,13 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
-    def scanelementtypediscovery(self: 'SpiderFootWebUi', id: str, eventType: str) -> dict:
+    def scanelementtypediscovery(self: 'SpiderFootWebUi', id: str, eventType: str, filterFp: str = "1") -> dict:
         """Scan element type discovery.
 
         Args:
             id (str): scan ID
             eventType (str): filter by event type
+            filterFp (str): filter out false positives (1=yes, 0=no)
 
         Returns:
             dict
@@ -2507,7 +2508,9 @@ class SpiderFootWebUi:
 
         # Get the events we will be tracing back from
         try:
-            leafSet = dbh.scanResultEvent(id, eventType)
+            # Filter false positives from leaf set if requested
+            filter_fp = filterFp == "1"
+            leafSet = dbh.scanResultEvent(id, eventType, filterFp=filter_fp)
             [datamap, pc] = dbh.scanElementSourcesAll(id, leafSet)
         except Exception:
             return retdata
@@ -2538,6 +2541,7 @@ class SpiderFootWebUi:
             ]
 
         retdata['data'] = datamap
+        retdata['scanId'] = id
 
         return retdata
 
