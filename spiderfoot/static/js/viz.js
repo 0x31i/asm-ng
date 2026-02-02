@@ -220,6 +220,9 @@ function sf_viz_dendrogram(targetId, data) {
     var infoPanelNode = null;
     // Track nodes marked as FP in this session (for undo capability)
     var sessionFpNodes = {};
+    // Store last panel position for updates
+    var lastPanelX = 100;
+    var lastPanelY = 100;
 
     // Function to get path from node to root
     function getPathToRoot(node) {
@@ -272,10 +275,16 @@ function sf_viz_dendrogram(targetId, data) {
     // Mark a node as false positive (persists to future scans)
     function markAsFalsePositive(nodeName, setFp) {
         var nodeData = dataMap[nodeName];
-        if (!nodeData || !nodeData[8]) return; // No hash available
+        if (!nodeData || !nodeData[8]) {
+            console.error("No node data or hash for:", nodeName);
+            alert("Cannot mark this item - no data available");
+            return;
+        }
 
         var hash = nodeData[8];
         var fpValue = setFp ? "1" : "0";
+
+        console.log("Marking FP:", nodeName, "hash:", hash, "fp:", fpValue, "scanId:", scanId);
 
         $.ajax({
             url: docroot + '/resultsetfppersist',
@@ -287,7 +296,16 @@ function sf_viz_dendrogram(targetId, data) {
                 persist: "1"  // Apply to future scans as well
             },
             success: function(response) {
-                var result = JSON.parse(response);
+                console.log("FP response:", response);
+                var result;
+                try {
+                    result = typeof response === 'string' ? JSON.parse(response) : response;
+                } catch (e) {
+                    console.error("Failed to parse response:", e);
+                    alert("Error parsing server response");
+                    return;
+                }
+
                 if (result[0] === "SUCCESS") {
                     if (setFp) {
                         sessionFpNodes[nodeName] = true;
@@ -313,20 +331,22 @@ function sf_viz_dendrogram(targetId, data) {
                 } else if (result[0] === "WARNING") {
                     alert(result[1]);
                 } else {
-                    alert("Error setting false positive: " + result[1]);
+                    alert("Error setting false positive: " + (result[1] || "Unknown error"));
                 }
             },
-            error: function() {
-                alert("Failed to communicate with server");
+            error: function(xhr, status, error) {
+                console.error("AJAX error:", status, error, xhr.responseText);
+                alert("Failed to communicate with server: " + error);
             }
         });
     }
 
-    // Update info panel content
+    // Update info panel content (preserves position)
     function updateInfoPanel(d) {
         var nodeData = dataMap[d.name];
         var isFp = sessionFpNodes[d.name] || false;
-        showInfoPanel(buildInfoPanelMessage(nodeData, d.name, isFp), d3.event ? d3.event.pageX : 100, d3.event ? d3.event.pageY : 100, true);
+        // Use stored position instead of d3.event (which won't exist in AJAX callback)
+        showInfoPanel(buildInfoPanelMessage(nodeData, d.name, isFp), lastPanelX, lastPanelY, true);
     }
 
     var node = svg.selectAll(".node")
@@ -355,7 +375,10 @@ function sf_viz_dendrogram(targetId, data) {
             infoPanelNode = d;
             var nodeData = dataMap[d.name];
             var isFp = sessionFpNodes[d.name] || false;
-            showInfoPanel(buildInfoPanelMessage(nodeData, d.name, isFp), d3.event.pageX + 10, d3.event.pageY + 10, true);
+            // Store position for later updates
+            lastPanelX = d3.event.pageX + 10;
+            lastPanelY = d3.event.pageY + 10;
+            showInfoPanel(buildInfoPanelMessage(nodeData, d.name, isFp), lastPanelX, lastPanelY, true);
         })
         .on("mouseover", function(d, i) {
             d3.select(this).classed("dend-node-hover", true);
