@@ -733,17 +733,17 @@ tr.danger td {
 
 .badge.alert-success {
   background: var(--accent-green) !important;
-  color: #000 !important;
+  color: #ffffff !important;
 }
 
 .badge.alert-info {
   background: var(--accent-blue) !important;
-  color: white !important;
+  color: #ffffff !important;
 }
 
 .badge.alert-warning {
   background: var(--accent-yellow) !important;
-  color: #000 !important;
+  color: #ffffff !important;
 }
 
 .badge.alert-danger {
@@ -1184,12 +1184,12 @@ svg text {
 
 #scanlist .badge.alert-success {
   background: var(--accent-green) !important;
-  color: #000000 !important;
+  color: #ffffff !important;
 }
 
 #scanlist .badge.alert-warning {
   background: var(--accent-yellow) !important;
-  color: #000000 !important;
+  color: #ffffff !important;
 }
 
 #scanlist .badge.alert-danger {
@@ -1235,12 +1235,12 @@ svg text {
 
 .label-success {
   background: var(--accent-green);
-  color: #000;
+  color: #ffffff;
 }
 
 .label-warning {
   background: var(--accent-yellow);
-  color: #000;
+  color: #ffffff;
 }
 
 .label-danger {
@@ -1878,19 +1878,19 @@ input[type="radio"]:checked::after {
    ============================================ */
 .badge.alert-success {
   background: var(--accent-green) !important;
-  color: #000 !important;
+  color: #ffffff !important;
   box-shadow: 0 0 12px var(--glow-green);
 }
 
 .badge.alert-info {
   background: var(--accent-blue) !important;
-  color: white !important;
+  color: #ffffff !important;
   box-shadow: 0 0 12px var(--glow-blue);
 }
 
 .badge.alert-warning {
   background: var(--accent-yellow) !important;
-  color: #000 !important;
+  color: #ffffff !important;
   box-shadow: 0 0 12px var(--glow-yellow);
 }
 
