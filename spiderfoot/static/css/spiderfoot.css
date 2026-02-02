@@ -1277,15 +1277,15 @@ svg text {
   filter: drop-shadow(0 0 3px var(--glow-red));
 }
 
-/* Dendrogram hover tooltip - ensure white text on dark background */
+/* Dendrogram hover tooltip - light mode styling */
 #messageToolTipDiv,
 #messageToolTipDiv * {
   color: white !important;
 }
 
 #messageToolTipDiv pre {
-  color: white !important;
-  background: rgba(255, 255, 255, 0.1);
+  color: #1f2937 !important;
+  background: #e5e7eb !important;
 }
 
 /* Dendrogram info panel (clicked) - light mode uses light background with dark text */
