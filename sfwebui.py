@@ -369,15 +369,15 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     def scancorrelationsexport(self: 'SpiderFootWebUi', id: str, filetype: str = "csv", dialect: str = "excel") -> str:
-        """Get scan correlation data in CSV or Excel format.
+        """Get scan correlation data in CSV, Excel, or HTML format.
 
         Args:
             id (str): scan ID
-            filetype (str): type of file ("xlsx|excel" or "csv")
+            filetype (str): type of file ("xlsx|excel", "csv", or "html")
             dialect (str): CSV dialect (default: excel)
 
         Returns:
-            str: results in CSV or Excel format
+            str: results in CSV, Excel, or HTML format
         """
         dbh = SpiderFootDb(self.config)
 
@@ -403,7 +403,7 @@ class SpiderFootWebUi:
             cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-correlations.csv"
             cherrypy.response.headers['Content-Type'] = "application/csv"
             cherrypy.response.headers['Pragma'] = "no-cache"
-            
+
             fileobj = StringIO()
             parser = csv.writer(fileobj, dialect=dialect)
             parser.writerow(headings)
@@ -411,20 +411,111 @@ class SpiderFootWebUi:
                 parser.writerow([str(x) for x in row])
             return fileobj.getvalue()
 
+        if filetype.lower() == 'html':
+            # Generate HTML report for correlations
+            scan_name = scan[0] if scan else "Unknown"
+            html_content = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpiderFoot Correlations Report</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 3px solid #ffc107; padding-bottom: 15px; margin-bottom: 20px; }
+        .summary { background: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .summary p { margin: 5px 0; color: #856404; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+        th { background: #343a40; color: white; padding: 12px 8px; text-align: left; }
+        td { padding: 12px 8px; border-bottom: 1px solid #dee2e6; vertical-align: top; }
+        tr:hover { background: #f8f9fa; }
+        tr:nth-child(even) { background: #fafafa; }
+        .risk-high { background: #dc3545; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold; }
+        .risk-medium { background: #ffc107; color: #333; padding: 3px 8px; border-radius: 3px; font-weight: bold; }
+        .risk-low { background: #28a745; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold; }
+        .risk-info { background: #17a2b8; color: white; padding: 3px 8px; border-radius: 3px; }
+        .rule-name { font-weight: 600; color: #495057; }
+        footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #6c757d; font-size: 12px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SpiderFoot Correlations Report</h1>
+        <div class="summary">
+            <p><strong>Scan:</strong> """ + scan_name + """</p>
+            <p><strong>Scan ID:</strong> """ + id + """</p>
+            <p><strong>Generated:</strong> """ + time.strftime("%Y-%m-%d %H:%M:%S") + """</p>
+            <p><strong>Total Correlations:</strong> """ + str(len(data)) + """</p>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Rule Name</th>
+                    <th>Correlation</th>
+                    <th>Risk Level</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+"""
+            for row in data:
+                rule_name = str(row[0]) if len(row) > 0 else ""
+                correlation = str(row[1]) if len(row) > 1 else ""
+                risk = str(row[2]) if len(row) > 2 else ""
+                description = str(row[3]) if len(row) > 3 else ""
+
+                # Escape HTML entities
+                correlation = correlation.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                description = description.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+                # Determine risk class
+                risk_lower = risk.lower()
+                if 'high' in risk_lower:
+                    risk_class = 'risk-high'
+                elif 'medium' in risk_lower:
+                    risk_class = 'risk-medium'
+                elif 'low' in risk_lower:
+                    risk_class = 'risk-low'
+                else:
+                    risk_class = 'risk-info'
+
+                html_content += f"""                <tr>
+                    <td class="rule-name">{rule_name}</td>
+                    <td>{correlation}</td>
+                    <td><span class="{risk_class}">{risk}</span></td>
+                    <td>{description}</td>
+                </tr>
+"""
+
+            html_content += """            </tbody>
+        </table>
+        <footer>
+            <p>Generated by SpiderFoot - Open Source Intelligence Automation</p>
+        </footer>
+    </div>
+</body>
+</html>"""
+
+            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-correlations.html"
+            cherrypy.response.headers['Content-Type'] = "text/html; charset=utf-8"
+            cherrypy.response.headers['Pragma'] = "no-cache"
+            return html_content.encode('utf-8')
+
         return self.error("Invalid export filetype.")
 
     @cherrypy.expose
     def scaneventresultexport(self: 'SpiderFootWebUi', id: str, type: str, filetype: str = "csv", dialect: str = "excel") -> str:
-        """Get scan event result data in CSV or Excel format.
+        """Get scan event result data in CSV, Excel, or HTML format.
 
         Args:
             id (str): scan ID
             type (str): TBD
-            filetype (str): type of file ("xlsx|excel" or "csv")
+            filetype (str): type of file ("xlsx|excel", "csv", or "html")
             dialect (str): CSV dialect (default: excel)
 
         Returns:
-            str: results in CSV or Excel format
+            str: results in CSV, Excel, or HTML format
         """
         dbh = SpiderFootDb(self.config)
         data = dbh.scanResultEvent(id, type)
@@ -487,20 +578,107 @@ class SpiderFootWebUi:
             cherrypy.response.headers['Pragma'] = "no-cache"
             return fileobj.getvalue().encode('utf-8')
 
+        if filetype.lower() == 'html':
+            # Generate HTML report
+            scan_name = scanInfo[0] if scanInfo else "Unknown"
+            html_content = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpiderFoot Scan Report</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1400px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 3px solid #28a745; padding-bottom: 15px; margin-bottom: 20px; }
+        .summary { background: #e8f5e9; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .summary p { margin: 5px 0; color: #2e7d32; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+        th { background: #343a40; color: white; padding: 12px 8px; text-align: left; position: sticky; top: 0; }
+        td { padding: 10px 8px; border-bottom: 1px solid #dee2e6; vertical-align: top; }
+        tr:hover { background: #f8f9fa; }
+        tr:nth-child(even) { background: #fafafa; }
+        tr:nth-child(even):hover { background: #f0f0f0; }
+        .fp-yes { color: #dc3545; font-weight: bold; }
+        .fp-no { color: #28a745; }
+        .data-cell { max-width: 400px; word-wrap: break-word; font-family: monospace; font-size: 12px; }
+        .type-badge { background: #007bff; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; white-space: nowrap; }
+        .module-badge { background: #6c757d; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+        .timestamp { color: #666; font-size: 12px; white-space: nowrap; }
+        footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #6c757d; font-size: 12px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SpiderFoot Scan Report</h1>
+        <div class="summary">
+            <p><strong>Scan:</strong> """ + scan_name + """</p>
+            <p><strong>Scan ID:</strong> """ + id + """</p>
+            <p><strong>Generated:</strong> """ + time.strftime("%Y-%m-%d %H:%M:%S") + """</p>
+            <p><strong>Total Results:</strong> """ + str(len([r for r in data if r[4] != "ROOT"])) + """</p>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Type</th>
+                    <th>Module</th>
+                    <th>Source</th>
+                    <th>F/P</th>
+                    <th>Data</th>
+                </tr>
+            </thead>
+            <tbody>
+"""
+            for row in data:
+                if row[4] == "ROOT":
+                    continue
+                lastseen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
+                datafield = str(row[1]).replace("<SFURL>", "").replace("</SFURL>", "")
+                # Escape HTML entities
+                datafield = datafield.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                event_type = translate_event_type(str(row[4]))
+                fp_flag = row[13] or (row[4], row[1]) in targetFps
+                fp_display = '<span class="fp-yes">Yes</span>' if fp_flag else '<span class="fp-no">No</span>'
+
+                html_content += f"""                <tr>
+                    <td class="timestamp">{lastseen}</td>
+                    <td><span class="type-badge">{event_type}</span></td>
+                    <td><span class="module-badge">{row[3]}</span></td>
+                    <td>{row[2]}</td>
+                    <td>{fp_display}</td>
+                    <td class="data-cell">{datafield}</td>
+                </tr>
+"""
+
+            html_content += """            </tbody>
+        </table>
+        <footer>
+            <p>Generated by SpiderFoot - Open Source Intelligence Automation</p>
+        </footer>
+    </div>
+</body>
+</html>"""
+
+            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-Report.html"
+            cherrypy.response.headers['Content-Type'] = "text/html; charset=utf-8"
+            cherrypy.response.headers['Pragma'] = "no-cache"
+            return html_content.encode('utf-8')
+
         return self.error("Invalid export filetype.")
 
     @cherrypy.expose
     def scaneventresultexportmulti(self: 'SpiderFootWebUi', ids: str, filetype: str = "csv", dialect: str = "excel") -> str:
-        """Get scan event result data in CSV or Excel format for multiple
+        """Get scan event result data in CSV, Excel, or HTML format for multiple
         scans.
 
         Args:
             ids (str): comma separated list of scan IDs
-            filetype (str): type of file ("xlsx|excel" or "csv")
+            filetype (str): type of file ("xlsx|excel", "csv", or "html")
             dialect (str): CSV dialect (default: excel)
 
         Returns:
-            str: results in CSV or Excel format
+            str: results in CSV, Excel, or HTML format
         """
         dbh = SpiderFootDb(self.config)
         scaninfo = dict()
@@ -585,6 +763,102 @@ class SpiderFootWebUi:
             cherrypy.response.headers['Content-Type'] = "application/csv"
             cherrypy.response.headers['Pragma'] = "no-cache"
             return fileobj.getvalue().encode('utf-8')
+
+        if filetype.lower() == 'html':
+            # Generate HTML report
+            html_content = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpiderFoot Scan Report</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1400px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 3px solid #28a745; padding-bottom: 15px; margin-bottom: 20px; }
+        .summary { background: #e8f5e9; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .summary p { margin: 5px 0; color: #2e7d32; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+        th { background: #343a40; color: white; padding: 12px 8px; text-align: left; position: sticky; top: 0; }
+        td { padding: 10px 8px; border-bottom: 1px solid #dee2e6; vertical-align: top; }
+        tr:hover { background: #f8f9fa; }
+        tr:nth-child(even) { background: #fafafa; }
+        tr:nth-child(even):hover { background: #f0f0f0; }
+        .fp-yes { color: #dc3545; font-weight: bold; }
+        .fp-no { color: #28a745; }
+        .data-cell { max-width: 400px; word-wrap: break-word; font-family: monospace; font-size: 12px; }
+        .type-badge { background: #007bff; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; white-space: nowrap; }
+        .module-badge { background: #6c757d; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+        .timestamp { color: #666; font-size: 12px; white-space: nowrap; }
+        .scan-name { font-weight: 500; color: #495057; }
+        footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #6c757d; font-size: 12px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SpiderFoot Scan Report</h1>
+        <div class="summary">
+            <p><strong>Generated:</strong> """ + time.strftime("%Y-%m-%d %H:%M:%S") + """</p>
+            <p><strong>Scans Included:</strong> """ + ids + """</p>
+            <p><strong>Total Results:</strong> """ + str(len([r for r in data if r[4] != "ROOT"])) + """</p>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Scan Name</th>
+                    <th>Timestamp</th>
+                    <th>Type</th>
+                    <th>Module</th>
+                    <th>Source</th>
+                    <th>F/P</th>
+                    <th>Data</th>
+                </tr>
+            </thead>
+            <tbody>
+"""
+            for row in data:
+                if row[4] == "ROOT":
+                    continue
+                lastseen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
+                datafield = str(row[1]).replace("<SFURL>", "").replace("</SFURL>", "")
+                # Escape HTML entities
+                datafield = datafield.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                event_type = translate_event_type(str(row[4]))
+                scan_id = row[12]
+                scan_name_display = scaninfo[scan_id][0] if scan_id in scaninfo and scaninfo[scan_id] else "Unknown"
+                targetFps = targetFpsPerScan.get(scan_id, set())
+                fp_flag = row[13] or (row[4], row[1]) in targetFps
+                fp_display = '<span class="fp-yes">Yes</span>' if fp_flag else '<span class="fp-no">No</span>'
+
+                html_content += f"""                <tr>
+                    <td class="scan-name">{scan_name_display}</td>
+                    <td class="timestamp">{lastseen}</td>
+                    <td><span class="type-badge">{event_type}</span></td>
+                    <td><span class="module-badge">{row[3]}</span></td>
+                    <td>{row[2]}</td>
+                    <td>{fp_display}</td>
+                    <td class="data-cell">{datafield}</td>
+                </tr>
+"""
+
+            html_content += """            </tbody>
+        </table>
+        <footer>
+            <p>Generated by SpiderFoot - Open Source Intelligence Automation</p>
+        </footer>
+    </div>
+</body>
+</html>"""
+
+            if len(ids.split(',')) > 1 or scan_name == "":
+                fname = "SpiderFoot-Report.html"
+            else:
+                fname = scan_name + "-SpiderFoot-Report.html"
+
+            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
+            cherrypy.response.headers['Content-Type'] = "text/html; charset=utf-8"
+            cherrypy.response.headers['Pragma'] = "no-cache"
+            return html_content.encode('utf-8')
 
         return self.error("Invalid export filetype.")
 
