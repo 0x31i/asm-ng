@@ -707,6 +707,27 @@ tr.danger td {
   margin: 1px;
 }
 
+/* Correlation badges in scan list - ensure proper colors */
+#scanlist .badge.alert-info {
+  background: var(--accent-blue) !important;
+  color: #ffffff !important;
+}
+
+#scanlist .badge.alert-success {
+  background: var(--accent-green) !important;
+  color: #ffffff !important;
+}
+
+#scanlist .badge.alert-warning {
+  background: var(--accent-yellow) !important;
+  color: #ffffff !important;
+}
+
+#scanlist .badge.alert-danger {
+  background: var(--accent-red) !important;
+  color: #ffffff !important;
+}
+
 /* ============================================
    Dropdowns - Sharp Modern Style
    ============================================ */
