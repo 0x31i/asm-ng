@@ -3218,10 +3218,15 @@ th.th-source-highlight {
   padding: 6px !important;
   cursor: pointer !important;
   background: rgba(255, 255, 255, 0.05) !important;
-  color: rgba(255, 255, 255, 0.4) !important;
+  color: #ffffff !important;
   border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
   transition: all 0.2s ease !important;
   margin-top: 8px !important;
+}
+
+#selection-toolbar.toolbar-left .toolbar-undo-snap .glyphicon,
+#selection-toolbar.toolbar-right .toolbar-undo-snap .glyphicon {
+  color: #ffffff !important;
 }
 
 #selection-toolbar.toolbar-left .toolbar-undo-snap:hover,

@@ -3346,6 +3346,11 @@ th.th-source-highlight *,
   margin-top: 8px !important;
 }
 
+#selection-toolbar.toolbar-left .toolbar-undo-snap .glyphicon,
+#selection-toolbar.toolbar-right .toolbar-undo-snap .glyphicon {
+  color: #ffffff !important;
+}
+
 #selection-toolbar.toolbar-left .toolbar-undo-snap:hover,
 #selection-toolbar.toolbar-right .toolbar-undo-snap:hover {
   background: rgba(255, 255, 255, 0.15) !important;
