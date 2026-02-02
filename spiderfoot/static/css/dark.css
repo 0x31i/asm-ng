@@ -3824,10 +3824,10 @@ table .btn-danger:hover {
 .created-date {
   font-family: var(--font-mono) !important;
   font-weight: 700 !important;
-  font-size: 28px !important;
+  font-size: 42px !important;
   color: #ffffff !important;
   margin: 10px 0 !important;
-  line-height: 1.2 !important;
+  line-height: 1.1 !important;
 }
 
 /* Workspace page - reduce top spacing */
