@@ -26,8 +26,9 @@
         <div id='modifyactions' role="group" class="btn-group">
             <a id='btn-setfp' rel="tooltip" data-title="Set/Unset False Positive flag" class="btn-warning btn btn-default dropdown-toggle" data-toggle="dropdown"><i class='glyphicon glyphicon-ban-circle glyphicon glyphicon-white'></i></a>
             <ul class="dropdown-menu">
-                <li><a href='#' class='link' onClick='setFp(1, 1)'>Set False Positive</a></li>
-                <li><a href='#' class='link' onClick='setFp(0, 1)'>Unset False Positive</a></li>
+                <li><a href='#' class='link' onClick='setFp(1, 1, 0)'>Set False Positive</a></li>
+                <li><a href='#' class='link' onClick='setFp(0, 1, 0)'>Unset False Positive</a></li>
+                <li><a href='#' class='link' onClick='setFp(0, 1, 1)'>Force Unset (ignore parent)</a></li>
                 <li class="divider"></li>
                 <li class="dropdown-header">Bulk Actions</li>
                 <li><a href='#' class='link' onClick='selectMatchingFps()'>Select All Matching Saved FPs</a></li>
@@ -454,7 +455,7 @@
             return ids;
         }
 
-        function setFp(flag, persist) {
+        function setFp(flag, persist, force) {
             sel = getSelected();
             if (sel.length == 0) {
                 alertify.error("You need to select at least one record.");
@@ -467,6 +468,9 @@
             var params = {'id': '${id}', 'fp': flag, 'resultids': data };
             if (persist) {
                 params['persist'] = persist;
+            }
+            if (force) {
+                params['force'] = force;
             }
             sf.fetchData(endpoint, params, function(ret) {
                 $("#loader").hide();
