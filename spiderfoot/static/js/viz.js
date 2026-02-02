@@ -428,7 +428,9 @@ function sf_viz_dendrogram(targetId, data) {
         }
         displayData = displayData.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-        var message = "<div style='text-align:left;'>";
+        // Close button at top right
+        var message = "<div style='position:relative;text-align:left;'>";
+        message += "<button onclick='window.dendroCloseInfoPanel()' style='position:absolute;top:-8px;right:-8px;background:#6b7280;color:white;border:none;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1;'>&times;</button>";
         message += "<table style='margin-bottom:10px;'>";
         message += "<tr><td><b>Type:</b></td><td>" + data[10] + "</td></tr>";
         message += "<tr><td><b>Source Module:</b></td><td>" + data[3] + "</td></tr>";
@@ -437,10 +439,10 @@ function sf_viz_dendrogram(targetId, data) {
 
         // Don't show FP button for synthetic nodes (like "Discovery Paths")
         if (data[8] && data[8] !== 'discovery_paths') {
-            message += "<div style='border-top:1px solid #444;padding-top:8px;margin-top:5px;'>";
+            message += "<div style='border-top:1px solid rgba(128,128,128,0.3);padding-top:8px;margin-top:5px;'>";
             if (isFp) {
                 message += "<button onclick='window.dendroUnsetFp(\"" + nodeName.replace(/"/g, '\\"') + "\")' style='background:#dc2626;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;margin-right:5px;'>Marked as False Positive</button>";
-                message += "<button onclick='window.dendroUnsetFp(\"" + nodeName.replace(/"/g, '\\"') + "\")' style='background:#374151;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;'>Undo</button>";
+                message += "<button onclick='window.dendroUnsetFp(\"" + nodeName.replace(/"/g, '\\"') + "\")' style='background:#6b7280;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;'>Undo</button>";
             } else {
                 message += "<button onclick='window.dendroSetFp(\"" + nodeName.replace(/"/g, '\\"') + "\")' style='background:#f59e0b;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;'>Mark as False Positive</button>";
             }
@@ -457,6 +459,15 @@ function sf_viz_dendrogram(targetId, data) {
     window.dendroUnsetFp = function(nodeName) {
         markAsFalsePositive(nodeName, false);
     };
+    window.dendroCloseInfoPanel = function() {
+        infoPanelNode = null;
+        hideInfoPanel();
+        // Also clear path highlighting
+        selectedNode = null;
+        svg.selectAll(".dend-link").classed("dend-link-highlighted", false).classed("dend-link-dimmed", false);
+        svg.selectAll(".dend-node").classed("dend-node-selected", false).classed("dend-node-path", false).classed("dend-node-dimmed", false);
+        d3.select(targetId).classed("path-active", false);
+    };
 
     function showToolTip(pMessage, pX, pY, pShow) {
         if (typeof(tooltipDivID) == "undefined") {
@@ -470,11 +481,41 @@ function sf_viz_dendrogram(targetId, data) {
     }
 
     function showInfoPanel(pMessage, pX, pY, pShow) {
+        // Detect dark mode
+        var isDarkMode = document.body.classList.contains('dark-mode') ||
+                         document.documentElement.getAttribute('data-theme') === 'dark' ||
+                         window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        var bgColor = isDarkMode ? 'rgba(17, 24, 39, 0.98)' : 'rgba(255, 255, 255, 0.98)';
+        var textColor = isDarkMode ? '#f3f4f6' : '#1f2937';
+        var borderColor = isDarkMode ? '#06b6d4' : '#0891b2';
+        var shadowColor = isDarkMode ? 'rgba(6, 182, 212, 0.3)' : 'rgba(8, 145, 178, 0.2)';
+
         if (typeof(infoPanelDivID) == "undefined") {
-            infoPanelDivID = $('<div id="infoPanelDiv" style="position:absolute;display:block;z-index:10001;border:2px solid #06b6d4;background-color:rgba(0,0,0,0.95);margin:auto;padding:12px 16px;color:white;font-size:12px;font-family:arial;border-radius:8px;vertical-align:middle;min-width:200px;max-width:450px;box-shadow:0 0 20px rgba(6,182,212,0.3);"></div>');
+            infoPanelDivID = $('<div id="infoPanelDiv" class="dendro-info-panel"></div>');
             $('body').append(infoPanelDivID);
         }
         if (!pShow) { infoPanelDivID.hide(); return; }
+
+        // Update styles based on theme
+        infoPanelDivID.css({
+            'position': 'absolute',
+            'display': 'block',
+            'z-index': '10001',
+            'border': '2px solid ' + borderColor,
+            'background-color': bgColor,
+            'margin': 'auto',
+            'padding': '12px 16px',
+            'color': textColor,
+            'font-size': '12px',
+            'font-family': 'arial',
+            'border-radius': '8px',
+            'vertical-align': 'middle',
+            'min-width': '200px',
+            'max-width': '450px',
+            'box-shadow': '0 0 20px ' + shadowColor
+        });
+
         // Hide hover tooltip when showing info panel
         if (typeof(tooltipDivID) != "undefined") {
             tooltipDivID.hide();
