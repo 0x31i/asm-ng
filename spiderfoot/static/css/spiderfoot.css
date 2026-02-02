@@ -521,7 +521,6 @@ input[type="checkbox"] {
 .table {
   background: transparent;
   border-radius: var(--radius-md);
-  overflow: hidden;
 }
 
 .table > thead > tr > th {
@@ -536,6 +535,10 @@ input[type="checkbox"] {
   letter-spacing: 0.5px;
   white-space: nowrap;
   vertical-align: middle;
+  /* Sticky table headers */
+  position: sticky !important;
+  top: 54px !important;
+  z-index: 100 !important;
 }
 
 /* Widen columns that tend to wrap */
