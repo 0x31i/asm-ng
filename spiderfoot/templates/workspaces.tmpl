@@ -1156,8 +1156,17 @@ function displayWorkspaces(workspaces) {
     }
 
     console.log('Setting #workspaceList HTML, length:', html.length);
+    console.log('HTML content:', html);
     $('#workspaceList').html(html);
     console.log('HTML set successfully');
+
+    // Debug: Check if element exists and is visible
+    var el = $('#workspaceList');
+    console.log('Element exists:', el.length > 0);
+    console.log('Element is visible:', el.is(':visible'));
+    console.log('Element height:', el.height());
+    console.log('Element parent visible:', el.parent().is(':visible'));
+    console.log('Element children count:', el.children().length);
 }
 
 function viewWorkspace(workspaceId) {
