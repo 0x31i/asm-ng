@@ -1051,29 +1051,62 @@ $(document).ready(function() {
 });
 
 function loadWorkspaces() {
+    console.log('loadWorkspaces() called');
     $('#loader').show();
-    $.getJSON('${docroot}/workspacelist', function(data) {
-        $('#loader').hide();
-        // Ensure data is an array
-        if (!Array.isArray(data)) {
-            console.error('Workspace list response is not an array:', data);
-            data = [];
+    $.ajax({
+        url: '${docroot}/workspacelist',
+        type: 'GET',
+        dataType: 'json',
+        success: function(data) {
+            console.log('AJAX success, raw data:', data);
+            console.log('Data type:', typeof data);
+            console.log('Is array:', Array.isArray(data));
+            $('#loader').hide();
+
+            // Handle the response - it should be an array
+            var workspaces = data;
+            if (!Array.isArray(data)) {
+                console.warn('Data is not an array, attempting to convert');
+                // Maybe it's wrapped in an object or is a single object
+                if (data && typeof data === 'object') {
+                    // Check if it's array-like (has numeric keys)
+                    if (data.length !== undefined) {
+                        workspaces = Array.from(data);
+                    } else if (data[0]) {
+                        // Object with numeric keys
+                        workspaces = Object.values(data);
+                    } else {
+                        // Single workspace object, wrap in array
+                        workspaces = [data];
+                    }
+                } else {
+                    workspaces = [];
+                }
+                console.log('Converted to:', workspaces);
+            }
+
+            displayWorkspaces(workspaces);
+        },
+        error: function(jqXHR, textStatus, errorThrown) {
+            $('#loader').hide();
+            console.error('AJAX error:', textStatus, errorThrown);
+            console.error('Response:', jqXHR.responseText);
+            alertify.error('Failed to load workspaces: ' + textStatus);
         }
-        displayWorkspaces(data);
-    }).fail(function(jqXHR, textStatus, errorThrown) {
-        $('#loader').hide();
-        console.error('Failed to load workspaces:', textStatus, errorThrown);
-        alertify.error('Failed to load workspaces');
     });
 }
 
 function displayWorkspaces(workspaces) {
+    console.log('displayWorkspaces() called with:', workspaces);
+    console.log('workspaces length:', workspaces ? workspaces.length : 'null/undefined');
     var html = '';
 
     // Ensure workspaces is an array
     if (!workspaces || !Array.isArray(workspaces) || workspaces.length === 0) {
+        console.log('Showing "no workspaces" message');
         html = '<div class="alert alert-info">No workspaces found. Create your first workspace to get started.</div>';
     } else {
+        console.log('Building table with', workspaces.length, 'workspaces');
         html = '<div class="table-responsive"><table class="table table-striped table-hover">';
         html += '<thead><tr>';
         html += '<th>Name</th>';
@@ -1121,8 +1154,10 @@ function displayWorkspaces(workspaces) {
         
         html += '</tbody></table></div>';
     }
-    
+
+    console.log('Setting #workspaceList HTML, length:', html.length);
     $('#workspaceList').html(html);
+    console.log('HTML set successfully');
 }
 
 function viewWorkspace(workspaceId) {
