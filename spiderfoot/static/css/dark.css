@@ -1252,6 +1252,24 @@ svg text {
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* Dendrogram info panel (clicked) - dark mode uses dark background with light text */
+#infoPanelDiv {
+  background-color: rgba(17, 24, 39, 0.98) !important;
+  color: var(--text-primary) !important;
+}
+
+#infoPanelDiv table,
+#infoPanelDiv td,
+#infoPanelDiv tr {
+  color: var(--text-primary) !important;
+}
+
+#infoPanelDiv pre {
+  color: var(--text-primary) !important;
+  background: var(--bg-tertiary) !important;
+  border: 1px solid var(--glass-border) !important;
+}
+
 /* Sigma.js Graph Visualization */
 .graph-container {
   background: var(--bg-secondary);
