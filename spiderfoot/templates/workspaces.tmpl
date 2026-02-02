@@ -1051,67 +1051,48 @@ $(document).ready(function() {
 });
 
 function loadWorkspaces() {
-    console.log('loadWorkspaces() called');
     $('#loader').show();
     $.ajax({
         url: '${docroot}/workspacelist',
         type: 'GET',
         dataType: 'json',
         success: function(data) {
-            console.log('AJAX success, raw data:', data);
-            console.log('Data type:', typeof data);
-            console.log('Is array:', Array.isArray(data));
             $('#loader').hide();
-
             // Handle the response - it should be an array
             var workspaces = data;
             if (!Array.isArray(data)) {
-                console.warn('Data is not an array, attempting to convert');
                 // Maybe it's wrapped in an object or is a single object
                 if (data && typeof data === 'object') {
-                    // Check if it's array-like (has numeric keys)
                     if (data.length !== undefined) {
                         workspaces = Array.from(data);
                     } else if (data[0]) {
-                        // Object with numeric keys
                         workspaces = Object.values(data);
                     } else {
-                        // Single workspace object, wrap in array
                         workspaces = [data];
                     }
                 } else {
                     workspaces = [];
                 }
-                console.log('Converted to:', workspaces);
             }
-
             displayWorkspaces(workspaces);
         },
         error: function(jqXHR, textStatus, errorThrown) {
             $('#loader').hide();
-            console.error('AJAX error:', textStatus, errorThrown);
-            console.error('Response:', jqXHR.responseText);
+            console.error('Failed to load workspaces:', textStatus, errorThrown);
             alertify.error('Failed to load workspaces: ' + textStatus);
         }
     });
 }
 
 function displayWorkspaces(workspaces) {
-    console.log('displayWorkspaces() called with:', workspaces);
-    console.log('workspaces length:', workspaces ? workspaces.length : 'null/undefined');
     var html = '';
 
     // Ensure workspaces is an array
     if (!workspaces || !Array.isArray(workspaces) || workspaces.length === 0) {
-        console.log('Showing "no workspaces" message');
         html = '<div class="alert alert-info">No workspaces found. Create your first workspace to get started.</div>';
     } else {
-        console.log('Building table with', workspaces.length, 'workspaces');
-
-        // Build rows array first for debugging
         var rows = [];
         workspaces.forEach(function(workspace, index) {
-            console.log('Processing workspace ' + index + ':', workspace);
             var createdDate = new Date(workspace.created_time * 1000).toLocaleDateString();
             var targetCount = workspace.target_count || 0;
             var scanCount = workspace.scan_count || 0;
@@ -1127,14 +1108,22 @@ function displayWorkspaces(workspaces) {
             row += '<td><span class="badge">' + scanCount + '</span></td>';
             row += '<td>';
             row += '<div class="btn-group" role="group">';
-            row += '<button class="btn btn-sm btn-info" onclick="viewWorkspace(\'' + wsId + '\')" title="View"><i class="glyphicon glyphicon-eye-open"></i></button>';
+            row += '<button class="btn btn-sm btn-info" onclick="viewWorkspace(\'' + wsId + '\')" title="View Details"><i class="glyphicon glyphicon-eye-open"></i></button>';
             row += '<button class="btn btn-sm btn-warning" onclick="editWorkspace(\'' + wsId + '\')" title="Edit"><i class="glyphicon glyphicon-edit"></i></button>';
             row += '<button class="btn btn-sm btn-success" onclick="addTarget(\'' + wsId + '\')" title="Add Target"><i class="glyphicon glyphicon-plus"></i></button>';
+            row += '<button class="btn btn-sm btn-primary" onclick="importScans(\'' + wsId + '\')" title="Import Scans"><i class="glyphicon glyphicon-import"></i></button>';
+            // Only show multi-scan button if workspace has targets
+            if (targetCount > 0) {
+                row += '<button class="btn btn-sm btn-success" onclick="startMultiTargetScan(\'' + wsId + '\')" title="Start Multi-Target Scan"><i class="glyphicon glyphicon-play"></i></button>';
+            }
+            // Only show generate report button if workspace has scans
+            if (scanCount > 0) {
+                row += '<button class="btn btn-sm btn-info" onclick="generateReport(\'' + wsId + '\')" title="Generate Report"><i class="glyphicon glyphicon-file"></i></button>';
+            }
             row += '<button class="btn btn-sm btn-danger" onclick="deleteWorkspace(\'' + wsId + '\')" title="Delete"><i class="glyphicon glyphicon-trash"></i></button>';
             row += '</div>';
             row += '</td>';
             row += '</tr>';
-            console.log('Row ' + index + ' HTML:', row);
             rows.push(row);
         });
 
@@ -1149,22 +1138,9 @@ function displayWorkspaces(workspaces) {
         html += '</tr></thead>';
         html += '<tbody>' + rows.join('') + '</tbody>';
         html += '</table>';
-
-        console.log('Final table HTML:', html);
     }
 
-    console.log('Setting #workspaceList HTML, length:', html.length);
-    console.log('HTML content:', html);
     $('#workspaceList').html(html);
-    console.log('HTML set successfully');
-
-    // Debug: Check if element exists and is visible
-    var el = $('#workspaceList');
-    console.log('Element exists:', el.length > 0);
-    console.log('Element is visible:', el.is(':visible'));
-    console.log('Element height:', el.height());
-    console.log('Element parent visible:', el.parent().is(':visible'));
-    console.log('Element children count:', el.children().length);
 }
 
 function viewWorkspace(workspaceId) {
