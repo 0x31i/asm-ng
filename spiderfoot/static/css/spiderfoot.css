@@ -2619,8 +2619,10 @@ div[id*="Help"].alert-info {
   left: 0;
   right: 0;
   width: 100%;
-  background: linear-gradient(180deg, #f0f0f0 0%, #ffffff 100%);
-  border-bottom: 1px solid var(--glass-border);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   z-index: 1050;
   display: flex;
   flex-direction: row;
@@ -2648,14 +2650,14 @@ div[id*="Help"].alert-info {
   display: flex;
   align-items: center;
   padding: 15px 25px;
-  color: var(--text-primary);
+  color: #ffffff;
   text-decoration: none;
   transition: all 0.2s ease;
   border-bottom: 3px solid transparent;
 }
 
 .asm-ng-sidebar .sidebar-nav > li > a:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.1);
   border-bottom-color: var(--accent-green);
 }
 
@@ -2670,7 +2672,7 @@ div[id*="Help"].alert-info {
   width: 24px;
   min-width: 24px;
   text-align: center;
-  color: var(--text-primary);
+  color: #ffffff;
   text-shadow: none;
   transition: all 0.2s ease;
 }
@@ -2694,7 +2696,7 @@ div[id*="Help"].alert-info {
   letter-spacing: 1px;
   margin-left: 10px;
   white-space: nowrap;
-  color: var(--text-primary);
+  color: #ffffff;
   text-shadow: none;
   transition: all 0.2s ease;
 }
@@ -2819,10 +2821,12 @@ div[id*="Help"].alert-info {
   bottom: 0;
   left: 0;
   right: 0;
-  background: #ffffff;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   padding: 15px 0;
   z-index: 1000;
-  border-top: 1px solid var(--glass-border);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .ngs-footer-text {
@@ -2831,7 +2835,7 @@ div[id*="Help"].alert-info {
   font-size: 14px;
   text-transform: uppercase;
   letter-spacing: 2px;
-  color: var(--text-primary);
+  color: #ffffff;
   text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.5), 0 0 30px rgba(255, 255, 255, 0.3);
 }
 
