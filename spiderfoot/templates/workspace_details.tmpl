@@ -78,20 +78,28 @@
                         <h3 class="panel-title"><i class="fa fa-calendar"></i> Created</h3>
                     </div>
                     <div class="panel-body text-center">
-                        <div class="created-date">
-                            <script>
-                                document.write(new Date(${workspace.created_time} * 1000).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'short',
-                                    day: 'numeric'
-                                }));
-                            </script>
-                        </div>
+                        <div class="created-date" id="workspace-created-date" data-timestamp="${workspace.created_time}">Loading...</div>
                         <p>Workspace Created</p>
                     </div>
                 </div>
             </div>
         </div>
+        <script>
+        // Format workspace created date
+        (function() {
+            var el = document.getElementById('workspace-created-date');
+            if (el) {
+                var ts = parseFloat(el.getAttribute('data-timestamp'));
+                if (ts < 10000000000) ts *= 1000;
+                var date = new Date(ts);
+                if (!isNaN(date.getTime())) {
+                    el.textContent = date.toLocaleDateString('en-US', {
+                        year: 'numeric', month: 'short', day: 'numeric'
+                    });
+                }
+            }
+        })();
+        </script>
 
         <!-- Navigation Tabs -->
         <div class="row">
@@ -191,83 +199,77 @@
                         </div>
                         <div class="clearfix"></div>
                         % if scan_details:
-                            <div class="table-responsive">
-                                <table class="table table-striped">                                    <thead>
-                                        <tr>
-                                            <th>Scan ID</th>
-                                            <th>Scan Name</th>
-                                            <th>Target</th>
-                                            <th>Status</th>
-                                            <th>Created</th>
-                                            <th>Actions</th>
-                                        </tr>                                    </thead>
-                                    <tbody>
-                                        % for scan in scan_details:
-                                            <tr>                                                <td>
-                                                    <code style="font-size: 11px; background: #f5f5f5; padding: 2px 4px; cursor: pointer; border: 1px solid #ddd; border-radius: 3px;" 
-                                                          onclick="copyWorkspaceScanId('${scan['scan_id']}')" 
-                                                          title="Click to copy scan ID">${scan['scan_id']} <i class="fa fa-copy" style="font-size: 10px; margin-left: 2px;"></i></code>
-                                                </td>
-                                                <td>
-                                                    <strong>${scan['name']}</strong>
-                                                </td>
-                                                <td>${scan['target']}</td>
-                                                <td>
-                                                    % if scan['status'] == 'FINISHED':
-                                                        <span class="label label-success">${scan['status']}</span>
-                                                    % elif scan['status'] == 'RUNNING':
-                                                        <span class="label label-primary">${scan['status']}</span>
-                                                    % elif scan['status'] == 'STARTING':
-                                                        <span class="label label-info">${scan['status']}</span>
-                                                    % else:
-                                                        <span class="label label-warning">${scan['status']}</span>
-                                                    % endif
-                                                </td>                                                <td>
-                                                    <script>
-                                                        // Handle both epoch timestamp and date string formats
-                                                        var dateValue = '${scan['created']}';
-                                                        var scanDate;
-                                                        
-                                                        // Check if it's a numeric timestamp (epoch)
-                                                        if (!isNaN(dateValue) && dateValue.length > 0) {
-                                                            // Convert epoch timestamp to milliseconds if needed
-                                                            var timestamp = parseInt(dateValue);
-                                                            if (timestamp < 10000000000) {
-                                                                timestamp *= 1000; // Convert to milliseconds
-                                                            }
-                                                            scanDate = new Date(timestamp);
-                                                        } else {
-                                                            // Try to parse as date string
-                                                            scanDate = new Date(dateValue);
-                                                        }
-                                                        
-                                                        // Display formatted date
-                                                        if (scanDate && !isNaN(scanDate.getTime())) {
-                                                            document.write(scanDate.toLocaleDateString('en-US', {
-                                                                year: 'numeric',
-                                                                month: 'short',
-                                                                day: 'numeric',
-                                                                hour: '2-digit',
-                                                                minute: '2-digit'
-                                                            }));
-                                                        } else {
-                                                            document.write('Invalid Date');
-                                                        }
-                                                    </script>
-                                                </td>
-                                                <td>
-                                                    <a href="${docroot}/scaninfo?id=${scan['scan_id']}" class="btn btn-xs btn-primary">
-                                                        <i class="fa fa-eye"></i> View
-                                                    </a>
-                                                    <button class="btn btn-xs btn-info" onclick="viewScanResults('${scan['scan_id']}')">
-                                                        <i class="fa fa-table"></i> Results
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        % endfor
-                                    </tbody>
-                                </table>
-                            </div>
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Scan ID</th>
+                                        <th>Scan Name</th>
+                                        <th>Target</th>
+                                        <th>Status</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    % for scan in scan_details:
+                                    <tr>
+                                        <td>
+                                            <code style="font-size: 11px; background: #f5f5f5; padding: 2px 4px; cursor: pointer; border: 1px solid #ddd; border-radius: 3px;"
+                                                  onclick="copyWorkspaceScanId('${scan['scan_id']}')"
+                                                  title="Click to copy scan ID">${scan['scan_id']} <i class="fa fa-copy" style="font-size: 10px; margin-left: 2px;"></i></code>
+                                        </td>
+                                        <td><strong>${scan['name']}</strong></td>
+                                        <td>${scan['target']}</td>
+                                        <td>
+                                            % if scan['status'] == 'FINISHED':
+                                                <span class="label label-success">${scan['status']}</span>
+                                            % elif scan['status'] == 'RUNNING':
+                                                <span class="label label-primary">${scan['status']}</span>
+                                            % elif scan['status'] == 'STARTING':
+                                                <span class="label label-info">${scan['status']}</span>
+                                            % else:
+                                                <span class="label label-warning">${scan['status']}</span>
+                                            % endif
+                                        </td>
+                                        <td class="scan-created-time" data-timestamp="${scan['created']}">Loading...</td>
+                                        <td>
+                                            <a href="${docroot}/scaninfo?id=${scan['scan_id']}" class="btn btn-xs btn-primary">
+                                                <i class="fa fa-eye"></i> View
+                                            </a>
+                                            <button class="btn btn-xs btn-info" onclick="viewScanResults('${scan['scan_id']}')">
+                                                <i class="fa fa-table"></i> Results
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    % endfor
+                                </tbody>
+                            </table>
+                            <script>
+                            // Format all scan created times after DOM is ready
+                            document.querySelectorAll('.scan-created-time').forEach(function(el) {
+                                var dateValue = el.getAttribute('data-timestamp');
+                                if (dateValue && dateValue !== '') {
+                                    var scanDate;
+                                    if (!isNaN(dateValue) && dateValue.length > 0) {
+                                        var timestamp = parseInt(dateValue);
+                                        if (timestamp < 10000000000) timestamp *= 1000;
+                                        scanDate = new Date(timestamp);
+                                    } else {
+                                        scanDate = new Date(dateValue);
+                                    }
+                                    if (scanDate && !isNaN(scanDate.getTime())) {
+                                        el.textContent = scanDate.toLocaleDateString('en-US', {
+                                            year: 'numeric', month: 'short', day: 'numeric',
+                                            hour: '2-digit', minute: '2-digit'
+                                        });
+                                    } else {
+                                        el.textContent = 'Invalid Date';
+                                    }
+                                } else {
+                                    el.textContent = 'Unknown';
+                                }
+                            });
+                            </script>
                         % else:
                             <div class="alert alert-info">
                                 <i class="fa fa-info-circle"></i> No scans in this workspace yet. 
