@@ -514,15 +514,45 @@ class SpiderFootDb:
                     except sqlite3.Error:
                         pass  # Table creation failed, but this is not critical
 
-                # Migration: Add source_data column to tbl_target_false_positives if it doesn't exist
+                # Migration: Add source_data column and update UNIQUE constraint
+                # SQLite doesn't support modifying constraints, so we need to recreate the table
                 try:
                     self.dbh.execute("SELECT source_data FROM tbl_target_false_positives LIMIT 1")
+                    # Column exists, but check if we need to fix the UNIQUE constraint
+                    # by checking if we can insert two entries with same (target, type, data) but different source
+                    self.dbh.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='tbl_target_false_positives'")
+                    table_sql = self.dbh.fetchone()
+                    if table_sql and 'source_data' not in str(table_sql[0]).split('UNIQUE')[1] if 'UNIQUE' in str(table_sql[0]) else True:
+                        # Need to recreate table with updated UNIQUE constraint
+                        raise sqlite3.Error("Need to update UNIQUE constraint")
                 except sqlite3.Error:
                     try:
-                        self.dbh.execute("ALTER TABLE tbl_target_false_positives ADD COLUMN source_data VARCHAR")
+                        # Recreate table with source_data in UNIQUE constraint
+                        self.dbh.execute("CREATE TABLE IF NOT EXISTS tbl_target_false_positives_new ( \
+                            id INTEGER PRIMARY KEY AUTOINCREMENT, \
+                            target VARCHAR NOT NULL, \
+                            event_type VARCHAR NOT NULL, \
+                            event_data VARCHAR NOT NULL, \
+                            source_data VARCHAR, \
+                            date_added INT NOT NULL, \
+                            notes VARCHAR, \
+                            UNIQUE(target, event_type, event_data, source_data) \
+                        )")
+                        # Copy existing data
+                        self.dbh.execute("INSERT OR IGNORE INTO tbl_target_false_positives_new \
+                            (id, target, event_type, event_data, source_data, date_added, notes) \
+                            SELECT id, target, event_type, event_data, \
+                            CASE WHEN source_data IS NULL THEN NULL ELSE source_data END, \
+                            date_added, notes FROM tbl_target_false_positives")
+                        # Drop old table and rename new one
+                        self.dbh.execute("DROP TABLE tbl_target_false_positives")
+                        self.dbh.execute("ALTER TABLE tbl_target_false_positives_new RENAME TO tbl_target_false_positives")
+                        # Recreate indexes
+                        self.dbh.execute("CREATE INDEX IF NOT EXISTS idx_target_fp_target ON tbl_target_false_positives (target)")
+                        self.dbh.execute("CREATE INDEX IF NOT EXISTS idx_target_fp_lookup ON tbl_target_false_positives (target, event_type, event_data, source_data)")
                         self.conn.commit()
                     except sqlite3.Error:
-                        pass  # Column addition failed, may already exist or table doesn't exist
+                        pass  # Migration failed, but continue
 
                 if init:
                     for row in self.eventDetails:
@@ -578,16 +608,31 @@ class SpiderFootDb:
                             continue
                     self.conn.commit()
 
-                # Migration: Add source_data column to tbl_target_false_positives if it doesn't exist
+                # Migration: Add source_data column and update UNIQUE constraint
                 try:
                     self.dbh.execute("SELECT source_data FROM tbl_target_false_positives LIMIT 1")
                 except psycopg2.Error:
-                    self.conn.rollback()  # PostgreSQL requires rollback after error
+                    self.conn.rollback()
                     try:
                         self.dbh.execute("ALTER TABLE tbl_target_false_positives ADD COLUMN source_data TEXT")
                         self.conn.commit()
                     except psycopg2.Error:
-                        self.conn.rollback()  # Column may already exist or table doesn't exist
+                        self.conn.rollback()
+
+                # Update UNIQUE constraint to include source_data (PostgreSQL)
+                try:
+                    # Check if old constraint exists and drop it
+                    self.dbh.execute("ALTER TABLE tbl_target_false_positives DROP CONSTRAINT IF EXISTS tbl_target_false_positives_target_event_type_event_data_key")
+                    self.conn.commit()
+                except psycopg2.Error:
+                    self.conn.rollback()
+
+                try:
+                    # Add new constraint with source_data
+                    self.dbh.execute("ALTER TABLE tbl_target_false_positives ADD CONSTRAINT tbl_target_false_positives_target_event_type_event_data_source_key UNIQUE (target, event_type, event_data, source_data)")
+                    self.conn.commit()
+                except psycopg2.Error:
+                    self.conn.rollback()  # Constraint may already exist
         else:
             raise ValueError(f"Unsupported database type: {self.db_type}")
 
