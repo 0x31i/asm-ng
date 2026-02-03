@@ -540,8 +540,8 @@ class SpiderFootWebUi:
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
                 event_type = translate_event_type(str(row[4]))
-                # Check both per-event FP flag and target-level FPs
-                fp_flag = 1 if row[13] or (row[4], row[1]) in targetFps else 0
+                # Check both per-event FP flag and target-level FPs (including source for granular matching)
+                fp_flag = 1 if row[13] or (row[4], row[1], row[2]) in targetFps else 0
                 rows.append([lastseen, event_type, str(row[3]),
                             str(row[2]), fp_flag, datafield])
 
@@ -566,8 +566,8 @@ class SpiderFootWebUi:
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
                 event_type = translate_event_type(str(row[4]))
-                # Check both per-event FP flag and target-level FPs
-                fp_flag = 1 if row[13] or (row[4], row[1]) in targetFps else 0
+                # Check both per-event FP flag and target-level FPs (including source for granular matching)
+                fp_flag = 1 if row[13] or (row[4], row[1], row[2]) in targetFps else 0
                 parser.writerow([lastseen, event_type, str(
                     row[3]), str(row[2]), fp_flag, datafield])
 
@@ -714,10 +714,10 @@ class SpiderFootWebUi:
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
                 event_type = translate_event_type(str(row[4]))
-                # Check both per-event FP flag and target-level FPs
+                # Check both per-event FP flag and target-level FPs (including source for granular matching)
                 scan_id = row[12]
                 targetFps = targetFpsPerScan.get(scan_id, set())
-                fp_flag = 1 if row[13] or (row[4], row[1]) in targetFps else 0
+                fp_flag = 1 if row[13] or (row[4], row[1], row[2]) in targetFps else 0
                 rows.append([scaninfo[row[12]][0], lastseen, event_type, str(row[3]),
                             str(row[2]), fp_flag, datafield])
 
@@ -746,10 +746,10 @@ class SpiderFootWebUi:
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
                 event_type = translate_event_type(str(row[4]))
-                # Check both per-event FP flag and target-level FPs
+                # Check both per-event FP flag and target-level FPs (including source for granular matching)
                 scan_id = row[12]
                 targetFps = targetFpsPerScan.get(scan_id, set())
-                fp_flag = 1 if row[13] or (row[4], row[1]) in targetFps else 0
+                fp_flag = 1 if row[13] or (row[4], row[1], row[2]) in targetFps else 0
                 parser.writerow([scaninfo[row[12]][0], lastseen, event_type, str(row[3]),
                                 str(row[2]), fp_flag, datafield])
 
@@ -900,8 +900,8 @@ class SpiderFootWebUi:
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
                 event_type = translate_event_type(str(row[10]))
-                # Check both per-event FP flag and target-level FPs
-                fp_flag = 1 if row[11] or (row[10], row[1]) in targetFps else 0
+                # Check both per-event FP flag and target-level FPs (including source for granular matching)
+                fp_flag = 1 if row[11] or (row[10], row[1], row[2]) in targetFps else 0
                 rows.append([row[0], event_type, str(row[3]),
                             str(row[2]), fp_flag, datafield])
             cherrypy.response.headers['Content-Disposition'] = "attachment; filename=SpiderFoot.xlsx"
@@ -921,8 +921,8 @@ class SpiderFootWebUi:
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
                 event_type = translate_event_type(str(row[10]))
-                # Check both per-event FP flag and target-level FPs
-                fp_flag = 1 if row[11] or (row[10], row[1]) in targetFps else 0
+                # Check both per-event FP flag and target-level FPs (including source for granular matching)
+                fp_flag = 1 if row[11] or (row[10], row[1], row[2]) in targetFps else 0
                 parser.writerow([row[0], event_type, str(
                     row[3]), str(row[2]), fp_flag, datafield])
 
@@ -1753,16 +1753,17 @@ class SpiderFootWebUi:
             events = dbh.scanResultEvent(id)
             eventMap = {row[8]: row for row in events}  # hash -> event data
 
-            for resultId in allIds:
+            for resultId in ids:  # Only persist the originally selected IDs, not children
                 if resultId in eventMap:
                     eventData = eventMap[resultId]
                     eventType = eventData[4]  # type
                     data = eventData[1]  # data
+                    sourceData = eventData[2]  # source data for granular matching
 
                     if fp == "1":
-                        dbh.targetFalsePositiveAdd(target, eventType, data)
+                        dbh.targetFalsePositiveAdd(target, eventType, data, sourceData)
                     else:
-                        dbh.targetFalsePositiveRemove(target, eventType, data)
+                        dbh.targetFalsePositiveRemove(target, eventType, data, sourceData)
 
         if ret:
             return json.dumps(["SUCCESS", ""]).encode('utf-8')
@@ -2410,10 +2411,11 @@ class SpiderFootWebUi:
             lastseen = time.strftime(
                 "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
             eventDataRaw = row[1]
+            sourceDataRaw = row[2]
             eventTypeRaw = row[4]
 
-            # Check if this result matches a target-level false positive
-            isTargetFp = 1 if (eventTypeRaw, eventDataRaw) in targetFps else 0
+            # Check if this result matches a target-level false positive (including source for granular matching)
+            isTargetFp = 1 if (eventTypeRaw, eventDataRaw, sourceDataRaw) in targetFps else 0
 
             retdata.append([
                 lastseen,

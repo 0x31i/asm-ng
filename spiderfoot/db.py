@@ -113,12 +113,13 @@ class SpiderFootDb:
             target          VARCHAR NOT NULL, \
             event_type      VARCHAR NOT NULL, \
             event_data      VARCHAR NOT NULL, \
+            source_data     VARCHAR, \
             date_added      INT NOT NULL, \
             notes           VARCHAR, \
-            UNIQUE(target, event_type, event_data) \
+            UNIQUE(target, event_type, event_data, source_data) \
         )",
         "CREATE INDEX idx_target_fp_target ON tbl_target_false_positives (target)",
-        "CREATE INDEX idx_target_fp_lookup ON tbl_target_false_positives (target, event_type, event_data)"
+        "CREATE INDEX idx_target_fp_lookup ON tbl_target_false_positives (target, event_type, event_data, source_data)"
     ]
 
     # PostgreSQL-specific schema queries
@@ -197,12 +198,13 @@ class SpiderFootDb:
             target          VARCHAR NOT NULL, \
             event_type      VARCHAR NOT NULL, \
             event_data      TEXT NOT NULL, \
+            source_data     TEXT, \
             date_added      BIGINT NOT NULL, \
             notes           TEXT, \
-            UNIQUE(target, event_type, event_data) \
+            UNIQUE(target, event_type, event_data, source_data) \
         )",
         "CREATE INDEX IF NOT EXISTS idx_target_fp_target ON tbl_target_false_positives (target)",
-        "CREATE INDEX IF NOT EXISTS idx_target_fp_lookup ON tbl_target_false_positives (target, event_type, event_data)"
+        "CREATE INDEX IF NOT EXISTS idx_target_fp_lookup ON tbl_target_false_positives (target, event_type, event_data, source_data)"
     ]
 
     eventDetails = [
@@ -512,6 +514,16 @@ class SpiderFootDb:
                     except sqlite3.Error:
                         pass  # Table creation failed, but this is not critical
 
+                # Migration: Add source_data column to tbl_target_false_positives if it doesn't exist
+                try:
+                    self.dbh.execute("SELECT source_data FROM tbl_target_false_positives LIMIT 1")
+                except sqlite3.Error:
+                    try:
+                        self.dbh.execute("ALTER TABLE tbl_target_false_positives ADD COLUMN source_data VARCHAR")
+                        self.conn.commit()
+                    except sqlite3.Error:
+                        pass  # Column addition failed, may already exist or table doesn't exist
+
                 if init:
                     for row in self.eventDetails:
                         event = row[0]
@@ -565,6 +577,17 @@ class SpiderFootDb:
                         except Exception:
                             continue
                     self.conn.commit()
+
+                # Migration: Add source_data column to tbl_target_false_positives if it doesn't exist
+                try:
+                    self.dbh.execute("SELECT source_data FROM tbl_target_false_positives LIMIT 1")
+                except psycopg2.Error:
+                    self.conn.rollback()  # PostgreSQL requires rollback after error
+                    try:
+                        self.dbh.execute("ALTER TABLE tbl_target_false_positives ADD COLUMN source_data TEXT")
+                        self.conn.commit()
+                    except psycopg2.Error:
+                        self.conn.rollback()  # Column may already exist or table doesn't exist
         else:
             raise ValueError(f"Unsupported database type: {self.db_type}")
 
@@ -1449,7 +1472,7 @@ class SpiderFootDb:
 
         return True
 
-    def targetFalsePositiveAdd(self, target: str, eventType: str, eventData: str, notes: str = None) -> bool:
+    def targetFalsePositiveAdd(self, target: str, eventType: str, eventData: str, sourceData: str = None, notes: str = None) -> bool:
         """Add a target-level false positive entry.
 
         This allows false positives to persist across scans for the same target.
@@ -1458,6 +1481,7 @@ class SpiderFootDb:
             target (str): the target (seed_target value)
             eventType (str): the event type
             eventData (str): the event data
+            sourceData (str): the source data element (for more granular matching)
             notes (str): optional notes about why this is a false positive
 
         Returns:
@@ -1476,29 +1500,30 @@ class SpiderFootDb:
 
         if self.db_type == 'sqlite':
             qry = "INSERT OR IGNORE INTO tbl_target_false_positives \
-                (target, event_type, event_data, date_added, notes) \
-                VALUES (?, ?, ?, ?, ?)"
+                (target, event_type, event_data, source_data, date_added, notes) \
+                VALUES (?, ?, ?, ?, ?, ?)"
         else:  # postgresql
             qry = "INSERT INTO tbl_target_false_positives \
-                (target, event_type, event_data, date_added, notes) \
-                VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING"
+                (target, event_type, event_data, source_data, date_added, notes) \
+                VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING"
 
         with self.dbhLock:
             try:
-                self.dbh.execute(qry, (target, eventType, eventData, int(time.time() * 1000), notes))
+                self.dbh.execute(qry, (target, eventType, eventData, sourceData, int(time.time() * 1000), notes))
                 self.conn.commit()
             except (sqlite3.Error, psycopg2.Error) as e:
                 raise IOError("SQL error encountered when adding target false positive") from e
 
         return True
 
-    def targetFalsePositiveRemove(self, target: str, eventType: str, eventData: str) -> bool:
+    def targetFalsePositiveRemove(self, target: str, eventType: str, eventData: str, sourceData: str = None) -> bool:
         """Remove a target-level false positive entry.
 
         Args:
             target (str): the target (seed_target value)
             eventType (str): the event type
             eventData (str): the event data
+            sourceData (str): the source data element
 
         Returns:
             bool: success
@@ -1514,11 +1539,16 @@ class SpiderFootDb:
         if not isinstance(eventData, str):
             raise TypeError(f"eventData is {type(eventData)}; expected str()") from None
 
-        qry = "DELETE FROM tbl_target_false_positives WHERE target = ? AND event_type = ? AND event_data = ?"
+        if sourceData is None:
+            qry = "DELETE FROM tbl_target_false_positives WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+            params = (target, eventType, eventData)
+        else:
+            qry = "DELETE FROM tbl_target_false_positives WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ?"
+            params = (target, eventType, eventData, sourceData)
 
         with self.dbhLock:
             try:
-                self.dbh.execute(qry, (target, eventType, eventData))
+                self.dbh.execute(qry, params)
                 self.conn.commit()
             except (sqlite3.Error, psycopg2.Error) as e:
                 raise IOError("SQL error encountered when removing target false positive") from e
@@ -1614,13 +1644,13 @@ class SpiderFootDb:
                 raise IOError("SQL error encountered when checking target false positive") from e
 
     def targetFalsePositivesForTarget(self, target: str) -> set:
-        """Get all false positive (type, data) pairs for a target as a set for fast lookups.
+        """Get all false positive (type, data, source) tuples for a target as a set for fast lookups.
 
         Args:
             target (str): the target (seed_target value)
 
         Returns:
-            set: set of (event_type, event_data) tuples
+            set: set of (event_type, event_data, source_data) tuples
 
         Raises:
             TypeError: arg type was invalid
@@ -1629,12 +1659,12 @@ class SpiderFootDb:
         if not isinstance(target, str):
             raise TypeError(f"target is {type(target)}; expected str()") from None
 
-        qry = "SELECT event_type, event_data FROM tbl_target_false_positives WHERE target = ?"
+        qry = "SELECT event_type, event_data, source_data FROM tbl_target_false_positives WHERE target = ?"
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, (target,))
-                return {(row[0], row[1]) for row in self.dbh.fetchall()}
+                return {(row[0], row[1], row[2]) for row in self.dbh.fetchall()}
             except (sqlite3.Error, psycopg2.Error) as e:
                 raise IOError("SQL error encountered when fetching target false positives") from e
 
