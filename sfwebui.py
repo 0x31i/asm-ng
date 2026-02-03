@@ -1625,23 +1625,23 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     def resultsetfp(self: 'SpiderFootWebUi', id: str, resultids: str, fp: str, force: str = "0") -> str:
-        """Set a bunch of results (hashes) as false positive.
+        """Set a bunch of results (hashes) as false positive or validated.
 
         Args:
             id (str): scan ID
             resultids (str): comma separated list of result IDs
-            fp (str): 0 or 1
+            fp (str): 0 (unvalidated), 1 (false positive), or 2 (validated)
             force (str): 0 or 1 - bypass parent element check when unsetting
 
         Returns:
-            str: set false positive status as JSON
+            str: set status as JSON
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
         dbh = SpiderFootDb(self.config)
 
-        if fp not in ["0", "1"]:
-            return json.dumps(["ERROR", "No FP flag set or not set correctly."]).encode('utf-8')
+        if fp not in ["0", "1", "2"]:
+            return json.dumps(["ERROR", "Invalid status flag. Use 0 (unvalidated), 1 (false positive), or 2 (validated)."]).encode('utf-8')
 
         try:
             ids = json.loads(resultids)
@@ -1686,27 +1686,27 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     def resultsetfppersist(self: 'SpiderFootWebUi', id: str, resultids: str, fp: str, persist: str = "0", force: str = "0") -> str:
-        """Set results as false positive with optional target-level persistence.
+        """Set results as false positive or validated with optional target-level persistence.
 
-        This extends resultsetfp to optionally persist false positives at the target level,
-        so they will be recognized in future scans of the same target.
+        This extends resultsetfp to optionally persist false positives or validated status
+        at the target level, so they will be recognized in future scans of the same target.
 
         Args:
             id (str): scan ID
             resultids (str): comma separated list of result IDs
-            fp (str): 0 or 1
+            fp (str): 0 (unvalidated), 1 (false positive), or 2 (validated)
             persist (str): 0 or 1 - whether to persist at target level
             force (str): 0 or 1 - bypass parent element check when unsetting
 
         Returns:
-            str: set false positive status as JSON
+            str: set status as JSON
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
         dbh = SpiderFootDb(self.config)
 
-        if fp not in ["0", "1"]:
-            return json.dumps(["ERROR", "No FP flag set or not set correctly."]).encode('utf-8')
+        if fp not in ["0", "1", "2"]:
+            return json.dumps(["ERROR", "Invalid status flag. Use 0 (unvalidated), 1 (false positive), or 2 (validated)."]).encode('utf-8')
 
         try:
             ids = json.loads(resultids)
@@ -1761,9 +1761,17 @@ class SpiderFootWebUi:
                     sourceData = eventData[2]  # source data for granular matching
 
                     if fp == "1":
+                        # Mark as false positive - add to FP table, remove from validated
                         dbh.targetFalsePositiveAdd(target, eventType, data, sourceData)
-                    else:
+                        dbh.targetValidatedRemove(target, eventType, data, sourceData)
+                    elif fp == "2":
+                        # Mark as validated - add to validated table, remove from FP
+                        dbh.targetValidatedAdd(target, eventType, data, sourceData)
                         dbh.targetFalsePositiveRemove(target, eventType, data, sourceData)
+                    else:
+                        # Clear status - remove from both tables
+                        dbh.targetFalsePositiveRemove(target, eventType, data, sourceData)
+                        dbh.targetValidatedRemove(target, eventType, data, sourceData)
 
         if ret:
             return json.dumps(["SUCCESS", ""]).encode('utf-8')
@@ -1853,6 +1861,99 @@ class SpiderFootWebUi:
                 ret = dbh.targetFalsePositiveRemoveById(int(id))
             elif target and event_type and event_data:
                 ret = dbh.targetFalsePositiveRemove(target, event_type, event_data)
+            else:
+                return json.dumps(["ERROR", "Must provide either ID or target/event_type/event_data."]).encode('utf-8')
+
+            if ret:
+                return json.dumps(["SUCCESS", ""]).encode('utf-8')
+        except Exception as e:
+            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+
+        return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def targetvalidatedlist(self: 'SpiderFootWebUi', target: str = None) -> list:
+        """List target-level validated entries.
+
+        Args:
+            target (str): optional target to filter by
+
+        Returns:
+            list: list of target-level validated entries
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        dbh = SpiderFootDb(self.config)
+
+        vals = dbh.targetValidatedList(target)
+
+        ret = []
+        for val in vals:
+            ret.append({
+                'id': val[0],
+                'target': val[1],
+                'event_type': val[2],
+                'event_data': val[3],
+                'date_added': val[4],
+                'notes': val[5]
+            })
+
+        return ret
+
+    @cherrypy.expose
+    def targetvalidatedadd(self: 'SpiderFootWebUi', target: str, event_type: str, event_data: str, notes: str = None) -> str:
+        """Add a target-level validated entry.
+
+        Args:
+            target (str): target value
+            event_type (str): event type
+            event_data (str): event data
+            notes (str): optional notes
+
+        Returns:
+            str: JSON status
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        dbh = SpiderFootDb(self.config)
+
+        if not target or not event_type or not event_data:
+            return json.dumps(["ERROR", "Missing required parameters."]).encode('utf-8')
+
+        try:
+            ret = dbh.targetValidatedAdd(target, event_type, event_data, notes)
+            if ret:
+                return json.dumps(["SUCCESS", ""]).encode('utf-8')
+        except Exception as e:
+            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+
+        return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
+
+    @cherrypy.expose
+    def targetvalidatedremove(self: 'SpiderFootWebUi', id: str = None, target: str = None, event_type: str = None, event_data: str = None) -> str:
+        """Remove a target-level validated entry.
+
+        Can be removed by ID or by target/event_type/event_data combination.
+
+        Args:
+            id (str): validated entry ID
+            target (str): target value
+            event_type (str): event type
+            event_data (str): event data
+
+        Returns:
+            str: JSON status
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        dbh = SpiderFootDb(self.config)
+
+        try:
+            if id:
+                ret = dbh.targetValidatedRemoveById(int(id))
+            elif target and event_type and event_data:
+                ret = dbh.targetValidatedRemove(target, event_type, event_data)
             else:
                 return json.dumps(["ERROR", "Must provide either ID or target/event_type/event_data."]).encode('utf-8')
 
@@ -2380,7 +2481,7 @@ class SpiderFootWebUi:
             correlationId (str): filter by events associated with a correlation
 
         Returns:
-            list: scan results with target-level FP status
+            list: scan results with target-level FP and validated status
         """
         retdata = []
 
@@ -2395,15 +2496,20 @@ class SpiderFootWebUi:
         except Exception:
             return retdata
 
-        # Get the target for this scan to check target-level FPs
+        # Get the target for this scan to check target-level FPs and validated status
         scanInfo = dbh.scanInstanceGet(id)
         target = scanInfo[1] if scanInfo else None
 
-        # Get all target-level false positives for fast lookup
+        # Get all target-level false positives and validated entries for fast lookup
         targetFps = set()
+        targetValidated = set()
         if target:
             try:
                 targetFps = dbh.targetFalsePositivesForTarget(target)
+            except Exception:
+                pass  # Table may not exist in older databases
+            try:
+                targetValidated = dbh.targetValidatedForTarget(target)
             except Exception:
                 pass  # Table may not exist in older databases
 
@@ -2416,6 +2522,8 @@ class SpiderFootWebUi:
 
             # Check if this result matches a target-level false positive (including source for granular matching)
             isTargetFp = 1 if (eventTypeRaw, eventDataRaw, sourceDataRaw) in targetFps else 0
+            # Check if this result matches a target-level validated entry
+            isTargetValidated = 1 if (eventTypeRaw, eventDataRaw, sourceDataRaw) in targetValidated else 0
 
             retdata.append([
                 lastseen,
@@ -2429,7 +2537,8 @@ class SpiderFootWebUi:
                 row[13],
                 row[14],
                 row[4],
-                isTargetFp  # Index 11: target-level false positive flag
+                isTargetFp,  # Index 11: target-level false positive flag
+                isTargetValidated  # Index 12: target-level validated flag
             ])
 
         return retdata

@@ -24,10 +24,13 @@
       <a id='btn-log' class="btn btn-default" onClick='viewScanLog("${id}")'><i class='glyphicon glyphicon-book'></i>&nbsp;Log</a>
     </div>
         <div id='modifyactions' role="group" class="btn-group">
-            <a id='btn-setfp' rel="tooltip" data-title="Set/Unset False Positive flag" class="btn-warning btn btn-default dropdown-toggle" data-toggle="dropdown"><i class='glyphicon glyphicon-ban-circle glyphicon glyphicon-white'></i></a>
+            <a id='btn-setfp' rel="tooltip" data-title="Set validation status" class="btn-warning btn btn-default dropdown-toggle" data-toggle="dropdown"><i class='glyphicon glyphicon-ok-circle glyphicon glyphicon-white'></i></a>
             <ul class="dropdown-menu">
-                <li><a href='#' class='link' onClick='setFp(1, 1, 0)'>Set False Positive</a></li>
-                <li><a href='#' class='link' onClick='setFp(0, 1, 0)'>Unset False Positive</a></li>
+                <li class="dropdown-header">Validation Status</li>
+                <li><a href='#' class='link' onClick='setFp(2, 1, 0)'><i class='glyphicon glyphicon-ok-circle' style='color: #16a34a;'></i> Mark as Validated</a></li>
+                <li><a href='#' class='link' onClick='setFp(1, 1, 0)'><i class='glyphicon glyphicon-ban-circle' style='color: #ea580c;'></i> Mark as False Positive</a></li>
+                <li><a href='#' class='link' onClick='setFp(0, 1, 0)'><i class='glyphicon glyphicon-minus' style='color: #6b7280;'></i> Mark as Unvalidated</a></li>
+                <li class="divider"></li>
                 <li><a href='#' class='link' onClick='setFp(0, 1, 1)'>Force Unset (ignore parent)</a></li>
                 <li class="divider"></li>
                 <li class="dropdown-header">Bulk Actions</li>
@@ -111,9 +114,17 @@
 
       <!-- Action buttons -->
       <div class="toolbar-actions">
-        <button class="btn btn-fp-action" onclick="setFp(1, 1)">
+        <button class="btn btn-validated-action" onclick="setFp(2, 1)" title="Mark as Validated (confirmed belongs to organization)">
+          <i class="glyphicon glyphicon-ok-circle"></i>
+          Validated
+        </button>
+        <button class="btn btn-fp-action" onclick="setFp(1, 1)" title="Mark as False Positive (confirmed doesn't belong)">
           <i class="glyphicon glyphicon-ban-circle"></i>
-          Mark as FP
+          False Positive
+        </button>
+        <button class="btn btn-unvalidated-action" onclick="setFp(0, 1)" title="Mark as Unvalidated (reset status)">
+          <i class="glyphicon glyphicon-minus"></i>
+          Unvalidated
         </button>
         <button class="btn btn-clear" onclick="clearSelection()">
           Clear
@@ -477,9 +488,11 @@
                 $("#loader").hide();
                 if (ret[0] == "SUCCESS") {
                     if (flag == 1) {
-                        alertify.success("False positive set successfully.");
+                        alertify.success("Marked as False Positive successfully.");
+                    } else if (flag == 2) {
+                        alertify.success("Marked as Validated successfully.");
                     } else {
-                        alertify.success("False positive removed successfully.");
+                        alertify.success("Status cleared successfully.");
                     }
                     refresh();
                     return;
@@ -489,7 +502,7 @@
                     return;
                 }
                 if (ret[0] == "ERROR") {
-                    alertify.error("There was an error setting false positives because: " + ret[1] + "<br/>If you believe this to be an error, please log out and log back in, and if the problem repeats, report this as a bug.");
+                    alertify.error("There was an error updating status because: " + ret[1] + "<br/>If you believe this to be an error, please log out and log back in, and if the problem repeats, report this as a bug.");
                 }
             });
         }
@@ -1231,6 +1244,7 @@
                             var table = "<table id='scansummary-content' class='table table-bordered table-striped small tablesorter'>";
                             table += "<thead><tr>";
                             table += "<th class='text-center'><input id='checkall' type='checkbox' onClick='switchSelectAll()'></th>";
+                            table += "<th class='text-center validation-status'>Status</th>";
                             table += "<th>Data Element</th></th>";
                             table += "<th>Source Data Element</th>";
                             table += "<th>Source Module</th>";
@@ -1243,17 +1257,33 @@
                                     continue;
                                 }
                                 table += "<tr>";
+                                // Checkbox column
                                 table += "<td class='text-center'><input type='checkbox' id='cb_" + data[i][7] + "'>";
-                                if (data[i][8] == "1") {
-                                    table += "<br /><i class='glyphicon glyphicon-ban-circle' class='vertical-align-bottom' title='Marked as false positive' />";
+                                // Show persistence indicators below checkbox
+                                if (data[i][11] == 1) {
+                                    table += "<br /><i class='glyphicon glyphicon-repeat text-warning' title='Saved as false positive for future scans' />";
                                 }
-                                // Show indicator for target-level false positive (data[11])
-                                if (data[i][11] == 1 && data[i][8] != "1") {
-                                    table += "<br /><i class='glyphicon glyphicon-repeat text-warning' title='Matches a saved false positive for this target' />";
-                                } else if (data[i][11] == 1 && data[i][8] == "1") {
-                                    table += "<i class='glyphicon glyphicon-repeat text-warning' title='Saved as false positive for future scans' />";
+                                if (data[i][12] == 1) {
+                                    table += "<br /><i class='glyphicon glyphicon-repeat text-success' title='Saved as validated for future scans' />";
                                 }
                                 table += "</td>";
+
+                                // Status column with glowing indicators
+                                table += "<td class='text-center validation-status'>";
+                                // Determine status: FP=1 or target-level FP = False Positive (ORANGE)
+                                // FP=2 or target-level validated = Validated (GREEN)
+                                // Otherwise = Unvalidated (GREY)
+                                if (data[i][8] == "1" || data[i][11] == 1) {
+                                    table += "<span class='status-fp' title='False Positive - confirmed does not belong to organization'>";
+                                    table += "<i class='glyphicon glyphicon-ban-circle'></i></span>";
+                                } else if (data[i][8] == "2" || data[i][12] == 1) {
+                                    table += "<span class='status-validated' title='Validated - confirmed belongs to organization'>";
+                                    table += "<i class='glyphicon glyphicon-ok-circle'></i></span>";
+                                } else {
+                                    table += "<span class='status-unvalidated' title='Not yet reviewed'>UNVALIDATED</span>";
+                                }
+                                table += "</td>";
+
                                 table += "<td><pre class='table-border-bg-inherit'>";
                                 //table += "<a href='${docroot}/entityinfo?id=" + data[i][7] + "'>" + data[i][1] + "</a>";
                                 table += sf.replace_sfurltag(data[i][1]);
@@ -1267,7 +1297,7 @@
                             table += "</tbody></table>"
                             $("#loader").fadeOut(500);
                             $("#mainbody").append(crumbs + table);
-                            $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false } } });
+                            $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false }, 1: { sorter: false } } });
                             lastChecked = null;
                             var chkboxes = $('input[id*=cb_]');
                             chkboxes.click(function(e) {

@@ -13,6 +13,11 @@ CSV Format Expected (standard SpiderFoot export):
     Updated, Type, Module, Source, F/P, Data
     or
     Scan Name, Updated, Type, Module, Source, F/P, Data
+
+F/P (or Status) Values:
+    0 = Unvalidated (not yet reviewed)
+    1 = False Positive (confirmed doesn't belong to organization)
+    2 = Validated (confirmed belongs to organization)
 """
 
 import argparse
@@ -62,6 +67,13 @@ def detect_csv_format(headers: list) -> dict:
     """Detect the CSV format based on headers."""
     headers_lower = [h.lower().strip() for h in headers]
 
+    # Determine the status/FP column index (check multiple possible names)
+    fp_index = None
+    for name in ['f/p', 'fp', 'status', 'validated']:
+        if name in headers_lower:
+            fp_index = headers_lower.index(name)
+            break
+
     # Check for multi-scan format (has Scan Name column)
     if 'scan name' in headers_lower:
         return {
@@ -71,7 +83,7 @@ def detect_csv_format(headers: list) -> dict:
             'type': headers_lower.index('type'),
             'module': headers_lower.index('module'),
             'source': headers_lower.index('source'),
-            'fp': headers_lower.index('f/p') if 'f/p' in headers_lower else None,
+            'fp': fp_index,
             'data': headers_lower.index('data'),
         }
     else:
@@ -81,7 +93,7 @@ def detect_csv_format(headers: list) -> dict:
             'type': headers_lower.index('type'),
             'module': headers_lower.index('module'),
             'source': headers_lower.index('source'),
-            'fp': headers_lower.index('f/p') if 'f/p' in headers_lower else None,
+            'fp': fp_index,
             'data': headers_lower.index('data'),
         }
 
@@ -111,6 +123,7 @@ def import_csv(csv_path: str, scan_name: str = None, target: str = None, dry_run
         'rows_imported': 0,
         'rows_skipped': 0,
         'fps_imported': 0,
+        'validated_imported': 0,
         'errors': [],
         'scan_id': None,
         'event_types': set(),
@@ -188,11 +201,16 @@ def import_csv(csv_path: str, scan_name: str = None, target: str = None, dry_run
             data = row[col_map['data']]
             timestamp = parse_timestamp(row[col_map['updated']])
 
-            # Handle false positive flag
+            # Handle status flag (0=unvalidated, 1=false positive, 2=validated)
             fp = 0
             if col_map['fp'] is not None and len(row) > col_map['fp']:
-                fp_val = row[col_map['fp']]
-                fp = 1 if fp_val and fp_val.lower() in ('1', 'true', 'yes') else 0
+                fp_val = row[col_map['fp']].strip().lower() if row[col_map['fp']] else ''
+                if fp_val in ('1', 'true', 'yes', 'fp', 'false positive'):
+                    fp = 1  # False Positive
+                elif fp_val in ('2', 'validated', 'valid', 'confirmed'):
+                    fp = 2  # Validated
+                elif fp_val and fp_val.isdigit():
+                    fp = int(fp_val) if int(fp_val) in (0, 1, 2) else 0
 
             # Skip ROOT events
             if event_type == 'ROOT':
@@ -227,6 +245,20 @@ def import_csv(csv_path: str, scan_name: str = None, target: str = None, dry_run
                 except Exception:
                     pass  # Ignore duplicate FP entries
 
+            # If marked as Validated, save to target-level validated table
+            # so it persists for future scans of this target
+            if fp == 2:
+                try:
+                    val_qry = """INSERT OR IGNORE INTO tbl_target_validated
+                        (target, event_type, event_data, date_added, notes)
+                        VALUES (?, ?, ?, ?, ?)"""
+                    val_qvals = [target, event_type, data, int(time.time() * 1000),
+                                f"Imported from legacy CSV: {Path(csv_path).name}"]
+                    db.dbh.execute(val_qry, val_qvals)
+                    stats['validated_imported'] += 1
+                except Exception:
+                    pass  # Ignore duplicate validated entries
+
             stats['event_types'].add(event_type)
             stats['rows_imported'] += 1
 
@@ -249,6 +281,7 @@ def import_csv(csv_path: str, scan_name: str = None, target: str = None, dry_run
     print(f"  Rows imported: {stats['rows_imported']}")
     print(f"  Rows skipped: {stats['rows_skipped']}")
     print(f"  False positives saved: {stats['fps_imported']}")
+    print(f"  Validated items saved: {stats['validated_imported']}")
     print(f"  Unique event types: {len(stats['event_types'])}")
 
     if stats['errors']:
