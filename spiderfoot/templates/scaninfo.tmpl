@@ -1208,9 +1208,10 @@
                             crumbs += "'browseEventData(\"" + instanceId + "\",\"" + eventTypeLabel + "\",\"" + eventType + "\",\"";
                             crumbs += format + "\", " + filterFP + ");'>";
                             crumbs += unescape(eventTypeLabel) + "</a></li>";
-                            if (fpcount > 0) {
+                            var totalFPCount = fpcount + targetfpcount;
+                            if (totalFPCount > 0) {
                                 crumbs += "<div class='pull-right text-center'>";
-                                crumbs += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;Hide " + fpcount + " False Positives: ";
+                                crumbs += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;Hide " + totalFPCount + " False Positives: ";
                                 crumbs += "<input class='vertical-align-top' type='checkbox' ";
                                 crumbs += "onClick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel +"', '" + eventType + "'";
                                 crumbs += ",'" + format + "', ";
@@ -1237,7 +1238,8 @@
                             table += "</tr></thead><tbody>";
 
                             for (var i = 0; i < data.length; i++) {
-                                if (filterFP && data[i][8] == "1") {
+                                // Hide both current scan FPs and target-level FP matches when filter is enabled
+                                if (filterFP && (data[i][8] == "1" || data[i][11] == 1)) {
                                     continue;
                                 }
                                 table += "<tr>";
