@@ -4486,61 +4486,44 @@ i.glyphicon-white,
 /* ============================================
    Validation Status Indicators
    Status column for scan results showing:
-   - ORANGE glow: False Positive (confirmed doesn't belong)
-   - GREEN glow: Validated (confirmed belongs to organization)
-   - GREY badge: Unvalidated (not yet reviewed)
+   - ORANGE box: False Positive (confirmed doesn't belong)
+   - GREEN box: Validated (confirmed belongs to organization)
+   - GREY box: Unvalidated (not yet reviewed)
+   All use monospace font with uppercase text
    ============================================ */
 
-/* False Positive - ORANGE Glow */
+/* False Positive - ORANGE Box with White Glowing Text */
 .status-fp {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  display: inline-block;
+  padding: 4px 8px;
   background: linear-gradient(135deg, var(--accent-orange) 0%, #c2410c 100%);
   color: #ffffff;
-  box-shadow: 0 0 15px var(--glow-orange), 0 0 30px var(--glow-orange);
-  animation: pulse-orange 2s infinite;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 4px;
+  box-shadow: 0 0 10px var(--glow-orange);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 0 15px rgba(255, 255, 255, 0.5);
   cursor: default;
 }
 
-.status-fp .glyphicon {
-  color: #ffffff !important;
-  font-size: 16px;
-  text-shadow: none;
-}
-
-@keyframes pulse-orange {
-  0%, 100% { box-shadow: 0 0 15px var(--glow-orange), 0 0 30px var(--glow-orange); }
-  50% { box-shadow: 0 0 25px var(--glow-orange), 0 0 50px var(--glow-orange); }
-}
-
-/* Validated - GREEN Glow */
+/* Validated - GREEN Box with White Glowing Text */
 .status-validated {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  display: inline-block;
+  padding: 4px 8px;
   background: linear-gradient(135deg, var(--accent-green) 0%, #15803d 100%);
   color: #ffffff;
-  box-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green);
-  animation: pulse-green 2s infinite;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 4px;
+  box-shadow: 0 0 10px var(--glow-green);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 0 15px rgba(255, 255, 255, 0.5);
   cursor: default;
-}
-
-.status-validated .glyphicon {
-  color: #ffffff !important;
-  font-size: 16px;
-  text-shadow: none;
-}
-
-@keyframes pulse-green {
-  0%, 100% { box-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green); }
-  50% { box-shadow: 0 0 25px var(--glow-green), 0 0 50px var(--glow-green); }
 }
 
 /* Unvalidated - GREY Badge */
@@ -4561,7 +4544,7 @@ i.glyphicon-white,
 
 /* Validation status column in tables */
 .validation-status {
-  width: 110px;
+  width: 120px;
   text-align: center;
   vertical-align: middle !important;
 }
@@ -4604,25 +4587,17 @@ i.glyphicon-white,
   color: white !important;
 }
 
-/* Responsive: smaller indicators on mobile */
+/* Responsive: smaller badges on mobile */
 @media (max-width: 768px) {
   .status-fp,
-  .status-validated {
-    width: 26px;
-    height: 26px;
-  }
-
-  .status-fp .glyphicon,
-  .status-validated .glyphicon {
-    font-size: 13px;
-  }
-
+  .status-validated,
   .status-unvalidated {
-    font-size: 9px;
-    padding: 3px 6px;
+    font-size: 8px;
+    padding: 3px 5px;
+    letter-spacing: 0.3px;
   }
 
   .validation-status {
-    width: 90px;
+    width: 100px;
   }
 }
