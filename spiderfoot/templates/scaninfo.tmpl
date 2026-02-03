@@ -27,11 +27,11 @@
             <a id='btn-setfp' rel="tooltip" data-title="Set validation status" class="btn-warning btn btn-default dropdown-toggle" data-toggle="dropdown"><i class='glyphicon glyphicon-ok-circle glyphicon glyphicon-white'></i></a>
             <ul class="dropdown-menu">
                 <li class="dropdown-header">Validation Status</li>
-                <li><a href='#' class='link' onClick='setFp(2, 1, 0)'><i class='glyphicon glyphicon-ok-circle' style='color: #16a34a;'></i> Mark as Validated</a></li>
-                <li><a href='#' class='link' onClick='setFp(1, 1, 0)'><i class='glyphicon glyphicon-ban-circle' style='color: #ea580c;'></i> Mark as False Positive</a></li>
-                <li><a href='#' class='link' onClick='setFp(0, 1, 0)'><i class='glyphicon glyphicon-minus' style='color: #6b7280;'></i> Mark as Unvalidated</a></li>
+                <li><a href='#' class='link' onClick='setFp(2)'><i class='glyphicon glyphicon-ok-circle' style='color: #16a34a;'></i> Mark as Validated</a></li>
+                <li><a href='#' class='link' onClick='setFp(1)'><i class='glyphicon glyphicon-ban-circle' style='color: #ea580c;'></i> Mark as False Positive</a></li>
+                <li><a href='#' class='link' onClick='setFp(0)'><i class='glyphicon glyphicon-minus' style='color: #6b7280;'></i> Mark as Unvalidated</a></li>
                 <li class="divider"></li>
-                <li><a href='#' class='link' onClick='setFp(0, 1, 1)'>Force Unset (ignore parent)</a></li>
+                <li><a href='#' class='link' onClick='setFp(0, 1)'>Force Unset (ignore parent)</a></li>
                 <li class="divider"></li>
                 <li class="dropdown-header">Bulk Actions</li>
                 <li><a href='#' class='link' onClick='selectMatchingFps()'>Select All Matching Saved FPs</a></li>
@@ -114,15 +114,15 @@
 
       <!-- Action buttons -->
       <div class="toolbar-actions">
-        <button class="btn btn-validated-action" onclick="setFp(2, 1)" title="Mark as Validated (confirmed belongs to organization)">
+        <button class="btn btn-validated-action" onclick="setFp(2)" title="Mark as Validated (confirmed belongs to organization)">
           <i class="glyphicon glyphicon-ok-circle"></i>
           Validated
         </button>
-        <button class="btn btn-fp-action" onclick="setFp(1, 1)" title="Mark as False Positive (confirmed doesn't belong)">
+        <button class="btn btn-fp-action" onclick="setFp(1)" title="Mark as False Positive (confirmed doesn't belong)">
           <i class="glyphicon glyphicon-ban-circle"></i>
           False Positive
         </button>
-        <button class="btn btn-unvalidated-action" onclick="setFp(0, 1)" title="Mark as Unvalidated (reset status)">
+        <button class="btn btn-unvalidated-action" onclick="setFp(0)" title="Mark as Unvalidated (reset status)">
           <i class="glyphicon glyphicon-minus"></i>
           Unvalidated
         </button>
@@ -212,9 +212,9 @@
                 return;
             }
             // Confirm before bulk marking
-            alertify.confirm("Mark " + sel.length + " items as False Positive?<br/><small>These will also be applied to future scans of this target.</small>",
+            alertify.confirm("Mark " + sel.length + " items as False Positive?<br/><small>These will be saved for all future scans of this target.</small>",
                 function() {
-                    setFp(1, 1);
+                    setFp(1);
                 },
                 function() {
                     alertify.warning("Cancelled");
@@ -467,7 +467,7 @@
             return ids;
         }
 
-        function setFp(flag, persist, force) {
+        function setFp(flag, force) {
             sel = getSelected();
             if (sel.length == 0) {
                 alertify.error("You need to select at least one record.");
@@ -475,12 +475,9 @@
             }
             data = JSON.stringify(sel);
             $("#loader").show();
-            // Use the persist endpoint if persistence is requested
-            var endpoint = persist ? '${docroot}/resultsetfppersist' : '${docroot}/resultsetfp';
-            var params = {'id': '${id}', 'fp': flag, 'resultids': data };
-            if (persist) {
-                params['persist'] = persist;
-            }
+            // Always use persist endpoint - all status changes are saved for future scans
+            var endpoint = '${docroot}/resultsetfppersist';
+            var params = {'id': '${id}', 'fp': flag, 'resultids': data, 'persist': 1 };
             if (force) {
                 params['force'] = force;
             }
@@ -1257,28 +1254,18 @@
                                     continue;
                                 }
                                 table += "<tr>";
-                                // Checkbox column
-                                table += "<td class='text-center'><input type='checkbox' id='cb_" + data[i][7] + "'>";
-                                // Show persistence indicators below checkbox
-                                if (data[i][11] == 1) {
-                                    table += "<br /><i class='glyphicon glyphicon-repeat text-warning' title='Saved as false positive for future scans' />";
-                                }
-                                if (data[i][12] == 1) {
-                                    table += "<br /><i class='glyphicon glyphicon-repeat text-success' title='Saved as validated for future scans' />";
-                                }
-                                table += "</td>";
+                                // Checkbox column (simple checkbox only, no persistence indicators)
+                                table += "<td class='text-center'><input type='checkbox' id='cb_" + data[i][7] + "'></td>";
 
-                                // Status column with glowing indicators
+                                // Status column with text badges
                                 table += "<td class='text-center validation-status'>";
                                 // Determine status: FP=1 or target-level FP = False Positive (ORANGE)
                                 // FP=2 or target-level validated = Validated (GREEN)
                                 // Otherwise = Unvalidated (GREY)
                                 if (data[i][8] == "1" || data[i][11] == 1) {
-                                    table += "<span class='status-fp' title='False Positive - confirmed does not belong to organization'>";
-                                    table += "<i class='glyphicon glyphicon-ban-circle'></i></span>";
+                                    table += "<span class='status-fp' title='False Positive - confirmed does not belong to organization'>FALSE POSITIVE</span>";
                                 } else if (data[i][8] == "2" || data[i][12] == 1) {
-                                    table += "<span class='status-validated' title='Validated - confirmed belongs to organization'>";
-                                    table += "<i class='glyphicon glyphicon-ok-circle'></i></span>";
+                                    table += "<span class='status-validated' title='Validated - confirmed belongs to organization'>VALIDATED</span>";
                                 } else {
                                     table += "<span class='status-unvalidated' title='Not yet reviewed'>UNVALIDATED</span>";
                                 }
