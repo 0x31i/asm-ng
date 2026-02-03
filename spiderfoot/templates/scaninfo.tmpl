@@ -26,9 +26,12 @@
         <div id='modifyactions' role="group" class="btn-group">
             <a id='btn-setfp' rel="tooltip" data-title="Set/Unset False Positive flag" class="btn-warning btn btn-default dropdown-toggle" data-toggle="dropdown"><i class='glyphicon glyphicon-ban-circle glyphicon glyphicon-white'></i></a>
             <ul class="dropdown-menu">
-                <li><a href='#' class='link' onClick='setFp(1, 1, 0)'>Set False Positive</a></li>
-                <li><a href='#' class='link' onClick='setFp(0, 1, 0)'>Unset False Positive</a></li>
-                <li><a href='#' class='link' onClick='setFp(0, 1, 1)'>Force Unset (ignore parent)</a></li>
+                <li><a href='#' class='link' onClick='setFp(1, 0, 0)'>Set False Positive</a></li>
+                <li><a href='#' class='link' onClick='setFp(1, 1, 0)'>Set FP + Save for Future Scans</a></li>
+                <li class="divider"></li>
+                <li><a href='#' class='link' onClick='setFp(0, 0, 0)'>Unset False Positive</a></li>
+                <li><a href='#' class='link' onClick='setFp(0, 1, 0)'>Unset FP + Remove from Saved</a></li>
+                <li><a href='#' class='link' onClick='setFp(0, 0, 1)'>Force Unset (ignore parent)</a></li>
                 <li class="divider"></li>
                 <li class="dropdown-header">Bulk Actions</li>
                 <li><a href='#' class='link' onClick='selectMatchingFps()'>Select All Matching Saved FPs</a></li>
@@ -111,7 +114,7 @@
 
       <!-- Action buttons -->
       <div class="toolbar-actions">
-        <button class="btn btn-fp-action" onclick="setFp(1, 1)">
+        <button class="btn btn-fp-action" onclick="setFp(1, 0)">
           <i class="glyphicon glyphicon-ban-circle"></i>
           Mark as FP
         </button>
