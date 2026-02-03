@@ -9,8 +9,7 @@
 Run the import in dry-run mode to validate the CSV format without making changes:
 
 ```bash
-cd /home/user/spiderfoot
-python3 tools/import_legacy_csv.py --csv test_data/test_import_basic.csv --dry-run
+python3 tools/import_legacy_csv.py --csv test/import_data/test_import_basic.csv --dry-run
 ```
 
 **Expected Output:**
@@ -25,7 +24,7 @@ Import the first test file with numeric F/P values (0, 1, 2):
 
 ```bash
 python3 tools/import_legacy_csv.py \
-    --csv test_data/test_import_basic.csv \
+    --csv test/import_data/test_import_basic.csv \
     --name "Test Import - Numeric Status" \
     --target "example.com"
 ```
@@ -53,7 +52,7 @@ Import the second test file with text-based status values:
 
 ```bash
 python3 tools/import_legacy_csv.py \
-    --csv test_data/test_import_text_status.csv \
+    --csv test/import_data/test_import_text_status.csv \
     --name "Test Import - Text Status" \
     --target "testcorp.com"
 ```
