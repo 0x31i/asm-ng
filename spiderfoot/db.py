@@ -119,7 +119,19 @@ class SpiderFootDb:
             UNIQUE(target, event_type, event_data, source_data) \
         )",
         "CREATE INDEX idx_target_fp_target ON tbl_target_false_positives (target)",
-        "CREATE INDEX idx_target_fp_lookup ON tbl_target_false_positives (target, event_type, event_data, source_data)"
+        "CREATE INDEX idx_target_fp_lookup ON tbl_target_false_positives (target, event_type, event_data, source_data)",
+        "CREATE TABLE tbl_target_validated ( \
+            id              INTEGER PRIMARY KEY AUTOINCREMENT, \
+            target          VARCHAR NOT NULL, \
+            event_type      VARCHAR NOT NULL, \
+            event_data      VARCHAR NOT NULL, \
+            source_data     VARCHAR, \
+            date_added      INT NOT NULL, \
+            notes           VARCHAR, \
+            UNIQUE(target, event_type, event_data, source_data) \
+        )",
+        "CREATE INDEX idx_target_val_target ON tbl_target_validated (target)",
+        "CREATE INDEX idx_target_val_lookup ON tbl_target_validated (target, event_type, event_data, source_data)"
     ]
 
     # PostgreSQL-specific schema queries
@@ -204,7 +216,19 @@ class SpiderFootDb:
             UNIQUE(target, event_type, event_data, source_data) \
         )",
         "CREATE INDEX IF NOT EXISTS idx_target_fp_target ON tbl_target_false_positives (target)",
-        "CREATE INDEX IF NOT EXISTS idx_target_fp_lookup ON tbl_target_false_positives (target, event_type, event_data, source_data)"
+        "CREATE INDEX IF NOT EXISTS idx_target_fp_lookup ON tbl_target_false_positives (target, event_type, event_data, source_data)",
+        "CREATE TABLE IF NOT EXISTS tbl_target_validated ( \
+            id              SERIAL PRIMARY KEY, \
+            target          VARCHAR NOT NULL, \
+            event_type      VARCHAR NOT NULL, \
+            event_data      TEXT NOT NULL, \
+            source_data     TEXT, \
+            date_added      BIGINT NOT NULL, \
+            notes           TEXT, \
+            UNIQUE(target, event_type, event_data, source_data) \
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_target_val_target ON tbl_target_validated (target)",
+        "CREATE INDEX IF NOT EXISTS idx_target_val_lookup ON tbl_target_validated (target, event_type, event_data, source_data)"
     ]
 
     eventDetails = [
@@ -553,6 +577,19 @@ class SpiderFootDb:
                         self.conn.commit()
                     except sqlite3.Error:
                         pass  # Migration failed, but continue
+
+                # Add target validated table if it doesn't exist (migration for validated status feature)
+                try:
+                    self.dbh.execute(
+                        "SELECT COUNT(*) FROM tbl_target_validated")
+                except sqlite3.Error:
+                    try:
+                        for query in self.createSchemaQueries:
+                            if "target_validated" in query or "target_val" in query:
+                                self.dbh.execute(query)
+                        self.conn.commit()
+                    except sqlite3.Error:
+                        pass  # Table creation failed, but this is not critical
 
                 if init:
                     for row in self.eventDetails:
@@ -1712,6 +1749,203 @@ class SpiderFootDb:
                 return {(row[0], row[1], row[2]) for row in self.dbh.fetchall()}
             except (sqlite3.Error, psycopg2.Error) as e:
                 raise IOError("SQL error encountered when fetching target false positives") from e
+
+    def targetValidatedAdd(self, target: str, eventType: str, eventData: str, sourceData: str = None, notes: str = None) -> bool:
+        """Add a target-level validated entry.
+
+        This allows validated status to persist across scans for the same target.
+        Validated means the data/asset has been confirmed to belong to the organization.
+
+        Args:
+            target (str): the target (seed_target value)
+            eventType (str): the event type
+            eventData (str): the event data
+            sourceData (str): the source data element (for more granular matching)
+            notes (str): optional notes about why this is validated
+
+        Returns:
+            bool: success
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(target, str):
+            raise TypeError(f"target is {type(target)}; expected str()") from None
+        if not isinstance(eventType, str):
+            raise TypeError(f"eventType is {type(eventType)}; expected str()") from None
+        if not isinstance(eventData, str):
+            raise TypeError(f"eventData is {type(eventData)}; expected str()") from None
+
+        if self.db_type == 'sqlite':
+            qry = "INSERT OR IGNORE INTO tbl_target_validated \
+                (target, event_type, event_data, source_data, date_added, notes) \
+                VALUES (?, ?, ?, ?, ?, ?)"
+        else:  # postgresql
+            qry = "INSERT INTO tbl_target_validated \
+                (target, event_type, event_data, source_data, date_added, notes) \
+                VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target, eventType, eventData, sourceData, int(time.time() * 1000), notes))
+                self.conn.commit()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when adding target validated entry") from e
+
+        return True
+
+    def targetValidatedRemove(self, target: str, eventType: str, eventData: str, sourceData: str = None) -> bool:
+        """Remove a target-level validated entry.
+
+        Args:
+            target (str): the target (seed_target value)
+            eventType (str): the event type
+            eventData (str): the event data
+            sourceData (str): the source data element
+
+        Returns:
+            bool: success
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(target, str):
+            raise TypeError(f"target is {type(target)}; expected str()") from None
+        if not isinstance(eventType, str):
+            raise TypeError(f"eventType is {type(eventType)}; expected str()") from None
+        if not isinstance(eventData, str):
+            raise TypeError(f"eventData is {type(eventData)}; expected str()") from None
+
+        if sourceData is None:
+            qry = "DELETE FROM tbl_target_validated WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+            params = (target, eventType, eventData)
+        else:
+            qry = "DELETE FROM tbl_target_validated WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ?"
+            params = (target, eventType, eventData, sourceData)
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, params)
+                self.conn.commit()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when removing target validated entry") from e
+
+        return True
+
+    def targetValidatedRemoveById(self, valId: int) -> bool:
+        """Remove a target-level validated entry by its ID.
+
+        Args:
+            valId (int): the validated entry ID
+
+        Returns:
+            bool: success
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(valId, int):
+            raise TypeError(f"valId is {type(valId)}; expected int()") from None
+
+        qry = "DELETE FROM tbl_target_validated WHERE id = ?"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (valId,))
+                self.conn.commit()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when removing target validated entry") from e
+
+        return True
+
+    def targetValidatedList(self, target: str = None) -> list:
+        """Get target-level validated entries.
+
+        Args:
+            target (str): optional target to filter by (if None, returns all)
+
+        Returns:
+            list: list of target validated entries
+
+        Raises:
+            IOError: database I/O failed
+        """
+        if target is not None:
+            qry = "SELECT id, target, event_type, event_data, ROUND(date_added/1000) as date_added, notes \
+                FROM tbl_target_validated WHERE target = ? ORDER BY date_added DESC"
+            qvars = [target]
+        else:
+            qry = "SELECT id, target, event_type, event_data, ROUND(date_added/1000) as date_added, notes \
+                FROM tbl_target_validated ORDER BY target, date_added DESC"
+            qvars = []
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, qvars)
+                return self.dbh.fetchall()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when fetching target validated entries") from e
+
+    def targetValidatedCheck(self, target: str, eventType: str, eventData: str) -> bool:
+        """Check if a specific event is marked as target-level validated.
+
+        Args:
+            target (str): the target (seed_target value)
+            eventType (str): the event type
+            eventData (str): the event data
+
+        Returns:
+            bool: True if it's marked as target-level validated
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(target, str):
+            raise TypeError(f"target is {type(target)}; expected str()") from None
+        if not isinstance(eventType, str):
+            raise TypeError(f"eventType is {type(eventType)}; expected str()") from None
+        if not isinstance(eventData, str):
+            raise TypeError(f"eventData is {type(eventData)}; expected str()") from None
+
+        qry = "SELECT COUNT(*) FROM tbl_target_validated \
+            WHERE target = ? AND event_type = ? AND event_data = ?"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target, eventType, eventData))
+                row = self.dbh.fetchone()
+                return row[0] > 0
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when checking target validated status") from e
+
+    def targetValidatedForTarget(self, target: str) -> set:
+        """Get all validated (type, data, source) tuples for a target as a set for fast lookups.
+
+        Args:
+            target (str): the target (seed_target value)
+
+        Returns:
+            set: set of (event_type, event_data, source_data) tuples
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(target, str):
+            raise TypeError(f"target is {type(target)}; expected str()") from None
+
+        qry = "SELECT event_type, event_data, source_data FROM tbl_target_validated WHERE target = ?"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target,))
+                return {(row[0], row[1], row[2]) for row in self.dbh.fetchall()}
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when fetching target validated entries") from e
 
     def configSet(self, optMap: dict = {}) -> bool:
         """Store the default configuration in the database.

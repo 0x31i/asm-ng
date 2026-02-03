@@ -4482,3 +4482,147 @@ i.glyphicon-white,
 .dropdown-toggle .glyphicon-white {
   color: var(--text-primary) !important;
 }
+
+/* ============================================
+   Validation Status Indicators
+   Status column for scan results showing:
+   - ORANGE glow: False Positive (confirmed doesn't belong)
+   - GREEN glow: Validated (confirmed belongs to organization)
+   - GREY badge: Unvalidated (not yet reviewed)
+   ============================================ */
+
+/* False Positive - ORANGE Glow */
+.status-fp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-orange) 0%, #c2410c 100%);
+  color: #ffffff;
+  box-shadow: 0 0 15px var(--glow-orange), 0 0 30px var(--glow-orange);
+  animation: pulse-orange 2s infinite;
+  cursor: default;
+}
+
+.status-fp .glyphicon {
+  color: #ffffff !important;
+  font-size: 16px;
+  text-shadow: none;
+}
+
+@keyframes pulse-orange {
+  0%, 100% { box-shadow: 0 0 15px var(--glow-orange), 0 0 30px var(--glow-orange); }
+  50% { box-shadow: 0 0 25px var(--glow-orange), 0 0 50px var(--glow-orange); }
+}
+
+/* Validated - GREEN Glow */
+.status-validated {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-green) 0%, #15803d 100%);
+  color: #ffffff;
+  box-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green);
+  animation: pulse-green 2s infinite;
+  cursor: default;
+}
+
+.status-validated .glyphicon {
+  color: #ffffff !important;
+  font-size: 16px;
+  text-shadow: none;
+}
+
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 15px var(--glow-green), 0 0 30px var(--glow-green); }
+  50% { box-shadow: 0 0 25px var(--glow-green), 0 0 50px var(--glow-green); }
+}
+
+/* Unvalidated - GREY Badge */
+.status-unvalidated {
+  display: inline-block;
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 4px;
+  border: 1px solid var(--glass-border);
+  cursor: default;
+}
+
+/* Validation status column in tables */
+.validation-status {
+  width: 110px;
+  text-align: center;
+  vertical-align: middle !important;
+}
+
+/* Selection toolbar - Validated action button (GREEN) */
+#selection-toolbar .btn-validated-action {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #15803d 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 12px var(--glow-green) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+  border: none !important;
+}
+
+#selection-toolbar .btn-validated-action:hover {
+  background: linear-gradient(135deg, var(--accent-green-light) 0%, var(--accent-green) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-green) !important;
+}
+
+#selection-toolbar .btn-validated-action .glyphicon,
+#selection-toolbar .btn-validated-action i {
+  color: white !important;
+}
+
+/* Selection toolbar - Unvalidated action button (GREY) */
+#selection-toolbar .btn-unvalidated-action {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 8px rgba(107, 114, 128, 0.3) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+  border: none !important;
+}
+
+#selection-toolbar .btn-unvalidated-action:hover {
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%) !important;
+  box-shadow: 0 0 15px rgba(107, 114, 128, 0.4) !important;
+}
+
+#selection-toolbar .btn-unvalidated-action .glyphicon,
+#selection-toolbar .btn-unvalidated-action i {
+  color: white !important;
+}
+
+/* Responsive: smaller indicators on mobile */
+@media (max-width: 768px) {
+  .status-fp,
+  .status-validated {
+    width: 26px;
+    height: 26px;
+  }
+
+  .status-fp .glyphicon,
+  .status-validated .glyphicon {
+    font-size: 13px;
+  }
+
+  .status-unvalidated {
+    font-size: 9px;
+    padding: 3px 6px;
+  }
+
+  .validation-status {
+    width: 90px;
+  }
+}
