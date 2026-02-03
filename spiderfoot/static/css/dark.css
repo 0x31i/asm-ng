@@ -4202,6 +4202,128 @@ button[data-target="#createWorkspaceModal"]:hover,
 }
 
 /* ============================================
+   Validation Status Indicators - Dark Mode
+   Enhanced glow effects for dark backgrounds
+   ============================================ */
+
+/* False Positive - ORANGE Box with White Glowing Text */
+.status-fp {
+  display: inline-block;
+  padding: 4px 8px;
+  background: linear-gradient(135deg, var(--accent-orange) 0%, #ea580c 100%);
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 4px;
+  box-shadow: 0 0 15px var(--glow-orange), 0 0 30px var(--glow-orange);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 0 20px rgba(255, 255, 255, 0.6);
+  cursor: default;
+}
+
+/* Validated - BLUE Box with White Glowing Text */
+.status-validated {
+  display: inline-block;
+  padding: 4px 8px;
+  background: linear-gradient(135deg, var(--accent-blue) 0%, #2563eb 100%);
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 4px;
+  box-shadow: 0 0 15px var(--glow-blue), 0 0 30px var(--glow-blue);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 0 20px rgba(255, 255, 255, 0.6);
+  cursor: default;
+}
+
+/* Unvalidated - GREY Badge */
+.status-unvalidated {
+  display: inline-block;
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 4px;
+  border: 1px solid var(--glass-border);
+  cursor: default;
+}
+
+/* Legacy indicator - smaller text appended to status */
+.status-legacy {
+  font-size: 8px;
+  opacity: 0.9;
+  margin-left: 2px;
+}
+
+/* Validation status column in tables */
+.validation-status {
+  width: 140px;
+  text-align: center;
+  vertical-align: middle !important;
+}
+
+/* Selection toolbar - Validated action button (BLUE) */
+#selection-toolbar .btn-validated-action {
+  background: linear-gradient(135deg, var(--accent-blue) 0%, #2563eb 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 15px var(--glow-blue) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+  border: none !important;
+}
+
+#selection-toolbar .btn-validated-action:hover {
+  background: linear-gradient(135deg, var(--accent-blue-light) 0%, var(--accent-blue) 100%) !important;
+  box-shadow: 0 0 25px var(--glow-blue) !important;
+}
+
+#selection-toolbar .btn-validated-action .glyphicon,
+#selection-toolbar .btn-validated-action i {
+  color: white !important;
+}
+
+/* Selection toolbar - Unvalidated action button (GREY) */
+#selection-toolbar .btn-unvalidated-action {
+  background: linear-gradient(135deg, #4b5563 0%, #374151 100%) !important;
+  color: white !important;
+  box-shadow: 0 0 10px rgba(107, 114, 128, 0.4) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+  border: none !important;
+}
+
+#selection-toolbar .btn-unvalidated-action:hover {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%) !important;
+  box-shadow: 0 0 18px rgba(107, 114, 128, 0.5) !important;
+}
+
+#selection-toolbar .btn-unvalidated-action .glyphicon,
+#selection-toolbar .btn-unvalidated-action i {
+  color: white !important;
+}
+
+/* Responsive: smaller badges on mobile */
+@media (max-width: 768px) {
+  .status-fp,
+  .status-validated,
+  .status-unvalidated {
+    font-size: 8px;
+    padding: 3px 5px;
+    letter-spacing: 0.3px;
+  }
+
+  .validation-status {
+    width: 120px;
+  }
+}
+
+/* ============================================
    FINAL OVERRIDE: White content on colored buttons
    This MUST be at the END of the file to win cascade
    ============================================ */

@@ -43,8 +43,8 @@ python3 tools/import_legacy_csv.py \
 4. Click Browse and select any event type (e.g., IP_ADDRESS)
 5. Verify the Status column shows:
    - 192.168.1.1 = GREY "UNVALIDATED" badge
-   - 10.0.0.1 = ORANGE glowing circle (False Positive)
-   - 203.0.113.50 = GREEN glowing circle (Validated)
+   - 10.0.0.1 = ORANGE "FALSE POSITIVE" badge
+   - 203.0.113.50 = BLUE "VALIDATED" badge
 
 ## Test 3: Import CSV with Text Status Values
 
@@ -97,13 +97,13 @@ After importing, test the UI actions:
 1. **Mark as Validated:**
    - Select an UNVALIDATED row (checkbox)
    - Click the green "Validated" button in the floating toolbar
-   - Verify the status changes to GREEN glow
+   - Verify the status changes to BLUE "VALIDATED" badge
    - Refresh and verify it persists
 
 2. **Mark as False Positive:**
    - Select a row
    - Click the orange "False Positive" button
-   - Verify the status changes to ORANGE glow
+   - Verify the status changes to ORANGE "FALSE POSITIVE" badge
 
 3. **Mark as Unvalidated:**
    - Select a validated or FP row
@@ -124,7 +124,7 @@ After importing, test the UI actions:
 2. Create a new scan against the same target
 3. After the new scan completes, browse the results
 4. Verify that items matching the saved validated entries show:
-   - GREEN glow
+   - BLUE "VALIDATED" badge (or "VALIDATED LEGACY" if from previous scan)
    - A small repeat icon indicating "Saved as validated for future scans"
 
 ## Test 7: Export and Re-Import
@@ -153,5 +153,7 @@ sqlite3 ~/.spiderfoot/spiderfoot.db "DELETE FROM tbl_target_validated WHERE targ
 | Value | Text Aliases | Color | Meaning |
 |-------|--------------|-------|---------|
 | 0 | (empty) | GREY badge | Unvalidated - not yet reviewed |
-| 1 | true, yes, fp, false positive | ORANGE glow | False Positive - doesn't belong |
-| 2 | validated, valid, confirmed | GREEN glow | Validated - confirmed belongs to org |
+| 1 | true, yes, fp, false positive | ORANGE box | False Positive - doesn't belong |
+| 2 | validated, valid, confirmed | BLUE box | Validated - confirmed belongs to org |
+
+**Note:** Items detected from previous scan persistence will show "LEGACY" suffix (e.g., "FALSE POSITIVE LEGACY" or "VALIDATED LEGACY").
