@@ -1208,25 +1208,21 @@
                             crumbs += "'browseEventData(\"" + instanceId + "\",\"" + eventTypeLabel + "\",\"" + eventType + "\",\"";
                             crumbs += format + "\", " + filterFP + ");'>";
                             crumbs += unescape(eventTypeLabel) + "</a></li>";
-                            if (fpcount > 0 || targetfpcount > 0) {
+                            if (fpcount > 0) {
                                 crumbs += "<div class='pull-right text-center'>";
-                                if (fpcount > 0) {
-                                    crumbs += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;Hide " + fpcount + " False Positives: ";
-                                    crumbs += "<input class='vertical-align-top' type='checkbox' ";
-                                    crumbs += "onClick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel +"', '" + eventType + "'";
-                                    crumbs += ",'" + format + "', ";
-                                    if (!filterFP) {
-                                        fp = 1;
-                                        ch = "";
-                                    } else {
-                                        fp = 0;
-                                        ch = "checked";
-                                    }
-                                    crumbs += fp + ")\" " + ch + "></input>";
+                                crumbs += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;Hide " + fpcount + " False Positives: ";
+                                crumbs += "<input class='vertical-align-top' type='checkbox' ";
+                                crumbs += "onClick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel +"', '" + eventType + "'";
+                                crumbs += ",'" + format + "', ";
+                                if (!filterFP) {
+                                    fp = 1;
+                                    ch = "";
+                                } else {
+                                    fp = 0;
+                                    ch = "checked";
                                 }
-                                if (targetfpcount > 0) {
-                                    crumbs += "&nbsp;&nbsp;<i class='glyphicon glyphicon-repeat text-warning'></i><span class='stored-fps-text'>" + targetfpcount + " Marked False Positives</span>";
-                                }
+                                crumbs += fp + ")\" " + ch + "></input>";
+                                crumbs += "&nbsp;&nbsp;<i class='glyphicon glyphicon-repeat'></i><span class='stored-fps-text'>" + fpcount + " Marked False Positives</span>";
                                 crumbs += "</div>";
                             }
                             crumbs += "</ul>";
