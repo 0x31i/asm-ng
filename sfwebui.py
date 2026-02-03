@@ -1753,7 +1753,7 @@ class SpiderFootWebUi:
             events = dbh.scanResultEvent(id)
             eventMap = {row[8]: row for row in events}  # hash -> event data
 
-            for resultId in ids:  # Only persist the originally selected IDs, not children
+            for resultId in allIds:  # Persist all marked items including children
                 if resultId in eventMap:
                     eventData = eventMap[resultId]
                     eventType = eventData[4]  # type
