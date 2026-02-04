@@ -84,7 +84,8 @@ class SpiderFootDb:
             module              VARCHAR NOT NULL, \
             data                VARCHAR, \
             false_positive      INT NOT NULL DEFAULT 0, \
-            source_event_hash  VARCHAR DEFAULT 'ROOT' \
+            source_event_hash  VARCHAR DEFAULT 'ROOT', \
+            imported_from_scan  VARCHAR DEFAULT NULL \
         )",
         "CREATE TABLE tbl_scan_correlation_results ( \
             id                  VARCHAR NOT NULL PRIMARY KEY, \
@@ -181,7 +182,8 @@ class SpiderFootDb:
             module              VARCHAR NOT NULL, \
             data                TEXT, \
             false_positive      INT NOT NULL DEFAULT 0, \
-            source_event_hash  VARCHAR DEFAULT 'ROOT' \
+            source_event_hash  VARCHAR DEFAULT 'ROOT', \
+            imported_from_scan  VARCHAR DEFAULT NULL \
         )",
         "CREATE TABLE IF NOT EXISTS tbl_scan_correlation_results ( \
             id                  VARCHAR NOT NULL PRIMARY KEY, \
@@ -591,6 +593,16 @@ class SpiderFootDb:
                     except sqlite3.Error:
                         pass  # Table creation failed, but this is not critical
 
+                # Migration: Add imported_from_scan column to tbl_scan_results if it doesn't exist
+                try:
+                    self.dbh.execute("SELECT imported_from_scan FROM tbl_scan_results LIMIT 1")
+                except sqlite3.Error:
+                    try:
+                        self.dbh.execute("ALTER TABLE tbl_scan_results ADD COLUMN imported_from_scan VARCHAR DEFAULT NULL")
+                        self.conn.commit()
+                    except sqlite3.Error:
+                        pass  # Column addition failed, but continue
+
                 if init:
                     for row in self.eventDetails:
                         event = row[0]
@@ -670,6 +682,17 @@ class SpiderFootDb:
                     self.conn.commit()
                 except psycopg2.Error:
                     self.conn.rollback()  # Constraint may already exist
+
+                # Migration: Add imported_from_scan column to tbl_scan_results if it doesn't exist
+                try:
+                    self.dbh.execute("SELECT imported_from_scan FROM tbl_scan_results LIMIT 1")
+                except psycopg2.Error:
+                    self.conn.rollback()
+                    try:
+                        self.dbh.execute("ALTER TABLE tbl_scan_results ADD COLUMN imported_from_scan VARCHAR DEFAULT NULL")
+                        self.conn.commit()
+                    except psycopg2.Error:
+                        self.conn.rollback()  # Column addition failed, but continue
         else:
             raise ValueError(f"Unsupported database type: {self.db_type}")
 
@@ -1304,7 +1327,8 @@ class SpiderFootDb:
             s.data as 'source_data', \
             c.module, c.type, c.confidence, c.visibility, c.risk, c.hash, \
             c.source_event_hash, t.event_descr, t.event_type, s.scan_instance_id, \
-            c.false_positive as 'fp', s.false_positive as 'parent_fp' \
+            c.false_positive as 'fp', s.false_positive as 'parent_fp', \
+            c.imported_from_scan \
             FROM tbl_scan_results c, tbl_scan_results s, tbl_event_types t "
 
         if correlationId:
@@ -2766,3 +2790,270 @@ class SpiderFootDb:
                 return entities
             except (sqlite3.Error, psycopg2.Error) as e:
                 raise IOError("SQL error encountered when fetching entity events") from e
+
+    def getLatestScanForTarget(self, target: str) -> str:
+        """Get the GUID of the most recent scan for a target.
+
+        Args:
+            target (str): the target (seed_target value)
+
+        Returns:
+            str: GUID of the latest scan, or None if no scans exist
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(target, str):
+            raise TypeError(f"target is {type(target)}; expected str()") from None
+
+        qry = """SELECT guid FROM tbl_scan_instance
+            WHERE seed_target = ?
+            ORDER BY started DESC LIMIT 1"""
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [target])
+                row = self.dbh.fetchone()
+                return row[0] if row else None
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when getting latest scan for target") from e
+
+    def isLatestScan(self, instanceId: str) -> dict:
+        """Check if a scan is the latest scan for its target.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            dict: {isLatest: bool, latestScanId: str, scanCount: int, importedCount: int}
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(f"instanceId is {type(instanceId)}; expected str()") from None
+
+        # Get the target for this scan
+        scanInfo = self.scanInstanceGet(instanceId)
+        if not scanInfo:
+            return {'isLatest': False, 'latestScanId': None, 'scanCount': 0, 'importedCount': 0}
+
+        target = scanInfo[1]
+
+        # Get the latest scan ID for this target
+        latestScanId = self.getLatestScanForTarget(target)
+
+        # Count scans for this target
+        scanCount = self.scanCountForTarget(target)
+
+        # Count imported entries for this scan
+        importedCount = self.getImportedEntriesCount(instanceId)
+
+        return {
+            'isLatest': instanceId == latestScanId,
+            'latestScanId': latestScanId,
+            'scanCount': scanCount,
+            'importedCount': importedCount
+        }
+
+    def getImportedEntriesCount(self, instanceId: str) -> int:
+        """Count the number of imported entries in a scan.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            int: number of imported entries
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(f"instanceId is {type(instanceId)}; expected str()") from None
+
+        qry = """SELECT COUNT(*) FROM tbl_scan_results
+            WHERE scan_instance_id = ? AND imported_from_scan IS NOT NULL"""
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [instanceId])
+                row = self.dbh.fetchone()
+                return row[0] if row else 0
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when counting imported entries") from e
+
+    def getImportableEntries(self, instanceId: str) -> list:
+        """Get entries from older scans that can be imported into this scan.
+
+        Returns entries from older scans of the same target that:
+        - Are validated (fp=2) or unvalidated (fp=0)
+        - Do not already exist in the current scan (by type+data combination)
+
+        Args:
+            instanceId (str): current scan instance ID
+
+        Returns:
+            list: list of importable entries with source scan info
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(f"instanceId is {type(instanceId)}; expected str()") from None
+
+        # Get the target for this scan
+        scanInfo = self.scanInstanceGet(instanceId)
+        if not scanInfo:
+            return []
+
+        target = scanInfo[1]
+
+        # Get entries from older scans that don't exist in current scan
+        # Join with scan_instance to get scan timestamps for ordering
+        qry = """
+            SELECT old.hash, old.type, old.data, old.module, old.generated,
+                   old.confidence, old.visibility, old.risk, old.false_positive,
+                   old.source_event_hash, old.scan_instance_id,
+                   si.name as source_scan_name, si.started as source_scan_started
+            FROM tbl_scan_results old
+            JOIN tbl_scan_instance si ON old.scan_instance_id = si.guid
+            WHERE si.seed_target = ?
+              AND old.scan_instance_id != ?
+              AND old.type != 'ROOT'
+              AND old.imported_from_scan IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM tbl_scan_results curr
+                  WHERE curr.scan_instance_id = ?
+                    AND curr.type = old.type
+                    AND curr.data = old.data
+              )
+            ORDER BY si.started DESC, old.generated DESC
+        """
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [target, instanceId, instanceId])
+                return self.dbh.fetchall()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when getting importable entries") from e
+
+    def importEntriesFromOlderScans(self, instanceId: str) -> dict:
+        """Import entries from older scans of the same target into this scan.
+
+        Copies unique entries from older scans, marking them with imported_from_scan.
+        Only imports entries that don't already exist in the current scan.
+
+        Args:
+            instanceId (str): current scan instance ID
+
+        Returns:
+            dict: {imported: int, skipped: int} counts
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(f"instanceId is {type(instanceId)}; expected str()") from None
+
+        # Get importable entries
+        entries = self.getImportableEntries(instanceId)
+
+        if not entries:
+            return {'imported': 0, 'skipped': 0}
+
+        imported = 0
+        skipped = 0
+
+        with self.dbhLock:
+            try:
+                for entry in entries:
+                    # Generate a new unique hash for the imported entry
+                    # Original: hash, type, data, module, generated, confidence, visibility, risk, false_positive, source_event_hash, scan_instance_id
+                    original_hash = entry[0]
+                    event_type = entry[1]
+                    data = entry[2]
+                    module = entry[3]
+                    generated = entry[4]
+                    confidence = entry[5]
+                    visibility = entry[6]
+                    risk = entry[7]
+                    false_positive = entry[8]
+                    source_event_hash = entry[9]
+                    source_scan_id = entry[10]
+
+                    # Generate new hash for this imported entry
+                    new_hash = hashlib.sha256(
+                        f"{instanceId}{event_type}{data}{module}{source_scan_id}".encode('utf-8')
+                    ).hexdigest()
+
+                    # Check if we need to map the source_event_hash
+                    # For ROOT events or if the parent doesn't exist, use ROOT
+                    if source_event_hash == 'ROOT':
+                        mapped_source_hash = 'ROOT'
+                    else:
+                        # Check if parent exists in current scan
+                        check_qry = """SELECT hash FROM tbl_scan_results
+                            WHERE scan_instance_id = ? AND hash = ?"""
+                        self.dbh.execute(check_qry, [instanceId, source_event_hash])
+                        if self.dbh.fetchone():
+                            mapped_source_hash = source_event_hash
+                        else:
+                            # Parent doesn't exist - link to ROOT
+                            mapped_source_hash = 'ROOT'
+
+                    # Insert the imported entry
+                    qry = """INSERT INTO tbl_scan_results
+                        (scan_instance_id, hash, type, generated, confidence, visibility,
+                         risk, module, data, false_positive, source_event_hash, imported_from_scan)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+
+                    try:
+                        self.dbh.execute(qry, [
+                            instanceId, new_hash, event_type, generated, confidence, visibility,
+                            risk, module, data, false_positive, mapped_source_hash, source_scan_id
+                        ])
+                        imported += 1
+                    except (sqlite3.Error, psycopg2.Error):
+                        # Entry already exists (race condition or duplicate)
+                        skipped += 1
+                        continue
+
+                self.conn.commit()
+                return {'imported': imported, 'skipped': skipped}
+
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when importing entries") from e
+
+    def getScansByTarget(self, target: str) -> list:
+        """Get all scans for a target, ordered by started date (newest first).
+
+        Args:
+            target (str): the target (seed_target value)
+
+        Returns:
+            list: list of (guid, name, created, started, ended, status) tuples
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(target, str):
+            raise TypeError(f"target is {type(target)}; expected str()") from None
+
+        qry = """SELECT guid, name, ROUND(created/1000) as created,
+            ROUND(started/1000) as started, ROUND(ended/1000) as ended, status
+            FROM tbl_scan_instance
+            WHERE seed_target = ?
+            ORDER BY started DESC"""
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [target])
+                return self.dbh.fetchall()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when getting scans for target") from e

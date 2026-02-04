@@ -4292,6 +4292,47 @@ button[data-target="#createWorkspaceModal"]:hover,
   margin-left: 2px;
 }
 
+/* Imported indicator - smaller text appended to status (PURPLE) */
+.status-imported {
+  font-size: 8px;
+  color: #a78bfa;
+  opacity: 0.9;
+  margin-left: 2px;
+}
+
+/* Stats bar - imported count styling */
+.stats-imported .stats-value {
+  color: #a78bfa;
+}
+
+.stats-imported .stats-label {
+  color: #c4b5fd;
+}
+
+/* Filter button for imported entries (PURPLE) */
+.filter-btn-imported {
+  border-color: #a78bfa !important;
+  color: #a78bfa !important;
+}
+
+.filter-btn-imported:hover {
+  background-color: rgba(167, 139, 250, 0.15) !important;
+}
+
+.filter-btn-imported.filter-btn-active {
+  background-color: #8b5cf6 !important;
+  color: white !important;
+}
+
+/* Imported row styling - subtle purple tint */
+.imported-row {
+  background-color: rgba(139, 92, 246, 0.08) !important;
+}
+
+.imported-row:hover {
+  background-color: rgba(139, 92, 246, 0.15) !important;
+}
+
 /* Validation status column in tables */
 .validation-status {
   width: 140px;
