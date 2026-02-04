@@ -4595,6 +4595,149 @@ i.glyphicon-white,
   color: white !important;
 }
 
+/* ============================================
+   Stats Bar Module
+   Shows row counts by status type with filter buttons
+   ============================================ */
+
+.stats-bar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 15px auto;
+  max-width: 100%;
+}
+
+.stats-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.stats-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 12px;
+}
+
+.stats-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.stats-value {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.stats-divider {
+  width: 1px;
+  height: 35px;
+  background: var(--glass-border);
+  margin: 0 4px;
+}
+
+/* Stats item color variants */
+.stats-item.stats-fp .stats-value {
+  color: var(--accent-orange);
+  text-shadow: 0 0 8px var(--glow-orange);
+}
+
+.stats-item.stats-fp-legacy .stats-value {
+  color: var(--accent-orange);
+  opacity: 0.7;
+}
+
+.stats-item.stats-validated .stats-value {
+  color: var(--accent-blue);
+  text-shadow: 0 0 8px var(--glow-blue);
+}
+
+.stats-item.stats-validated-legacy .stats-value {
+  color: var(--accent-blue);
+  opacity: 0.7;
+}
+
+.stats-item.stats-unvalidated .stats-value {
+  color: var(--text-muted);
+}
+
+/* Filter buttons container */
+.stats-filters {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* Filter button base style - colorless/ghost when inactive */
+.filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.filter-btn:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
+.filter-btn .glyphicon {
+  font-size: 12px;
+}
+
+/* Active filter button - FP (Orange) */
+.filter-btn-fp.filter-btn-active {
+  background: linear-gradient(135deg, var(--accent-orange) 0%, #c2410c 100%);
+  border-color: var(--accent-orange);
+  color: #ffffff;
+  box-shadow: 0 0 12px var(--glow-orange);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+.filter-btn-fp.filter-btn-active:hover {
+  box-shadow: 0 0 18px var(--glow-orange);
+}
+
+/* Active filter button - Validated (Blue) */
+.filter-btn-validated.filter-btn-active {
+  background: linear-gradient(135deg, var(--accent-blue) 0%, #1d4ed8 100%);
+  border-color: var(--accent-blue);
+  color: #ffffff;
+  box-shadow: 0 0 12px var(--glow-blue);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+.filter-btn-validated.filter-btn-active:hover {
+  box-shadow: 0 0 18px var(--glow-blue);
+}
+
 /* Responsive: smaller badges on mobile */
 @media (max-width: 768px) {
   .status-fp,

@@ -4324,6 +4324,187 @@ button[data-target="#createWorkspaceModal"]:hover,
 }
 
 /* ============================================
+   Stats Bar Module - Dark Mode
+   ============================================ */
+
+.stats-bar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 15px auto;
+  max-width: 100%;
+}
+
+.stats-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 40px rgba(59, 130, 246, 0.05);
+  backdrop-filter: blur(12px);
+}
+
+.stats-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(51, 65, 85, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.stats-item:hover {
+  background: rgba(71, 85, 105, 0.6);
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+.stats-label {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+}
+
+.stats-value {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #e2e8f0;
+  text-shadow: 0 0 8px rgba(226, 232, 240, 0.3);
+}
+
+.stats-divider {
+  width: 1px;
+  height: 24px;
+  background: linear-gradient(180deg, transparent 0%, rgba(148, 163, 184, 0.3) 50%, transparent 100%);
+  margin: 0 4px;
+}
+
+/* Filter Buttons Row */
+.filter-buttons-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  background: rgba(51, 65, 85, 0.4);
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-btn:hover {
+  background: rgba(71, 85, 105, 0.6);
+  border-color: rgba(148, 163, 184, 0.4);
+  color: #cbd5e1;
+}
+
+/* False Positive Filter - Active State */
+.filter-btn-fp.filter-btn-active {
+  background: linear-gradient(135deg, #f97316 0%, #c2410c 100%);
+  border-color: #f97316;
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.5), 0 0 40px rgba(249, 115, 22, 0.2);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+}
+
+.filter-btn-fp.filter-btn-active:hover {
+  background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+  box-shadow: 0 0 25px rgba(249, 115, 22, 0.6), 0 0 50px rgba(249, 115, 22, 0.3);
+}
+
+/* Validated Filter - Active State */
+.filter-btn-validated.filter-btn-active {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  border-color: #3b82f6;
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.5), 0 0 40px rgba(59, 130, 246, 0.2);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+}
+
+.filter-btn-validated.filter-btn-active:hover {
+  background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+  box-shadow: 0 0 25px rgba(59, 130, 246, 0.6), 0 0 50px rgba(59, 130, 246, 0.3);
+}
+
+/* Stats item color variations */
+.stats-item-fp .stats-value {
+  color: #fb923c;
+  text-shadow: 0 0 10px rgba(251, 146, 60, 0.5);
+}
+
+.stats-item-fp-legacy .stats-value {
+  color: #fdba74;
+  text-shadow: 0 0 8px rgba(253, 186, 116, 0.4);
+}
+
+.stats-item-validated .stats-value {
+  color: #60a5fa;
+  text-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+}
+
+.stats-item-validated-legacy .stats-value {
+  color: #93c5fd;
+  text-shadow: 0 0 8px rgba(147, 197, 253, 0.4);
+}
+
+.stats-item-unvalidated .stats-value {
+  color: #9ca3af;
+  text-shadow: 0 0 6px rgba(156, 163, 175, 0.3);
+}
+
+/* Responsive adjustments for stats bar */
+@media (max-width: 768px) {
+  .stats-bar {
+    padding: 10px 15px;
+    gap: 6px;
+  }
+
+  .stats-item {
+    padding: 4px 8px;
+  }
+
+  .stats-label {
+    font-size: 8px;
+  }
+
+  .stats-value {
+    font-size: 11px;
+  }
+
+  .filter-buttons-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .filter-btn {
+    font-size: 10px;
+    padding: 6px 12px;
+  }
+}
+
+/* ============================================
    FINAL OVERRIDE: White content on colored buttons
    This MUST be at the END of the file to win cascade
    ============================================ */
