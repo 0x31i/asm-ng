@@ -130,11 +130,15 @@ function sf_viz_vbar(targetId, gdata) {
         .attr("class", "y axis")
         .call(yAxis)
       .append("text")
+        .attr("class", "y-axis-label")
         .attr("transform", "rotate(-90)")
         .attr("y", 6)
         .attr("dy", "-50px")
         .style("text-anchor", "end")
-        .text("Percentage of Unique Elements");
+        .style("text-transform", "uppercase")
+        .style("letter-spacing", "1px")
+        .style("font-size", "11px")
+        .text("PERCENTAGE OF UNIQUE ELEMENTS");
 
     svg.selectAll(".bar")
         .data(data)
@@ -155,9 +159,9 @@ function sf_viz_vbar(targetId, gdata) {
 
     function buildPopupMessage(data) {
         message = "<table>";
-        message += "<tr><td><b>Type:</b></td><td>" + data.name + "</td></tr>";
-        message += "<tr><td><b>Unique Elements:</b></td><td>" + data.counter + "</td></tr>";
-        message += "<tr><td><b>Total Elements:</b></td><td>" + data.total+ "</td></tr>";
+        message += "<tr><td><b>TYPE:</b></td><td>" + data.name.toUpperCase() + "</td></tr>";
+        message += "<tr><td><b>UNIQUE:</b></td><td>" + data.counter + "</td></tr>";
+        message += "<tr><td><b>TOTAL:</b></td><td>" + data.total+ "</td></tr>";
         message += "</table>";
         return message;
     }

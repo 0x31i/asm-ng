@@ -241,12 +241,14 @@ a:hover {
    ============================================ */
 .btn {
   font-weight: 600;
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   padding: 8px 16px;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   border: none;
   transition: all 0.2s ease;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .btn:hover {
@@ -403,16 +405,16 @@ a:hover {
 
 /* Button groups */
 .btn-group > .btn {
-  border-radius: 0;
+  border-radius: 0 !important;
 }
 
 .btn-group > .btn:first-child {
-  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  border-radius: 0 !important;
 }
 
 .btn-group > .btn:last-child,
 .btn-group > .dropdown-toggle {
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  border-radius: 0 !important;
 }
 
 .btn-group > .btn + .btn,
@@ -612,7 +614,7 @@ tr.danger td {
 .panel {
   background: var(--bg-secondary);
   border: 1px solid var(--glass-border) !important;
-  border-radius: var(--radius-md) !important;
+  border-radius: 0 !important;
   box-shadow: none;
 }
 
@@ -625,15 +627,15 @@ tr.danger td {
   background: var(--bg-tertiary) !important;
   border-color: var(--glass-border) !important;
   border-bottom: 1px solid var(--glass-border) !important;
-  border-radius: var(--radius-md) var(--radius-md) 0 0 !important;
+  border-radius: 0 !important;
   color: #ffffff !important;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  padding: 14px 18px;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5), 0 0 20px rgba(255, 255, 255, 0.3);
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  padding: 14px 18px !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5), 0 0 20px rgba(255, 255, 255, 0.3) !important;
 }
 
 .panel-default > .panel-heading .glyphicon {
@@ -1166,18 +1168,105 @@ svg text {
   fill: var(--text-primary) !important;
 }
 
+/* D3.js Chart Axis Styling */
 .axis path,
 .axis line {
   fill: var(--text-secondary);
   stroke: var(--text-secondary);
 }
 
+.axis text {
+  font-family: var(--font-mono) !important;
+  font-size: 10px !important;
+  text-transform: uppercase !important;
+  fill: var(--text-primary) !important;
+}
+
+.axis .tick text {
+  font-family: var(--font-mono) !important;
+  fill: var(--text-primary) !important;
+}
+
+/* Y-axis label */
+.y.axis text[dy="-50px"] {
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  fill: var(--text-primary) !important;
+}
+
+/* Bar Chart Styling - Modern Glow Effect */
 .bar {
-  fill: var(--accent-blue);
+  fill: var(--accent-cyan);
+  filter: drop-shadow(0 0 8px var(--glow-cyan));
+  transition: all 0.2s ease;
 }
 
 .bar:hover {
-  fill: var(--accent-blue-light);
+  fill: var(--accent-cyan-light);
+  filter: drop-shadow(0 0 15px var(--glow-cyan)) drop-shadow(0 0 25px var(--glow-cyan));
+}
+
+/* DATA TYPES Chart Container */
+#vbarsummary {
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  padding: 20px;
+  border-radius: 0;
+}
+
+#vbarsummary svg {
+  display: block;
+  margin: 0 auto;
+}
+
+/* Chart axis lines - subtle grid */
+#vbarsummary .axis path,
+#vbarsummary .axis line {
+  stroke: rgba(255, 255, 255, 0.2);
+  stroke-width: 1px;
+}
+
+/* Chart text - code font with glow */
+#vbarsummary .axis text,
+#vbarsummary text {
+  font-family: var(--font-mono) !important;
+  font-size: 10px !important;
+  text-transform: uppercase !important;
+  fill: var(--text-primary) !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+/* X-axis labels (rotated data type names) */
+#vbarsummary .x.axis text {
+  font-size: 9px !important;
+  letter-spacing: 0.5px !important;
+}
+
+/* Tooltip styling */
+#messageToolTipDiv {
+  font-family: var(--font-mono) !important;
+  background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 0 !important;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.8), 0 0 40px rgba(34, 211, 238, 0.2) !important;
+  text-transform: uppercase !important;
+  font-size: 11px !important;
+  letter-spacing: 0.5px !important;
+}
+
+#messageToolTipDiv table {
+  margin: 0;
+}
+
+#messageToolTipDiv td {
+  padding: 4px 8px;
+  font-family: var(--font-mono) !important;
+}
+
+#messageToolTipDiv b {
+  color: var(--accent-cyan) !important;
+  text-shadow: 0 0 10px var(--glow-cyan);
 }
 
 /* Dendrogram (Discovery Path) Visualization */
@@ -1863,20 +1952,28 @@ pre.table-border-bg-inherit {
    Secondary Button - For labels/badges
    ============================================ */
 .btn-secondary {
-  background: var(--bg-elevated) !important;
+  background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%) !important;
   color: var(--text-primary) !important;
   border: 1px solid var(--glass-border) !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5) !important;
+  border-radius: 0 !important;
 }
 
 .btn-secondary:hover {
-  background: var(--bg-tertiary) !important;
+  background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%) !important;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.7) !important;
 }
 
 .btn-secondary.disabled,
 .btn-secondary:disabled {
-  background: var(--bg-elevated) !important;
+  background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%) !important;
   color: var(--text-primary) !important;
   opacity: 1;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5) !important;
 }
 
 /* ============================================
@@ -2444,7 +2541,11 @@ tr.active td {
 .panel-body .btn-toolbar .btn-group > .btn {
   padding: 4px 10px !important;
   font-size: 12px !important;
-  font-weight: 600;
+  font-weight: 700 !important;
+  font-family: var(--font-mono) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  border-radius: 0 !important;
 }
 
 /* Correlation HIGH button - Bright red with strong glow */
@@ -2456,7 +2557,7 @@ tr.active td {
   border: none !important;
   box-shadow: 0 0 15px rgba(239, 68, 68, 0.7), 0 0 30px rgba(239, 68, 68, 0.4) !important;
   opacity: 1 !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* Correlation MEDIUM button - Bright orange/yellow with strong glow */
@@ -2468,7 +2569,7 @@ tr.active td {
   border: none !important;
   box-shadow: 0 0 15px rgba(245, 158, 11, 0.7), 0 0 30px rgba(245, 158, 11, 0.4) !important;
   opacity: 1 !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* Correlation LOW button - Bright purple with strong glow */
@@ -2480,7 +2581,7 @@ tr.active td {
   border: none !important;
   box-shadow: 0 0 15px rgba(139, 92, 246, 0.7), 0 0 30px rgba(139, 92, 246, 0.4) !important;
   opacity: 1 !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* Correlation INFO button - Bright green with strong glow */
@@ -2492,7 +2593,7 @@ tr.active td {
   border: none !important;
   box-shadow: 0 0 15px rgba(34, 197, 94, 0.7), 0 0 30px rgba(34, 197, 94, 0.4) !important;
   opacity: 1 !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* Correlation count buttons - neutral dark with subtle glow */
@@ -2503,6 +2604,65 @@ tr.active td {
   color: var(--text-primary) !important;
   border: 1px solid rgba(255, 255, 255, 0.15) !important;
   opacity: 1 !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* ============================================
+   Scan Summary Page - Modern Sharp Style
+   Sharp corners, code font, glowing text
+   ============================================ */
+
+/* Scan Summary panels - Sharp modern style */
+#scansummary-content .panel {
+  border-radius: 0 !important;
+  border: 1px solid var(--glass-border) !important;
+  overflow: hidden;
+}
+
+#scansummary-content .panel-heading {
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5), 0 0 20px rgba(255, 255, 255, 0.3) !important;
+}
+
+#scansummary-content .panel-heading .glyphicon {
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Scan Status panel body */
+#scansummary-content .panel-body {
+  background: var(--bg-secondary) !important;
+  border-radius: 0 !important;
+}
+
+/* All buttons in scan summary - sharp corners and code font */
+#scansummary-content .btn {
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+/* Scan status label buttons (Total, Unique, Status, Errors) */
+#scansummary-content .btn-secondary {
+  background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--glass-border) !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Scan status value buttons (counts) */
+#scansummary-content .btn-default {
+  background: linear-gradient(135deg, #1f1f1f 0%, #151515 100%) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--glass-border) !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.6) !important;
+  font-size: 14px !important;
 }
 
 /* ============================================
