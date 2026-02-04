@@ -4841,7 +4841,24 @@ i.glyphicon-white,
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
   color: #1f2937 !important;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Header highlights with stats-bar specificity - must match above selector specificity */
+#stats-bar + #scansummary-content thead th.th-data-highlight {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
+  background-color: #22c55e !important;
+  color: #ffffff !important;
+  border: 1px solid #16a34a !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+#stats-bar + #scansummary-content thead th.th-source-highlight {
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%) !important;
+  background-color: #a855f7 !important;
+  color: #ffffff !important;
+  border: 1px solid #7c3aed !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* Search results info bar */
