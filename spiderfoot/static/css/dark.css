@@ -1250,6 +1250,28 @@ svg text {
   filter: drop-shadow(0 0 4px var(--glow-red));
 }
 
+/* Validated node styling - blue */
+.dend-node-validated circle {
+  fill: var(--accent-blue) !important;
+  stroke: var(--bg-primary);
+  stroke-width: 2px;
+  filter: drop-shadow(0 0 6px var(--accent-blue));
+}
+
+.dend-node-validated text {
+  fill: var(--accent-blue) !important;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* Validated link styling - blue connecting lines */
+.dend-link-validated {
+  stroke: var(--accent-blue) !important;
+  stroke-opacity: 0.7;
+  stroke-width: 2px;
+  filter: drop-shadow(0 0 4px var(--glow-blue));
+}
+
 /* Dendrogram hover tooltip - ensure white text on dark background */
 #messageToolTipDiv,
 #messageToolTipDiv * {
