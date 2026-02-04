@@ -4210,13 +4210,15 @@ button[data-target="#createWorkspaceModal"]:hover,
 /* False Positive - ORANGE Box with White Glowing Text */
 .status-fp {
   display: inline-block;
-  padding: 4px 8px;
+  min-width: 130px;
+  padding: 6px 10px;
   background: linear-gradient(135deg, var(--accent-orange) 0%, #ea580c 100%);
   color: #ffffff;
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
+  text-align: center;
   letter-spacing: 0.5px;
   border-radius: 4px;
   box-shadow: 0 0 15px var(--glow-orange), 0 0 30px var(--glow-orange);
@@ -4227,13 +4229,15 @@ button[data-target="#createWorkspaceModal"]:hover,
 /* Validated - BLUE Box with White Glowing Text */
 .status-validated {
   display: inline-block;
-  padding: 4px 8px;
+  min-width: 130px;
+  padding: 6px 10px;
   background: linear-gradient(135deg, var(--accent-blue) 0%, #2563eb 100%);
   color: #ffffff;
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
+  text-align: center;
   letter-spacing: 0.5px;
   border-radius: 4px;
   box-shadow: 0 0 15px var(--glow-blue), 0 0 30px var(--glow-blue);
@@ -4244,13 +4248,15 @@ button[data-target="#createWorkspaceModal"]:hover,
 /* Unvalidated - GREY Badge */
 .status-unvalidated {
   display: inline-block;
-  padding: 4px 8px;
+  min-width: 130px;
+  padding: 6px 10px;
   background: var(--bg-tertiary);
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
+  text-align: center;
   letter-spacing: 0.5px;
   border-radius: 4px;
   border: 1px solid var(--glass-border);

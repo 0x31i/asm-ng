@@ -4496,13 +4496,15 @@ i.glyphicon-white,
 /* False Positive - ORANGE Box with White Glowing Text */
 .status-fp {
   display: inline-block;
-  padding: 4px 8px;
+  min-width: 130px;
+  padding: 6px 10px;
   background: linear-gradient(135deg, var(--accent-orange) 0%, #c2410c 100%);
   color: #ffffff;
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
+  text-align: center;
   letter-spacing: 0.5px;
   border-radius: 4px;
   box-shadow: 0 0 10px var(--glow-orange);
@@ -4513,13 +4515,15 @@ i.glyphicon-white,
 /* Validated - BLUE Box with White Glowing Text */
 .status-validated {
   display: inline-block;
-  padding: 4px 8px;
+  min-width: 130px;
+  padding: 6px 10px;
   background: linear-gradient(135deg, var(--accent-blue) 0%, #1d4ed8 100%);
   color: #ffffff;
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
+  text-align: center;
   letter-spacing: 0.5px;
   border-radius: 4px;
   box-shadow: 0 0 10px var(--glow-blue);
@@ -4530,13 +4534,15 @@ i.glyphicon-white,
 /* Unvalidated - GREY Badge */
 .status-unvalidated {
   display: inline-block;
-  padding: 4px 8px;
+  min-width: 130px;
+  padding: 6px 10px;
   background: var(--bg-tertiary);
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
+  text-align: center;
   letter-spacing: 0.5px;
   border-radius: 4px;
   border: 1px solid var(--glass-border);
