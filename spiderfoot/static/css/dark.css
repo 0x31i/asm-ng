@@ -2875,50 +2875,54 @@ label {
 }
 
 /* ============================================
-   Settings Page Sidebar Navigation - Modern Toolbar Style
+   Settings Page Sidebar Navigation - Modern Sharp Style
    ============================================ */
-/* Container - large rounded dark grey background */
+/* Container - sharp dark grey background */
 .tabs-left .nav-pills.nav-stacked {
   background: linear-gradient(180deg, #1e1e1e 0%, #151515 100%);
-  border-radius: 12px;
+  border-radius: 0 !important;
   padding: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-/* Each button - dark with bold white text */
+/* Each button - dark with code font */
 .tabs-left .nav-pills.nav-stacked > li > a {
   background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%) !important;
   color: #ffffff !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  border-radius: 8px !important;
+  border-radius: 0 !important;
   padding: 10px 14px;
-  margin: 8px 0;
+  margin: 4px 0;
   font-weight: 700;
-  font-family: var(--font-sans);
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
   transition: all 0.2s ease;
-  text-shadow: none;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.4) !important;
 }
 
 /* Hover state - bold text with glow effect */
 .tabs-left .nav-pills.nav-stacked > li > a:hover {
-  background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%) !important;
+  background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%) !important;
   color: white !important;
   font-weight: 700;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.5), 0 0 30px rgba(255, 255, 255, 0.3);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.5) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
   border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
-/* Active/selected state - lighter blue button (like Save Changes brighter style) */
+/* Active/selected state - blue button with glow */
 .tabs-left .nav-pills.nav-stacked > li.active > a,
 .tabs-left .nav-pills.nav-stacked > li.active > a:hover,
 .tabs-left .nav-pills.nav-stacked > li.active > a:focus {
   background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%) !important;
   color: white !important;
   border: none !important;
+  border-radius: 0 !important;
   box-shadow: 0 0 20px var(--glow-blue), 0 0 40px rgba(59, 130, 246, 0.3);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 1px 3px rgba(0, 0, 0, 0.4) !important;
   font-weight: 700;
   transform: none;
 }
@@ -2932,6 +2936,69 @@ label {
 .tabs-left .nav-pills.nav-stacked > li.active > a .glyphicon-lock {
   color: white !important;
   opacity: 0.9;
+}
+
+/* Settings Page Content - Headers and Tables */
+.tabs-left .tab-content h4,
+.tab-content h4,
+.settings-header,
+h4 {
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Settings Table Styling */
+.tabs-left .tab-content .table,
+.tab-content .table.table-bordered {
+  border-radius: 0 !important;
+  border: 1px solid var(--glass-border) !important;
+}
+
+.tabs-left .tab-content .table th,
+.tab-content .table.table-bordered th {
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  background: var(--bg-tertiary) !important;
+  color: #ffffff !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5) !important;
+  border: 1px solid var(--glass-border) !important;
+  padding: 12px 15px !important;
+}
+
+.tabs-left .tab-content .table td,
+.tab-content .table.table-bordered td {
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  color: var(--text-secondary) !important;
+  border: 1px solid var(--glass-border) !important;
+  padding: 12px 15px !important;
+  vertical-align: middle !important;
+}
+
+/* Settings input fields and selects */
+.tabs-left .tab-content .form-control,
+.tab-content .form-control,
+.tabs-left .tab-content select,
+.tab-content select {
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--glass-border) !important;
+  color: var(--text-primary) !important;
+}
+
+.tabs-left .tab-content .form-control:focus,
+.tab-content .form-control:focus {
+  border-color: var(--accent-green) !important;
+  box-shadow: 0 0 10px var(--glow-green) !important;
 }
 
 /* ============================================
