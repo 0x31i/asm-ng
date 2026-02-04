@@ -4607,7 +4607,7 @@ button[data-target="#createWorkspaceModal"]:hover,
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
   color: #ffffff !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
 
 /* Search results info bar */

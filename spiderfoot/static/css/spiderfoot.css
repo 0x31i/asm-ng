@@ -4841,7 +4841,7 @@ i.glyphicon-white,
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
   color: #1f2937 !important;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid rgba(0, 0, 0, 0.2) !important;
 }
 
 /* Search results info bar */
