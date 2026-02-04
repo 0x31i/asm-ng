@@ -2886,11 +2886,10 @@ class SpiderFootDb:
                 raise IOError("SQL error encountered when counting imported entries") from e
 
     def deleteImportedEntries(self, instanceId: str) -> int:
-        """Delete UNVALIDATED imported entries from a scan.
+        """Delete ALL imported entries from a scan.
 
-        Only deletes imported entries that are still unvalidated (false_positive = 0).
-        Preserves imported entries that have been validated (false_positive = 2) or
-        marked as false positive (false_positive = 1) by the user.
+        Deletes all entries that have imported_from_scan set, regardless of
+        validation status. This ensures a clean slate before re-importing.
 
         Args:
             instanceId (str): scan instance ID
@@ -2907,21 +2906,18 @@ class SpiderFootDb:
 
         with self.dbhLock:
             try:
-                # First count how many will be deleted (only unvalidated imports)
+                # First count how many will be deleted (ALL imported entries)
                 count_qry = """SELECT COUNT(*) FROM tbl_scan_results
                     WHERE scan_instance_id = ?
-                    AND imported_from_scan IS NOT NULL
-                    AND false_positive = 0"""
+                    AND imported_from_scan IS NOT NULL"""
                 self.dbh.execute(count_qry, [instanceId])
                 row = self.dbh.fetchone()
                 count = row[0] if row else 0
 
-                # Delete only unvalidated imported entries
-                # Keep validated (fp=2) and false positive (fp=1) entries
+                # Delete ALL imported entries regardless of validation status
                 delete_qry = """DELETE FROM tbl_scan_results
                     WHERE scan_instance_id = ?
-                    AND imported_from_scan IS NOT NULL
-                    AND false_positive = 0"""
+                    AND imported_from_scan IS NOT NULL"""
                 self.dbh.execute(delete_qry, [instanceId])
                 self.conn.commit()
 
@@ -2933,10 +2929,11 @@ class SpiderFootDb:
         """Get entries from older scans that can be imported into this scan.
 
         Returns entries from older scans of the same target that:
-        - Do not already exist in the current scan
+        - Do not already exist as NATIVE entries in the current scan
+          (native = entries where imported_from_scan IS NULL)
         - Are unique across all older scans (no duplicates from multiple old scans)
 
-        Duplicate detection uses a triple check:
+        Duplicate detection uses a triple check against NATIVE entries only:
         - DATA ELEMENT (data column)
         - SOURCE DATA ELEMENT (parent event's data)
         - SOURCE MODULE (module that produced the entry)
@@ -2964,6 +2961,7 @@ class SpiderFootDb:
         with self.dbhLock:
             try:
                 # Step 1: Get all (data, source_data, module) combinations in current scan
+                # ONLY from NATIVE entries (where imported_from_scan IS NULL)
                 # This is the "triple check" for duplicate detection
                 current_entries_qry = """
                     SELECT curr.data, COALESCE(src.data, 'ROOT') as source_data, curr.module
@@ -2971,6 +2969,7 @@ class SpiderFootDb:
                     LEFT JOIN tbl_scan_results src ON curr.source_event_hash = src.hash
                         AND curr.scan_instance_id = src.scan_instance_id
                     WHERE curr.scan_instance_id = ?
+                      AND curr.imported_from_scan IS NULL
                 """
                 self.dbh.execute(current_entries_qry, [instanceId])
                 current_entries = set()
