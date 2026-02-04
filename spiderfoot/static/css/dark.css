@@ -4325,20 +4325,22 @@ button[data-target="#createWorkspaceModal"]:hover,
 }
 
 /* ============================================
-   Stats Bar Module - Dark Mode (Full Width Sharp Design)
+   Stats Bar Module - Dark Mode
+   Detached from table with obvious button styling
    ============================================ */
 
-/* Full-width stats bar that matches table width */
+/* Full-width stats bar - detached from table */
 .stats-bar-fullwidth {
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
   padding: 0;
-  margin-bottom: 0;
-  background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-bottom: none;
+  margin-bottom: 15px;
+  background: linear-gradient(180deg, #1e1e1e 0%, #141414 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   box-sizing: border-box;
 }
 
@@ -4353,10 +4355,11 @@ button[data-target="#createWorkspaceModal"]:hover,
 .stats-bar-right {
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 12px;
+  padding: 8px 12px;
 }
 
-/* Stats item - sharp rectangular cells */
+/* Stats item - clean cells */
 .stats-bar-fullwidth .stats-item {
   display: flex;
   align-items: center;
@@ -4367,8 +4370,12 @@ button[data-target="#createWorkspaceModal"]:hover,
   transition: background 0.15s ease;
 }
 
+.stats-bar-fullwidth .stats-item:first-child {
+  border-radius: 7px 0 0 7px;
+}
+
 .stats-bar-fullwidth .stats-item:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .stats-bar-fullwidth .stats-value {
@@ -4378,7 +4385,7 @@ button[data-target="#createWorkspaceModal"]:hover,
   color: #ffffff;
   min-width: 24px;
   text-align: right;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.15);
 }
 
 .stats-bar-fullwidth .stats-label {
@@ -4393,121 +4400,129 @@ button[data-target="#createWorkspaceModal"]:hover,
 /* Stats item color variants */
 .stats-bar-fullwidth .stats-fp .stats-value {
   color: #fb923c;
-  text-shadow: 0 0 10px rgba(251, 146, 60, 0.5);
+  text-shadow: 0 0 10px rgba(251, 146, 60, 0.4);
 }
 
 .stats-bar-fullwidth .stats-fp-legacy .stats-value {
   color: #fdba74;
-  text-shadow: 0 0 8px rgba(253, 186, 116, 0.4);
+  text-shadow: 0 0 8px rgba(253, 186, 116, 0.3);
 }
 
 .stats-bar-fullwidth .stats-validated .stats-value {
   color: #60a5fa;
-  text-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+  text-shadow: 0 0 10px rgba(96, 165, 250, 0.4);
 }
 
 .stats-bar-fullwidth .stats-validated-legacy .stats-value {
   color: #93c5fd;
-  text-shadow: 0 0 8px rgba(147, 197, 253, 0.4);
+  text-shadow: 0 0 8px rgba(147, 197, 253, 0.3);
 }
 
 .stats-bar-fullwidth .stats-unvalidated .stats-value {
   color: #9ca3af;
-  text-shadow: 0 0 6px rgba(156, 163, 175, 0.3);
 }
 
-/* Filter buttons - sharp rectangular style */
+/* Filter buttons - obvious clickable button style */
 .stats-bar-fullwidth .filter-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 12px 20px;
+  padding: 8px 16px;
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border: none;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 0;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
   transition: all 0.15s ease;
-  height: 100%;
 }
 
 .stats-bar-fullwidth .filter-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #ffffff;
 }
 
 /* Active filter button - FP (Orange) */
 .stats-bar-fullwidth .filter-btn-fp.filter-btn-active {
-  background: linear-gradient(180deg, #f97316 0%, #c2410c 100%);
+  background: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
+  border-color: #f97316;
   color: #ffffff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 15px rgba(249, 115, 22, 0.3);
+  box-shadow: 0 0 15px rgba(249, 115, 22, 0.4);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .stats-bar-fullwidth .filter-btn-fp.filter-btn-active:hover {
-  background: linear-gradient(180deg, #fb923c 0%, #ea580c 100%);
+  background: linear-gradient(180deg, #fb923c 0%, #f97316 100%);
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.5);
 }
 
 /* Active filter button - Validated (Blue) */
 .stats-bar-fullwidth .filter-btn-validated.filter-btn-active {
-  background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+  border-color: #3b82f6;
   color: #ffffff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 15px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .stats-bar-fullwidth .filter-btn-validated.filter-btn-active:hover {
-  background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+  background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
 }
 
 /* Simple stats bar variant (for unique view) */
 .stats-bar-simple {
-  background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+  background: linear-gradient(180deg, #1e1e1e 0%, #141414 100%);
 }
 
 /* Search results info bar */
 .search-results-info {
   padding: 12px 16px;
+  margin-bottom: 15px;
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: rgba(255, 255, 255, 0.6);
-  background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-bottom: none;
+  background: linear-gradient(180deg, #1e1e1e 0%, #141414 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* Responsive adjustments */
 @media (max-width: 992px) {
   .stats-bar-fullwidth {
     flex-wrap: wrap;
+    border-radius: 8px;
   }
 
-  .stats-bar-left,
+  .stats-bar-left {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .stats-bar-left .stats-item:first-child {
+    border-radius: 7px 0 0 0;
+  }
+
   .stats-bar-right {
     width: 100%;
     justify-content: center;
-  }
-
-  .stats-bar-right {
     border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 12px;
   }
 
   .stats-bar-fullwidth .filter-btn {
-    border-left: none;
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  .stats-bar-fullwidth .filter-btn:last-child {
-    border-right: none;
+    flex: 1;
+    min-width: 120px;
   }
 }
 
