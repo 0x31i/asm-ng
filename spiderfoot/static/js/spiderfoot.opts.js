@@ -36,9 +36,13 @@ function getFile(elemId) {
    }
 }
 
-// Track whether settings have been modified
+// ============================================
+// Change detection and toolbar state management
+// ============================================
 var settingsModified = false;
 var originalValues = {};
+var saveConfirmPending = false;
+var discardConfirmPending = false;
 
 function captureOriginalValues() {
     var form = document.getElementById('savesettingsform');
@@ -64,31 +68,107 @@ function checkForChanges() {
 
     if (hasChanges && !settingsModified) {
         settingsModified = true;
-        showFloatingSaveBar();
+        showChangeToolbar();
     } else if (!hasChanges && settingsModified) {
         settingsModified = false;
-        hideFloatingSaveBar();
+        hideChangeToolbar();
     }
 }
 
-function showFloatingSaveBar() {
-    var bar = document.getElementById('floating-save-bar');
-    if (bar) {
-        bar.classList.add('visible');
+function showChangeToolbar() {
+    document.getElementById('toolbar-default').style.display = 'none';
+    document.getElementById('toolbar-changes').style.display = '';
+    resetConfirmStates();
+}
+
+function hideChangeToolbar() {
+    document.getElementById('toolbar-changes').style.display = 'none';
+    document.getElementById('toolbar-default').style.display = '';
+    resetConfirmStates();
+}
+
+function resetConfirmStates() {
+    saveConfirmPending = false;
+    discardConfirmPending = false;
+
+    var saveBtn = document.getElementById('btn-save-changes');
+    var discardBtn = document.getElementById('btn-discard-changes');
+
+    if (saveBtn) {
+        saveBtn.textContent = 'Save Changes';
+        saveBtn.classList.remove('confirm-save');
+    }
+    if (discardBtn) {
+        discardBtn.textContent = 'Discard Changes';
+        discardBtn.classList.remove('confirm-discard');
     }
 }
 
-function hideFloatingSaveBar() {
-    var bar = document.getElementById('floating-save-bar');
-    if (bar) {
-        bar.classList.remove('visible');
+function handleSaveClick() {
+    if (!saveConfirmPending) {
+        // First click: enter confirm state
+        saveConfirmPending = true;
+        discardConfirmPending = false;
+
+        var saveBtn = document.getElementById('btn-save-changes');
+        var discardBtn = document.getElementById('btn-discard-changes');
+
+        saveBtn.textContent = 'Confirm';
+        saveBtn.classList.add('confirm-save');
+
+        // Reset discard if it was in confirm state
+        if (discardBtn) {
+            discardBtn.textContent = 'Discard Changes';
+            discardBtn.classList.remove('confirm-discard');
+        }
+    } else {
+        // Second click: actually save
+        saveSettings();
+        document.getElementById('savesettingsform').submit();
     }
+}
+
+function handleDiscardClick() {
+    if (!discardConfirmPending) {
+        // First click: enter confirm state
+        discardConfirmPending = true;
+        saveConfirmPending = false;
+
+        var discardBtn = document.getElementById('btn-discard-changes');
+        var saveBtn = document.getElementById('btn-save-changes');
+
+        discardBtn.textContent = 'Confirm';
+        discardBtn.classList.add('confirm-discard');
+
+        // Reset save if it was in confirm state
+        if (saveBtn) {
+            saveBtn.textContent = 'Save Changes';
+            saveBtn.classList.remove('confirm-save');
+        }
+    } else {
+        // Second click: revert all changes
+        revertAllChanges();
+    }
+}
+
+function revertAllChanges() {
+    var form = document.getElementById('savesettingsform');
+    if (!form) return;
+    var elements = form.querySelectorAll('input[type="text"], select');
+    elements.forEach(function(el) {
+        if (!el.id || el.id === 'allopts' || el.id === 'token') return;
+        if (originalValues.hasOwnProperty(el.id)) {
+            el.value = originalValues[el.id];
+        }
+    });
+    settingsModified = false;
+    hideChangeToolbar();
 }
 
 $(document).ready(function() {
-    // Wire up static buttons
-    $("#btn-save-changes").click(function() { saveSettings(); });
-    $("#btn-save-floating").click(function() { saveSettings(); });
+    // Wire up buttons
+    $("#btn-save-changes").click(function(e) { e.preventDefault(); handleSaveClick(); return false; });
+    $("#btn-discard-changes").click(function(e) { e.preventDefault(); handleDiscardClick(); return false; });
     $("#btn-import-config").click(function() { getFile("configFile"); return false; });
     $("#btn-reset-settings").click(function() { clearSettings(); });
     $("#btn-opt-export").click(function() { window.location.href=docroot + "/optsexport?pattern=api_key"; return false; });
@@ -100,6 +180,15 @@ $(document).ready(function() {
     // Listen for changes on all form inputs and selects
     $('#savesettingsform').on('input change', 'input[type="text"], select', function() {
         checkForChanges();
+    });
+
+    // Click anywhere else resets confirm states (but not the toolbar)
+    $(document).on('click', function(e) {
+        if (!$(e.target).is('#btn-save-changes') && !$(e.target).is('#btn-discard-changes')) {
+            if (saveConfirmPending || discardConfirmPending) {
+                resetConfirmStates();
+            }
+        }
     });
 });
 
@@ -136,7 +225,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('allopts').value = JSON.stringify(opts);
     });
 
-    // Optional: handle reset button to set allopts to "RESET"
+    // Handle reset button to set allopts to "RESET"
     var resetBtn = document.getElementById('btn-reset-settings');
     if (resetBtn) {
         resetBtn.addEventListener('click', function (e) {
