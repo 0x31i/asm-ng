@@ -1182,12 +1182,16 @@ svg text {
   stroke: var(--text-secondary);
 }
 
+/* Bar Chart Styling - Modern Blue Glow for Light Mode */
 .bar {
   fill: var(--accent-blue);
+  filter: drop-shadow(0 0 6px rgba(37, 99, 235, 0.5)) drop-shadow(0 0 12px rgba(37, 99, 235, 0.3));
+  transition: all 0.2s ease;
 }
 
 .bar:hover {
   fill: var(--accent-blue-light);
+  filter: drop-shadow(0 0 10px rgba(37, 99, 235, 0.7)) drop-shadow(0 0 20px rgba(37, 99, 235, 0.5));
 }
 
 /* Dendrogram (Discovery Path) Visualization */
@@ -1917,18 +1921,23 @@ pre.table-border-bg-inherit {
    Secondary Button - For labels/badges
    ============================================ */
 .btn-secondary {
-  background: var(--bg-elevated) !important;
+  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%) !important;
   color: var(--text-primary) !important;
-  border: 1px solid var(--glass-border) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  border-radius: 0 !important;
 }
 
 .btn-secondary:hover {
-  background: var(--bg-tertiary) !important;
+  background: linear-gradient(135deg, #d1d5db 0%, #c5c9d0 100%) !important;
 }
 
 .btn-secondary.disabled,
 .btn-secondary:disabled {
-  background: var(--bg-elevated) !important;
+  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%) !important;
   color: var(--text-primary) !important;
   opacity: 1;
 }
@@ -2517,7 +2526,11 @@ tr.active td {
 .panel-body .btn-toolbar .btn-group > .btn {
   padding: 4px 10px !important;
   font-size: 12px !important;
-  font-weight: 600;
+  font-weight: 700 !important;
+  font-family: var(--font-mono) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  border-radius: 0 !important;
 }
 
 /* Correlation HIGH button - Bright red with strong glow */
@@ -2568,14 +2581,106 @@ tr.active td {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-/* Correlation count buttons - neutral dark with subtle glow */
+/* Correlation count buttons - light neutral with subtle shadow */
 .panel-body .btn-toolbar .btn-group > .btn-default,
 .panel-body .btn-toolbar .btn-group > .btn-default.disabled,
 .panel-body .btn-toolbar .btn-group > .btn-default:disabled {
-  background: linear-gradient(135deg, #d5d5d5 0%, #e5e5e5 100%) !important;
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%) !important;
   color: var(--text-primary) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
   opacity: 1 !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* ============================================
+   Scan Summary Page - Light Mode Sharp Style
+   Sharp corners, code font, clean styling
+   ============================================ */
+
+/* Scan Summary panels - Sharp modern style */
+#scansummary-content .panel {
+  border-radius: 0 !important;
+  border: 1px solid var(--glass-border) !important;
+  overflow: hidden;
+}
+
+#scansummary-content .panel-heading {
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%) !important;
+  color: var(--text-primary) !important;
+}
+
+#scansummary-content .panel-heading .glyphicon {
+  color: var(--text-primary) !important;
+}
+
+/* Scan Status panel body */
+#scansummary-content .panel-body {
+  background: var(--bg-secondary) !important;
+  border-radius: 0 !important;
+}
+
+/* All buttons in scan summary - sharp corners and code font */
+#scansummary-content .btn {
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+/* Scan status label buttons (Total, Unique, Status, Errors) */
+#scansummary-content .btn-secondary {
+  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Scan status value buttons (counts) */
+#scansummary-content .btn-default {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  font-size: 14px !important;
+}
+
+/* DATA TYPES Chart Container - Light Mode */
+#vbarsummary {
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  padding: 20px;
+  border-radius: 0;
+}
+
+#vbarsummary svg {
+  display: block;
+  margin: 0 auto;
+}
+
+/* Chart axis lines - subtle grid */
+#vbarsummary .axis path,
+#vbarsummary .axis line {
+  stroke: rgba(0, 0, 0, 0.2);
+  stroke-width: 1px;
+}
+
+/* Chart text - code font */
+#vbarsummary .axis text,
+#vbarsummary text {
+  font-family: var(--font-mono) !important;
+  font-size: 10px !important;
+  text-transform: uppercase !important;
+  fill: var(--text-primary) !important;
+}
+
+/* X-axis labels (rotated data type names) */
+#vbarsummary .x.axis text {
+  font-size: 9px !important;
+  letter-spacing: 0.5px !important;
 }
 
 /* ============================================
