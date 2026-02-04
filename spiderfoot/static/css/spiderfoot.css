@@ -455,16 +455,16 @@ a:hover {
 
 /* Button groups */
 .btn-group > .btn {
-  border-radius: 0;
+  border-radius: 0 !important;
 }
 
 .btn-group > .btn:first-child {
-  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  border-radius: 0 !important;
 }
 
 .btn-group > .btn:last-child,
 .btn-group > .dropdown-toggle {
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  border-radius: 0 !important;
 }
 
 .btn-group > .btn + .btn,
@@ -478,21 +478,24 @@ a:hover {
 .form-control {
   background: var(--bg-secondary) !important;
   border: 1px solid var(--glass-border) !important;
-  border-radius: var(--radius-sm) !important;
+  border-radius: 0 !important;
   color: var(--text-primary) !important;
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   padding: 10px 14px;
   transition: all var(--transition-fast);
 }
 
 .form-control:focus {
-  border-color: var(--text-muted) !important;
-  box-shadow: none !important;
+  border-color: var(--accent-green) !important;
+  box-shadow: 0 0 8px var(--glow-green) !important;
   outline: none;
 }
 
 .form-control::placeholder {
   color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 12px;
 }
 
 input[type="text"],
@@ -504,17 +507,17 @@ textarea,
 select {
   background: var(--bg-secondary);
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
+  border-radius: 0 !important;
   color: var(--text-primary);
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   padding: 10px 14px;
 }
 
 input:focus,
 textarea:focus,
 select:focus {
-  border-color: var(--text-muted);
-  box-shadow: none;
+  border-color: var(--accent-green);
+  box-shadow: 0 0 8px var(--glow-green);
   outline: none;
 }
 
@@ -1060,10 +1063,9 @@ input[type="checkbox"]#hidefps:hover,
   text-transform: uppercase;
   letter-spacing: 0.5px;
   border: none;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border-radius: 0 !important;
   padding: 12px 20px;
   transition: all var(--transition-fast);
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }
 
 .nav-tabs > li > a:hover {
@@ -2681,6 +2683,118 @@ tr.active td {
 #vbarsummary .x.axis text {
   font-size: 9px !important;
   letter-spacing: 0.5px !important;
+}
+
+/* ============================================
+   NEW SCAN Page - Light Mode Sharp Style
+   Sharp corners, code font, clean styling
+   ============================================ */
+
+/* Form labels - Code font with uppercase */
+.control-label,
+label {
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  color: var(--text-primary) !important;
+  margin-bottom: 8px !important;
+}
+
+/* Help text styling */
+.help-block {
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+  color: var(--text-secondary) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+/* Info panel on new scan page */
+.panel-info {
+  border-radius: 0 !important;
+  border: 1px solid var(--glass-border) !important;
+  background: var(--bg-secondary) !important;
+}
+
+.panel-info > .panel-heading {
+  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%) !important;
+  border-radius: 0 !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+}
+
+.panel-info > .panel-body {
+  background: var(--bg-secondary) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+}
+
+/* New scan info panel text - make it code-like */
+.panel-info .panel-body b,
+.panel-info .panel-body strong {
+  color: var(--accent-green) !important;
+}
+
+/* Use case/module table styling */
+#usetable,
+#typetable,
+#modtable {
+  border-radius: 0 !important;
+}
+
+#usetable th,
+#typetable th,
+#modtable th {
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%) !important;
+  color: var(--text-primary) !important;
+  border-radius: 0 !important;
+}
+
+#usetable td,
+#typetable td,
+#modtable td {
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  vertical-align: middle !important;
+}
+
+/* Use case description text */
+#usetable td:nth-child(3),
+#typetable td:nth-child(2),
+#modtable td:nth-child(2) {
+  font-size: 11px !important;
+  color: var(--text-secondary) !important;
+}
+
+/* Run Scan button styling */
+#btn-run-scan {
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+}
+
+/* Select All / De-Select All buttons */
+#btn-select-all,
+#btn-deselect-all,
+.btn-select-all,
+.btn-deselect-all {
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  font-size: 11px !important;
 }
 
 /* ============================================
