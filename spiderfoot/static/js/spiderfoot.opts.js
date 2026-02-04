@@ -79,12 +79,24 @@ function showChangeToolbar() {
     document.getElementById('toolbar-default').style.display = 'none';
     document.getElementById('toolbar-changes').style.display = '';
     resetConfirmStates();
+    // Push the sticky content panel down so the toolbar doesn't cover it
+    var contentPanel = document.querySelector('.tabbable.tabs-left > .tab-content');
+    if (contentPanel) {
+        var bar = document.getElementById('toolbar-changes');
+        var barHeight = bar ? bar.offsetHeight : 50;
+        contentPanel.style.top = (barHeight + 10) + 'px';
+    }
 }
 
 function hideChangeToolbar() {
     document.getElementById('toolbar-changes').style.display = 'none';
     document.getElementById('toolbar-default').style.display = '';
     resetConfirmStates();
+    // Restore the content panel's original sticky position
+    var contentPanel = document.querySelector('.tabbable.tabs-left > .tab-content');
+    if (contentPanel) {
+        contentPanel.style.top = '20px';
+    }
 }
 
 function resetConfirmStates() {
