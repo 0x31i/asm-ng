@@ -18,6 +18,12 @@ function switchTab(tab) {
     $("#tab_"+activeTab).removeClass("active");
     $("#tab_"+tab).addClass("active");
     activeTab = tab;
+
+    // Scroll the sticky content panel back to top
+    var contentPanel = document.querySelector('.tab-content');
+    if (contentPanel) {
+        contentPanel.scrollTop = 0;
+    }
 }
 
 function getFile(elemId) {

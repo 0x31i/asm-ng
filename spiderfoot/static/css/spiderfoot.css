@@ -2845,11 +2845,14 @@ label {
    ============================================ */
 #btn-save-changes {
   background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%) !important;
-  color: var(--text-primary) !important;
+  color: white !important;
   border: none !important;
   box-shadow: 0 0 15px var(--glow-blue);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  font-weight: 600;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 1px 3px rgba(0, 0, 0, 0.4);
+  font-weight: 700;
+  font-family: var(--font-mono) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
 }
 
 #btn-save-changes:hover,
@@ -2866,11 +2869,14 @@ label {
 #btn-import-config,
 #btn-opt-export {
   background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%) !important;
-  color: var(--text-primary) !important;
+  color: white !important;
   border: none !important;
   box-shadow: 0 0 15px var(--glow-purple);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  font-weight: 600;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 1px 3px rgba(0, 0, 0, 0.4);
+  font-weight: 700;
+  font-family: var(--font-mono) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
 }
 
 #btn-import-config:hover,
@@ -2880,6 +2886,64 @@ label {
   background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%) !important;
   box-shadow: 0 0 25px var(--glow-purple), 0 4px 15px rgba(0, 0, 0, 0.3);
   transform: translateY(-1px);
+}
+
+/* ============================================
+   Settings Page - Reset to Factory Default Button
+   Red gradient with code font and glow
+   ============================================ */
+#btn-reset-settings {
+  color: white !important;
+  font-weight: 700;
+  font-family: var(--font-mono) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================
+   Settings Page Layout - Flexbox with Sticky Content
+   ============================================ */
+.tabbable.tabs-left {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.tabbable.tabs-left > .nav-pills.nav-stacked {
+  flex: 0 0 25%;
+  max-width: 25%;
+  float: none;
+}
+
+.tabbable.tabs-left > .tab-content {
+  flex: 0 0 75%;
+  max-width: 75%;
+  float: none;
+  position: -webkit-sticky;
+  position: sticky;
+  top: 20px;
+  align-self: flex-start;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+
+/* Scrollbar styling for sticky content panel */
+.tabbable.tabs-left > .tab-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tabbable.tabs-left > .tab-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tabbable.tabs-left > .tab-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.tabbable.tabs-left > .tab-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
 }
 
 /* ============================================
