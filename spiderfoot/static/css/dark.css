@@ -226,12 +226,14 @@ a:hover {
   margin-right: auto !important;
   padding-left: 15px;
   padding-right: 15px;
+  overflow: visible !important; /* Required for sticky positioning to work */
 }
 
 #mainbody {
   padding-top: 20px;
   margin-left: auto !important;
   margin-right: auto !important;
+  overflow: visible !important; /* Required for sticky positioning to work */
 }
 
 /* ============================================
