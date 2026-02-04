@@ -1269,13 +1269,13 @@
                                     table += "<span class='status-fp' title='False Positive - confirmed does not belong to organization'>FALSE POSITIVE</span>";
                                 } else if (data[i][11] == 1) {
                                     // Target-level FP from previous scan
-                                    table += "<span class='status-fp' title='False Positive from previous scan'>FALSE POSITIVE<span class='status-legacy'> LEGACY</span></span>";
+                                    table += "<span class='status-fp' title='False Positive from previous scan'>FALSE POSITIVE<span class='status-legacy'> [LEGACY]</span></span>";
                                 } else if (data[i][8] == "2") {
                                     // Current scan marked as validated
                                     table += "<span class='status-validated' title='Validated - confirmed belongs to organization'>VALIDATED</span>";
                                 } else if (data[i][12] == 1) {
                                     // Target-level validated from previous scan
-                                    table += "<span class='status-validated' title='Validated from previous scan'>VALIDATED<span class='status-legacy'> LEGACY</span></span>";
+                                    table += "<span class='status-validated' title='Validated from previous scan'>VALIDATED<span class='status-legacy'> [LEGACY]</span></span>";
                                 } else {
                                     table += "<span class='status-unvalidated' title='Not yet reviewed'>UNVALIDATED</span>";
                                 }
