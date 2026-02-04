@@ -27,16 +27,16 @@
             <a id='btn-setfp' rel="tooltip" data-title="Set validation status" class="btn-warning btn btn-default dropdown-toggle" data-toggle="dropdown"><i class='glyphicon glyphicon-ok-circle glyphicon glyphicon-white'></i></a>
             <ul class="dropdown-menu">
                 <li class="dropdown-header">Validation Status</li>
-                <li><a href='#' class='link' onClick='setFp(2)'><i class='glyphicon glyphicon-ok-circle' style='color: #3b82f6;'></i> Mark as Validated</a></li>
-                <li><a href='#' class='link' onClick='setFp(1)'><i class='glyphicon glyphicon-ban-circle' style='color: #ea580c;'></i> Mark as False Positive</a></li>
-                <li><a href='#' class='link' onClick='setFp(0)'><i class='glyphicon glyphicon-minus' style='color: #6b7280;'></i> Mark as Unvalidated</a></li>
+                <li><a href='#' class='link' onClick='setFp(2); return false;'><i class='glyphicon glyphicon-ok-circle' style='color: #3b82f6;'></i> Mark as Validated</a></li>
+                <li><a href='#' class='link' onClick='setFp(1); return false;'><i class='glyphicon glyphicon-ban-circle' style='color: #ea580c;'></i> Mark as False Positive</a></li>
+                <li><a href='#' class='link' onClick='setFp(0); return false;'><i class='glyphicon glyphicon-minus' style='color: #6b7280;'></i> Mark as Unvalidated</a></li>
                 <li class="divider"></li>
-                <li><a href='#' class='link' onClick='setFp(0, 1)'>Force Unset (ignore parent)</a></li>
+                <li><a href='#' class='link' onClick='setFp(0, 1); return false;'>Force Unset (ignore parent)</a></li>
                 <li class="divider"></li>
                 <li class="dropdown-header">Bulk Actions</li>
-                <li><a href='#' class='link' onClick='selectMatchingFps()'>Select All Matching Saved FPs</a></li>
-                <li><a href='#' class='link' onClick='markAllMatchingFps()'>Mark All Matching as FP</a></li>
-                <li><a href='#' class='link' onClick='selectAllVisible()'>Select All Visible</a></li>
+                <li><a href='#' class='link' onClick='selectMatchingFps(); return false;'>Select All Matching Saved FPs</a></li>
+                <li><a href='#' class='link' onClick='markAllMatchingFps(); return false;'>Mark All Matching as FP</a></li>
+                <li><a href='#' class='link' onClick='selectAllVisible(); return false;'>Select All Visible</a></li>
             </ul>
         </div>
         <div id='customtabview' role="group" class="btn-group">
@@ -75,7 +75,7 @@
   </div>
 
   <!-- Floating Selection Toolbar - Modern horizontal design -->
-  <div id="selection-toolbar" class="toolbar-bottom" style="display: none !important;">
+  <div id="selection-toolbar" class="toolbar-bottom toolbar-hidden">
     <!-- Left snap button (horizontal mode only) -->
     <div class="toolbar-snap-btn toolbar-snap-left" onclick="snapToolbar('left')" title="Snap to left">
       <i class="glyphicon glyphicon-chevron-left"></i>
@@ -175,6 +175,95 @@
         // Store data for bulk FP operations
         var currentViewData = [];
 
+        // Client-side filter state - persists while on the page
+        var clientFilterState = {
+            fp: false,
+            validated: false,
+            imported: false
+        };
+
+        // Toggle client-side filter
+        function toggleClientFilter(type) {
+            clientFilterState[type] = !clientFilterState[type];
+            applyClientSideFilters();
+            updateFilterButtonStates();
+        }
+
+        // Apply client-side filters by showing/hiding rows
+        function applyClientSideFilters() {
+            var visibleCount = 0;
+            var hiddenCount = 0;
+
+            $("#scansummary-content tbody tr").each(function() {
+                var row = $(this);
+                var statusSpan = row.find(".validation-status span");
+                var isImported = row.hasClass("imported-row");
+
+                var shouldHide = false;
+
+                // Check FP filter
+                if (clientFilterState.fp && statusSpan.hasClass('status-fp')) {
+                    shouldHide = true;
+                }
+
+                // Check Validated filter
+                if (clientFilterState.validated && statusSpan.hasClass('status-validated')) {
+                    shouldHide = true;
+                }
+
+                // Check Imported filter
+                if (clientFilterState.imported && isImported) {
+                    shouldHide = true;
+                }
+
+                if (shouldHide) {
+                    row.hide();
+                    hiddenCount++;
+                } else {
+                    row.show();
+                    visibleCount++;
+                }
+            });
+
+            // Update visible count in stats
+            $(".stats-bar-left .stats-item:first-child .stats-value").text(visibleCount);
+
+            return visibleCount;
+        }
+
+        // Update filter button visual states
+        function updateFilterButtonStates() {
+            // Update FP button
+            var fpBtn = $(".filter-btn-fp");
+            if (clientFilterState.fp) {
+                fpBtn.addClass('filter-btn-active');
+                fpBtn.text(fpBtn.data('hiding-text') || 'HIDING FP');
+            } else {
+                fpBtn.removeClass('filter-btn-active');
+                fpBtn.text(fpBtn.data('show-text') || 'HIDE FP');
+            }
+
+            // Update Validated button
+            var valBtn = $(".filter-btn-validated");
+            if (clientFilterState.validated) {
+                valBtn.addClass('filter-btn-active');
+                valBtn.text(valBtn.data('hiding-text') || 'HIDING VALIDATED');
+            } else {
+                valBtn.removeClass('filter-btn-active');
+                valBtn.text(valBtn.data('show-text') || 'HIDE VALIDATED');
+            }
+
+            // Update Imported button
+            var impBtn = $(".filter-btn-imported");
+            if (clientFilterState.imported) {
+                impBtn.addClass('filter-btn-active');
+                impBtn.text(impBtn.data('hiding-text') || 'HIDING IMPORTED');
+            } else {
+                impBtn.removeClass('filter-btn-active');
+                impBtn.text(impBtn.data('show-text') || 'HIDE IMPORTED');
+            }
+        }
+
         // Select all visible checkboxes
         function selectAllVisible() {
             $("input[id*=cb_]").prop('checked', true);
@@ -238,7 +327,7 @@
             // Only operate if we're on a page with FP checkboxes
             var hasCheckboxes = $("input[id*=cb_]").length > 0;
             if (!hasCheckboxes) {
-                $("#selection-toolbar").hide();
+                hideSelectionToolbar();
                 return;
             }
 
@@ -246,8 +335,8 @@
             $("#selection-count").text(selectedCount);
 
             if (selectedCount > 0) {
-                // Show toolbar with flex display - jQuery .show() uses block which breaks flex layout
-                $("#selection-toolbar").css('display', 'flex');
+                // Show toolbar - use class toggle for consistent behavior
+                showSelectionToolbar();
 
                 // Highlight table headers to match toolbar buttons
                 highlightTableHeaders(true);
@@ -310,9 +399,26 @@
                     $("#match-source-element").hide();
                 }
             } else {
-                $("#selection-toolbar").hide();
+                hideSelectionToolbar();
                 // Remove table header highlights
                 highlightTableHeaders(false);
+            }
+        }
+
+        // Helper functions for consistent toolbar show/hide
+        function showSelectionToolbar() {
+            var toolbar = document.getElementById('selection-toolbar');
+            if (toolbar) {
+                toolbar.classList.remove('toolbar-hidden');
+                toolbar.style.display = 'flex';
+            }
+        }
+
+        function hideSelectionToolbar() {
+            var toolbar = document.getElementById('selection-toolbar');
+            if (toolbar) {
+                toolbar.classList.add('toolbar-hidden');
+                toolbar.style.display = 'none';
             }
         }
 
@@ -428,13 +534,10 @@
         }
 
         function updateToolbarStyle() {
-            var toolbar = document.getElementById('selection-toolbar');
             var selectedCount = $("input[id*=cb_]:checked").length;
 
             if (selectedCount > 0) {
-                toolbar.style.display = 'flex';
-                toolbar.style.position = 'fixed';
-                toolbar.style.zIndex = '1050';
+                showSelectionToolbar();
             }
         }
 
@@ -491,7 +594,12 @@
                     } else {
                         alertify.success("Status cleared successfully.");
                     }
-                    refresh();
+                    // Update rows in-place instead of full refresh
+                    updateRowsStatus(sel, flag);
+                    // Clear selection and update toolbar
+                    clearSelection();
+                    // Update stats bar counts
+                    updateStatsBarCounts();
                     return;
                 }
                 if (ret[0] == "WARNING") {
@@ -502,6 +610,66 @@
                     alertify.error("There was an error updating status because: " + ret[1] + "<br/>If you believe this to be an error, please log out and log back in, and if the problem repeats, report this as a bug.");
                 }
             });
+        }
+
+        // Update rows in place without full refresh
+        function updateRowsStatus(ids, flag) {
+            ids.forEach(function(id) {
+                var checkbox = $("input#cb_" + id);
+                var row = checkbox.closest("tr");
+                var statusCell = row.find("td.validation-status");
+
+                var isImported = row.hasClass("imported-row");
+                var importedClass = isImported ? " status-imported-glow" : "";
+                var statusHtml = "";
+
+                if (flag == 1) {
+                    statusHtml = "<span class='status-fp" + importedClass + "' title='False Positive - confirmed does not belong to organization'>FALSE POSITIVE</span>";
+                    row.attr('data-status', 'fp');
+                } else if (flag == 2) {
+                    statusHtml = "<span class='status-validated" + importedClass + "' title='Validated - confirmed belongs to organization'>VALIDATED</span>";
+                    row.attr('data-status', 'validated');
+                } else {
+                    statusHtml = "<span class='status-unvalidated" + importedClass + "' title='Not yet reviewed'>UNVALIDATED</span>";
+                    row.attr('data-status', 'unvalidated');
+                }
+
+                statusCell.html(statusHtml);
+            });
+        }
+
+        // Update stats bar counts without full refresh
+        function updateStatsBarCounts() {
+            var stats = {
+                total: 0,
+                fp: 0,
+                validated: 0,
+                unvalidated: 0,
+                imported: 0
+            };
+
+            $("#scansummary-content tbody tr:visible").each(function() {
+                var row = $(this);
+                stats.total++;
+
+                if (row.hasClass('imported-row')) {
+                    stats.imported++;
+                }
+
+                var statusSpan = row.find(".validation-status span");
+                if (statusSpan.hasClass('status-fp')) {
+                    stats.fp++;
+                } else if (statusSpan.hasClass('status-validated')) {
+                    stats.validated++;
+                } else {
+                    stats.unvalidated++;
+                }
+            });
+
+            // Update stats bar display
+            $(".stats-bar-left .stats-fp .stats-value").text(stats.fp);
+            $(".stats-bar-left .stats-validated .stats-value").text(stats.validated);
+            $(".stats-bar-left .stats-unvalidated .stats-value").text(stats.unvalidated);
         }
 
         function navTo(target) {
@@ -522,7 +690,7 @@
             $("#customvizview").hide();
             $("#modifyactions").hide();
             // Hide selection toolbar and remove header highlights when navigating away
-            $("#selection-toolbar").attr('style', 'display: none !important;');
+            hideSelectionToolbar();
             highlightTableHeaders(false);
             currentSection = target
             dataloaders = []
@@ -1256,30 +1424,30 @@
                             }
                             statsBar += "</div>";
 
-                            // Right side: Filter buttons
+                            // Right side: Filter buttons - use client-side filtering
                             statsBar += "<div class='stats-bar-right'>";
 
-                            // Hide FP button
+                            // Hide FP button - uses client-side toggle
                             if (totalFP > 0) {
-                                var fpBtnClass = filterFP ? 'filter-btn filter-btn-active filter-btn-fp' : 'filter-btn filter-btn-fp';
-                                var fpBtnText = filterFP ? 'HIDING ' + totalFP + ' FP' : 'HIDE ' + totalFP + ' FP';
-                                statsBar += "<button class='" + fpBtnClass + "' onclick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel + "', '" + eventType + "', '" + format + "', " + (!filterFP) + ", " + filterValidated + ", " + filterImportedEntries + ")\">";
+                                var fpBtnClass = clientFilterState.fp ? 'filter-btn filter-btn-active filter-btn-fp' : 'filter-btn filter-btn-fp';
+                                var fpBtnText = clientFilterState.fp ? 'HIDING ' + totalFP + ' FP' : 'HIDE ' + totalFP + ' FP';
+                                statsBar += "<button class='" + fpBtnClass + "' data-show-text='HIDE " + totalFP + " FP' data-hiding-text='HIDING " + totalFP + " FP' onclick=\"toggleClientFilter('fp')\">";
                                 statsBar += fpBtnText + "</button>";
                             }
 
-                            // Hide Validated button
+                            // Hide Validated button - uses client-side toggle
                             if (totalValidated > 0) {
-                                var valBtnClass = filterValidated ? 'filter-btn filter-btn-active filter-btn-validated' : 'filter-btn filter-btn-validated';
-                                var valBtnText = filterValidated ? 'HIDING ' + totalValidated + ' VALIDATED' : 'HIDE ' + totalValidated + ' VALIDATED';
-                                statsBar += "<button class='" + valBtnClass + "' onclick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel + "', '" + eventType + "', '" + format + "', " + filterFP + ", " + (!filterValidated) + ", " + filterImportedEntries + ")\">";
+                                var valBtnClass = clientFilterState.validated ? 'filter-btn filter-btn-active filter-btn-validated' : 'filter-btn filter-btn-validated';
+                                var valBtnText = clientFilterState.validated ? 'HIDING ' + totalValidated + ' VALIDATED' : 'HIDE ' + totalValidated + ' VALIDATED';
+                                statsBar += "<button class='" + valBtnClass + "' data-show-text='HIDE " + totalValidated + " VALIDATED' data-hiding-text='HIDING " + totalValidated + " VALIDATED' onclick=\"toggleClientFilter('validated')\">";
                                 statsBar += valBtnText + "</button>";
                             }
 
-                            // Hide Imported button
+                            // Hide Imported button - uses client-side toggle
                             if (stats.imported > 0) {
-                                var impBtnClass = filterImportedEntries ? 'filter-btn filter-btn-active filter-btn-imported' : 'filter-btn filter-btn-imported';
-                                var impBtnText = filterImportedEntries ? 'HIDING ' + stats.imported + ' IMPORTED' : 'HIDE ' + stats.imported + ' IMPORTED';
-                                statsBar += "<button class='" + impBtnClass + "' onclick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel + "', '" + eventType + "', '" + format + "', " + filterFP + ", " + filterValidated + ", " + (!filterImportedEntries) + ")\">";
+                                var impBtnClass = clientFilterState.imported ? 'filter-btn filter-btn-active filter-btn-imported' : 'filter-btn filter-btn-imported';
+                                var impBtnText = clientFilterState.imported ? 'HIDING ' + stats.imported + ' IMPORTED' : 'HIDE ' + stats.imported + ' IMPORTED';
+                                statsBar += "<button class='" + impBtnClass + "' data-show-text='HIDE " + stats.imported + " IMPORTED' data-hiding-text='HIDING " + stats.imported + " IMPORTED' onclick=\"toggleClientFilter('imported')\">";
                                 statsBar += impBtnText + "</button>";
                             }
 
@@ -1297,19 +1465,7 @@
                             table += "</tr></thead><tbody>";
 
                             for (var i = 0; i < data.length; i++) {
-                                // Hide FPs when filterFP is enabled
-                                if (filterFP && (data[i][8] == "1" || data[i][11] == 1)) {
-                                    continue;
-                                }
-                                // Hide Validated when filterValidated is enabled
-                                if (filterValidated && (data[i][8] == "2" || data[i][12] == 1)) {
-                                    continue;
-                                }
-                                // Hide Imported entries when filterImportedEntries is enabled
-                                if (filterImportedEntries && data[i][13] != null) {
-                                    continue;
-                                }
-
+                                // All rows are rendered - filtering is done client-side
                                 // Check if this entry is imported
                                 var isImported = data[i][13] != null;
 
@@ -1349,6 +1505,11 @@
                             $("#loader").fadeOut(500);
                             $("#mainbody").append(statsBar + table);
                             $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false }, 1: { sorter: false } } });
+
+                            // Apply any active client-side filters after table render
+                            if (clientFilterState.fp || clientFilterState.validated || clientFilterState.imported) {
+                                applyClientSideFilters();
+                            }
                             lastChecked = null;
                             var chkboxes = $('input[id*=cb_]');
                             chkboxes.click(function(e) {

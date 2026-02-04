@@ -72,6 +72,12 @@
 /* ============================================
    Base Styles
    ============================================ */
+
+/* Always show scrollbar to prevent layout shift when toolbar shows/hides */
+html {
+  overflow-y: scroll;
+}
+
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
@@ -3212,6 +3218,11 @@ th.th-source-highlight {
   z-index: 1050 !important;
   flex-direction: row !important;
   align-items: center !important;
+}
+
+/* Toolbar hidden state - controlled by JavaScript */
+#selection-toolbar.toolbar-hidden {
+  display: none !important;
 }
 
 /* Toolbar header (count + close button) */
