@@ -1,5 +1,5 @@
 <%include file="HEADER.tmpl"/>
-    <script type='text/javascript' src='${docroot}/static/js/spiderfoot.opts.js'></script>
+    <script>document.write('<script type="text/javascript" src="${docroot}/static/js/spiderfoot.opts.js?v=' + Date.now() + '"><\/script>');</script>
     <h2>Settings</h2>
 % if updated:
 <div class="alert alert-success">

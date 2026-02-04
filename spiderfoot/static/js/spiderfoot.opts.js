@@ -184,7 +184,7 @@ var pendingNavigationUrl = null;
 
 function showUnsavedWarning(url) {
     pendingNavigationUrl = url || null;
-    document.getElementById('unsaved-warning-overlay').style.display = '';
+    document.getElementById('unsaved-warning-overlay').style.display = 'flex';
 }
 
 function hideUnsavedWarning() {
