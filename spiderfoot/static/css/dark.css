@@ -226,12 +226,14 @@ a:hover {
   margin-right: auto !important;
   padding-left: 15px;
   padding-right: 15px;
+  overflow: visible !important; /* Required for sticky positioning to work */
 }
 
 #mainbody {
   padding-top: 20px;
   margin-left: auto !important;
   margin-right: auto !important;
+  overflow: visible !important; /* Required for sticky positioning to work */
 }
 
 /* ============================================
@@ -4433,7 +4435,8 @@ button[data-target="#createWorkspaceModal"]:hover,
    ============================================ */
 
 /* Full-width stats bar - detached from table */
-.stats-bar-fullwidth {
+.stats-bar-fullwidth,
+#stats-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -4446,6 +4449,7 @@ button[data-target="#createWorkspaceModal"]:hover,
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   box-sizing: border-box;
   /* Sticky positioning - stays fixed below the navigation menu when scrolling */
+  position: -webkit-sticky !important; /* Safari support */
   position: sticky !important;
   top: 54px !important;
   z-index: 101 !important;

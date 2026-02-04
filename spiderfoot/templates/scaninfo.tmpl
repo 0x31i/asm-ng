@@ -1411,7 +1411,8 @@
                             var totalValidated = stats.validated + stats.validatedLegacy;
 
                             // Full-width stats bar with integrated filter buttons
-                            var statsBar = "<div id='stats-bar' class='stats-bar-fullwidth'>";
+                            // Inline styles ensure sticky positioning works even if CSS doesn't load properly
+                            var statsBar = "<div id='stats-bar' class='stats-bar-fullwidth' style='position: sticky; position: -webkit-sticky; top: 54px; z-index: 101;'>";
 
                             // Left side: Stats
                             statsBar += "<div class='stats-bar-left'>";
@@ -1455,13 +1456,18 @@
                             statsBar += "</div>";
 
                             var table = "<table id='scansummary-content' class='table table-bordered table-striped small tablesorter'>";
+                            // Inline sticky styles on th elements ensure headers stick below stats bar
+                            // Use appropriate background color based on current theme
+                            var isDarkMode = localStorage.getItem("theme") === "dark-theme";
+                            var thBg = isDarkMode ? "#1a1a1a" : "#f8fafc";
+                            var thStyle = "style='position: sticky; position: -webkit-sticky; top: 104px; z-index: 100; background: " + thBg + ";'";
                             table += "<thead><tr>";
-                            table += "<th class='text-center'><input id='checkall' type='checkbox' onClick='switchSelectAll()'></th>";
-                            table += "<th class='text-center validation-status'>Status</th>";
-                            table += "<th>Data Element</th></th>";
-                            table += "<th>Source Data Element</th>";
-                            table += "<th>Source Module</th>";
-                            table += "<th>Identified</th>";
+                            table += "<th class='text-center' " + thStyle + "><input id='checkall' type='checkbox' onClick='switchSelectAll()'></th>";
+                            table += "<th class='text-center validation-status' " + thStyle + ">Status</th>";
+                            table += "<th " + thStyle + ">Data Element</th>";
+                            table += "<th " + thStyle + ">Source Data Element</th>";
+                            table += "<th " + thStyle + ">Source Module</th>";
+                            table += "<th " + thStyle + ">Identified</th>";
                             table += "</tr></thead><tbody>";
 
                             for (var i = 0; i < data.length; i++) {
