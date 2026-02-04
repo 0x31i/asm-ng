@@ -220,6 +220,8 @@ function sf_viz_dendrogram(targetId, data) {
     var infoPanelNode = null;
     // Track nodes marked as FP in this session (for undo capability)
     var sessionFpNodes = {};
+    // Track nodes marked as Validated in this session
+    var sessionValidatedNodes = {};
     // Store last panel position for updates
     var lastPanelX = 100;
     var lastPanelY = 100;
@@ -288,7 +290,7 @@ function sf_viz_dendrogram(targetId, data) {
     }
 
     // Mark a node as false positive (persists to future scans)
-    function markAsFalsePositive(nodeName, setFp) {
+    function markAsFalsePositive(nodeName, setFp, ignoreParent) {
         var nodeData = dataMap[nodeName];
         if (!nodeData || !nodeData[8]) {
             console.error("No node data or hash for:", nodeName);
@@ -331,8 +333,8 @@ function sf_viz_dendrogram(targetId, data) {
                         }
                     });
 
-                    // Get all descendant node names
-                    if (clickedNode) {
+                    // Get all descendant node names (unless ignoreParent is true)
+                    if (clickedNode && !ignoreParent) {
                         var descendants = getDescendants(clickedNode);
                         descendantNames = descendants.map(function(d) { return d.name; });
                     }
@@ -340,14 +342,18 @@ function sf_viz_dendrogram(targetId, data) {
                     if (setFp) {
                         // Mark the node and all descendants as FP
                         sessionFpNodes[nodeName] = true;
+                        // Clear any validated marking
+                        delete sessionValidatedNodes[nodeName];
                         descendantNames.forEach(function(name) {
                             sessionFpNodes[name] = true;
+                            delete sessionValidatedNodes[name];
                         });
 
                         // Mark all nodes visually as FP (red)
                         svg.selectAll(".dend-node").each(function(d) {
                             if (d.name === nodeName || descendantNames.indexOf(d.name) !== -1) {
                                 d3.select(this).classed("dend-node-fp", true);
+                                d3.select(this).classed("dend-node-validated", false);
                             }
                         });
 
@@ -357,6 +363,7 @@ function sf_viz_dendrogram(targetId, data) {
                             var targetIsFp = linkData.target.name === nodeName || descendantNames.indexOf(linkData.target.name) !== -1;
                             if (sourceIsFp && targetIsFp) {
                                 d3.select(this).classed("dend-link-fp", true);
+                                d3.select(this).classed("dend-link-validated", false);
                             }
                         });
                     } else {
@@ -399,12 +406,125 @@ function sf_viz_dendrogram(targetId, data) {
         });
     }
 
+    // Mark a node as validated (persists to future scans)
+    function markAsValidated(nodeName, setValidated, ignoreParent) {
+        var nodeData = dataMap[nodeName];
+        if (!nodeData || !nodeData[8]) {
+            console.error("No node data or hash for:", nodeName);
+            alert("Cannot mark this item - no data available");
+            return;
+        }
+
+        var hash = nodeData[8];
+        var fpValue = setValidated ? "2" : "0";  // 2 = validated, 0 = unset
+
+        console.log("Marking Validated:", nodeName, "hash:", hash, "validated:", setValidated, "scanId:", scanId);
+
+        $.ajax({
+            url: docroot + '/resultsetfppersist',
+            type: 'GET',
+            data: {
+                id: scanId,
+                resultids: JSON.stringify([hash]),
+                fp: fpValue,
+                persist: "1"
+            },
+            success: function(response) {
+                console.log("Validated response:", response);
+                var result;
+                try {
+                    result = typeof response === 'string' ? JSON.parse(response) : response;
+                } catch (e) {
+                    console.error("Failed to parse response:", e);
+                    alert("Error parsing server response");
+                    return;
+                }
+
+                if (result[0] === "SUCCESS") {
+                    var clickedNode = null;
+                    var descendantNames = [];
+                    svg.selectAll(".dend-node").each(function(d) {
+                        if (d.name === nodeName) {
+                            clickedNode = d;
+                        }
+                    });
+
+                    if (clickedNode && !ignoreParent) {
+                        var descendants = getDescendants(clickedNode);
+                        descendantNames = descendants.map(function(d) { return d.name; });
+                    }
+
+                    if (setValidated) {
+                        // Mark the node and descendants as validated
+                        sessionValidatedNodes[nodeName] = true;
+                        // Clear any FP marking
+                        delete sessionFpNodes[nodeName];
+                        descendantNames.forEach(function(name) {
+                            sessionValidatedNodes[name] = true;
+                            delete sessionFpNodes[name];
+                        });
+
+                        // Mark visually as validated (blue)
+                        svg.selectAll(".dend-node").each(function(d) {
+                            if (d.name === nodeName || descendantNames.indexOf(d.name) !== -1) {
+                                d3.select(this).classed("dend-node-validated", true);
+                                d3.select(this).classed("dend-node-fp", false);
+                            }
+                        });
+
+                        svg.selectAll(".dend-link").each(function(linkData) {
+                            var sourceIsVal = linkData.source.name === nodeName || descendantNames.indexOf(linkData.source.name) !== -1;
+                            var targetIsVal = linkData.target.name === nodeName || descendantNames.indexOf(linkData.target.name) !== -1;
+                            if (sourceIsVal && targetIsVal) {
+                                d3.select(this).classed("dend-link-validated", true);
+                                d3.select(this).classed("dend-link-fp", false);
+                            }
+                        });
+                    } else {
+                        // Remove validated marking
+                        delete sessionValidatedNodes[nodeName];
+                        descendantNames.forEach(function(name) {
+                            delete sessionValidatedNodes[name];
+                        });
+
+                        svg.selectAll(".dend-node").each(function(d) {
+                            if (d.name === nodeName || descendantNames.indexOf(d.name) !== -1) {
+                                d3.select(this).classed("dend-node-validated", false);
+                            }
+                        });
+
+                        svg.selectAll(".dend-link").each(function(linkData) {
+                            var sourceWasVal = linkData.source.name === nodeName || descendantNames.indexOf(linkData.source.name) !== -1;
+                            var targetWasVal = linkData.target.name === nodeName || descendantNames.indexOf(linkData.target.name) !== -1;
+                            if (sourceWasVal && targetWasVal) {
+                                d3.select(this).classed("dend-link-validated", false);
+                            }
+                        });
+                    }
+                    // Update the info panel if still open
+                    if (infoPanelNode && infoPanelNode.name === nodeName) {
+                        updateInfoPanel(infoPanelNode);
+                    }
+                } else if (result[0] === "WARNING") {
+                    alert(result[1]);
+                } else {
+                    alert("Error setting validated: " + (result[1] || "Unknown error"));
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("AJAX error:", status, error, xhr.responseText);
+                alert("Failed to communicate with server: " + error);
+            }
+        });
+    }
+
     // Update info panel content (preserves position)
     function updateInfoPanel(d) {
         var nodeData = dataMap[d.name];
         var isFp = sessionFpNodes[d.name] || false;
+        var isValidated = sessionValidatedNodes[d.name] || false;
         // Use stored position instead of d3.event (which won't exist in AJAX callback)
-        showInfoPanel(buildInfoPanelMessage(nodeData, d.name, isFp), lastPanelX, lastPanelY, true);
+        showInfoPanel(buildInfoPanelMessage(nodeData, d.name, isFp, isValidated), lastPanelX, lastPanelY, true);
     }
 
     var node = svg.selectAll(".node")
@@ -433,10 +553,11 @@ function sf_viz_dendrogram(targetId, data) {
             infoPanelNode = d;
             var nodeData = dataMap[d.name];
             var isFp = sessionFpNodes[d.name] || false;
+            var isValidated = sessionValidatedNodes[d.name] || false;
             // Store position for later updates
             lastPanelX = d3.event.pageX + 10;
             lastPanelY = d3.event.pageY + 10;
-            showInfoPanel(buildInfoPanelMessage(nodeData, d.name, isFp), lastPanelX, lastPanelY, true);
+            showInfoPanel(buildInfoPanelMessage(nodeData, d.name, isFp, isValidated), lastPanelX, lastPanelY, true);
         })
         .on("mouseover", function(d, i) {
             d3.select(this).classed("dend-node-hover", true);
@@ -503,8 +624,8 @@ function sf_viz_dendrogram(targetId, data) {
         return message;
     }
 
-    // Persistent info panel with FP button (detailed info + actions)
-    function buildInfoPanelMessage(data, nodeName, isFp) {
+    // Persistent info panel with FP and Validate buttons (detailed info + actions)
+    function buildInfoPanelMessage(data, nodeName, isFp, isValidated) {
         var displayData = data[1];
         if (displayData.length > 300) {
             displayData = displayData.substring(0, 300) + "...";
@@ -531,14 +652,26 @@ function sf_viz_dendrogram(targetId, data) {
         message += "<tr><td style='color:" + labelColor + ";padding-right:10px;vertical-align:top;'><b>Data:</b></td><td><pre style='max-width:300px;overflow:auto;background:" + preBackground + ";color:" + preTextColor + ";padding:8px;border-radius:4px;border:1px solid " + borderColor + ";margin:0;'>" + sf.remove_sfurltag(displayData) + "</pre></td></tr>";
         message += "</table>";
 
-        // Don't show FP button for synthetic nodes (like "Discovery Paths")
+        // Don't show buttons for synthetic nodes (like "Discovery Paths")
         if (data[8] && data[8] !== 'discovery_paths') {
-            message += "<div style='border-top:1px solid " + borderColor + ";padding-top:10px;margin-top:5px;'>";
+            message += "<div style='border-top:1px solid " + borderColor + ";padding-top:10px;margin-top:5px;display:flex;flex-wrap:wrap;gap:8px;'>";
+
+            var escapedName = nodeName.replace(/"/g, '\\"');
+
             if (isFp) {
-                message += "<span style='display:inline-block;background:#dc2626;color:white;padding:6px 12px;border-radius:4px;margin-right:8px;font-weight:500;'>Marked as False Positive</span>";
-                message += "<button onclick='window.dendroUnsetFp(\"" + nodeName.replace(/"/g, '\\"') + "\")' style='background:#6b7280;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;'>Unset False Positive</button>";
+                // Currently marked as False Positive - show unmark options
+                message += "<span style='display:inline-block;background:#ea580c;color:white;padding:6px 12px;border-radius:4px;font-weight:600;font-size:11px;'>FALSE POSITIVE</span>";
+                message += "<button onclick='window.dendroUnsetFp(\"" + escapedName + "\", false)' style='background:#6b7280;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;'>UNMARK FP</button>";
+                message += "<button onclick='window.dendroUnsetFp(\"" + escapedName + "\", true)' style='background:#4b5563;color:white;border:none;padding:6px 10px;border-radius:4px;cursor:pointer;font-size:10px;'>UNMARK - IGNORE PARENT</button>";
+            } else if (isValidated) {
+                // Currently marked as Validated - show unmark options
+                message += "<span style='display:inline-block;background:#2563eb;color:white;padding:6px 12px;border-radius:4px;font-weight:600;font-size:11px;'>VALIDATED</span>";
+                message += "<button onclick='window.dendroUnsetValidated(\"" + escapedName + "\", false)' style='background:#6b7280;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;'>UNVALIDATE</button>";
+                message += "<button onclick='window.dendroUnsetValidated(\"" + escapedName + "\", true)' style='background:#4b5563;color:white;border:none;padding:6px 10px;border-radius:4px;cursor:pointer;font-size:10px;'>UNMARK - IGNORE PARENT</button>";
             } else {
-                message += "<button onclick='window.dendroSetFp(\"" + nodeName.replace(/"/g, '\\"') + "\")' style='background:#f59e0b;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:500;'>Mark as False Positive</button>";
+                // Not marked - show both action buttons
+                message += "<button onclick='window.dendroSetFp(\"" + escapedName + "\")' style='background:#ea580c;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:600;font-size:11px;'>FALSE POSITIVE</button>";
+                message += "<button onclick='window.dendroSetValidated(\"" + escapedName + "\")' style='background:#2563eb;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:600;font-size:11px;'>VALIDATE</button>";
             }
             message += "</div>";
         }
@@ -550,8 +683,15 @@ function sf_viz_dendrogram(targetId, data) {
     window.dendroSetFp = function(nodeName) {
         markAsFalsePositive(nodeName, true);
     };
-    window.dendroUnsetFp = function(nodeName) {
-        markAsFalsePositive(nodeName, false);
+    window.dendroUnsetFp = function(nodeName, ignoreParent) {
+        markAsFalsePositive(nodeName, false, ignoreParent);
+    };
+    // Expose Validate functions globally for button onclick
+    window.dendroSetValidated = function(nodeName) {
+        markAsValidated(nodeName, true);
+    };
+    window.dendroUnsetValidated = function(nodeName, ignoreParent) {
+        markAsValidated(nodeName, false, ignoreParent);
     };
     window.dendroCloseInfoPanel = function() {
         infoPanelNode = null;
