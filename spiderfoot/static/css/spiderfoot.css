@@ -2850,6 +2850,15 @@ label {
   flex-wrap: wrap;
 }
 
+#toolbar-changes {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg-primary);
+  padding: 10px 0;
+}
+
 /* Discard Changes button - default state */
 #btn-discard-changes {
   background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%) !important;
