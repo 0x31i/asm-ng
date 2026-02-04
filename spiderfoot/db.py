@@ -2948,41 +2948,65 @@ class SpiderFootDb:
 
         target = scanInfo[1]
 
-        # Get entries from older scans that don't exist in current scan
-        # Join with source event to get source_data for proper duplicate detection
-        # Use GROUP BY to deduplicate entries that appear in multiple old scans
-        # Match on type + data + source_data (DATA ELEMENT + SOURCE DATA ELEMENT)
-        qry = """
-            SELECT old.hash, old.type, old.data, old.module, old.generated,
-                   old.confidence, old.visibility, old.risk, old.false_positive,
-                   old.source_event_hash, old.scan_instance_id,
-                   si.name as source_scan_name, si.started as source_scan_started,
-                   COALESCE(src.data, 'ROOT') as source_data
-            FROM tbl_scan_results old
-            JOIN tbl_scan_instance si ON old.scan_instance_id = si.guid
-            LEFT JOIN tbl_scan_results src ON old.source_event_hash = src.hash
-                AND old.scan_instance_id = src.scan_instance_id
-            WHERE si.seed_target = ?
-              AND old.scan_instance_id != ?
-              AND old.type != 'ROOT'
-              AND old.imported_from_scan IS NULL
-              AND NOT EXISTS (
-                  SELECT 1 FROM tbl_scan_results curr
-                  LEFT JOIN tbl_scan_results curr_src ON curr.source_event_hash = curr_src.hash
-                      AND curr.scan_instance_id = curr_src.scan_instance_id
-                  WHERE curr.scan_instance_id = ?
-                    AND curr.type = old.type
-                    AND curr.data = old.data
-                    AND COALESCE(curr_src.data, 'ROOT') = COALESCE(src.data, 'ROOT')
-              )
-            GROUP BY old.type, old.data, COALESCE(src.data, 'ROOT')
-            ORDER BY si.started DESC, old.generated DESC
-        """
-
         with self.dbhLock:
             try:
-                self.dbh.execute(qry, [target, instanceId, instanceId])
-                return self.dbh.fetchall()
+                # Step 1: Get all (type, data, source_data) combinations in current scan
+                current_entries_qry = """
+                    SELECT curr.type, curr.data, COALESCE(src.data, 'ROOT') as source_data
+                    FROM tbl_scan_results curr
+                    LEFT JOIN tbl_scan_results src ON curr.source_event_hash = src.hash
+                        AND curr.scan_instance_id = src.scan_instance_id
+                    WHERE curr.scan_instance_id = ?
+                """
+                self.dbh.execute(current_entries_qry, [instanceId])
+                current_entries = set()
+                for row in self.dbh.fetchall():
+                    current_entries.add((row[0], row[1], row[2]))
+
+                # Step 2: Get all entries from older scans with their source_data
+                old_entries_qry = """
+                    SELECT old.hash, old.type, old.data, old.module, old.generated,
+                           old.confidence, old.visibility, old.risk, old.false_positive,
+                           old.source_event_hash, old.scan_instance_id,
+                           si.name as source_scan_name, si.started as source_scan_started,
+                           COALESCE(src.data, 'ROOT') as source_data
+                    FROM tbl_scan_results old
+                    JOIN tbl_scan_instance si ON old.scan_instance_id = si.guid
+                    LEFT JOIN tbl_scan_results src ON old.source_event_hash = src.hash
+                        AND old.scan_instance_id = src.scan_instance_id
+                    WHERE si.seed_target = ?
+                      AND old.scan_instance_id != ?
+                      AND old.type != 'ROOT'
+                      AND old.imported_from_scan IS NULL
+                    ORDER BY si.started DESC, old.generated DESC
+                """
+                self.dbh.execute(old_entries_qry, [target, instanceId])
+                old_entries = self.dbh.fetchall()
+
+                # Step 3: Filter and deduplicate in Python
+                seen_combinations = set()
+                importable = []
+
+                for entry in old_entries:
+                    event_type = entry[1]
+                    data = entry[2]
+                    source_data = entry[13]  # COALESCE(src.data, 'ROOT')
+
+                    entry_key = (event_type, data, source_data)
+
+                    # Skip if this combination already exists in current scan
+                    if entry_key in current_entries:
+                        continue
+
+                    # Skip if we've already seen this combination from another old scan
+                    if entry_key in seen_combinations:
+                        continue
+
+                    seen_combinations.add(entry_key)
+                    importable.append(entry)
+
+                return importable
+
             except (sqlite3.Error, psycopg2.Error) as e:
                 raise IOError("SQL error encountered when getting importable entries") from e
 
