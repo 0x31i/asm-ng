@@ -4487,8 +4487,9 @@ i.glyphicon-white,
    Validation Status Indicators
    Status column for scan results showing:
    - ORANGE box: False Positive (confirmed doesn't belong)
-   - GREEN box: Validated (confirmed belongs to organization)
+   - BLUE box: Validated (confirmed belongs to organization)
    - GREY box: Unvalidated (not yet reviewed)
+   - LEGACY suffix: Detected from previous scan persistence
    All use monospace font with uppercase text
    ============================================ */
 
@@ -4509,11 +4510,11 @@ i.glyphicon-white,
   cursor: default;
 }
 
-/* Validated - GREEN Box with White Glowing Text */
+/* Validated - BLUE Box with White Glowing Text */
 .status-validated {
   display: inline-block;
   padding: 4px 8px;
-  background: linear-gradient(135deg, var(--accent-green) 0%, #15803d 100%);
+  background: linear-gradient(135deg, var(--accent-blue) 0%, #1d4ed8 100%);
   color: #ffffff;
   font-family: var(--font-mono);
   font-size: 10px;
@@ -4521,7 +4522,7 @@ i.glyphicon-white,
   text-transform: uppercase;
   letter-spacing: 0.5px;
   border-radius: 4px;
-  box-shadow: 0 0 10px var(--glow-green);
+  box-shadow: 0 0 10px var(--glow-blue);
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 0 15px rgba(255, 255, 255, 0.5);
   cursor: default;
 }
@@ -4542,25 +4543,32 @@ i.glyphicon-white,
   cursor: default;
 }
 
+/* Legacy indicator - smaller text appended to status */
+.status-legacy {
+  font-size: 8px;
+  opacity: 0.9;
+  margin-left: 2px;
+}
+
 /* Validation status column in tables */
 .validation-status {
-  width: 120px;
+  width: 140px;
   text-align: center;
   vertical-align: middle !important;
 }
 
-/* Selection toolbar - Validated action button (GREEN) */
+/* Selection toolbar - Validated action button (BLUE) */
 #selection-toolbar .btn-validated-action {
-  background: linear-gradient(135deg, var(--accent-green) 0%, #15803d 100%) !important;
+  background: linear-gradient(135deg, var(--accent-blue) 0%, #1d4ed8 100%) !important;
   color: white !important;
-  box-shadow: 0 0 12px var(--glow-green) !important;
+  box-shadow: 0 0 12px var(--glow-blue) !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
   border: none !important;
 }
 
 #selection-toolbar .btn-validated-action:hover {
-  background: linear-gradient(135deg, var(--accent-green-light) 0%, var(--accent-green) 100%) !important;
-  box-shadow: 0 0 20px var(--glow-green) !important;
+  background: linear-gradient(135deg, var(--accent-blue-light) 0%, var(--accent-blue) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-blue) !important;
 }
 
 #selection-toolbar .btn-validated-action .glyphicon,
