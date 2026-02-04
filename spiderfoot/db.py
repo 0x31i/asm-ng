@@ -2890,7 +2890,8 @@ class SpiderFootDb:
 
         Returns entries from older scans of the same target that:
         - Are validated (fp=2) or unvalidated (fp=0)
-        - Do not already exist in the current scan (by type+data combination)
+        - Do not already exist in the current scan (by type+data+source_data combination)
+        - Are unique across all older scans (no duplicates from multiple old scans)
 
         Args:
             instanceId (str): current scan instance ID
@@ -2913,24 +2914,33 @@ class SpiderFootDb:
         target = scanInfo[1]
 
         # Get entries from older scans that don't exist in current scan
-        # Join with scan_instance to get scan timestamps for ordering
+        # Join with source event to get source_data for proper duplicate detection
+        # Use GROUP BY to deduplicate entries that appear in multiple old scans
+        # Match on type + data + source_data (DATA ELEMENT + SOURCE DATA ELEMENT)
         qry = """
             SELECT old.hash, old.type, old.data, old.module, old.generated,
                    old.confidence, old.visibility, old.risk, old.false_positive,
                    old.source_event_hash, old.scan_instance_id,
-                   si.name as source_scan_name, si.started as source_scan_started
+                   si.name as source_scan_name, si.started as source_scan_started,
+                   COALESCE(src.data, 'ROOT') as source_data
             FROM tbl_scan_results old
             JOIN tbl_scan_instance si ON old.scan_instance_id = si.guid
+            LEFT JOIN tbl_scan_results src ON old.source_event_hash = src.hash
+                AND old.scan_instance_id = src.scan_instance_id
             WHERE si.seed_target = ?
               AND old.scan_instance_id != ?
               AND old.type != 'ROOT'
               AND old.imported_from_scan IS NULL
               AND NOT EXISTS (
                   SELECT 1 FROM tbl_scan_results curr
+                  LEFT JOIN tbl_scan_results curr_src ON curr.source_event_hash = curr_src.hash
+                      AND curr.scan_instance_id = curr_src.scan_instance_id
                   WHERE curr.scan_instance_id = ?
                     AND curr.type = old.type
                     AND curr.data = old.data
+                    AND COALESCE(curr_src.data, 'ROOT') = COALESCE(src.data, 'ROOT')
               )
+            GROUP BY old.type, old.data, COALESCE(src.data, 'ROOT')
             ORDER BY si.started DESC, old.generated DESC
         """
 
@@ -2946,6 +2956,7 @@ class SpiderFootDb:
 
         Copies unique entries from older scans, marking them with imported_from_scan.
         Only imports entries that don't already exist in the current scan.
+        Duplicate detection is based on type + data + source_data.
 
         Args:
             instanceId (str): current scan instance ID
@@ -2969,11 +2980,15 @@ class SpiderFootDb:
         imported = 0
         skipped = 0
 
+        # Track already imported combinations to prevent duplicates within this batch
+        imported_combinations = set()
+
         with self.dbhLock:
             try:
                 for entry in entries:
-                    # Generate a new unique hash for the imported entry
-                    # Original: hash, type, data, module, generated, confidence, visibility, risk, false_positive, source_event_hash, scan_instance_id
+                    # Entry format: hash, type, data, module, generated, confidence, visibility,
+                    #               risk, false_positive, source_event_hash, scan_instance_id,
+                    #               source_scan_name, source_scan_started, source_data
                     original_hash = entry[0]
                     event_type = entry[1]
                     data = entry[2]
@@ -2985,10 +3000,36 @@ class SpiderFootDb:
                     false_positive = entry[8]
                     source_event_hash = entry[9]
                     source_scan_id = entry[10]
+                    source_data = entry[13] if len(entry) > 13 else 'ROOT'
+
+                    # Create a unique key for this entry based on type + data + source_data
+                    entry_key = (event_type, data, source_data)
+
+                    # Skip if we've already imported this combination in this batch
+                    if entry_key in imported_combinations:
+                        skipped += 1
+                        continue
+
+                    # Double-check: verify this exact combination doesn't exist in current scan
+                    # This catches any edge cases the query might have missed
+                    check_qry = """
+                        SELECT 1 FROM tbl_scan_results curr
+                        LEFT JOIN tbl_scan_results curr_src ON curr.source_event_hash = curr_src.hash
+                            AND curr.scan_instance_id = curr_src.scan_instance_id
+                        WHERE curr.scan_instance_id = ?
+                          AND curr.type = ?
+                          AND curr.data = ?
+                          AND COALESCE(curr_src.data, 'ROOT') = ?
+                        LIMIT 1
+                    """
+                    self.dbh.execute(check_qry, [instanceId, event_type, data, source_data])
+                    if self.dbh.fetchone():
+                        skipped += 1
+                        continue
 
                     # Generate new hash for this imported entry
                     new_hash = hashlib.sha256(
-                        f"{instanceId}{event_type}{data}{module}{source_scan_id}".encode('utf-8')
+                        f"{instanceId}{event_type}{data}{module}{source_data}".encode('utf-8')
                     ).hexdigest()
 
                     # Check if we need to map the source_event_hash
@@ -2997,9 +3038,9 @@ class SpiderFootDb:
                         mapped_source_hash = 'ROOT'
                     else:
                         # Check if parent exists in current scan
-                        check_qry = """SELECT hash FROM tbl_scan_results
+                        parent_qry = """SELECT hash FROM tbl_scan_results
                             WHERE scan_instance_id = ? AND hash = ?"""
-                        self.dbh.execute(check_qry, [instanceId, source_event_hash])
+                        self.dbh.execute(parent_qry, [instanceId, source_event_hash])
                         if self.dbh.fetchone():
                             mapped_source_hash = source_event_hash
                         else:
@@ -3018,6 +3059,8 @@ class SpiderFootDb:
                             risk, module, data, false_positive, mapped_source_hash, source_scan_id
                         ])
                         imported += 1
+                        # Track this combination as imported
+                        imported_combinations.add(entry_key)
                     except (sqlite3.Error, psycopg2.Error):
                         # Entry already exists (race condition or duplicate)
                         skipped += 1
