@@ -494,6 +494,7 @@ input[type="checkbox"] {
   letter-spacing: 0.5px;
   white-space: nowrap;
   vertical-align: middle;
+  text-align: center;
   /* Sticky table headers - at top since main nav is not sticky */
   position: sticky !important;
   top: 0 !important;
