@@ -712,6 +712,27 @@
             $(".stats-bar-left .stats-unvalidated .stats-value").text(stats.unvalidated);
         }
 
+        // Page title mappings
+        var pageTitles = {
+            "btn-status": "SUMMARY",
+            "btn-correlations": "CORRELATIONS",
+            "btn-browse": "BROWSE",
+            "btn-graph": "GRAPH",
+            "btn-info": "SCAN SETTINGS",
+            "btn-log": "LOG",
+            "btn-search": "SEARCH RESULTS"
+        };
+
+        // Update page title with optional subdirectory
+        function updatePageTitle(subDirectory) {
+            var baseTitle = pageTitles[currentSection] || currentSection.replace("btn-", "").toUpperCase();
+            if (subDirectory && subDirectory !== "All" && subDirectory !== "ALL") {
+                $("#page-title").text(baseTitle + " / " + subDirectory.toUpperCase());
+            } else {
+                $("#page-title").text(baseTitle);
+            }
+        }
+
         function navTo(target) {
             var targets = [ "btn-browse", "btn-info", "btn-log",
                 "btn-export", "btn-download-logs", "btn-viz",
@@ -724,17 +745,8 @@
                 }
             }
 
-            // Update page title based on current section
-            var pageTitles = {
-                "btn-status": "SUMMARY",
-                "btn-correlations": "CORRELATIONS",
-                "btn-browse": "BROWSE",
-                "btn-graph": "GRAPH",
-                "btn-info": "SCAN SETTINGS",
-                "btn-log": "LOG",
-                "btn-search": "SEARCH RESULTS"
-            };
-            $("#page-title").text(pageTitles[target] || target.replace("btn-", "").toUpperCase());
+            currentSection = target;
+            updatePageTitle();
 
             $("#breadcrumbs").remove();
             $("#stats-bar").remove();
@@ -744,7 +756,6 @@
             // Hide selection toolbar and remove header highlights when navigating away
             hideSelectionToolbar();
             highlightTableHeaders(false);
-            currentSection = target
             dataloaders = []
         }
 
@@ -1420,6 +1431,7 @@
             $("#scanreminder").hide();
             currentType = eventType;
             currentTypeName = eventTypeLabel;
+            updatePageTitle(currentTypeName);
             refresh = function() { browseEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated, filterImportedEntries); }
             browseUpdate = function(newformat) { browseEventData(instanceId, eventTypeLabel, eventType, newformat, filterFP, filterValidated, filterImportedEntries); }
 
