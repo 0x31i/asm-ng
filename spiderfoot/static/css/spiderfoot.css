@@ -4578,9 +4578,9 @@ i.glyphicon-white,
   margin-left: 2px;
 }
 
-/* Imported indicator - intense purple glow behind status badge */
+/* Imported indicator - subtle purple glow behind status badge */
 .status-imported-glow {
-  box-shadow: 0 0 12px 4px rgba(139, 92, 246, 0.7), 0 0 20px 8px rgba(139, 92, 246, 0.4) !important;
+  box-shadow: 0 0 8px 2px rgba(139, 92, 246, 0.35), 0 0 12px 4px rgba(139, 92, 246, 0.2) !important;
 }
 
 /* Stats bar - imported count styling */
