@@ -177,6 +177,37 @@ function revertAllChanges() {
     hideChangeToolbar();
 }
 
+// ============================================
+// Unsaved changes warning - beforeunload & navigation interception
+// ============================================
+var pendingNavigationUrl = null;
+
+function showUnsavedWarning(url) {
+    pendingNavigationUrl = url || null;
+    document.getElementById('unsaved-warning-overlay').style.display = '';
+}
+
+function hideUnsavedWarning() {
+    document.getElementById('unsaved-warning-overlay').style.display = 'none';
+    pendingNavigationUrl = null;
+}
+
+function handleWarningLeave() {
+    // Temporarily disable beforeunload so navigation goes through
+    settingsModified = false;
+    hideUnsavedWarning();
+    if (pendingNavigationUrl) {
+        window.location.href = pendingNavigationUrl;
+    }
+}
+
+function handleWarningStay() {
+    hideUnsavedWarning();
+    // Show the change toolbar so user can save
+    if (!settingsModified) return;
+    showChangeToolbar();
+}
+
 $(document).ready(function() {
     // Wire up buttons
     $("#btn-save-changes").click(function(e) { e.preventDefault(); handleSaveClick(); return false; });
@@ -200,6 +231,45 @@ $(document).ready(function() {
             if (saveConfirmPending || discardConfirmPending) {
                 resetConfirmStates();
             }
+        }
+    });
+
+    // Browser beforeunload warning (native dialog for tab close / refresh / address bar navigation)
+    window.addEventListener('beforeunload', function(e) {
+        if (settingsModified) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
+    // Intercept all link clicks to show custom warning modal
+    $(document).on('click', 'a[href]', function(e) {
+        if (!settingsModified) return;
+
+        var href = $(this).attr('href');
+        // Ignore javascript: links, anchors, and empty hrefs
+        if (!href || href === '#' || href.indexOf('javascript:') === 0) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        showUnsavedWarning(href);
+    });
+
+    // Wire up warning modal buttons
+    $('#unsaved-warning-leave').click(function() { handleWarningLeave(); });
+    $('#unsaved-warning-stay').click(function() { handleWarningStay(); });
+
+    // Close modal on overlay click (outside the modal box)
+    $('#unsaved-warning-overlay').click(function(e) {
+        if (e.target === this) {
+            hideUnsavedWarning();
+        }
+    });
+
+    // Close modal on Escape key
+    $(document).on('keydown', function(e) {
+        if (e.key === 'Escape' && document.getElementById('unsaved-warning-overlay').style.display !== 'none') {
+            hideUnsavedWarning();
         }
     });
 });
