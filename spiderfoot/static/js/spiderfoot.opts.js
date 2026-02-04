@@ -193,7 +193,7 @@ function hideUnsavedWarning() {
 }
 
 function handleWarningLeave() {
-    // Temporarily disable beforeunload so navigation goes through
+    // Discard changes and navigate away
     settingsModified = false;
     hideUnsavedWarning();
     if (pendingNavigationUrl) {
@@ -201,11 +201,19 @@ function handleWarningLeave() {
     }
 }
 
-function handleWarningStay() {
+function handleWarningContinue() {
+    // Close modal and return to editing
     hideUnsavedWarning();
-    // Show the change toolbar so user can save
-    if (!settingsModified) return;
-    showChangeToolbar();
+    if (settingsModified) showChangeToolbar();
+}
+
+function handleWarningSaveAndLeave() {
+    // Save settings then navigate away
+    saveSettings();
+    settingsModified = false;
+    var url = pendingNavigationUrl;
+    hideUnsavedWarning();
+    document.getElementById('savesettingsform').submit();
 }
 
 $(document).ready(function() {
@@ -257,7 +265,8 @@ $(document).ready(function() {
 
     // Wire up warning modal buttons
     $('#unsaved-warning-leave').click(function() { handleWarningLeave(); });
-    $('#unsaved-warning-stay').click(function() { handleWarningStay(); });
+    $('#unsaved-warning-continue').click(function() { handleWarningContinue(); });
+    $('#unsaved-warning-save').click(function() { handleWarningSaveAndLeave(); });
 
     // Close modal on overlay click (outside the modal box)
     $('#unsaved-warning-overlay').click(function(e) {
