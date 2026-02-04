@@ -4445,10 +4445,10 @@ button[data-target="#createWorkspaceModal"]:hover,
   border-radius: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   box-sizing: border-box;
-  /* Sticky positioning */
-  position: sticky;
-  top: 54px;
-  z-index: 101;
+  /* Sticky positioning - stays fixed below the navigation menu when scrolling */
+  position: sticky !important;
+  top: 54px !important;
+  z-index: 101 !important;
 }
 
 /* Left side: Stats items */
@@ -4587,8 +4587,9 @@ button[data-target="#createWorkspaceModal"]:hover,
   background: linear-gradient(180deg, #1e1e1e 0%, #141414 100%);
 }
 
-/* Sticky table header for scansummary - positioned below stats bar */
-#scansummary-content thead th {
+/* Sticky table header for scansummary - positioned below stats bar when stats bar exists */
+/* Use adjacent sibling selector so this only applies when stats bar is present */
+#stats-bar + #scansummary-content thead th {
   position: sticky !important;
   top: 104px !important; /* 54px navbar + 50px stats bar */
   z-index: 100 !important;

@@ -4690,10 +4690,10 @@ i.glyphicon-white,
   border-radius: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
-  /* Sticky positioning */
-  position: sticky;
-  top: 54px;
-  z-index: 101;
+  /* Sticky positioning - stays fixed below the navigation menu when scrolling */
+  position: sticky !important;
+  top: 54px !important;
+  z-index: 101 !important;
 }
 
 /* Left side: Stats items */
@@ -4821,16 +4821,12 @@ i.glyphicon-white,
   background: #ffffff;
 }
 
-/* Sticky table header for scansummary - positioned below stats bar */
-#scansummary-content thead th {
+/* Sticky table header for scansummary - positioned below stats bar when stats bar exists */
+/* Use adjacent sibling selector so this only applies when stats bar is present */
+#stats-bar + #scansummary-content thead th {
   position: sticky !important;
   top: 104px !important; /* 54px navbar + 50px stats bar */
   z-index: 100 !important;
-  background: #1a1a1a !important;
-}
-
-/* Light mode override for scansummary table header */
-body:not(.dark-mode) #scansummary-content thead th {
   background: #f8fafc !important;
 }
 
