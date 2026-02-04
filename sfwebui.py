@@ -2496,6 +2496,41 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
+    def resyncscanentries(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Delete imported entries and re-import fresh from older scans.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: {success: bool, deleted: int, imported: int, skipped: int, message: str}
+        """
+        dbh = SpiderFootDb(self.config)
+
+        try:
+            # Check if this is a valid scan
+            scanInfo = dbh.scanInstanceGet(id)
+            if not scanInfo:
+                return {'success': False, 'deleted': 0, 'imported': 0, 'skipped': 0, 'message': 'Scan not found'}
+
+            # Delete existing imported entries
+            deleted = dbh.deleteImportedEntries(id)
+
+            # Re-import from older scans
+            result = dbh.importEntriesFromOlderScans(id)
+
+            return {
+                'success': True,
+                'deleted': deleted,
+                'imported': result['imported'],
+                'skipped': result['skipped'],
+                'message': f"Deleted {deleted} old imports, imported {result['imported']} entries fresh"
+            }
+        except Exception as e:
+            return {'success': False, 'deleted': 0, 'imported': 0, 'skipped': 0, 'message': f'Error: {str(e)}'}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
     def scancorrelations(self: 'SpiderFootWebUi', id: str) -> list:
         """Correlation results from a scan.
 

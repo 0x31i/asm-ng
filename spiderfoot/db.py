@@ -2885,6 +2885,41 @@ class SpiderFootDb:
             except (sqlite3.Error, psycopg2.Error) as e:
                 raise IOError("SQL error encountered when counting imported entries") from e
 
+    def deleteImportedEntries(self, instanceId: str) -> int:
+        """Delete all imported entries from a scan.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            int: number of entries deleted
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(f"instanceId is {type(instanceId)}; expected str()") from None
+
+        with self.dbhLock:
+            try:
+                # First count how many will be deleted
+                count_qry = """SELECT COUNT(*) FROM tbl_scan_results
+                    WHERE scan_instance_id = ? AND imported_from_scan IS NOT NULL"""
+                self.dbh.execute(count_qry, [instanceId])
+                row = self.dbh.fetchone()
+                count = row[0] if row else 0
+
+                # Delete imported entries
+                delete_qry = """DELETE FROM tbl_scan_results
+                    WHERE scan_instance_id = ? AND imported_from_scan IS NOT NULL"""
+                self.dbh.execute(delete_qry, [instanceId])
+                self.conn.commit()
+
+                return count
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when deleting imported entries") from e
+
     def getImportableEntries(self, instanceId: str) -> list:
         """Get entries from older scans that can be imported into this scan.
 
