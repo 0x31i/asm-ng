@@ -494,6 +494,7 @@ input[type="checkbox"] {
   letter-spacing: 0.5px;
   white-space: nowrap;
   vertical-align: middle;
+  text-align: center;
   /* Sticky table headers - at top since main nav is not sticky */
   position: sticky !important;
   top: 0 !important;
@@ -1697,6 +1698,21 @@ pre.table-border-bg-inherit {
   font-family: var(--font-mono);
   background: var(--bg-tertiary) !important;
   color: var(--text-secondary) !important;
+}
+
+/* ============================================
+   Page Title - Section indicator below navigation
+   ============================================ */
+.page-title {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5), 0 0 20px rgba(255, 255, 255, 0.3);
+  padding: 8px 0 12px 0;
+  margin: 0;
 }
 
 /* ============================================
