@@ -4578,17 +4578,9 @@ i.glyphicon-white,
   margin-left: 2px;
 }
 
-/* Imported indicator - small purple rectangle badge */
-.status-imported {
-  display: inline-block;
-  font-size: 8px;
-  color: white !important;
-  background-color: #8b5cf6;
-  padding: 2px 4px;
-  margin-left: 4px;
-  border-radius: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  vertical-align: middle;
+/* Imported indicator - intense purple glow behind status badge */
+.status-imported-glow {
+  box-shadow: 0 0 12px 4px rgba(139, 92, 246, 0.7), 0 0 20px 8px rgba(139, 92, 246, 0.4) !important;
 }
 
 /* Stats bar - imported count styling */

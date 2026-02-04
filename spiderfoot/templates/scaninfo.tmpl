@@ -1318,21 +1318,20 @@
                                 table += "<td class='text-center'><input type='checkbox' id='cb_" + data[i][7] + "'></td>";
 
                                 // Status column with text badges
-                                // IMPORTED suffix is shown when entry comes from a previous scan
+                                // Imported entries get a purple glow behind the status badge
                                 table += "<td class='text-center validation-status'>";
                                 // Determine status: FP=1 or target-level FP = False Positive (ORANGE)
                                 // FP=2 or target-level validated = Validated (BLUE)
                                 // Otherwise = Unvalidated (GREY)
-                                // Add IMPORTED suffix if entry was imported from a previous scan
-                                var importedSuffix = isImported ? "<span class='status-imported' title='Imported from previous scan'> [IMPORTED]</span>" : "";
+                                var importedClass = isImported ? " status-imported-glow" : "";
                                 if (data[i][8] == "1" || data[i][11] == 1) {
                                     // Current scan marked as FP or target-level FP
-                                    table += "<span class='status-fp' title='False Positive - confirmed does not belong to organization'>FALSE POSITIVE" + importedSuffix + "</span>";
+                                    table += "<span class='status-fp" + importedClass + "' title='False Positive - confirmed does not belong to organization'>FALSE POSITIVE</span>";
                                 } else if (data[i][8] == "2" || data[i][12] == 1) {
                                     // Current scan marked as validated or target-level validated
-                                    table += "<span class='status-validated' title='Validated - confirmed belongs to organization'>VALIDATED" + importedSuffix + "</span>";
+                                    table += "<span class='status-validated" + importedClass + "' title='Validated - confirmed belongs to organization'>VALIDATED</span>";
                                 } else {
-                                    table += "<span class='status-unvalidated' title='Not yet reviewed'>UNVALIDATED" + importedSuffix + "</span>";
+                                    table += "<span class='status-unvalidated" + importedClass + "' title='Not yet reviewed'>UNVALIDATED</span>";
                                 }
                                 table += "</td>";
 
