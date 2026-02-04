@@ -1174,13 +1174,17 @@
         }
 
         // Detailed view of data for an event type for a scan
-        function browseEventData(instanceId, eventTypeLabel, eventType, format, filterFP) {
-            if (filterFP === 'undefined') {
+        function browseEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated) {
+            if (filterFP === 'undefined' || filterFP === undefined) {
                 filterFP = false;
+            }
+            if (filterValidated === 'undefined' || filterValidated === undefined) {
+                filterValidated = false;
             }
             $("#scansummary-content").remove();
             $("#scanlogs-content").remove();
             $("#breadcrumbs").remove();
+            $("#stats-bar").remove();
             $("#loader").show();
             navTo("btn-browse");
             $("#btn-export").show();
@@ -1191,8 +1195,8 @@
             $("#scanreminder").hide();
             currentType = eventType;
             currentTypeName = eventTypeLabel;
-            refresh = function() { browseEventData(instanceId, eventTypeLabel, eventType, format, filterFP); }
-            browseUpdate = function(newformat) { browseEventData(instanceId, eventTypeLabel, eventType, newformat, filterFP); }
+            refresh = function() { browseEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated); }
+            browseUpdate = function(newformat) { browseEventData(instanceId, eventTypeLabel, eventType, newformat, filterFP, filterValidated); }
 
             if (format == 'full') {
                 $("#btn-fullview").addClass("active");
@@ -1200,43 +1204,79 @@
                 $("#btn-vizview").removeClass("active");
                 $("#modifyactions").show();
                 sf.fetchData('${docroot}/scaneventresults', {'id': instanceId, 'eventType': eventType }, function(data) {
-                            totalcount = 0;
-                            fpcount = 0;
-                            targetfpcount = 0;
+                            // Count all categories
+                            var stats = {
+                                total: 0,
+                                fp: 0,           // Current scan FPs
+                                fpLegacy: 0,     // Target-level FPs from previous scans
+                                validated: 0,     // Current scan validated
+                                validatedLegacy: 0, // Target-level validated from previous scans
+                                unvalidated: 0
+                            };
+
                             for (var i = 0; i < data.length; i++) {
-                                totalcount++;
+                                stats.total++;
                                 if (data[i][8] == "1") {
-                                    fpcount++;
-                                }
-                                // Count results matching target-level FPs that aren't already marked
-                                if (data[i][11] == 1 && data[i][8] != "1") {
-                                    targetfpcount++;
+                                    stats.fp++;
+                                } else if (data[i][11] == 1) {
+                                    stats.fpLegacy++;
+                                } else if (data[i][8] == "2") {
+                                    stats.validated++;
+                                } else if (data[i][12] == 1) {
+                                    stats.validatedLegacy++;
+                                } else {
+                                    stats.unvalidated++;
                                 }
                             }
+
+                            var totalFP = stats.fp + stats.fpLegacy;
+                            var totalValidated = stats.validated + stats.validatedLegacy;
+
+                            // Breadcrumbs
                             var crumbs = " <ul class='breadcrumb' id='breadcrumbs'> <li><a class='link' onClick='browseEventList(\"" + instanceId + "\");'>Browse</a>";
                             crumbs += " <span class='divider'></span></li> <li><a class='link' onClick=";
                             crumbs += "'browseEventData(\"" + instanceId + "\",\"" + eventTypeLabel + "\",\"" + eventType + "\",\"";
-                            crumbs += format + "\", " + filterFP + ");'>";
-                            crumbs += unescape(eventTypeLabel) + "</a></li>";
-                            var totalFPCount = fpcount + targetfpcount;
-                            if (totalFPCount > 0) {
-                                crumbs += "<div class='pull-right text-center'>";
-                                crumbs += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;Hide " + totalFPCount + " False Positives: ";
-                                crumbs += "<input class='vertical-align-top' type='checkbox' ";
-                                crumbs += "onClick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel +"', '" + eventType + "'";
-                                crumbs += ",'" + format + "', ";
-                                if (!filterFP) {
-                                    fp = 1;
-                                    ch = "";
-                                } else {
-                                    fp = 0;
-                                    ch = "checked";
-                                }
-                                crumbs += fp + ")\" " + ch + "></input>";
-                                crumbs += "&nbsp;&nbsp;<i class='glyphicon glyphicon-repeat'></i><span class='stored-fps-text'>" + fpcount + " Marked False Positives</span>";
-                                crumbs += "</div>";
+                            crumbs += format + "\", " + filterFP + ", " + filterValidated + ");'>";
+                            crumbs += unescape(eventTypeLabel) + "</a></li></ul>";
+
+                            // Stats bar module
+                            var statsBar = "<div id='stats-bar' class='stats-bar-container'>";
+                            statsBar += "<div class='stats-bar'>";
+
+                            // Stats items
+                            statsBar += "<div class='stats-item'><span class='stats-label'>TOTAL</span><span class='stats-value'>" + stats.total + "</span></div>";
+                            statsBar += "<div class='stats-divider'></div>";
+                            statsBar += "<div class='stats-item stats-fp'><span class='stats-label'>FALSE POSITIVES</span><span class='stats-value'>" + stats.fp + "</span></div>";
+                            statsBar += "<div class='stats-item stats-fp-legacy'><span class='stats-label'>FP [LEGACY]</span><span class='stats-value'>" + stats.fpLegacy + "</span></div>";
+                            statsBar += "<div class='stats-divider'></div>";
+                            statsBar += "<div class='stats-item stats-validated'><span class='stats-label'>VALIDATED</span><span class='stats-value'>" + stats.validated + "</span></div>";
+                            statsBar += "<div class='stats-item stats-validated-legacy'><span class='stats-label'>VALIDATED [LEGACY]</span><span class='stats-value'>" + stats.validatedLegacy + "</span></div>";
+                            statsBar += "<div class='stats-divider'></div>";
+                            statsBar += "<div class='stats-item stats-unvalidated'><span class='stats-label'>UNVALIDATED</span><span class='stats-value'>" + stats.unvalidated + "</span></div>";
+
+                            statsBar += "</div>";
+
+                            // Filter buttons
+                            statsBar += "<div class='stats-filters'>";
+
+                            // Hide FP button
+                            if (totalFP > 0) {
+                                var fpBtnClass = filterFP ? 'filter-btn filter-btn-active filter-btn-fp' : 'filter-btn filter-btn-fp';
+                                var fpBtnText = filterFP ? 'HIDING ' + totalFP + ' FALSE POSITIVES' : 'HIDE ' + totalFP + ' FALSE POSITIVES';
+                                statsBar += "<button class='" + fpBtnClass + "' onclick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel + "', '" + eventType + "', '" + format + "', " + (!filterFP) + ", " + filterValidated + ")\">";
+                                statsBar += "<i class='glyphicon glyphicon-ban-circle'></i> " + fpBtnText + "</button>";
                             }
-                            crumbs += "</ul>";
+
+                            // Hide Validated button
+                            if (totalValidated > 0) {
+                                var valBtnClass = filterValidated ? 'filter-btn filter-btn-active filter-btn-validated' : 'filter-btn filter-btn-validated';
+                                var valBtnText = filterValidated ? 'HIDING ' + totalValidated + ' VALIDATED' : 'HIDE ' + totalValidated + ' VALIDATED';
+                                statsBar += "<button class='" + valBtnClass + "' onclick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel + "', '" + eventType + "', '" + format + "', " + filterFP + ", " + (!filterValidated) + ")\">";
+                                statsBar += "<i class='glyphicon glyphicon-ok-circle'></i> " + valBtnText + "</button>";
+                            }
+
+                            statsBar += "</div>";
+                            statsBar += "</div>";
 
                             var table = "<table id='scansummary-content' class='table table-bordered table-striped small tablesorter'>";
                             table += "<thead><tr>";
@@ -1249,8 +1289,12 @@
                             table += "</tr></thead><tbody>";
 
                             for (var i = 0; i < data.length; i++) {
-                                // Hide both current scan FPs and target-level FP matches when filter is enabled
+                                // Hide FPs when filterFP is enabled
                                 if (filterFP && (data[i][8] == "1" || data[i][11] == 1)) {
+                                    continue;
+                                }
+                                // Hide Validated when filterValidated is enabled
+                                if (filterValidated && (data[i][8] == "2" || data[i][12] == 1)) {
                                     continue;
                                 }
                                 table += "<tr>";
@@ -1293,7 +1337,7 @@
                             }
                             table += "</tbody></table>"
                             $("#loader").fadeOut(500);
-                            $("#mainbody").append(crumbs + table);
+                            $("#mainbody").append(crumbs + statsBar + table);
                             $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false }, 1: { sorter: false } } });
                             lastChecked = null;
                             var chkboxes = $('input[id*=cb_]');
