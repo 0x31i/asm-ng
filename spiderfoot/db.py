@@ -2886,7 +2886,11 @@ class SpiderFootDb:
                 raise IOError("SQL error encountered when counting imported entries") from e
 
     def deleteImportedEntries(self, instanceId: str) -> int:
-        """Delete all imported entries from a scan.
+        """Delete UNVALIDATED imported entries from a scan.
+
+        Only deletes imported entries that are still unvalidated (false_positive = 0).
+        Preserves imported entries that have been validated (false_positive = 2) or
+        marked as false positive (false_positive = 1) by the user.
 
         Args:
             instanceId (str): scan instance ID
@@ -2903,16 +2907,21 @@ class SpiderFootDb:
 
         with self.dbhLock:
             try:
-                # First count how many will be deleted
+                # First count how many will be deleted (only unvalidated imports)
                 count_qry = """SELECT COUNT(*) FROM tbl_scan_results
-                    WHERE scan_instance_id = ? AND imported_from_scan IS NOT NULL"""
+                    WHERE scan_instance_id = ?
+                    AND imported_from_scan IS NOT NULL
+                    AND false_positive = 0"""
                 self.dbh.execute(count_qry, [instanceId])
                 row = self.dbh.fetchone()
                 count = row[0] if row else 0
 
-                # Delete imported entries
+                # Delete only unvalidated imported entries
+                # Keep validated (fp=2) and false positive (fp=1) entries
                 delete_qry = """DELETE FROM tbl_scan_results
-                    WHERE scan_instance_id = ? AND imported_from_scan IS NOT NULL"""
+                    WHERE scan_instance_id = ?
+                    AND imported_from_scan IS NOT NULL
+                    AND false_positive = 0"""
                 self.dbh.execute(delete_qry, [instanceId])
                 self.conn.commit()
 
