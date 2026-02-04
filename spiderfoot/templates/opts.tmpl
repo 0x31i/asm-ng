@@ -9,6 +9,13 @@
 </div>
 % endif
 <form class="form" action='${docroot}/savesettings' id="savesettingsform" method='POST' enctype="multipart/form-data">
+<!-- Floating Save Bar - appears when settings are modified -->
+<div id="floating-save-bar">
+    <div id="floating-save-inner">
+        <span id="floating-save-label">Unsaved Changes</span>
+        <button id="btn-save-floating" class='btn btn-primary' type="submit">Save Changes</button>
+    </div>
+</div>
 <div class='text-left'>
     <input type=hidden id='allopts' name='allopts' value=''>
     <input type=hidden id='token' name='token' value="${token}">
@@ -22,7 +29,7 @@
 
 <div class="tabbable tabs-left">
 <ul class="nav nav-pills nav-stacked col-md-3">
-<li id='tab_global' class="active"><a href="#">Global</a></li>
+<li id='tab_global' class="active"><a href="javascript:void(0)">Global</a></li>
 % for mod in sorted(opts['__modules__'].keys()):
     <% keylist = dict((k, v) for k, v in opts['__modules__'][mod]['opts'].items() if not k.startswith('_')) %>
     % if len(keylist) > 0:
@@ -32,7 +39,7 @@
         if len(apikeylist) > 0: 
             keyicon = "&nbsp;&nbsp;<i class=\"glyphicon glyphicon-lock\"></i>"
         %>
-        <li id='tab_${mod}'><a href='#' onclick='switchTab("${mod}");' >${opts['__modules__'][mod].get('name', mod)}${keyicon}</a></li>
+        <li id='tab_${mod}'><a href='javascript:void(0)' onclick='switchTab("${mod}");' >${opts['__modules__'][mod].get('name', mod)}${keyicon}</a></li>
     % endif
 % endfor
 </ul>
@@ -146,7 +153,7 @@
                                     step = re.sub(r'(https?://.[^ ]+)', '<a target=_new href=\'\\1\'>\\1</a>', step)
                                 instructions += f"<li>{step}</li>"
                         %>
-                        &nbsp;&nbsp;<a href='#' data-html="true" data-toggle="popover" data-trigger="focus" title="Instructions" data-content="<ol>${instructions}</ol>"><i class="glyphicon glyphicon-question-sign"></i></a>
+                        &nbsp;&nbsp;<a href='javascript:void(0)' data-html="true" data-toggle="popover" data-trigger="focus" title="Instructions" data-content="<ol>${instructions}</ol>"><i class="glyphicon glyphicon-question-sign"></i></a>
                     % endif
                 % endif
               </td>
