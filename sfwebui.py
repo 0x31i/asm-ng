@@ -2433,6 +2433,69 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
+    def scanislatest(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Check if a scan is the latest scan for its target.
+
+        Also triggers auto-import of entries from older scans if this is the
+        latest scan and hasn't been imported yet.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: {isLatest: bool, scanCount: int, importedCount: int, importStatus: str}
+        """
+        dbh = SpiderFootDb(self.config)
+
+        try:
+            result = dbh.isLatestScan(id)
+
+            # Auto-import: if this is the latest scan and there are multiple scans
+            # and no entries have been imported yet, trigger import
+            if result['isLatest'] and result['scanCount'] > 1 and result['importedCount'] == 0:
+                importResult = dbh.importEntriesFromOlderScans(id)
+                result['importedCount'] = importResult['imported']
+                result['importStatus'] = f"Imported {importResult['imported']} entries from previous scans"
+            else:
+                result['importStatus'] = 'already_imported' if result['importedCount'] > 0 else 'not_applicable'
+
+            return result
+        except Exception as e:
+            return {'isLatest': False, 'scanCount': 0, 'importedCount': 0, 'importStatus': f'error: {str(e)}'}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def triggerscanmimport(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Manually trigger import of entries from older scans.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: {success: bool, imported: int, skipped: int, message: str}
+        """
+        dbh = SpiderFootDb(self.config)
+
+        try:
+            # Check if this is a valid scan
+            scanInfo = dbh.scanInstanceGet(id)
+            if not scanInfo:
+                return {'success': False, 'imported': 0, 'skipped': 0, 'message': 'Scan not found'}
+
+            # Perform the import
+            result = dbh.importEntriesFromOlderScans(id)
+
+            return {
+                'success': True,
+                'imported': result['imported'],
+                'skipped': result['skipped'],
+                'message': f"Imported {result['imported']} entries, skipped {result['skipped']} duplicates"
+            }
+        except Exception as e:
+            return {'success': False, 'imported': 0, 'skipped': 0, 'message': f'Error: {str(e)}'}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
     def scancorrelations(self: 'SpiderFootWebUi', id: str) -> list:
         """Correlation results from a scan.
 
@@ -2550,7 +2613,8 @@ class SpiderFootWebUi:
                 row[14],
                 row[4],
                 isTargetFp,  # Index 11: target-level false positive flag
-                isTargetValidated  # Index 12: target-level validated flag
+                isTargetValidated,  # Index 12: target-level validated flag
+                row[15]  # Index 13: imported_from_scan (scan ID if imported, None otherwise)
             ])
 
         return retdata

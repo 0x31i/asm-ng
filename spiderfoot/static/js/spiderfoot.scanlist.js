@@ -333,16 +333,35 @@ function showlisttable(types, filter, data) {
         buttons += "<i class='glyphicon glyphicon-stop glyphicon-white'></i></button>";
         buttons += "</div>";
 
-        buttons += "</div>";        var table = "<table id='scanlist' class='table table-bordered table-striped'>";
+        buttons += "</div>";
+
+        // Track the latest scan per target (data is sorted by started DESC, so first occurrence is latest)
+        var latestPerTarget = {};
+        var targetScanCounts = {};
+        for (var i = 0; i < data.length; i++) {
+            var target = data[i][2];
+            if (!latestPerTarget[target]) {
+                latestPerTarget[target] = data[i][0];  // First occurrence is the newest (sorted by started DESC)
+            }
+            targetScanCounts[target] = (targetScanCounts[target] || 0) + 1;
+        }
+
+        var table = "<table id='scanlist' class='table table-bordered table-striped'>";
         table += "<thead><tr><th class='sorter-false text-center'><input id='checkall' type='checkbox'></th> <th>Scan ID</th> <th>Name</th> <th>Target</th> <th>Started</th> <th >Finished</th> <th class='text-center'>Status</th> <th class='text-center'>Elements</th><th class='text-center'>Correlations</th><th class='sorter-false text-center'>Action</th> </tr></thead><tbody>";
         filtered = 0;
         for (var i = 0; i < data.length; i++) {
             if (types != null && $.inArray(data[i][6], types) === -1) {
                 filtered++;
                 continue;
-            }            table += "<tr><td class='text-center'><input type='checkbox' id='cb_" + data[i][0] + "'></td>"
+            }
+
+            // Check if this scan is the latest for its target
+            var isLatest = (data[i][0] === latestPerTarget[data[i][2]]) && (targetScanCounts[data[i][2]] > 1);
+            var latestBadge = isLatest ? " <span class='badge' style='background-color: #3b82f6; font-size: 9px; margin-left: 4px;'>LATEST</span>" : "";
+
+            table += "<tr><td class='text-center'><input type='checkbox' id='cb_" + data[i][0] + "'></td>"
             table += "<td><code style='font-size: 11px; background: #f5f5f5; padding: 2px 4px; cursor: pointer; border: 1px solid #ddd; border-radius: 3px;' onclick='copyToClipboard(\"" + data[i][0] + "\")' title='Click to copy scan ID'>" + data[i][0] + " <i class='glyphicon glyphicon-copy' style='font-size: 10px; margin-left: 2px;'></i></code></td>";
-            table += "<td><a href=" + docroot + "/scaninfo?id=" + data[i][0] + ">" + data[i][1] + "</a></td>";
+            table += "<td><a href=" + docroot + "/scaninfo?id=" + data[i][0] + ">" + data[i][1] + "</a>" + latestBadge + "</td>";
             table += "<td>" + data[i][2] + "</td>";
             table += "<td>" + data[i][3] + "</td>";
             table += "<td>" + data[i][5] + "</td>";

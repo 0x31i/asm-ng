@@ -13,7 +13,7 @@
     statusy = "alert-info"
   end
 %>
-<h2>${name}&nbsp;<span id='scanstatusbadge' class='badge ${statusy}'>${status}</span>&nbsp;<img id="loader" src="${docroot}/static/img/loader.gif"></h2>
+<h2>${name}&nbsp;<span id='scanstatusbadge' class='badge ${statusy}'>${status}</span><span id='latestbadge' class='badge' style='display: none; background-color: #3b82f6; margin-left: 5px;'>LATEST</span><span id='importedbadge' class='badge' style='display: none; background-color: #8b5cf6; margin-left: 5px;'></span>&nbsp;<img id="loader" src="${docroot}/static/img/loader.gif"></h2>
   <div class="btn-toolbar" role="toolbar" style='padding-bottom: 10px'>
    <div class="btn-group">
       <a id='btn-status' class="btn btn-default" onClick='scanSummaryView("${id}")'><i class='glyphicon glyphicon-eye-open'></i>&nbsp;Summary</a>
@@ -1176,12 +1176,15 @@
         }
 
         // Detailed view of data for an event type for a scan
-        function browseEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated) {
+        function browseEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated, filterImportedEntries) {
             if (filterFP === 'undefined' || filterFP === undefined) {
                 filterFP = false;
             }
             if (filterValidated === 'undefined' || filterValidated === undefined) {
                 filterValidated = false;
+            }
+            if (filterImportedEntries === 'undefined' || filterImportedEntries === undefined) {
+                filterImportedEntries = false;  // Default: show imported entries
             }
             $("#scansummary-content").remove();
             $("#scanlogs-content").remove();
@@ -1197,8 +1200,8 @@
             $("#scanreminder").hide();
             currentType = eventType;
             currentTypeName = eventTypeLabel;
-            refresh = function() { browseEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated); }
-            browseUpdate = function(newformat) { browseEventData(instanceId, eventTypeLabel, eventType, newformat, filterFP, filterValidated); }
+            refresh = function() { browseEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated, filterImportedEntries); }
+            browseUpdate = function(newformat) { browseEventData(instanceId, eventTypeLabel, eventType, newformat, filterFP, filterValidated, filterImportedEntries); }
 
             if (format == 'full') {
                 $("#btn-fullview").addClass("active");
@@ -1213,11 +1216,16 @@
                                 fpLegacy: 0,     // Target-level FPs from previous scans
                                 validated: 0,     // Current scan validated
                                 validatedLegacy: 0, // Target-level validated from previous scans
-                                unvalidated: 0
+                                unvalidated: 0,
+                                imported: 0      // Entries imported from older scans
                             };
 
                             for (var i = 0; i < data.length; i++) {
                                 stats.total++;
+                                // Count imported entries (data[13] is imported_from_scan)
+                                if (data[i][13] != null) {
+                                    stats.imported++;
+                                }
                                 if (data[i][8] == "1") {
                                     stats.fp++;
                                 } else if (data[i][11] == 1) {
@@ -1245,6 +1253,9 @@
                             statsBar += "<div class='stats-item stats-validated'><span class='stats-value'>" + stats.validated + "</span><span class='stats-label'>VALIDATED</span></div>";
                             statsBar += "<div class='stats-item stats-validated-legacy'><span class='stats-value'>" + stats.validatedLegacy + "</span><span class='stats-label'>VAL [LEGACY]</span></div>";
                             statsBar += "<div class='stats-item stats-unvalidated'><span class='stats-value'>" + stats.unvalidated + "</span><span class='stats-label'>UNVALIDATED</span></div>";
+                            if (stats.imported > 0) {
+                                statsBar += "<div class='stats-item stats-imported'><span class='stats-value'>" + stats.imported + "</span><span class='stats-label'>IMPORTED</span></div>";
+                            }
                             statsBar += "</div>";
 
                             // Right side: Filter buttons
@@ -1254,7 +1265,7 @@
                             if (totalFP > 0) {
                                 var fpBtnClass = filterFP ? 'filter-btn filter-btn-active filter-btn-fp' : 'filter-btn filter-btn-fp';
                                 var fpBtnText = filterFP ? 'HIDING ' + totalFP + ' FP' : 'HIDE ' + totalFP + ' FP';
-                                statsBar += "<button class='" + fpBtnClass + "' onclick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel + "', '" + eventType + "', '" + format + "', " + (!filterFP) + ", " + filterValidated + ")\">";
+                                statsBar += "<button class='" + fpBtnClass + "' onclick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel + "', '" + eventType + "', '" + format + "', " + (!filterFP) + ", " + filterValidated + ", " + filterImportedEntries + ")\">";
                                 statsBar += fpBtnText + "</button>";
                             }
 
@@ -1262,8 +1273,16 @@
                             if (totalValidated > 0) {
                                 var valBtnClass = filterValidated ? 'filter-btn filter-btn-active filter-btn-validated' : 'filter-btn filter-btn-validated';
                                 var valBtnText = filterValidated ? 'HIDING ' + totalValidated + ' VALIDATED' : 'HIDE ' + totalValidated + ' VALIDATED';
-                                statsBar += "<button class='" + valBtnClass + "' onclick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel + "', '" + eventType + "', '" + format + "', " + filterFP + ", " + (!filterValidated) + ")\">";
+                                statsBar += "<button class='" + valBtnClass + "' onclick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel + "', '" + eventType + "', '" + format + "', " + filterFP + ", " + (!filterValidated) + ", " + filterImportedEntries + ")\">";
                                 statsBar += valBtnText + "</button>";
+                            }
+
+                            // Hide Imported button
+                            if (stats.imported > 0) {
+                                var impBtnClass = filterImportedEntries ? 'filter-btn filter-btn-active filter-btn-imported' : 'filter-btn filter-btn-imported';
+                                var impBtnText = filterImportedEntries ? 'HIDING ' + stats.imported + ' IMPORTED' : 'HIDE ' + stats.imported + ' IMPORTED';
+                                statsBar += "<button class='" + impBtnClass + "' onclick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel + "', '" + eventType + "', '" + format + "', " + filterFP + ", " + filterValidated + ", " + (!filterImportedEntries) + ")\">";
+                                statsBar += impBtnText + "</button>";
                             }
 
                             statsBar += "</div>";
@@ -1288,31 +1307,42 @@
                                 if (filterValidated && (data[i][8] == "2" || data[i][12] == 1)) {
                                     continue;
                                 }
-                                table += "<tr>";
+                                // Hide Imported entries when filterImportedEntries is enabled
+                                if (filterImportedEntries && data[i][13] != null) {
+                                    continue;
+                                }
+
+                                // Check if this entry is imported
+                                var isImported = data[i][13] != null;
+
+                                table += "<tr" + (isImported ? " class='imported-row'" : "") + ">";
                                 // Checkbox column (simple checkbox only, no persistence indicators)
                                 table += "<td class='text-center'><input type='checkbox' id='cb_" + data[i][7] + "'></td>";
 
                                 // Status column with text badges
                                 // LEGACY suffix is shown when status comes from previous scan persistence
+                                // IMPORTED suffix is shown when entry comes from a previous scan
                                 table += "<td class='text-center validation-status'>";
                                 // Determine status: FP=1 or target-level FP = False Positive (ORANGE)
                                 // FP=2 or target-level validated = Validated (BLUE)
                                 // Otherwise = Unvalidated (GREY)
                                 // Add LEGACY suffix if status comes from target-level persistence (not current scan)
+                                // Add IMPORTED suffix if entry was imported from a previous scan
+                                var importedSuffix = isImported ? "<span class='status-imported' title='Imported from previous scan'> [IMPORTED]</span>" : "";
                                 if (data[i][8] == "1") {
                                     // Current scan marked as FP
-                                    table += "<span class='status-fp' title='False Positive - confirmed does not belong to organization'>FALSE POSITIVE</span>";
+                                    table += "<span class='status-fp' title='False Positive - confirmed does not belong to organization'>FALSE POSITIVE" + importedSuffix + "</span>";
                                 } else if (data[i][11] == 1) {
                                     // Target-level FP from previous scan
-                                    table += "<span class='status-fp' title='False Positive from previous scan'>FALSE POSITIVE<span class='status-legacy'> [LEGACY]</span></span>";
+                                    table += "<span class='status-fp' title='False Positive from previous scan'>FALSE POSITIVE<span class='status-legacy'> [LEGACY]</span>" + importedSuffix + "</span>";
                                 } else if (data[i][8] == "2") {
                                     // Current scan marked as validated
-                                    table += "<span class='status-validated' title='Validated - confirmed belongs to organization'>VALIDATED</span>";
+                                    table += "<span class='status-validated' title='Validated - confirmed belongs to organization'>VALIDATED" + importedSuffix + "</span>";
                                 } else if (data[i][12] == 1) {
                                     // Target-level validated from previous scan
-                                    table += "<span class='status-validated' title='Validated from previous scan'>VALIDATED<span class='status-legacy'> [LEGACY]</span></span>";
+                                    table += "<span class='status-validated' title='Validated from previous scan'>VALIDATED<span class='status-legacy'> [LEGACY]</span>" + importedSuffix + "</span>";
                                 } else {
-                                    table += "<span class='status-unvalidated' title='Not yet reviewed'>UNVALIDATED</span>";
+                                    table += "<span class='status-unvalidated' title='Not yet reviewed'>UNVALIDATED" + importedSuffix + "</span>";
                                 }
                                 table += "</td>";
 
@@ -1567,6 +1597,34 @@
         }
 
         refreshSummaryInterval = setInterval(refreshSummary, 5000);
+
+        // Check if this scan is the latest for its target and handle auto-import
+        var scanLatestInfo = null;
+        var filterImported = false;  // Default: show imported entries
+
+        function checkScanLatest() {
+            sf.fetchData('${docroot}/scanislatest', {'id': '${id}'}, function(data) {
+                scanLatestInfo = data;
+
+                // Show LATEST badge if this is the latest scan
+                if (data.isLatest) {
+                    $('#latestbadge').show();
+                }
+
+                // Show imported count badge if there are imported entries
+                if (data.importedCount > 0) {
+                    $('#importedbadge').text('+' + data.importedCount + ' IMPORTED').show();
+                }
+
+                // Log import status
+                if (data.importStatus && data.importStatus.indexOf('Imported') === 0) {
+                    alertify.success(data.importStatus);
+                }
+            });
+        }
+
+        // Check on page load
+        checkScanLatest();
 
     </script>
 <iframe class="hidden" id='exportframe'></iframe>

@@ -4578,6 +4578,47 @@ i.glyphicon-white,
   margin-left: 2px;
 }
 
+/* Imported indicator - smaller text appended to status (PURPLE) */
+.status-imported {
+  font-size: 8px;
+  color: #8b5cf6;
+  opacity: 0.9;
+  margin-left: 2px;
+}
+
+/* Stats bar - imported count styling */
+.stats-imported .stats-value {
+  color: #8b5cf6;
+}
+
+.stats-imported .stats-label {
+  color: #a78bfa;
+}
+
+/* Filter button for imported entries (PURPLE) */
+.filter-btn-imported {
+  border-color: #8b5cf6 !important;
+  color: #8b5cf6 !important;
+}
+
+.filter-btn-imported:hover {
+  background-color: rgba(139, 92, 246, 0.1) !important;
+}
+
+.filter-btn-imported.filter-btn-active {
+  background-color: #8b5cf6 !important;
+  color: white !important;
+}
+
+/* Imported row styling - subtle purple tint */
+.imported-row {
+  background-color: rgba(139, 92, 246, 0.05) !important;
+}
+
+.imported-row:hover {
+  background-color: rgba(139, 92, 246, 0.1) !important;
+}
+
 /* Validation status column in tables */
 .validation-status {
   width: 140px;
