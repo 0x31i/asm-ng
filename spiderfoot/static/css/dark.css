@@ -494,7 +494,6 @@ input[type="checkbox"] {
   letter-spacing: 0.5px;
   white-space: nowrap;
   vertical-align: middle;
-  text-align: center;
   /* Sticky table headers - at top since main nav is not sticky */
   position: sticky !important;
   top: 0 !important;
@@ -1705,7 +1704,7 @@ pre.table-border-bg-inherit {
    ============================================ */
 .page-title {
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
-  font-size: 13px;
+  font-size: 18px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1.5px;
