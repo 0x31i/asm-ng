@@ -9,7 +9,7 @@
 </div>
 % endif
 <form class="form" action='${docroot}/savesettings' id="savesettingsform" method='POST' enctype="multipart/form-data">
-<div class='text-left' id="settings-toolbar">
+<div class='text-left'>
     <input type=hidden id='allopts' name='allopts' value=''>
     <input type=hidden id='token' name='token' value="${token}">
     <input type="file" name='configFile' id="configFile" class='hidden' onChange='$("#savesettingsform").submit()' />
@@ -19,13 +19,13 @@
         <button id="btn-opt-export" class='btn btn-info'>Export API Keys</button>
         <button id="btn-reset-settings" class='btn btn-danger'>Reset to Factory Default</button>
     </div>
-    <!-- Change toolbar: appears when settings are modified -->
-    <div id="toolbar-changes" style="display: none">
-        <button id="btn-save-changes" class='btn btn-primary' type="button">Save Changes</button>
-        <button id="btn-discard-changes" class='btn btn-default' type="button">Discard Changes</button>
-    </div>
-<br><br>
 </div>
+<!-- Change toolbar: direct child of form so sticky works against full page height -->
+<div id="toolbar-changes" style="display: none">
+    <button id="btn-save-changes" class='btn btn-primary' type="button">Save Changes</button>
+    <button id="btn-discard-changes" class='btn btn-default' type="button">Discard Changes</button>
+</div>
+<br>
 
 <div class="tabbable tabs-left">
 <ul class="nav nav-pills nav-stacked col-md-3">
