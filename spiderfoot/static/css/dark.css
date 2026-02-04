@@ -865,6 +865,32 @@ tr.danger td {
   border-radius: 0 0 var(--radius-lg) var(--radius-lg) !important;
 }
 
+/* Alertify buttons - dark mode fix */
+.ajs-buttons .ajs-button {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 8px 20px !important;
+  font-weight: 500 !important;
+  transition: all 0.15s ease !important;
+}
+
+.ajs-buttons .ajs-button:hover {
+  background: var(--bg-secondary) !important;
+  border-color: var(--accent-primary) !important;
+}
+
+.ajs-buttons .ajs-button.ajs-ok {
+  background: var(--accent-primary) !important;
+  color: white !important;
+  border-color: var(--accent-primary) !important;
+}
+
+.ajs-buttons .ajs-button.ajs-ok:hover {
+  background: var(--accent-primary-hover) !important;
+}
+
 /* ============================================
    Breadcrumbs
    ============================================ */
@@ -4292,9 +4318,9 @@ button[data-target="#createWorkspaceModal"]:hover,
   margin-left: 2px;
 }
 
-/* Imported indicator - intense purple glow behind status badge */
+/* Imported indicator - subtle purple glow behind status badge */
 .status-imported-glow {
-  box-shadow: 0 0 12px 4px rgba(139, 92, 246, 0.7), 0 0 20px 8px rgba(139, 92, 246, 0.4) !important;
+  box-shadow: 0 0 8px 2px rgba(139, 92, 246, 0.35), 0 0 12px 4px rgba(139, 92, 246, 0.2) !important;
 }
 
 /* Stats bar - imported count styling */
