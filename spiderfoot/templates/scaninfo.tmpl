@@ -13,7 +13,7 @@
     statusy = "alert-info"
   end
 %>
-<h2>${name}&nbsp;<span id='scanstatusbadge' class='badge ${statusy}'>${status}</span><span id='latestbadge' class='badge' style='display: none; background-color: #3b82f6; margin-left: 5px;'>LATEST</span><span id='importedbadge' class='badge' style='display: none; background-color: #8b5cf6; margin-left: 5px;'></span>&nbsp;<img id="loader" src="${docroot}/static/img/loader.gif"></h2>
+<h2>${name}&nbsp;<span id='scanstatusbadge' class='badge ${statusy}'>${status}</span><span id='latestbadge' class='badge' style='display: none; background-color: #3b82f6; margin-left: 5px;'>LATEST</span><span id='syncbadge' class='badge' style='display: none; background-color: #10b981; margin-left: 5px; cursor: pointer;' onclick='resyncScanEntries()' title='Click to sync entries from previous scans'>SYNC</span><span id='importedbadge' class='badge' style='display: none; background-color: #8b5cf6; margin-left: 5px;'></span>&nbsp;<img id="loader" src="${docroot}/static/img/loader.gif"></h2>
   <div class="btn-toolbar" role="toolbar" style='padding-bottom: 10px'>
    <div class="btn-group">
       <a id='btn-status' class="btn btn-default" onClick='scanSummaryView("${id}")'><i class='glyphicon glyphicon-eye-open'></i>&nbsp;Summary</a>
@@ -1609,6 +1609,17 @@
                 // Show LATEST badge if this is the latest scan
                 if (data.isLatest) {
                     $('#latestbadge').show();
+
+                    // Show SYNC/RESYNC badge only for latest scans with multiple scans for target
+                    if (data.scanCount > 1) {
+                        if (data.importedCount > 0) {
+                            // Already synced - show RESYNC
+                            $('#syncbadge').text('RESYNC').attr('title', 'Click to delete and re-import entries from previous scans').show();
+                        } else {
+                            // Not yet synced - show SYNC
+                            $('#syncbadge').text('SYNC').attr('title', 'Click to import entries from previous scans').show();
+                        }
+                    }
                 }
 
                 // Show imported count badge if there are imported entries
@@ -1621,6 +1632,47 @@
                     alertify.success(data.importStatus);
                 }
             });
+        }
+
+        // Resync scan entries - delete imported and re-import fresh
+        function resyncScanEntries() {
+            var currentText = $('#syncbadge').text();
+            var actionText = currentText === 'RESYNC' ? 'delete existing imports and re-import' : 'import';
+
+            alertify.confirm("Are you sure you want to " + actionText + " entries from previous scans?",
+            function() {
+                // User confirmed
+                $('#syncbadge').text('SYNCING...').css('background-color', '#f59e0b');
+                $('#loader').show();
+
+                sf.fetchData('${docroot}/resyncscanentries', {'id': '${id}'}, function(data) {
+                    $('#loader').hide();
+
+                    if (data.success) {
+                        alertify.success(data.message);
+
+                        // Update badges
+                        if (data.imported > 0) {
+                            $('#syncbadge').text('RESYNC').css('background-color', '#10b981');
+                            $('#importedbadge').text('+' + data.imported + ' IMPORTED').show();
+                        } else {
+                            $('#syncbadge').text('SYNC').css('background-color', '#10b981');
+                            $('#importedbadge').hide();
+                        }
+
+                        // Refresh the current view to show updated data
+                        if (typeof refresh === 'function') {
+                            refresh();
+                        }
+                    } else {
+                        alertify.error('Sync failed: ' + data.message);
+                        $('#syncbadge').text(currentText).css('background-color', '#10b981');
+                    }
+                });
+            },
+            function() {
+                // User cancelled
+            }).set({title: currentText === 'RESYNC' ? "Re-sync entries?" : "Sync entries?"});
         }
 
         // Check on page load
