@@ -532,15 +532,15 @@ input[type="checkbox"] {
 }
 
 .table > thead > tr > th {
-  /* Dark glass blur effect for sticky headers */
-  background: rgba(0, 0, 0, 0.85) !important;
+  /* White glass blur effect for sticky headers - matches footer style */
+  background: rgba(255, 255, 255, 0.85) !important;
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
-  color: #ffffff !important;
+  color: #1f2937 !important;
   font-weight: 600;
   font-size: 14px;
   font-family: var(--font-sans);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
   padding: 14px 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -4690,13 +4690,13 @@ i.glyphicon-white,
   width: 100%;
   padding: 0;
   margin-bottom: 0;
-  /* Dark glass blur effect when sticky */
-  background: rgba(0, 0, 0, 0.85) !important;
+  /* White glass blur effect when sticky - matches footer style */
+  background: rgba(255, 255, 255, 0.85) !important;
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 0;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
   /* Sticky positioning - stays fixed at top when scrolling */
   position: -webkit-sticky !important; /* Safari support */
@@ -4726,20 +4726,20 @@ i.glyphicon-white,
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
   background: transparent;
   transition: background 0.15s ease;
 }
 
 .stats-bar-fullwidth .stats-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .stats-bar-fullwidth .stats-value {
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
   font-size: 14px;
   font-weight: 700;
-  color: #ffffff;
+  color: #1f2937;
   min-width: 24px;
   text-align: right;
 }
@@ -4750,7 +4750,7 @@ i.glyphicon-white,
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: rgba(255, 255, 255, 0.6);
+  color: #6b7280;
 }
 
 /* Stats item color variants */
@@ -4836,12 +4836,12 @@ i.glyphicon-white,
   position: sticky !important;
   top: 50px !important; /* Below sticky stats bar */
   z-index: 100 !important;
-  /* Dark glass blur effect */
-  background: rgba(0, 0, 0, 0.85) !important;
+  /* White glass blur effect - matches footer style */
+  background: rgba(255, 255, 255, 0.85) !important;
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
-  color: #ffffff !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #1f2937 !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
 }
 
 /* Search results info bar */
