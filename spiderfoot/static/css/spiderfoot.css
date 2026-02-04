@@ -4578,12 +4578,13 @@ i.glyphicon-white,
   margin-left: 2px;
 }
 
-/* Imported indicator - smaller text appended to status (PURPLE) */
+/* Imported indicator - smaller text appended to status (WHITE for legibility) */
 .status-imported {
   font-size: 8px;
-  color: #8b5cf6;
-  opacity: 0.9;
+  color: white !important;
+  opacity: 0.85;
   margin-left: 2px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 /* Stats bar - imported count styling */
@@ -4679,7 +4680,7 @@ i.glyphicon-white,
   margin-bottom: 15px;
   background: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
 }
@@ -4829,7 +4830,7 @@ i.glyphicon-white,
 @media (max-width: 992px) {
   .stats-bar-fullwidth {
     flex-wrap: wrap;
-    border-radius: 8px;
+    border-radius: 0;
   }
 
   .stats-bar-left {

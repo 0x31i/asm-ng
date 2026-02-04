@@ -13,7 +13,7 @@
     statusy = "alert-info"
   end
 %>
-<h2>${name}&nbsp;<span id='scanstatusbadge' class='badge ${statusy}'>${status}</span><span id='latestbadge' class='badge' style='display: none; background-color: #3b82f6; margin-left: 5px;'>LATEST</span><span id='syncbadge' class='badge' style='display: none; background-color: #10b981; margin-left: 5px; cursor: pointer;' onclick='resyncScanEntries()' title='Click to sync entries from previous scans'>SYNC</span><span id='importedbadge' class='badge' style='display: none; background-color: #8b5cf6; margin-left: 5px;'></span>&nbsp;<img id="loader" src="${docroot}/static/img/loader.gif"></h2>
+<h2>${name}&nbsp;<span id='scanstatusbadge' class='badge ${statusy}'>${status}</span><span id='latestbadge' class='badge' style='display: none; background-color: #3b82f6; color: white; margin-left: 5px;'>LATEST</span><span id='syncbadge' class='badge' style='display: none; background-color: #10b981; color: white; margin-left: 5px; cursor: pointer;' onclick='resyncScanEntries()' title='Click to sync entries from previous scans'>SYNC</span><span id='importedbadge' class='badge' style='display: none; background-color: #8b5cf6; color: white; margin-left: 5px;'></span>&nbsp;<img id="loader" src="${docroot}/static/img/loader.gif"></h2>
   <div class="btn-toolbar" role="toolbar" style='padding-bottom: 10px'>
    <div class="btn-group">
       <a id='btn-status' class="btn btn-default" onClick='scanSummaryView("${id}")'><i class='glyphicon glyphicon-eye-open'></i>&nbsp;Summary</a>
@@ -1249,9 +1249,7 @@
                             statsBar += "<div class='stats-bar-left'>";
                             statsBar += "<div class='stats-item'><span class='stats-value'>" + stats.total + "</span><span class='stats-label'>TOTAL</span></div>";
                             statsBar += "<div class='stats-item stats-fp'><span class='stats-value'>" + stats.fp + "</span><span class='stats-label'>FALSE POSITIVES</span></div>";
-                            statsBar += "<div class='stats-item stats-fp-legacy'><span class='stats-value'>" + stats.fpLegacy + "</span><span class='stats-label'>FP [LEGACY]</span></div>";
                             statsBar += "<div class='stats-item stats-validated'><span class='stats-value'>" + stats.validated + "</span><span class='stats-label'>VALIDATED</span></div>";
-                            statsBar += "<div class='stats-item stats-validated-legacy'><span class='stats-value'>" + stats.validatedLegacy + "</span><span class='stats-label'>VAL [LEGACY]</span></div>";
                             statsBar += "<div class='stats-item stats-unvalidated'><span class='stats-value'>" + stats.unvalidated + "</span><span class='stats-label'>UNVALIDATED</span></div>";
                             if (stats.imported > 0) {
                                 statsBar += "<div class='stats-item stats-imported'><span class='stats-value'>" + stats.imported + "</span><span class='stats-label'>IMPORTED</span></div>";
@@ -1320,27 +1318,19 @@
                                 table += "<td class='text-center'><input type='checkbox' id='cb_" + data[i][7] + "'></td>";
 
                                 // Status column with text badges
-                                // LEGACY suffix is shown when status comes from previous scan persistence
                                 // IMPORTED suffix is shown when entry comes from a previous scan
                                 table += "<td class='text-center validation-status'>";
                                 // Determine status: FP=1 or target-level FP = False Positive (ORANGE)
                                 // FP=2 or target-level validated = Validated (BLUE)
                                 // Otherwise = Unvalidated (GREY)
-                                // Add LEGACY suffix if status comes from target-level persistence (not current scan)
                                 // Add IMPORTED suffix if entry was imported from a previous scan
                                 var importedSuffix = isImported ? "<span class='status-imported' title='Imported from previous scan'> [IMPORTED]</span>" : "";
-                                if (data[i][8] == "1") {
-                                    // Current scan marked as FP
+                                if (data[i][8] == "1" || data[i][11] == 1) {
+                                    // Current scan marked as FP or target-level FP
                                     table += "<span class='status-fp' title='False Positive - confirmed does not belong to organization'>FALSE POSITIVE" + importedSuffix + "</span>";
-                                } else if (data[i][11] == 1) {
-                                    // Target-level FP from previous scan
-                                    table += "<span class='status-fp' title='False Positive from previous scan'>FALSE POSITIVE<span class='status-legacy'> [LEGACY]</span>" + importedSuffix + "</span>";
-                                } else if (data[i][8] == "2") {
-                                    // Current scan marked as validated
+                                } else if (data[i][8] == "2" || data[i][12] == 1) {
+                                    // Current scan marked as validated or target-level validated
                                     table += "<span class='status-validated' title='Validated - confirmed belongs to organization'>VALIDATED" + importedSuffix + "</span>";
-                                } else if (data[i][12] == 1) {
-                                    // Target-level validated from previous scan
-                                    table += "<span class='status-validated' title='Validated from previous scan'>VALIDATED<span class='status-legacy'> [LEGACY]</span>" + importedSuffix + "</span>";
                                 } else {
                                     table += "<span class='status-unvalidated' title='Not yet reviewed'>UNVALIDATED" + importedSuffix + "</span>";
                                 }
