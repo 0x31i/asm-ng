@@ -12,37 +12,80 @@
 document.addEventListener("DOMContentLoaded", () => {
   const themeToggler = document.getElementById("theme-toggler");
 
+  // Create theme transition overlay (hidden by default)
+  var overlay = document.createElement('div');
+  overlay.id = 'theme-transition-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#1a1a2e;opacity:0;pointer-events:none;transition:opacity 0.15s ease;z-index:99999;';
+  document.body.appendChild(overlay);
+
   // Set initial toggle state based on current theme
   if (localStorage.getItem("theme") === "dark-theme") {
     themeToggler.checked = true;
   } else {
     themeToggler.checked = false;
+    overlay.style.background = '#ffffff';
   }
 
   themeToggler.addEventListener("click", () => {
     var themeLink = document.getElementById("theme-css");
     var isDark = localStorage.getItem("theme") === "dark-theme";
+    var newHref;
 
-    if (isDark) {
-      // Switch to light theme
-      localStorage.removeItem("theme");
-      if (themeLink) {
-        themeLink.href = docroot + "/static/css/spiderfoot.css?v=" + Date.now();
-      }
-      document.body.classList.remove('dark-mode');
-    } else {
-      // Switch to dark theme
-      localStorage.setItem("theme", "dark-theme");
-      if (themeLink) {
-        themeLink.href = docroot + "/static/css/dark.css?v=" + Date.now();
-      }
-      document.body.classList.add('dark-mode');
-    }
+    // Set overlay color based on target theme
+    overlay.style.background = isDark ? '#ffffff' : '#1a1a2e';
 
-    // Dispatch custom event for components that need to react to theme change
-    document.dispatchEvent(new CustomEvent('themeChanged', {
-      detail: { isDark: !isDark }
-    }));
+    // Fade in overlay to hide the transition
+    overlay.style.opacity = '1';
+    overlay.style.pointerEvents = 'auto';
+
+    // Small delay to let overlay fade in
+    setTimeout(function() {
+      if (isDark) {
+        // Switch to light theme
+        localStorage.removeItem("theme");
+        newHref = docroot + "/static/css/spiderfoot.css?v=" + Date.now();
+        document.body.classList.remove('dark-mode');
+      } else {
+        // Switch to dark theme
+        localStorage.setItem("theme", "dark-theme");
+        newHref = docroot + "/static/css/dark.css?v=" + Date.now();
+        document.body.classList.add('dark-mode');
+      }
+
+      if (themeLink) {
+        // Create new link element to preload CSS
+        var newLink = document.createElement('link');
+        newLink.rel = 'stylesheet';
+        newLink.id = 'theme-css-new';
+        newLink.href = newHref;
+
+        // When new CSS loads, swap and fade out overlay
+        newLink.onload = function() {
+          themeLink.remove();
+          newLink.id = 'theme-css';
+
+          // Fade out overlay after CSS is applied
+          setTimeout(function() {
+            overlay.style.opacity = '0';
+            overlay.style.pointerEvents = 'none';
+          }, 50);
+        };
+
+        // Fallback in case onload doesn't fire
+        newLink.onerror = function() {
+          overlay.style.opacity = '0';
+          overlay.style.pointerEvents = 'none';
+        };
+
+        // Insert new link after the old one
+        themeLink.parentNode.insertBefore(newLink, themeLink.nextSibling);
+      }
+
+      // Dispatch custom event for components that need to react to theme change
+      document.dispatchEvent(new CustomEvent('themeChanged', {
+        detail: { isDark: !isDark }
+      }));
+    }, 150);
   });
 });
 
