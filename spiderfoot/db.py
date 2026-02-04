@@ -2933,9 +2933,13 @@ class SpiderFootDb:
         """Get entries from older scans that can be imported into this scan.
 
         Returns entries from older scans of the same target that:
-        - Are validated (fp=2) or unvalidated (fp=0)
-        - Do not already exist in the current scan (by type+data+source_data combination)
+        - Do not already exist in the current scan
         - Are unique across all older scans (no duplicates from multiple old scans)
+
+        Duplicate detection uses a triple check:
+        - DATA ELEMENT (data column)
+        - SOURCE DATA ELEMENT (parent event's data)
+        - SOURCE MODULE (module that produced the entry)
 
         Args:
             instanceId (str): current scan instance ID
@@ -2959,9 +2963,10 @@ class SpiderFootDb:
 
         with self.dbhLock:
             try:
-                # Step 1: Get all (type, data, source_data) combinations in current scan
+                # Step 1: Get all (data, source_data, module) combinations in current scan
+                # This is the "triple check" for duplicate detection
                 current_entries_qry = """
-                    SELECT curr.type, curr.data, COALESCE(src.data, 'ROOT') as source_data
+                    SELECT curr.data, COALESCE(src.data, 'ROOT') as source_data, curr.module
                     FROM tbl_scan_results curr
                     LEFT JOIN tbl_scan_results src ON curr.source_event_hash = src.hash
                         AND curr.scan_instance_id = src.scan_instance_id
@@ -2970,7 +2975,11 @@ class SpiderFootDb:
                 self.dbh.execute(current_entries_qry, [instanceId])
                 current_entries = set()
                 for row in self.dbh.fetchall():
-                    current_entries.add((row[0], row[1], row[2]))
+                    # Normalize: strip whitespace, use consistent case for comparison
+                    data = (row[0] or '').strip()
+                    source_data = (row[1] or 'ROOT').strip()
+                    module = (row[2] or '').strip()
+                    current_entries.add((data, source_data, module))
 
                 # Step 2: Get all entries from older scans with their source_data
                 old_entries_qry = """
@@ -2992,16 +3001,21 @@ class SpiderFootDb:
                 self.dbh.execute(old_entries_qry, [target, instanceId])
                 old_entries = self.dbh.fetchall()
 
-                # Step 3: Filter and deduplicate in Python
+                # Step 3: Filter and deduplicate in Python using triple check
                 seen_combinations = set()
                 importable = []
 
                 for entry in old_entries:
-                    event_type = entry[1]
-                    data = entry[2]
-                    source_data = entry[13]  # COALESCE(src.data, 'ROOT')
+                    # Entry format: hash[0], type[1], data[2], module[3], generated[4],
+                    #               confidence[5], visibility[6], risk[7], false_positive[8],
+                    #               source_event_hash[9], scan_instance_id[10],
+                    #               source_scan_name[11], source_scan_started[12], source_data[13]
+                    data = (entry[2] or '').strip()
+                    source_data = (entry[13] or 'ROOT').strip()
+                    module = (entry[3] or '').strip()
 
-                    entry_key = (event_type, data, source_data)
+                    # Triple check key: DATA ELEMENT + SOURCE DATA ELEMENT + SOURCE MODULE
+                    entry_key = (data, source_data, module)
 
                     # Skip if this combination already exists in current scan
                     if entry_key in current_entries:
@@ -3024,7 +3038,7 @@ class SpiderFootDb:
 
         Copies unique entries from older scans, marking them with imported_from_scan.
         Only imports entries that don't already exist in the current scan.
-        Duplicate detection is based on type + data + source_data.
+        Duplicate detection uses triple check: DATA + SOURCE DATA + MODULE.
 
         Args:
             instanceId (str): current scan instance ID
@@ -3039,7 +3053,7 @@ class SpiderFootDb:
         if not isinstance(instanceId, str):
             raise TypeError(f"instanceId is {type(instanceId)}; expected str()") from None
 
-        # Get importable entries
+        # Get importable entries (already filtered by getImportableEntries)
         entries = self.getImportableEntries(instanceId)
 
         if not entries:
@@ -3054,13 +3068,14 @@ class SpiderFootDb:
         with self.dbhLock:
             try:
                 for entry in entries:
-                    # Entry format: hash, type, data, module, generated, confidence, visibility,
-                    #               risk, false_positive, source_event_hash, scan_instance_id,
-                    #               source_scan_name, source_scan_started, source_data
+                    # Entry format: hash[0], type[1], data[2], module[3], generated[4],
+                    #               confidence[5], visibility[6], risk[7], false_positive[8],
+                    #               source_event_hash[9], scan_instance_id[10],
+                    #               source_scan_name[11], source_scan_started[12], source_data[13]
                     original_hash = entry[0]
                     event_type = entry[1]
-                    data = entry[2]
-                    module = entry[3]
+                    data = (entry[2] or '').strip()
+                    module = (entry[3] or '').strip()
                     generated = entry[4]
                     confidence = entry[5]
                     visibility = entry[6]
@@ -3068,10 +3083,10 @@ class SpiderFootDb:
                     false_positive = entry[8]
                     source_event_hash = entry[9]
                     source_scan_id = entry[10]
-                    source_data = entry[13] if len(entry) > 13 else 'ROOT'
+                    source_data = (entry[13] if len(entry) > 13 else 'ROOT').strip()
 
-                    # Create a unique key for this entry based on type + data + source_data
-                    entry_key = (event_type, data, source_data)
+                    # Triple check key: DATA ELEMENT + SOURCE DATA ELEMENT + SOURCE MODULE
+                    entry_key = (data, source_data, module)
 
                     # Skip if we've already imported this combination in this batch
                     if entry_key in imported_combinations:
@@ -3079,18 +3094,18 @@ class SpiderFootDb:
                         continue
 
                     # Double-check: verify this exact combination doesn't exist in current scan
-                    # This catches any edge cases the query might have missed
+                    # Uses the same triple check: data + source_data + module
                     check_qry = """
                         SELECT 1 FROM tbl_scan_results curr
                         LEFT JOIN tbl_scan_results curr_src ON curr.source_event_hash = curr_src.hash
                             AND curr.scan_instance_id = curr_src.scan_instance_id
                         WHERE curr.scan_instance_id = ?
-                          AND curr.type = ?
                           AND curr.data = ?
                           AND COALESCE(curr_src.data, 'ROOT') = ?
+                          AND curr.module = ?
                         LIMIT 1
                     """
-                    self.dbh.execute(check_qry, [instanceId, event_type, data, source_data])
+                    self.dbh.execute(check_qry, [instanceId, data, source_data, module])
                     if self.dbh.fetchone():
                         skipped += 1
                         continue
