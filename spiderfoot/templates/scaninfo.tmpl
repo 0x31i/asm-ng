@@ -552,19 +552,13 @@
             sf.search(instanceId, query, typeName, function(data) {
                             lastSearchType = typeName;
                             lastSearchQuery = query;
-                            var crumbs = " <ul class='breadcrumb' id='breadcrumbs'> <li><a class='link' onClick='browseEventList(\"" + instanceId + "\");'>Browse</a>";
-                            crumbs += " <span class='divider'></span></li>";
-                            if (typeName != null) {
-                                crumbs += " <li><a class='link' onClick=";
-                                crumbs += "'browseEventData(\"" + instanceId + "\",\"" + currentTypeName + "\",\"" + typeName + "\",\"full\");'>";
-                                crumbs += unescape(currentTypeName) + "</a><span class='divider'></span></li>";
-                            }
-                            crumbs += "<li>Search results";
-                            crumbs += " (" + data.length + " records)</li></ul>";
 
                             if (data.length == 0) {
                                 var table = "<div id='scansummary-content'>&nbsp;&nbsp;No results found. Try broadening your search criteria.</div>";
                             } else {
+                                // Search results info bar
+                                var infoBar = "<div class='search-results-info'>Search results: " + data.length + " records</div>";
+
                                 var table = "<table id='scansummary-content' class='table table-bordered table-striped small tablesorter'><thead><tr>";
                                 if (typeName == null) {
                                     table += "<th class='sorter-false'>Data Element Type</th>";
@@ -586,9 +580,10 @@
                                     table += "</tr>";
                                 }
                                 table += "</tbody></table>"
+                                table = infoBar + table;
                             }
                             $("#loader").fadeOut(500);
-                            $("#mainbody").append(crumbs + table);
+                            $("#mainbody").append(table);
                             $("#scansummary-content").tablesorter();
             });
         }
@@ -1232,39 +1227,28 @@
                             var totalFP = stats.fp + stats.fpLegacy;
                             var totalValidated = stats.validated + stats.validatedLegacy;
 
-                            // Breadcrumbs
-                            var crumbs = " <ul class='breadcrumb' id='breadcrumbs'> <li><a class='link' onClick='browseEventList(\"" + instanceId + "\");'>Browse</a>";
-                            crumbs += " <span class='divider'></span></li> <li><a class='link' onClick=";
-                            crumbs += "'browseEventData(\"" + instanceId + "\",\"" + eventTypeLabel + "\",\"" + eventType + "\",\"";
-                            crumbs += format + "\", " + filterFP + ", " + filterValidated + ");'>";
-                            crumbs += unescape(eventTypeLabel) + "</a></li></ul>";
+                            // Full-width stats bar with integrated filter buttons
+                            var statsBar = "<div id='stats-bar' class='stats-bar-fullwidth'>";
 
-                            // Stats bar module
-                            var statsBar = "<div id='stats-bar' class='stats-bar-container'>";
-                            statsBar += "<div class='stats-bar'>";
-
-                            // Stats items
-                            statsBar += "<div class='stats-item'><span class='stats-label'>TOTAL</span><span class='stats-value'>" + stats.total + "</span></div>";
-                            statsBar += "<div class='stats-divider'></div>";
-                            statsBar += "<div class='stats-item stats-fp'><span class='stats-label'>FALSE POSITIVES</span><span class='stats-value'>" + stats.fp + "</span></div>";
-                            statsBar += "<div class='stats-item stats-fp-legacy'><span class='stats-label'>FP [LEGACY]</span><span class='stats-value'>" + stats.fpLegacy + "</span></div>";
-                            statsBar += "<div class='stats-divider'></div>";
-                            statsBar += "<div class='stats-item stats-validated'><span class='stats-label'>VALIDATED</span><span class='stats-value'>" + stats.validated + "</span></div>";
-                            statsBar += "<div class='stats-item stats-validated-legacy'><span class='stats-label'>VALIDATED [LEGACY]</span><span class='stats-value'>" + stats.validatedLegacy + "</span></div>";
-                            statsBar += "<div class='stats-divider'></div>";
-                            statsBar += "<div class='stats-item stats-unvalidated'><span class='stats-label'>UNVALIDATED</span><span class='stats-value'>" + stats.unvalidated + "</span></div>";
-
+                            // Left side: Stats
+                            statsBar += "<div class='stats-bar-left'>";
+                            statsBar += "<div class='stats-item'><span class='stats-value'>" + stats.total + "</span><span class='stats-label'>TOTAL</span></div>";
+                            statsBar += "<div class='stats-item stats-fp'><span class='stats-value'>" + stats.fp + "</span><span class='stats-label'>FALSE POSITIVES</span></div>";
+                            statsBar += "<div class='stats-item stats-fp-legacy'><span class='stats-value'>" + stats.fpLegacy + "</span><span class='stats-label'>FP [LEGACY]</span></div>";
+                            statsBar += "<div class='stats-item stats-validated'><span class='stats-value'>" + stats.validated + "</span><span class='stats-label'>VALIDATED</span></div>";
+                            statsBar += "<div class='stats-item stats-validated-legacy'><span class='stats-value'>" + stats.validatedLegacy + "</span><span class='stats-label'>VAL [LEGACY]</span></div>";
+                            statsBar += "<div class='stats-item stats-unvalidated'><span class='stats-value'>" + stats.unvalidated + "</span><span class='stats-label'>UNVALIDATED</span></div>";
                             statsBar += "</div>";
 
-                            // Filter buttons
-                            statsBar += "<div class='stats-filters'>";
+                            // Right side: Filter buttons
+                            statsBar += "<div class='stats-bar-right'>";
 
                             // Hide FP button
                             if (totalFP > 0) {
                                 var fpBtnClass = filterFP ? 'filter-btn filter-btn-active filter-btn-fp' : 'filter-btn filter-btn-fp';
-                                var fpBtnText = filterFP ? 'HIDING ' + totalFP + ' FALSE POSITIVES' : 'HIDE ' + totalFP + ' FALSE POSITIVES';
+                                var fpBtnText = filterFP ? 'HIDING ' + totalFP + ' FP' : 'HIDE ' + totalFP + ' FP';
                                 statsBar += "<button class='" + fpBtnClass + "' onclick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel + "', '" + eventType + "', '" + format + "', " + (!filterFP) + ", " + filterValidated + ")\">";
-                                statsBar += "<i class='glyphicon glyphicon-ban-circle'></i> " + fpBtnText + "</button>";
+                                statsBar += fpBtnText + "</button>";
                             }
 
                             // Hide Validated button
@@ -1272,7 +1256,7 @@
                                 var valBtnClass = filterValidated ? 'filter-btn filter-btn-active filter-btn-validated' : 'filter-btn filter-btn-validated';
                                 var valBtnText = filterValidated ? 'HIDING ' + totalValidated + ' VALIDATED' : 'HIDE ' + totalValidated + ' VALIDATED';
                                 statsBar += "<button class='" + valBtnClass + "' onclick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel + "', '" + eventType + "', '" + format + "', " + filterFP + ", " + (!filterValidated) + ")\">";
-                                statsBar += "<i class='glyphicon glyphicon-ok-circle'></i> " + valBtnText + "</button>";
+                                statsBar += valBtnText + "</button>";
                             }
 
                             statsBar += "</div>";
@@ -1337,7 +1321,7 @@
                             }
                             table += "</tbody></table>"
                             $("#loader").fadeOut(500);
-                            $("#mainbody").append(crumbs + statsBar + table);
+                            $("#mainbody").append(statsBar + table);
                             $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false }, 1: { sorter: false } } });
                             lastChecked = null;
                             var chkboxes = $('input[id*=cb_]');
@@ -1389,24 +1373,16 @@
                     filterFP = null;
                 }
                 sf.fetchData('${docroot}/scaneventresultsunique', {'id': instanceId, 'eventType': eventType, 'filterfp': filterFP }, function(data) {
-                            var crumbs = " <ul class='breadcrumb' id='breadcrumbs'> <li><a class='link' onClick='browseEventList(\"" + instanceId + "\");'>Browse</a>";
-                            crumbs += " <span class='divider'></span></li> <li><a class='link' onClick=";
-                            crumbs += "'browseEventData(\"" + instanceId + "\",\"" + eventTypeLabel + "\",\"" + eventType + "\",\"" + format;
-                            crumbs += "\", " + filterFP + ");'>";
-                            crumbs += unescape(eventTypeLabel) + "</a></li>";
-                            crumbs += "<div class='pull-right text-center'><i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;&nbsp;&nbsp;Hide False Positives: ";
-                            crumbs += "<input class='vertical-align-top' type='checkbox' ";
-                            crumbs += "onClick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel +"', '" + eventType + "'";
-                            crumbs += ",'" + format + "', ";
-                            if (!filterFP) {
-                                fp = 1;
-                                ch = "";
-                            } else {
-                                fp = 0;
-                                ch = "checked";
-                            }
-                            crumbs += fp + ")\" " + ch + "></input></div>";
-                            crumbs += "</ul>";
+                            // Filter bar for unique view
+                            var filterBar = "<div class='stats-bar-fullwidth stats-bar-simple'>";
+                            filterBar += "<div class='stats-bar-left'>";
+                            filterBar += "<div class='stats-item'><span class='stats-value'>" + data.length + "</span><span class='stats-label'>UNIQUE ITEMS</span></div>";
+                            filterBar += "</div>";
+                            filterBar += "<div class='stats-bar-right'>";
+                            var fpBtnClass = filterFP ? 'filter-btn filter-btn-active filter-btn-fp' : 'filter-btn filter-btn-fp';
+                            var fpBtnText = filterFP ? 'SHOWING ALL' : 'HIDE FP';
+                            filterBar += "<button class='" + fpBtnClass + "' onclick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel + "', '" + eventType + "', '" + format + "', " + (!filterFP ? 1 : 0) + ")\">" + fpBtnText + "</button>";
+                            filterBar += "</div></div>";
 
                             var table = "<table id='scansummary-content' class='table table-bordered table-striped small'>";
                             table += "<thead><tr> <th>Unique Data Element</th><th>Occurrences</th></tr></thead><tbody>";
@@ -1418,7 +1394,7 @@
                             }
                             table += "</tbody></table>"
                             $("#loader").fadeOut(500);
-                            $("#mainbody").append(crumbs + table);
+                            $("#mainbody").append(filterBar + table);
                 });
             }
 
@@ -1429,10 +1405,6 @@
 
                 if (format.indexOf("viz-bubble") == 0) {
                     sf.fetchData('${docroot}/scaneventresults', {'id': instanceId, 'eventType': eventType }, function(data) {
-                        var crumbs = " <ul class='breadcrumb' id='breadcrumbs'> <li><a class='link' onClick='browseEventList(\"" + instanceId + "\");'>Browse</a>";
-                        crumbs += " <span class='divider'>;</span></li> <li><a class='link' onClick=";
-                        crumbs += "'browseEventData(\"" + instanceId + "\",\"" + eventTypeLabel + "\",\"" + eventType + "\",\"" + format + "\");'>";
-                        crumbs += unescape(eventTypeLabel) + "</a></li></ul>";
                         itemList = []
                         for (var i = 0; i < data.length; i++) {
                             if (format == "viz-bubble-source") {
@@ -1443,20 +1415,15 @@
                             }
                         }
                         $("#loader").fadeOut(500);
-                        $("#mainbody").append(crumbs + "<div id='scansummary-content' class='text-center'></div>");
+                        $("#mainbody").append("<div id='scansummary-content' class='text-center'></div>");
                         sf_viz_bubble("#scansummary-content", itemList)
                     });
                 }
 
                 if (format == "viz-dendro") {
                     sf.fetchData("${docroot}/scanelementtypediscovery", {'id': instanceId, 'eventType': eventType }, function(data) {
-                        var crumbs = " <ul class='breadcrumb' id='breadcrumbs'> <li><a class='link' onClick='browseEventList(\"" + instanceId + "\");'>Browse</a>";
-                        crumbs += " <span class='divider'></span></li> <li><a class='link' onClick=";
-                        crumbs += "'browseEventData(\"" + instanceId + "\",\"" + eventTypeLabel + "\",\"" + eventType + "\",\"" + format + "\");'>";
-                        crumbs += unescape(eventTypeLabel) + "</a></li></ul>";
-
                         $("#loader").fadeOut(500);
-                        $("#mainbody").append(crumbs + "<div id='scansummary-content' class='text-center'></div>");
+                        $("#mainbody").append("<div id='scansummary-content' class='text-center'></div>");
                         sf_viz_dendrogram("#scansummary-content", data);
                     });
                 }
