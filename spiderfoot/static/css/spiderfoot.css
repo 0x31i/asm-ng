@@ -2842,34 +2842,12 @@ label {
 /* ============================================
    Settings Page - Toolbar & Change Bar
    ============================================ */
-#settings-toolbar {
-  position: -webkit-sticky;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  padding-top: 8px;
-  padding-bottom: 0;
-  background: var(--bg-primary);
-}
-
 #toolbar-default,
 #toolbar-changes {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-}
-
-/* "Unsaved Changes" label */
-#changes-label {
-  font-family: var(--font-mono) !important;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #d97706;
-  text-shadow: 0 0 8px rgba(217, 119, 6, 0.3);
-  margin-right: 4px;
 }
 
 /* Discard Changes button - default state */
