@@ -532,20 +532,23 @@ input[type="checkbox"] {
 }
 
 .table > thead > tr > th {
-  background: var(--bg-secondary) !important;
-  color: var(--text-primary) !important;
+  /* Dark glass blur effect for sticky headers */
+  background: rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  color: #ffffff !important;
   font-weight: 600;
   font-size: 14px;
   font-family: var(--font-sans);
-  border-bottom: 1px solid var(--glass-border) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
   padding: 14px 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   white-space: nowrap;
   vertical-align: middle;
-  /* Sticky table headers */
+  /* Sticky table headers - at top since main nav is not sticky */
   position: sticky !important;
-  top: 54px !important;
+  top: 0 !important;
   z-index: 100 !important;
 }
 
@@ -2808,8 +2811,7 @@ div[id*="Help"].alert-info {
    ASM-NG Horizontal Centered Menu
    ============================================ */
 .asm-ng-sidebar {
-  position: sticky !important;
-  top: 0 !important;
+  position: relative !important; /* Not sticky - scrolls with page */
   left: 0 !important;
   right: 0 !important;
   width: 100% !important;
@@ -4688,15 +4690,18 @@ i.glyphicon-white,
   width: 100%;
   padding: 0;
   margin-bottom: 0;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  /* Dark glass blur effect when sticky */
+  background: rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   box-sizing: border-box;
-  /* Sticky positioning - stays fixed below the navigation menu when scrolling */
+  /* Sticky positioning - stays fixed at top when scrolling */
   position: -webkit-sticky !important; /* Safari support */
   position: sticky !important;
-  top: 54px !important;
+  top: 0 !important;
   z-index: 101 !important;
 }
 
@@ -4721,20 +4726,20 @@ i.glyphicon-white,
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  border-right: 1px solid #e5e7eb;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
   background: transparent;
   transition: background 0.15s ease;
 }
 
 .stats-bar-fullwidth .stats-item:hover {
-  background: #f9fafb;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .stats-bar-fullwidth .stats-value {
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
   font-size: 14px;
   font-weight: 700;
-  color: #1f2937;
+  color: #ffffff;
   min-width: 24px;
   text-align: right;
 }
@@ -4745,7 +4750,7 @@ i.glyphicon-white,
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #6b7280;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 /* Stats item color variants */
@@ -4829,9 +4834,14 @@ i.glyphicon-white,
 /* Use adjacent sibling selector so this only applies when stats bar is present */
 #stats-bar + #scansummary-content thead th {
   position: sticky !important;
-  top: 104px !important; /* 54px navbar + 50px stats bar */
+  top: 50px !important; /* Below sticky stats bar */
   z-index: 100 !important;
-  background: #f8fafc !important;
+  /* Dark glass blur effect */
+  background: rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  color: #ffffff !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
 /* Search results info bar */
