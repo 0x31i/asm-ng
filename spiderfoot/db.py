@@ -2981,23 +2981,27 @@ class SpiderFootDb:
                     current_entries.add((data, source_data, module))
 
                 # Step 2: Get all entries from older scans with their source_data
+                # IMPORTANT: Look up source_data in the CURRENT scan (not old scan)
+                # This ensures we compare what the entry would look like AFTER import,
+                # since the UI displays source_data by joining on current scan_instance_id.
+                # If the parent doesn't exist in current scan, COALESCE returns 'ROOT'.
                 old_entries_qry = """
                     SELECT old.hash, old.type, old.data, old.module, old.generated,
                            old.confidence, old.visibility, old.risk, old.false_positive,
                            old.source_event_hash, old.scan_instance_id,
                            si.name as source_scan_name, si.started as source_scan_started,
-                           COALESCE(src.data, 'ROOT') as source_data
+                           COALESCE(curr_src.data, 'ROOT') as source_data
                     FROM tbl_scan_results old
                     JOIN tbl_scan_instance si ON old.scan_instance_id = si.guid
-                    LEFT JOIN tbl_scan_results src ON old.source_event_hash = src.hash
-                        AND old.scan_instance_id = src.scan_instance_id
+                    LEFT JOIN tbl_scan_results curr_src ON old.source_event_hash = curr_src.hash
+                        AND curr_src.scan_instance_id = ?
                     WHERE si.seed_target = ?
                       AND old.scan_instance_id != ?
                       AND old.type != 'ROOT'
                       AND old.imported_from_scan IS NULL
                     ORDER BY si.started DESC, old.generated DESC
                 """
-                self.dbh.execute(old_entries_qry, [target, instanceId])
+                self.dbh.execute(old_entries_qry, [instanceId, target, instanceId])
                 old_entries = self.dbh.fetchall()
 
                 # Step 3: Filter and deduplicate in Python using triple check
