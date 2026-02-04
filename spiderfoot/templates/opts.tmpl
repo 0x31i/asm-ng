@@ -9,21 +9,22 @@
 </div>
 % endif
 <form class="form" action='${docroot}/savesettings' id="savesettingsform" method='POST' enctype="multipart/form-data">
-<!-- Floating Save Bar - appears when settings are modified -->
-<div id="floating-save-bar">
-    <div id="floating-save-inner">
-        <span id="floating-save-label">Unsaved Changes</span>
-        <button id="btn-save-floating" class='btn btn-primary' type="submit">Save Changes</button>
-    </div>
-</div>
-<div class='text-left'>
+<div class='text-left' id="settings-toolbar">
     <input type=hidden id='allopts' name='allopts' value=''>
     <input type=hidden id='token' name='token' value="${token}">
     <input type="file" name='configFile' id="configFile" class='hidden' onChange='$("#savesettingsform").submit()' />
-    <button id="btn-save-changes" class='btn btn-primary' type="submit">Save Changes</button>
-    <button id="btn-import-config" class='btn btn-info'>Import API Keys</button>
-    <button id="btn-opt-export" class='btn btn-info'>Export API Keys</button>
-    <button id="btn-reset-settings" class='btn btn-danger'>Reset to Factory Default</button>
+    <!-- Default toolbar: Import/Export/Reset (no Save Changes) -->
+    <div id="toolbar-default">
+        <button id="btn-import-config" class='btn btn-info'>Import API Keys</button>
+        <button id="btn-opt-export" class='btn btn-info'>Export API Keys</button>
+        <button id="btn-reset-settings" class='btn btn-danger'>Reset to Factory Default</button>
+    </div>
+    <!-- Change toolbar: appears when settings are modified -->
+    <div id="toolbar-changes" style="display: none">
+        <span id="changes-label">Unsaved Changes</span>
+        <button id="btn-save-changes" class='btn btn-primary' type="button">Save Changes</button>
+        <button id="btn-discard-changes" class='btn btn-default' type="button">Discard Changes</button>
+    </div>
 <br><br>
 </div>
 
