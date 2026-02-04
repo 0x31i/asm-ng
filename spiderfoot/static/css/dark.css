@@ -2727,6 +2727,52 @@ label {
   text-shadow: 0 0 8px var(--glow-green) !important;
 }
 
+/* New Scan TIP box - Target types help panel */
+.col-sm-9 > .panel.panel-default[style*="background-color"] {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 0 !important;
+}
+
+.col-sm-9 > .panel.panel-default[style*="background-color"] .panel-body {
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+  line-height: 1.8 !important;
+  color: var(--text-secondary) !important;
+}
+
+/* TIP box header text with icon */
+.col-sm-9 > .panel.panel-default[style*="background-color"] .glyphicon-question-sign {
+  color: var(--accent-cyan) !important;
+  text-shadow: 0 0 10px var(--glow-cyan) !important;
+}
+
+/* TIP box description text */
+.col-sm-9 > .panel.panel-default[style*="background-color"] .col-sm-12 {
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  color: #ffffff !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* TIP box labels (Domain Name, IPv4 Address, etc.) */
+.col-sm-9 > .panel.panel-default[style*="background-color"] b {
+  color: var(--accent-green) !important;
+  text-shadow: 0 0 8px var(--glow-green) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+/* TIP box example values */
+.col-sm-9 > .panel.panel-default[style*="background-color"] i {
+  color: var(--accent-cyan) !important;
+  font-style: normal !important;
+  text-shadow: 0 0 8px var(--glow-cyan) !important;
+}
+
 /* Use case/module table styling */
 #usetable,
 #typetable,
