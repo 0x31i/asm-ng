@@ -1726,6 +1726,13 @@ class SpiderFootWebUi:
 
         target = status[1]  # seed_target
 
+        # Auto-enable persistence if there are multiple scans for this target
+        # This ensures FP changes always sync across all scans of the same target
+        if persist != "1":
+            scanCount = dbh.scanCountForTarget(target)
+            if scanCount > 1:
+                persist = "1"
+
         # Make sure the user doesn't set something as non-FP when the
         # parent is set as an FP (unless force is set).
         if fp == "0" and force != "1":

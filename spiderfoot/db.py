@@ -1099,6 +1099,32 @@ class SpiderFootDb:
                 raise IOError(
                     "SQL error encountered when retrieving scan instance") from e
 
+    def scanCountForTarget(self, target: str) -> int:
+        """Count the number of scans for a given target.
+
+        Args:
+            target (str): the target (seed_target value)
+
+        Returns:
+            int: number of scans for the target
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(target, str):
+            raise TypeError(f"target is {type(target)}; expected str()") from None
+
+        qry = "SELECT COUNT(*) FROM tbl_scan_instance WHERE seed_target = ?"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [target])
+                row = self.dbh.fetchone()
+                return row[0] if row else 0
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when counting scans for target") from e
+
     def scanResultSummary(self, instanceId: str, by: str = "type") -> list:
         """Obtain a summary of the results, filtered by event type, module or
         entity.
