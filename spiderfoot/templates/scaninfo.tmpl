@@ -517,6 +517,7 @@
             }
 
             $("#breadcrumbs").remove();
+            $("#stats-bar").remove();
             $("#customtabview").hide();
             $("#customvizview").hide();
             $("#modifyactions").hide();
@@ -540,6 +541,7 @@
             // Remove pre-existing tables if they exist
             $("#scansummary-content").remove();
             $("#scanlogs-content").remove();
+            $("#stats-bar").remove();
             navTo("btn-search");
             $("#modifyactions").hide();
             $("#loader").show();
@@ -596,6 +598,7 @@
 
             $("#scansummary-content").remove();
             $("#scanlogs-content").remove();
+            $("#stats-bar").remove();
             $("#loader").show();
             $("#btn-export").show();
             $("#btn-download-logs").hide();
@@ -793,6 +796,7 @@
 
             $("#scansummary-content").remove();
             $("#scanlogs-content").remove();
+            $("#stats-bar").remove();
             $("#loader").show();
             $("#btn-export").hide();
             $("#btn-download-logs").hide();
@@ -925,6 +929,7 @@
         // Correlation results for the scan
         function browseCorrelations(instanceId) {
             $("#scansummary-content").remove();
+            $("#stats-bar").remove();
             $("#loader").show();
             $("#btn-search").hide();
             $("#btn-export").hide();
@@ -1100,6 +1105,7 @@
         function viewScanLog(instanceId) {
             $("#scansummary-content").remove();
             $("#scanlogs-content").remove();
+            $("#stats-bar").remove();
             $("#loader").show();
             $("#btn-search").hide();
             $("#btn-export").hide();
@@ -1137,6 +1143,7 @@
             // Remove pre-existing tables if they exist
             $("#scansummary-content").remove();
             $("#scanlogs-content").remove();
+            $("#stats-bar").remove();
             navTo("btn-browse");
             $("#loader").show();
             $("#btn-export").show();
@@ -1478,6 +1485,7 @@
         function viewScanConfig(instanceId) {
             $("#scansummary-content").remove();
             $("#scanlogs-content").remove();
+            $("#stats-bar").remove();
             $("#loader").show();
             $("#btn-export").hide();
             $("#btn-download-logs").hide();
