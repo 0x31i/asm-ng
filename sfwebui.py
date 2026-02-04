@@ -1726,6 +1726,13 @@ class SpiderFootWebUi:
 
         target = status[1]  # seed_target
 
+        # Auto-enable persistence if there are multiple scans for this target
+        # This ensures FP changes always sync across all scans of the same target
+        if persist != "1":
+            scanCount = dbh.scanCountForTarget(target)
+            if scanCount > 1:
+                persist = "1"
+
         # Make sure the user doesn't set something as non-FP when the
         # parent is set as an FP (unless force is set).
         if fp == "0" and force != "1":
@@ -1747,7 +1754,7 @@ class SpiderFootWebUi:
 
         ret = dbh.scanResultsUpdateFP(id, allIds, fp)
 
-        # Handle target-level persistence
+        # Handle target-level persistence and cross-scan sync
         if ret and persist == "1":
             # Get the event details for each ID to persist at target level
             events = dbh.scanResultEvent(id)
@@ -1772,6 +1779,11 @@ class SpiderFootWebUi:
                         # Clear status - remove from both tables
                         dbh.targetFalsePositiveRemove(target, eventType, data, sourceData)
                         dbh.targetValidatedRemove(target, eventType, data, sourceData)
+
+                    # Sync the scan-level FP flag across all scans of the same target
+                    # This ensures that if you change FP status on one scan, all other scans
+                    # with the same entry (same type, data, source_data) are also updated
+                    dbh.syncFalsePositiveAcrossScans(target, eventType, data, sourceData, int(fp))
 
         if ret:
             return json.dumps(["SUCCESS", ""]).encode('utf-8')

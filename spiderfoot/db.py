@@ -1099,6 +1099,32 @@ class SpiderFootDb:
                 raise IOError(
                     "SQL error encountered when retrieving scan instance") from e
 
+    def scanCountForTarget(self, target: str) -> int:
+        """Count the number of scans for a given target.
+
+        Args:
+            target (str): the target (seed_target value)
+
+        Returns:
+            int: number of scans for the target
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(target, str):
+            raise TypeError(f"target is {type(target)}; expected str()") from None
+
+        qry = "SELECT COUNT(*) FROM tbl_scan_instance WHERE seed_target = ?"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [target])
+                row = self.dbh.fetchone()
+                return row[0] if row else 0
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when counting scans for target") from e
+
     def scanResultSummary(self, instanceId: str, by: str = "type") -> list:
         """Obtain a summary of the results, filtered by event type, module or
         entity.
@@ -1554,6 +1580,69 @@ class SpiderFootDb:
 
         return True
 
+    def syncFalsePositiveAcrossScans(self, target: str, eventType: str, eventData: str, sourceData: str, fpFlag: int) -> int:
+        """Sync the false positive flag across all scans of the same target for matching entries.
+
+        This updates the scan-level FP flag in tbl_scan_results for all entries across
+        all scans of the same target that match the given (event_type, event_data, source_data).
+
+        Args:
+            target (str): the target (seed_target value)
+            eventType (str): the event type
+            eventData (str): the event data
+            sourceData (str): the source data of the event (data from the source event)
+            fpFlag (int): false positive flag (0=unvalidated, 1=FP, 2=validated)
+
+        Returns:
+            int: number of rows updated
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(target, str):
+            raise TypeError(f"target is {type(target)}; expected str()") from None
+        if not isinstance(eventType, str):
+            raise TypeError(f"eventType is {type(eventType)}; expected str()") from None
+        if not isinstance(eventData, str):
+            raise TypeError(f"eventData is {type(eventData)}; expected str()") from None
+
+        # Update scan results across all scans of the same target where:
+        # - type matches eventType
+        # - data matches eventData
+        # - the source event's data matches sourceData
+        # This uses a subquery to find scans with the same target and match source data via self-join
+        if sourceData is not None:
+            qry = """UPDATE tbl_scan_results
+                SET false_positive = ?
+                WHERE scan_instance_id IN (SELECT guid FROM tbl_scan_instance WHERE seed_target = ?)
+                AND type = ?
+                AND data = ?
+                AND source_event_hash IN (
+                    SELECT hash FROM tbl_scan_results src
+                    WHERE src.scan_instance_id = tbl_scan_results.scan_instance_id
+                    AND src.data = ?
+                )"""
+            params = (fpFlag, target, eventType, eventData, sourceData)
+        else:
+            # If sourceData is None, only match entries where source_event_hash = 'ROOT'
+            qry = """UPDATE tbl_scan_results
+                SET false_positive = ?
+                WHERE scan_instance_id IN (SELECT guid FROM tbl_scan_instance WHERE seed_target = ?)
+                AND type = ?
+                AND data = ?
+                AND source_event_hash = 'ROOT'"""
+            params = (fpFlag, target, eventType, eventData)
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, params)
+                rowcount = self.dbh.rowcount
+                self.conn.commit()
+                return rowcount
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when syncing false positive across scans") from e
+
     def targetFalsePositiveAdd(self, target: str, eventType: str, eventData: str, sourceData: str = None, notes: str = None) -> bool:
         """Add a target-level false positive entry.
 
@@ -1601,6 +1690,9 @@ class SpiderFootDb:
     def targetFalsePositiveRemove(self, target: str, eventType: str, eventData: str, sourceData: str = None) -> bool:
         """Remove a target-level false positive entry.
 
+        When removing with a specific source_data, also removes entries with NULL source_data
+        to handle legacy imports that didn't include source_data.
+
         Args:
             target (str): the target (seed_target value)
             eventType (str): the event type
@@ -1621,16 +1713,20 @@ class SpiderFootDb:
         if not isinstance(eventData, str):
             raise TypeError(f"eventData is {type(eventData)}; expected str()") from None
 
-        if sourceData is None:
-            qry = "DELETE FROM tbl_target_false_positives WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
-            params = (target, eventType, eventData)
-        else:
-            qry = "DELETE FROM tbl_target_false_positives WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ?"
-            params = (target, eventType, eventData, sourceData)
-
         with self.dbhLock:
             try:
-                self.dbh.execute(qry, params)
+                if sourceData is None:
+                    # Only delete entries with NULL source_data
+                    qry = "DELETE FROM tbl_target_false_positives WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+                    self.dbh.execute(qry, (target, eventType, eventData))
+                else:
+                    # Delete the specific entry with matching source_data
+                    qry = "DELETE FROM tbl_target_false_positives WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ?"
+                    self.dbh.execute(qry, (target, eventType, eventData, sourceData))
+                    # Also delete legacy entries with NULL source_data for the same (event_type, event_data)
+                    # This handles old legacy imports that didn't include source_data
+                    qry_null = "DELETE FROM tbl_target_false_positives WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+                    self.dbh.execute(qry_null, (target, eventType, eventData))
                 self.conn.commit()
             except (sqlite3.Error, psycopg2.Error) as e:
                 raise IOError("SQL error encountered when removing target false positive") from e
@@ -1798,6 +1894,9 @@ class SpiderFootDb:
     def targetValidatedRemove(self, target: str, eventType: str, eventData: str, sourceData: str = None) -> bool:
         """Remove a target-level validated entry.
 
+        When removing with a specific source_data, also removes entries with NULL source_data
+        to handle legacy imports that didn't include source_data.
+
         Args:
             target (str): the target (seed_target value)
             eventType (str): the event type
@@ -1818,16 +1917,20 @@ class SpiderFootDb:
         if not isinstance(eventData, str):
             raise TypeError(f"eventData is {type(eventData)}; expected str()") from None
 
-        if sourceData is None:
-            qry = "DELETE FROM tbl_target_validated WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
-            params = (target, eventType, eventData)
-        else:
-            qry = "DELETE FROM tbl_target_validated WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ?"
-            params = (target, eventType, eventData, sourceData)
-
         with self.dbhLock:
             try:
-                self.dbh.execute(qry, params)
+                if sourceData is None:
+                    # Only delete entries with NULL source_data
+                    qry = "DELETE FROM tbl_target_validated WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+                    self.dbh.execute(qry, (target, eventType, eventData))
+                else:
+                    # Delete the specific entry with matching source_data
+                    qry = "DELETE FROM tbl_target_validated WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ?"
+                    self.dbh.execute(qry, (target, eventType, eventData, sourceData))
+                    # Also delete legacy entries with NULL source_data for the same (event_type, event_data)
+                    # This handles old legacy imports that didn't include source_data
+                    qry_null = "DELETE FROM tbl_target_validated WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+                    self.dbh.execute(qry_null, (target, eventType, eventData))
                 self.conn.commit()
             except (sqlite3.Error, psycopg2.Error) as e:
                 raise IOError("SQL error encountered when removing target validated entry") from e

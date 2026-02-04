@@ -236,9 +236,9 @@ def import_csv(csv_path: str, scan_name: str = None, target: str = None, dry_run
             if fp == 1:
                 try:
                     fp_qry = """INSERT OR IGNORE INTO tbl_target_false_positives
-                        (target, event_type, event_data, date_added, notes)
-                        VALUES (?, ?, ?, ?, ?)"""
-                    fp_qvals = [target, event_type, data, int(time.time() * 1000),
+                        (target, event_type, event_data, source_data, date_added, notes)
+                        VALUES (?, ?, ?, ?, ?, ?)"""
+                    fp_qvals = [target, event_type, data, source, int(time.time() * 1000),
                                f"Imported from legacy CSV: {Path(csv_path).name}"]
                     db.dbh.execute(fp_qry, fp_qvals)
                     stats['fps_imported'] += 1
@@ -250,9 +250,9 @@ def import_csv(csv_path: str, scan_name: str = None, target: str = None, dry_run
             if fp == 2:
                 try:
                     val_qry = """INSERT OR IGNORE INTO tbl_target_validated
-                        (target, event_type, event_data, date_added, notes)
-                        VALUES (?, ?, ?, ?, ?)"""
-                    val_qvals = [target, event_type, data, int(time.time() * 1000),
+                        (target, event_type, event_data, source_data, date_added, notes)
+                        VALUES (?, ?, ?, ?, ?, ?)"""
+                    val_qvals = [target, event_type, data, source, int(time.time() * 1000),
                                 f"Imported from legacy CSV: {Path(csv_path).name}"]
                     db.dbh.execute(val_qry, val_qvals)
                     stats['validated_imported'] += 1
