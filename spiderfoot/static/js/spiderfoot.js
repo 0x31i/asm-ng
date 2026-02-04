@@ -20,15 +20,29 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   themeToggler.addEventListener("click", () => {
-    if (localStorage.getItem("theme") === "dark-theme") {
+    var themeLink = document.getElementById("theme-css");
+    var isDark = localStorage.getItem("theme") === "dark-theme";
+
+    if (isDark) {
       // Switch to light theme
       localStorage.removeItem("theme");
+      if (themeLink) {
+        themeLink.href = docroot + "/static/css/spiderfoot.css?v=" + Date.now();
+      }
+      document.body.classList.remove('dark-mode');
     } else {
       // Switch to dark theme
       localStorage.setItem("theme", "dark-theme");
+      if (themeLink) {
+        themeLink.href = docroot + "/static/css/dark.css?v=" + Date.now();
+      }
+      document.body.classList.add('dark-mode');
     }
-    // Reload to apply new theme
-    location.reload();
+
+    // Dispatch custom event for components that need to react to theme change
+    document.dispatchEvent(new CustomEvent('themeChanged', {
+      detail: { isDark: !isDark }
+    }));
   });
 });
 

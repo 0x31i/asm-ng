@@ -193,7 +193,7 @@
                     </div>                    <!-- Scans Tab -->
                     <div role="tabpanel" class="tab-pane" id="scans-tab">
                         <div class="pull-right" style="margin-bottom: 10px;">
-                            <button class="btn btn-sm btn-default" onclick="location.reload()">
+                            <button class="btn btn-sm btn-default" onclick="refreshScansTab()">
                                 <i class="fa fa-refresh"></i> Refresh Scans
                             </button>
                         </div>
@@ -778,16 +778,76 @@ $('a[href="#schedules-tab"]').on('shown.bs.tab', function() {
 // Load correlations on page load
 $(document).ready(function() {
     loadCorrelationCount();
-    
+
     // Auto-refresh every 30 seconds to pick up new scans and status changes
     setInterval(function() {
         if ($('#scans-tab').hasClass('active')) {
-            location.reload(); // Reload page to get updated scan list
+            refreshScansTab(); // AJAX refresh instead of page reload
         } else if ($('#correlations-tab').hasClass('active')) {
             loadCorrelations(); // Refresh correlations
         }
     }, 30000);
 });
+
+// Refresh scans tab via AJAX without page reload
+function refreshScansTab() {
+    $.get('${docroot}/workspaceget', { workspace_id: '${workspace.workspace_id}' })
+        .done(function(data) {
+            if (data.success && data.scans) {
+                updateScansTable(data.scans);
+            }
+        })
+        .fail(function() {
+            // Fallback to reload if AJAX fails
+            console.log('AJAX refresh failed, falling back to reload');
+            location.reload();
+        });
+}
+
+// Update the scans table without page reload
+function updateScansTable(scans) {
+    var tbody = $('#scans-tab table tbody');
+    if (tbody.length === 0) {
+        // If no table exists yet (no scans initially), we need to reload
+        if (scans.length > 0) {
+            location.reload();
+        }
+        return;
+    }
+
+    // Update each row's status
+    scans.forEach(function(scan) {
+        var row = tbody.find('tr').filter(function() {
+            return $(this).find('code').text().trim().indexOf(scan.scan_id) >= 0;
+        });
+
+        if (row.length > 0) {
+            // Update status badge
+            var statusCell = row.find('td:eq(3)');
+            var statusClass = 'label-warning';
+            if (scan.status === 'FINISHED') statusClass = 'label-success';
+            else if (scan.status === 'RUNNING') statusClass = 'label-primary';
+            else if (scan.status === 'STARTING') statusClass = 'label-info';
+
+            statusCell.html('<span class="label ' + statusClass + '">' + scan.status + '</span>');
+        }
+    });
+
+    // Check if there are new scans we don't have rows for
+    var existingIds = [];
+    tbody.find('code').each(function() {
+        existingIds.push($(this).text().trim().split(' ')[0]);
+    });
+
+    var hasNewScans = scans.some(function(scan) {
+        return existingIds.indexOf(scan.scan_id) === -1;
+    });
+
+    if (hasNewScans) {
+        // New scans were added, need to reload to show them
+        location.reload();
+    }
+}
 
 function loadCorrelationCount() {
     $.get('${docroot}/workspacescancorrelations', {workspace_id: '${workspace.workspace_id}'})
