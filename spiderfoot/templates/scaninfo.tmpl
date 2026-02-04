@@ -1412,7 +1412,7 @@
 
                             // Full-width stats bar with integrated filter buttons
                             // Inline styles ensure sticky positioning works even if CSS doesn't load properly
-                            var statsBar = "<div id='stats-bar' class='stats-bar-fullwidth' style='position: sticky; position: -webkit-sticky; top: 54px; z-index: 101;'>";
+                            var statsBar = "<div id='stats-bar' class='stats-bar-fullwidth' style='position: sticky; position: -webkit-sticky; top: 0; z-index: 101;'>";
 
                             // Left side: Stats
                             statsBar += "<div class='stats-bar-left'>";
@@ -1457,10 +1457,8 @@
 
                             var table = "<table id='scansummary-content' class='table table-bordered table-striped small tablesorter'>";
                             // Inline sticky styles on th elements ensure headers stick below stats bar
-                            // Use appropriate background color based on current theme
-                            var isDarkMode = localStorage.getItem("theme") === "dark-theme";
-                            var thBg = isDarkMode ? "#1a1a1a" : "#f8fafc";
-                            var thStyle = "style='position: sticky; position: -webkit-sticky; top: 104px; z-index: 100; background: " + thBg + ";'";
+                            // Dark glass blur effect - backdrop-filter applied via CSS
+                            var thStyle = "style='position: sticky; position: -webkit-sticky; top: 50px; z-index: 100; background: rgba(0, 0, 0, 0.85); color: #ffffff;'";
                             table += "<thead><tr>";
                             table += "<th class='text-center' " + thStyle + "><input id='checkall' type='checkbox' onClick='switchSelectAll()'></th>";
                             table += "<th class='text-center validation-status' " + thStyle + ">Status</th>";

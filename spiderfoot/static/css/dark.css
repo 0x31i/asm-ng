@@ -480,20 +480,23 @@ input[type="checkbox"] {
 }
 
 .table > thead > tr > th {
-  background: var(--bg-secondary) !important;
-  color: var(--text-primary) !important;
+  /* Dark glass blur effect for sticky headers */
+  background: rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  color: #ffffff !important;
   font-weight: 600;
   font-size: 14px;
   font-family: var(--font-sans);
-  border-bottom: 1px solid var(--glass-border) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
   padding: 14px 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   white-space: nowrap;
   vertical-align: middle;
-  /* Sticky table headers */
+  /* Sticky table headers - at top since main nav is not sticky */
   position: sticky !important;
-  top: 54px !important;
+  top: 0 !important;
   z-index: 100 !important;
 }
 
@@ -2735,8 +2738,7 @@ div[id*="Help"].alert-info {
    ASM-NG Horizontal Centered Menu
    ============================================ */
 .asm-ng-sidebar {
-  position: sticky;
-  top: 0;
+  position: relative; /* Not sticky - scrolls with page */
   left: 0;
   right: 0;
   width: 100%;
@@ -4443,15 +4445,18 @@ button[data-target="#createWorkspaceModal"]:hover,
   width: 100%;
   padding: 0;
   margin-bottom: 0;
-  background: linear-gradient(180deg, #1e1e1e 0%, #141414 100%);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  /* Dark glass blur effect when sticky */
+  background: rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   box-sizing: border-box;
-  /* Sticky positioning - stays fixed below the navigation menu when scrolling */
+  /* Sticky positioning - stays fixed at top when scrolling */
   position: -webkit-sticky !important; /* Safari support */
   position: sticky !important;
-  top: 54px !important;
+  top: 0 !important;
   z-index: 101 !important;
 }
 
@@ -4595,9 +4600,14 @@ button[data-target="#createWorkspaceModal"]:hover,
 /* Use adjacent sibling selector so this only applies when stats bar is present */
 #stats-bar + #scansummary-content thead th {
   position: sticky !important;
-  top: 104px !important; /* 54px navbar + 50px stats bar */
+  top: 50px !important; /* Below sticky stats bar */
   z-index: 100 !important;
-  background: #1a1a1a !important;
+  /* Dark glass blur effect */
+  background: rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  color: #ffffff !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
 /* Search results info bar */
