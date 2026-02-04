@@ -193,11 +193,12 @@ function hideUnsavedWarning() {
 }
 
 function handleWarningLeave() {
-    // Discard changes and navigate away
+    // Capture URL before hideUnsavedWarning clears it
+    var url = pendingNavigationUrl;
     settingsModified = false;
     hideUnsavedWarning();
-    if (pendingNavigationUrl) {
-        window.location.href = pendingNavigationUrl;
+    if (url) {
+        window.location.href = url;
     }
 }
 
@@ -208,12 +209,26 @@ function handleWarningContinue() {
 }
 
 function handleWarningSaveAndLeave() {
-    // Save settings then navigate away
+    // Capture URL before hideUnsavedWarning clears it
+    var url = pendingNavigationUrl;
     saveSettings();
     settingsModified = false;
-    var url = pendingNavigationUrl;
     hideUnsavedWarning();
-    document.getElementById('savesettingsform').submit();
+    // Save via AJAX so we can navigate to the intended destination
+    var allopts = document.getElementById('allopts').value;
+    var token = document.getElementById('token').value;
+    $.ajax({
+        url: docroot + '/savesettingsraw',
+        type: 'POST',
+        data: { allopts: allopts, token: token },
+        success: function() {
+            if (url) window.location.href = url;
+        },
+        error: function() {
+            // Fallback: navigate anyway, changes may be lost
+            if (url) window.location.href = url;
+        }
+    });
 }
 
 $(document).ready(function() {
