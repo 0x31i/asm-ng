@@ -424,20 +424,57 @@
 
         // Highlight or unhighlight table headers when toolbar is shown/hidden
         function highlightTableHeaders(highlight) {
+            var isDarkMode = localStorage.getItem("theme") === "dark-theme";
+            var defaultBg = isDarkMode ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 255, 255, 0.85)";
+            var defaultColor = isDarkMode ? "#ffffff" : "#1f2937";
+            var defaultBorder = isDarkMode ? "1px solid rgba(255, 255, 255, 0.2)" : "1px solid rgba(0, 0, 0, 0.2)";
+
             // Find headers by text content
             $("#scansummary-content thead th").each(function() {
                 var headerText = $(this).text().trim();
                 if (headerText === "Data Element") {
                     if (highlight) {
                         $(this).addClass('th-data-highlight');
+                        // Override inline styles with green button style
+                        $(this).css({
+                            'background': 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                            'background-color': '#22c55e',
+                            'color': '#ffffff',
+                            'border': '1px solid #16a34a',
+                            'text-shadow': '0 1px 2px rgba(0, 0, 0, 0.3)'
+                        });
                     } else {
                         $(this).removeClass('th-data-highlight');
+                        // Restore default styles
+                        $(this).css({
+                            'background': defaultBg,
+                            'background-color': '',
+                            'color': defaultColor,
+                            'border': defaultBorder,
+                            'text-shadow': ''
+                        });
                     }
                 } else if (headerText === "Source Data Element") {
                     if (highlight) {
                         $(this).addClass('th-source-highlight');
+                        // Override inline styles with purple button style
+                        $(this).css({
+                            'background': 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+                            'background-color': '#a855f7',
+                            'color': '#ffffff',
+                            'border': '1px solid #7c3aed',
+                            'text-shadow': '0 1px 2px rgba(0, 0, 0, 0.3)'
+                        });
                     } else {
                         $(this).removeClass('th-source-highlight');
+                        // Restore default styles
+                        $(this).css({
+                            'background': defaultBg,
+                            'background-color': '',
+                            'color': defaultColor,
+                            'border': defaultBorder,
+                            'text-shadow': ''
+                        });
                     }
                 }
             });
