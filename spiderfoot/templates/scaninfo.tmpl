@@ -1457,8 +1457,11 @@
 
                             var table = "<table id='scansummary-content' class='table table-bordered table-striped small tablesorter'>";
                             // Inline sticky styles on th elements ensure headers stick below stats bar
-                            // Dark glass blur effect - backdrop-filter applied via CSS
-                            var thStyle = "style='position: sticky; position: -webkit-sticky; top: 50px; z-index: 100; background: rgba(0, 0, 0, 0.85); color: #ffffff;'";
+                            // Theme-aware glass blur effect - backdrop-filter applied via CSS
+                            var isDarkMode = localStorage.getItem("theme") === "dark-theme";
+                            var thBg = isDarkMode ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 255, 255, 0.85)";
+                            var thColor = isDarkMode ? "#ffffff" : "#1f2937";
+                            var thStyle = "style='position: sticky; position: -webkit-sticky; top: 50px; z-index: 100; background: " + thBg + "; color: " + thColor + ";'";
                             table += "<thead><tr>";
                             table += "<th class='text-center' " + thStyle + "><input id='checkall' type='checkbox' onClick='switchSelectAll()'></th>";
                             table += "<th class='text-center validation-status' " + thStyle + ">Status</th>";
