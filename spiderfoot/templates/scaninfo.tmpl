@@ -727,7 +727,9 @@
         function updatePageTitle(subDirectory) {
             var baseTitle = pageTitles[currentSection] || currentSection.replace("btn-", "").toUpperCase();
             if (subDirectory && subDirectory !== "All" && subDirectory !== "ALL") {
-                $("#page-title").text(baseTitle + " / " + subDirectory.toUpperCase());
+                // Decode URL-encoded characters (e.g., %20 -> space)
+                var decodedSubDir = decodeURIComponent(subDirectory);
+                $("#page-title").text(baseTitle + " / " + decodedSubDir.toUpperCase());
             } else {
                 $("#page-title").text(baseTitle);
             }
