@@ -209,5 +209,19 @@
 </div>
 </div> <!-- /tabbable tabs-left -->
 </form>
+
+<!-- Unsaved Changes Warning Modal -->
+<div id="unsaved-warning-overlay" class="unsaved-warning-overlay" style="display: none;">
+  <div class="unsaved-warning-modal">
+    <div class="unsaved-warning-icon">&#9888;</div>
+    <div class="unsaved-warning-title">UNSAVED CHANGES</div>
+    <div class="unsaved-warning-message">You have unsaved settings changes that will be lost if you leave this page.</div>
+    <div class="unsaved-warning-actions">
+      <button id="unsaved-warning-leave" class="unsaved-warning-btn unsaved-warning-btn-leave" type="button">LEAVE PAGE</button>
+      <button id="unsaved-warning-stay" class="unsaved-warning-btn unsaved-warning-btn-stay" type="button">STAY &amp; SAVE</button>
+    </div>
+  </div>
+</div>
+
 <br><br>
 <%include file="FOOTER.tmpl"/>

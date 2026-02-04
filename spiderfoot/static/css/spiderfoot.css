@@ -2927,6 +2927,121 @@ label {
 }
 
 /* ============================================
+   Settings Page - Unsaved Changes Warning Modal
+   Large orange modal with sharp modernized design
+   ============================================ */
+.unsaved-warning-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: unsavedOverlayFadeIn 0.2s ease;
+}
+
+@keyframes unsavedOverlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes unsavedModalSlideIn {
+  from { opacity: 0; transform: scale(0.9) translateY(-20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.unsaved-warning-modal {
+  background: linear-gradient(160deg, #fff7ed 0%, #ffedd5 40%, #fed7aa 100%);
+  border: 3px solid #f97316;
+  border-radius: 0 !important;
+  padding: 50px 60px;
+  max-width: 600px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 0 60px rgba(249, 115, 22, 0.35), 0 25px 50px rgba(0, 0, 0, 0.25);
+  animation: unsavedModalSlideIn 0.25s ease;
+}
+
+.unsaved-warning-icon {
+  font-size: 80px;
+  line-height: 1;
+  margin-bottom: 15px;
+  color: #ea580c;
+  text-shadow: 0 0 30px rgba(249, 115, 22, 0.4);
+}
+
+.unsaved-warning-title {
+  font-family: var(--font-mono) !important;
+  font-size: 28px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #9a3412;
+  margin-bottom: 15px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.unsaved-warning-message {
+  font-family: var(--font-mono) !important;
+  font-size: 14px;
+  font-weight: 500;
+  color: #7c2d12;
+  line-height: 1.6;
+  margin-bottom: 35px;
+  letter-spacing: 0.3px;
+}
+
+.unsaved-warning-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+.unsaved-warning-btn {
+  font-family: var(--font-mono) !important;
+  font-size: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 16px 40px;
+  border: none;
+  border-radius: 0 !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.unsaved-warning-btn-leave {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.unsaved-warning-btn-leave:hover {
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+  box-shadow: 0 0 20px rgba(107, 114, 128, 0.4), 0 4px 15px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+.unsaved-warning-btn-stay {
+  background: linear-gradient(135deg, #fb923c 0%, #f97316 50%, #ea580c 100%);
+  color: white;
+  box-shadow: 0 0 25px rgba(249, 115, 22, 0.4), 0 4px 15px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.unsaved-warning-btn-stay:hover {
+  background: linear-gradient(135deg, #fdba74 0%, #fb923c 50%, #f97316 100%);
+  box-shadow: 0 0 40px rgba(249, 115, 22, 0.6), 0 4px 20px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+/* ============================================
    Settings Page - Import/Export API Keys Buttons
    Modern gradient purple style
    ============================================ */
