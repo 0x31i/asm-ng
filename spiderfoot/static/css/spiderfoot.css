@@ -3028,16 +3028,29 @@ label {
   transform: translateY(-2px);
 }
 
-.unsaved-warning-btn-stay {
+.unsaved-warning-btn-continue {
   background: linear-gradient(135deg, #fb923c 0%, #f97316 50%, #ea580c 100%);
   color: white;
   box-shadow: 0 0 25px rgba(249, 115, 22, 0.4), 0 4px 15px rgba(0, 0, 0, 0.2);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-.unsaved-warning-btn-stay:hover {
+.unsaved-warning-btn-continue:hover {
   background: linear-gradient(135deg, #fdba74 0%, #fb923c 50%, #f97316 100%);
   box-shadow: 0 0 40px rgba(249, 115, 22, 0.6), 0 4px 20px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+.unsaved-warning-btn-save {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 50%, #059669 100%);
+  color: white;
+  box-shadow: 0 0 25px rgba(16, 185, 129, 0.4), 0 4px 15px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.unsaved-warning-btn-save:hover {
+  background: linear-gradient(135deg, #6ee7b7 0%, #34d399 50%, #10b981 100%);
+  box-shadow: 0 0 40px rgba(16, 185, 129, 0.6), 0 4px 20px rgba(0, 0, 0, 0.3);
   transform: translateY(-2px);
 }
 
