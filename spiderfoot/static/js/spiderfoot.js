@@ -27,7 +27,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   themeToggler.addEventListener("click", () => {
-    var themeLink = document.getElementById("theme-css");
     var isDark = localStorage.getItem("theme") === "dark-theme";
     var newHref;
 
@@ -52,34 +51,38 @@ document.addEventListener("DOMContentLoaded", () => {
         document.body.classList.add('dark-mode');
       }
 
-      if (themeLink) {
-        // Create new link element to preload CSS
-        var newLink = document.createElement('link');
-        newLink.rel = 'stylesheet';
-        newLink.id = 'theme-css-new';
-        newLink.href = newHref;
+      // Get fresh reference to theme link (critical - old reference may be stale)
+      var currentThemeLink = document.getElementById("theme-css");
 
-        // When new CSS loads, swap and fade out overlay
-        newLink.onload = function() {
-          themeLink.remove();
-          newLink.id = 'theme-css';
+      // Create new link element to preload CSS
+      var newLink = document.createElement('link');
+      newLink.rel = 'stylesheet';
+      newLink.href = newHref;
 
-          // Fade out overlay after CSS is applied
-          setTimeout(function() {
-            overlay.style.opacity = '0';
-            overlay.style.pointerEvents = 'none';
-          }, 50);
-        };
+      // When new CSS loads, swap and fade out overlay
+      newLink.onload = function() {
+        // Remove old link if it exists
+        if (currentThemeLink && currentThemeLink.parentNode) {
+          currentThemeLink.parentNode.removeChild(currentThemeLink);
+        }
+        // Give the new link the standard ID
+        newLink.id = 'theme-css';
 
-        // Fallback in case onload doesn't fire
-        newLink.onerror = function() {
+        // Fade out overlay after CSS is applied
+        setTimeout(function() {
           overlay.style.opacity = '0';
           overlay.style.pointerEvents = 'none';
-        };
+        }, 50);
+      };
 
-        // Insert new link after the old one
-        themeLink.parentNode.insertBefore(newLink, themeLink.nextSibling);
-      }
+      // Fallback in case onload doesn't fire
+      newLink.onerror = function() {
+        overlay.style.opacity = '0';
+        overlay.style.pointerEvents = 'none';
+      };
+
+      // Insert new link in document head
+      document.head.appendChild(newLink);
 
       // Dispatch custom event for components that need to react to theme change
       document.dispatchEvent(new CustomEvent('themeChanged', {
