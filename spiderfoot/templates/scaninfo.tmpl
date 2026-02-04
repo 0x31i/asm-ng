@@ -74,6 +74,9 @@
     </div>
   </div>
 
+  <!-- Page Title -->
+  <div id="page-title" class="page-title">BROWSE</div>
+
   <!-- Floating Selection Toolbar - Modern horizontal design -->
   <div id="selection-toolbar" class="toolbar-bottom toolbar-hidden">
     <!-- Left snap button (horizontal mode only) -->
@@ -710,7 +713,7 @@
         }
 
         function navTo(target) {
-            var targets = [ "btn-browse", "btn-info", "btn-log", 
+            var targets = [ "btn-browse", "btn-info", "btn-log",
                 "btn-export", "btn-download-logs", "btn-viz",
                 "btn-status", "btn-graph", "btn-correlations" ]
             for (var i = 0; i < targets.length; i++) {
@@ -720,6 +723,18 @@
                     $("#" + targets[i]).removeClass("active");
                 }
             }
+
+            // Update page title based on current section
+            var pageTitles = {
+                "btn-status": "SUMMARY",
+                "btn-correlations": "CORRELATIONS",
+                "btn-browse": "BROWSE",
+                "btn-graph": "GRAPH",
+                "btn-info": "SCAN SETTINGS",
+                "btn-log": "LOG",
+                "btn-search": "SEARCH RESULTS"
+            };
+            $("#page-title").text(pageTitles[target] || target.replace("btn-", "").toUpperCase());
 
             $("#breadcrumbs").remove();
             $("#stats-bar").remove();
