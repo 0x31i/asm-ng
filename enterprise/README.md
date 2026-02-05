@@ -22,8 +22,8 @@ That's it. All enterprise features are now active.
 
 | File | Purpose |
 |------|---------|
-| `enterprise-full.cfg` | Config that enables ALL enterprise features (requires deps installed) |
-| `enterprise-lite.cfg` | Config that enables only zero-dependency features (no pip install needed) |
+| `enterprise-full.cfg` | Config that enables ALL enterprise features + optimizes all free modules (requires deps installed) |
+| `enterprise-lite.cfg` | Config that enables zero-dependency enterprise features + optimizes all free modules (no pip install needed) |
 | `install-deps.sh` | Installs all required Python packages |
 | `requirements-enterprise.txt` | pip requirements file for manual installation |
 
@@ -128,6 +128,7 @@ Skip the install entirely and import `enterprise-lite.cfg` instead. This enables
 - Advanced DB query optimization + performance monitoring
 - RBAC, audit logging, zero-trust (no encryption/MFA)
 - 4chan monitoring
+- All free module optimizations (see below)
 
 ---
 
@@ -142,6 +143,39 @@ Skip the install entirely and import `enterprise-lite.cfg` instead. This enables
 
 ### Via Config File on Launch
 You can also apply settings by placing them in the SpiderFoot database. The import via web UI is the simplest method for fresh installs.
+
+---
+
+## Free Module Optimizations (Part 2 of Config)
+
+Both config files include a "Part 2" section that turns ON useful features in modules that are completely free (no API key required). These are disabled by default in SpiderFoot but provide significantly more thorough scanning when enabled.
+
+### What Gets Enabled
+
+| Module | Option | What It Does |
+|--------|--------|-------------|
+| **DNS Brute Force** | `top10000` | Try 10,000 common hostnames instead of the default smaller list |
+| **TLD Search** | `activeonly` | Only report domains that have actual content |
+| **Web Spider** | `reportduplicates` | Report links every time found (better coverage tracking) |
+| **Robtex** | `cohostsamedomain` | Treat co-hosted sites on same domain as co-hosting |
+| **Robtex** | `subnetlookup` | Look up all IPs on target subnets |
+| **ThreatMiner** | `netblocklookup` | Look up IPs on target netblocks for blacklisted hosts |
+| **ThreatMiner** | `subnetlookup` | Look up all IPs on target subnets |
+| **HackerTarget** | `cohostsamedomain` | Co-hosted site detection |
+| **HackerTarget** | `http_headers` | Retrieve IP HTTP headers |
+| **Mnemonic** | `cohostsamedomain` | Co-hosted site detection via PassiveDNS |
+| **Accounts** | `permutate` | Check account name permutations (detect squatting/fraud) |
+| **Country Name** | `similardomain` | Resolve country from similar domains |
+| **Archive.org** | `formpages` | Query Wayback Machine for historic form pages |
+| **Archive.org** | `flashpages` | Query Wayback Machine for historic Flash pages |
+| **Archive.org** | `javapages` | Query Wayback Machine for historic Java applet pages |
+| **Archive.org** | `staticpages` | Query Wayback Machine for historic static pages |
+| **Archive.org** | `webframeworkpages` | Query Wayback Machine for historic JS framework pages |
+| **Archive.org** | `javascriptpages` | Query Wayback Machine for historic JavaScript pages |
+| **TruffleHog** | `entropy` | Enable entropy checks for secret detection |
+| **TruffleHog** | `allrepos` | Scan all discovered code repositories |
+
+**Note on scan speed:** Enabling `sfp_dnsbrute:top10000` and the Archive.org options will make scans slower but significantly more thorough. The trade-off is worth it for comprehensive reconnaissance.
 
 ---
 
