@@ -639,7 +639,7 @@ class SpiderFootWebUi:
         return self.error("Invalid export filetype.")
 
     @cherrypy.expose
-    def scaneventresultexport(self: 'SpiderFootWebUi', id: str, type: str, filetype: str = "csv", dialect: str = "excel", export_mode: str = "full") -> str:
+    def scaneventresultexport(self: 'SpiderFootWebUi', id: str, type: str, filetype: str = "csv", dialect: str = "excel", export_mode: str = "full", legacy: str = "0") -> str:
         """Get scan event result data in CSV, Excel, or HTML format.
 
         Args:
@@ -649,10 +649,12 @@ class SpiderFootWebUi:
             dialect (str): CSV dialect (default: excel)
             export_mode (str): "full" (all data), "analysis" (no FPs),
                                or "analysis_correlations" (no FPs + correlations tab, Excel only)
+            legacy (str): "1" to use legacy v4.0 type mapping, "0" for native types (default)
 
         Returns:
             str: results in CSV, Excel, or HTML format
         """
+        use_legacy = (str(legacy) == "1")
         dbh = SpiderFootDb(self.config)
         data = dbh.scanResultEvent(id, type)
         filter_fps = export_mode in ("analysis", "analysis_correlations")
@@ -706,7 +708,7 @@ class SpiderFootWebUi:
                     "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
-                event_type = translate_event_type(str(row[4]))
+                event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
                 rows.append([lastseen, event_type, str(row[3]),
                             str(row[2]), fp_flag, datafield])
 
@@ -739,7 +741,7 @@ class SpiderFootWebUi:
                     "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
-                event_type = translate_event_type(str(row[4]))
+                event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
                 parser.writerow([lastseen, event_type, str(
                     row[3]), str(row[2]), fp_flag, datafield])
 
@@ -812,7 +814,7 @@ class SpiderFootWebUi:
                 datafield = str(row[1]).replace("<SFURL>", "").replace("</SFURL>", "")
                 # Escape HTML entities
                 datafield = datafield.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                event_type = translate_event_type(str(row[4]))
+                event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
                 fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
                 fp_display = '<span class="fp-yes">Yes</span>' if fp_flag else '<span class="fp-no">No</span>'
 
@@ -843,7 +845,7 @@ class SpiderFootWebUi:
         return self.error("Invalid export filetype.")
 
     @cherrypy.expose
-    def scaneventresultexportmulti(self: 'SpiderFootWebUi', ids: str, filetype: str = "csv", dialect: str = "excel", export_mode: str = "full") -> str:
+    def scaneventresultexportmulti(self: 'SpiderFootWebUi', ids: str, filetype: str = "csv", dialect: str = "excel", export_mode: str = "full", legacy: str = "0") -> str:
         """Get scan event result data in CSV, Excel, or HTML format for multiple
         scans.
 
@@ -853,10 +855,12 @@ class SpiderFootWebUi:
             dialect (str): CSV dialect (default: excel)
             export_mode (str): "full" (all data), "analysis" (no FPs),
                                or "analysis_correlations" (no FPs + correlations tab, Excel only)
+            legacy (str): "1" to use legacy v4.0 type mapping, "0" for native types (default)
 
         Returns:
             str: results in CSV, Excel, or HTML format
         """
+        use_legacy = (str(legacy) == "1")
         dbh = SpiderFootDb(self.config)
         scaninfo = dict()
         targetFpsPerScan = dict()  # Store target FPs per scan ID
@@ -928,7 +932,7 @@ class SpiderFootWebUi:
                     "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
-                event_type = translate_event_type(str(row[4]))
+                event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
                 rows.append([scaninfo[row[12]][0], lastseen, event_type, str(row[3]),
                             str(row[2]), fp_flag, datafield])
 
@@ -972,7 +976,7 @@ class SpiderFootWebUi:
                     "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
-                event_type = translate_event_type(str(row[4]))
+                event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
                 parser.writerow([scaninfo[row[12]][0], lastseen, event_type, str(row[3]),
                                 str(row[2]), fp_flag, datafield])
 
@@ -1052,7 +1056,7 @@ class SpiderFootWebUi:
                 datafield = str(row[1]).replace("<SFURL>", "").replace("</SFURL>", "")
                 # Escape HTML entities
                 datafield = datafield.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                event_type = translate_event_type(str(row[4]))
+                event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
                 scan_id = row[12]
                 scan_name_display = scaninfo[scan_id][0] if scan_id in scaninfo and scaninfo[scan_id] else "Unknown"
                 targetFps = targetFpsPerScan.get(scan_id, set())
@@ -1092,7 +1096,7 @@ class SpiderFootWebUi:
         return self.error("Invalid export filetype.")
 
     @cherrypy.expose
-    def scansearchresultexport(self: 'SpiderFootWebUi', id: str, eventType: str = None, value: str = None, filetype: str = "csv", dialect: str = "excel", export_mode: str = "full") -> str:
+    def scansearchresultexport(self: 'SpiderFootWebUi', id: str, eventType: str = None, value: str = None, filetype: str = "csv", dialect: str = "excel", export_mode: str = "full", legacy: str = "0") -> str:
         """Get search result data in CSV or Excel format.
 
         Args:
@@ -1103,10 +1107,12 @@ class SpiderFootWebUi:
             dialect (str): CSV dialect (default: excel)
             export_mode (str): "full" (all data), "analysis" (no FPs),
                                or "analysis_correlations" (no FPs + correlations tab, Excel only)
+            legacy (str): "1" to use legacy v4.0 type mapping, "0" for native types (default)
 
         Returns:
             str: results in CSV or Excel format
         """
+        use_legacy = (str(legacy) == "1")
         data = self.searchBase(id, eventType, value)
         filter_fps = export_mode in ("analysis", "analysis_correlations")
 
@@ -1161,7 +1167,7 @@ class SpiderFootWebUi:
                     continue
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
-                event_type = translate_event_type(str(row[10]))
+                event_type = translate_event_type(str(row[10]), use_legacy=use_legacy)
                 rows.append([row[0], event_type, str(row[3]),
                             str(row[2]), fp_flag, datafield])
 
@@ -1191,7 +1197,7 @@ class SpiderFootWebUi:
                     continue
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
-                event_type = translate_event_type(str(row[10]))
+                event_type = translate_event_type(str(row[10]), use_legacy=use_legacy)
                 parser.writerow([row[0], event_type, str(
                     row[3]), str(row[2]), fp_flag, datafield])
 

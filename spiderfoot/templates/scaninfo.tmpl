@@ -66,6 +66,13 @@
               <li><a class='link' onClick='exportEventData("${id}", currentType, "csv", "analysis")'>CSV</a></li>
               <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "analysis")'>Excel</a></li>
               <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "analysis_correlations")'>Excel + Correlations</a></li>
+              <li class="divider"></li>
+              <li class="dropdown-header">Legacy Export (v4.0 Types)</li>
+              <li><a class='link' onClick='exportEventData("${id}", currentType, "csv", "full", true)'>CSV</a></li>
+              <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "full", true)'>Excel</a></li>
+              <li><a class='link' onClick='exportEventData("${id}", currentType, "csv", "analysis", true)'>CSV Analysis</a></li>
+              <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "analysis", true)'>Excel Analysis</a></li>
+              <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "analysis_correlations", true)'>Excel Analysis + Correlations</a></li>
             </ul>
         </div>
     <div class='btn-group search-group'>
@@ -1706,8 +1713,9 @@
         }
 
         // Download the data currently being viewed
-        function exportEventData(instanceId, eventType, fileType, exportMode) {
+        function exportEventData(instanceId, eventType, fileType, exportMode, legacy) {
             exportMode = exportMode || "full";
+            var legacyParam = legacy ? '&legacy=1' : '';
             $("#loader").show();
             var efr = document.getElementById('exportframe');
             if (currentSection == "btn-search") {
@@ -1717,18 +1725,18 @@
                     type = lastSearchType;
                 }
                 if (fileType == "excel") {
-                    var urlBase = '${docroot}/scansearchresultexport?filetype=excel&export_mode=' + exportMode + '&id=';
+                    var urlBase = '${docroot}/scansearchresultexport?filetype=excel&export_mode=' + exportMode + legacyParam + '&id=';
                 } else {
-                    var urlBase = '${docroot}/scansearchresultexport?export_mode=' + exportMode + '&id=';
+                    var urlBase = '${docroot}/scansearchresultexport?export_mode=' + exportMode + legacyParam + '&id=';
                 }
                 efr.src = urlBase + instanceId + '&eventType=' + type + "&value=" + lastSearchQuery;
             }
 
             if (currentSection == "btn-browse") {
                 if (fileType == "excel") {
-                    var urlBase = '${docroot}/scaneventresultexport?filetype=excel&export_mode=' + exportMode + '&id=';
+                    var urlBase = '${docroot}/scaneventresultexport?filetype=excel&export_mode=' + exportMode + legacyParam + '&id=';
                 } else {
-                    var urlBase = '${docroot}/scaneventresultexport?export_mode=' + exportMode + '&id=';
+                    var urlBase = '${docroot}/scaneventresultexport?export_mode=' + exportMode + legacyParam + '&id=';
                 }
                 efr.src = urlBase + instanceId + '&type=' + eventType;
             }

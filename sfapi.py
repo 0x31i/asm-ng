@@ -618,6 +618,7 @@ async def get_scan_events(
 async def export_scan(
     scan_id: str,
     format: str = Query("json", pattern="^(json|csv|xml)$"),
+    legacy: bool = Query(False),
     api_key: str = Depends(optional_auth)
 ):
     """Export scan results"""
@@ -648,7 +649,7 @@ async def export_scan(
             writer.writerow(['Time', 'Event Type', 'Module', 'Data', 'Source', 'F/P', 'Confidence', 'Visibility', 'Risk'])
 
             for event in events:
-                event_type = translate_event_type(str(event[4]))
+                event_type = translate_event_type(str(event[4]), use_legacy=legacy)
                 # Check both per-event FP flag (event[13]) and target-level FPs
                 fp_flag = 1 if event[13] or (event[4], event[1]) in targetFps else 0
                 writer.writerow([
@@ -668,7 +669,7 @@ async def export_scan(
             # Basic XML export
             xml_content = f"<?xml version='1.0' encoding='UTF-8'?>\n<scan id='{scan_id}'>\n"
             for event in events:
-                event_type = translate_event_type(str(event[4]))
+                event_type = translate_event_type(str(event[4]), use_legacy=legacy)
                 # Check both per-event FP flag and target-level FPs
                 fp_flag = 1 if event[13] or (event[4], event[1]) in targetFps else 0
                 xml_content += f"  <event type='{event_type}' module='{event[3]}' time='{event[0]}' fp='{fp_flag}'>\n"
@@ -686,7 +687,7 @@ async def export_scan(
             # JSON format
             events_list = []
             for event in events:
-                event_type = translate_event_type(str(event[4]))
+                event_type = translate_event_type(str(event[4]), use_legacy=legacy)
                 # Check both per-event FP flag and target-level FPs
                 fp_flag = 1 if event[13] or (event[4], event[1]) in targetFps else 0
                 events_list.append({

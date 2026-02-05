@@ -125,6 +125,21 @@ function exportSelected(type) {
         case "excel_analysis_correlations":
             efr.src = docroot + '/scaneventresultexportmulti?filetype=excel&export_mode=analysis_correlations&ids=' + ids.join(',');
             break;
+        case "csv_legacy":
+            efr.src = docroot + '/scaneventresultexportmulti?legacy=1&ids=' + ids.join(',');
+            break;
+        case "excel_legacy":
+            efr.src = docroot + '/scaneventresultexportmulti?filetype=excel&legacy=1&ids=' + ids.join(',');
+            break;
+        case "csv_analysis_legacy":
+            efr.src = docroot + '/scaneventresultexportmulti?export_mode=analysis&legacy=1&ids=' + ids.join(',');
+            break;
+        case "excel_analysis_legacy":
+            efr.src = docroot + '/scaneventresultexportmulti?filetype=excel&export_mode=analysis&legacy=1&ids=' + ids.join(',');
+            break;
+        case "excel_analysis_correlations_legacy":
+            efr.src = docroot + '/scaneventresultexportmulti?filetype=excel&export_mode=analysis_correlations&legacy=1&ids=' + ids.join(',');
+            break;
         case "json":
             efr.src = docroot + '/scanexportjsonmulti?ids=' + ids.join(',');
             break;
@@ -334,6 +349,13 @@ function showlisttable(types, filter, data) {
         buttons += "<li><a href='javascript:exportSelected(\"csv_analysis\")'>CSV</a></li>";
         buttons += "<li><a href='javascript:exportSelected(\"excel_analysis\")'>Excel</a></li>";
         buttons += "<li><a href='javascript:exportSelected(\"excel_analysis_correlations\")'>Excel + Correlations</a></li>";
+        buttons += "<li class='divider'></li>";
+        buttons += "<li class='dropdown-header'>Legacy Export (v4.0 Types)</li>";
+        buttons += "<li><a href='javascript:exportSelected(\"csv_legacy\")'>CSV</a></li>";
+        buttons += "<li><a href='javascript:exportSelected(\"excel_legacy\")'>Excel</a></li>";
+        buttons += "<li><a href='javascript:exportSelected(\"csv_analysis_legacy\")'>CSV Analysis</a></li>";
+        buttons += "<li><a href='javascript:exportSelected(\"excel_analysis_legacy\")'>Excel Analysis</a></li>";
+        buttons += "<li><a href='javascript:exportSelected(\"excel_analysis_correlations_legacy\")'>Excel Analysis + Correlations</a></li>";
         buttons += "<li class='divider'></li>";
         buttons += "<li class='dropdown-header'>Other Formats</li>";
         buttons += "<li><a href='javascript:exportSelected(\"gexf\")'>GEXF</a></li>";
