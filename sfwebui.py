@@ -125,8 +125,8 @@ class SpiderFootWebUi:
         def check_auth():
             """Before handler: redirect to login if not authenticated."""
             path = cherrypy.request.path_info
-            # Allow access to login page, static files, and ping endpoint
-            if path.endswith('/login') or '/static/' in path or path.endswith('/ping'):
+            # Allow access to login page, logout beacon, static files, and ping endpoint
+            if path.endswith('/login') or path.endswith('/logout') or '/static/' in path or path.endswith('/ping'):
                 return
             if not cherrypy.session.get('username'):
                 raise cherrypy.HTTPRedirect(f"{self.docroot}/login")
@@ -208,14 +208,23 @@ class SpiderFootWebUi:
         return templ.render(docroot=self.docroot, version=__version__, error=error)
 
     @cherrypy.expose
-    def logout(self: 'SpiderFootWebUi') -> None:
-        """Logout the current user."""
+    def logout(self: 'SpiderFootWebUi') -> str:
+        """Logout the current user.
+
+        Supports GET (browser redirect) and POST (beacon from tab close).
+        """
         username = self.currentUser()
         if username:
             dbh = SpiderFootDb(self.config)
             dbh.auditLog(username, 'LOGOUT', ip_address=self.clientIP())
             self.log.info(f"User '{username}' logged out")
         cherrypy.session.clear()
+
+        # POST requests come from the beforeunload beacon — return a short response
+        if cherrypy.request.method == 'POST':
+            cherrypy.response.headers['Content-Type'] = 'text/plain'
+            return 'ok'
+
         raise cherrypy.HTTPRedirect(f"{self.docroot}/login")
 
     def error_page(self: 'SpiderFootWebUi') -> None:
