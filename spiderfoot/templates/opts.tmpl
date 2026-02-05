@@ -19,6 +19,9 @@
         <button id="btn-opt-export" class='btn btn-info'>Export API Keys</button>
         <button id="btn-reset-settings" class='btn btn-danger'>Reset to Factory Default</button>
         <a href="${docroot}/auditlog" class='btn btn-default'>Activity Log</a>
+% if current_user == 'admin':
+        <a href="${docroot}/users" class='btn btn-warning'><i class="glyphicon glyphicon-user"></i> User Management</a>
+% endif
     </div>
 </div>
 <!-- Change toolbar: direct child of form so sticky works against full page height -->

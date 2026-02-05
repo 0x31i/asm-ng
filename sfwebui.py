@@ -1931,8 +1931,185 @@ class SpiderFootWebUi:
         templ = Template(
             filename='spiderfoot/templates/opts.tmpl', lookup=self.lookup)
         self.token = random.SystemRandom().randint(0, 99999999)
+        current_user = self.currentUser()
         return templ.render(opts=self.config, pageid='SETTINGS', token=self.token, version=__version__,
-                            updated=updated, docroot=self.docroot)
+                            updated=updated, docroot=self.docroot, current_user=current_user)
+
+    @cherrypy.expose
+    def users(self: 'SpiderFootWebUi') -> str:
+        """Show user management page (admin only).
+
+        Returns:
+            str: User management page HTML or redirect
+        """
+        # Only admin can access user management
+        current_user = self.currentUser()
+        if current_user != 'admin':
+            raise cherrypy.HTTPRedirect(f"{self.docroot}/opts")
+
+        dbh = SpiderFootDb(self.config)
+        users_list = dbh.userList()
+
+        templ = Template(
+            filename='spiderfoot/templates/users.tmpl', lookup=self.lookup)
+        return templ.render(
+            pageid='USERS', docroot=self.docroot, version=__version__,
+            users=users_list, current_user=current_user)
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def userlist(self: 'SpiderFootWebUi') -> list:
+        """List all users (admin only).
+
+        Returns:
+            list: List of user dicts
+        """
+        # Only admin can list users
+        current_user = self.currentUser()
+        if current_user != 'admin':
+            return {'success': False, 'error': 'Unauthorized'}
+
+        dbh = SpiderFootDb(self.config)
+        users = dbh.userList()
+        return {'success': True, 'users': users}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def usercreate(self: 'SpiderFootWebUi', username: str, password: str, display_name: str = None) -> dict:
+        """Create a new user (admin only).
+
+        Args:
+            username (str): username
+            password (str): password
+            display_name (str): optional display name
+
+        Returns:
+            dict: Result
+        """
+        # Only admin can create users
+        current_user = self.currentUser()
+        if current_user != 'admin':
+            return {'success': False, 'error': 'Unauthorized'}
+
+        if not username or not password:
+            return {'success': False, 'error': 'Username and password are required'}
+
+        # Validate username format
+        if not username.isalnum() or len(username) < 3:
+            return {'success': False, 'error': 'Username must be at least 3 alphanumeric characters'}
+
+        if len(password) < 8:
+            return {'success': False, 'error': 'Password must be at least 8 characters'}
+
+        dbh = SpiderFootDb(self.config)
+
+        # Check if username already exists
+        if dbh.userGet(username):
+            return {'success': False, 'error': 'Username already exists'}
+
+        if dbh.userCreate(username, password, display_name):
+            dbh.auditLog(current_user, 'USER_CREATE', detail=f'Created user: {username}', ip_address=self.clientIP())
+            return {'success': True, 'message': f'User {username} created successfully'}
+        else:
+            return {'success': False, 'error': 'Failed to create user'}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def userupdate(self: 'SpiderFootWebUi', username: str, display_name: str = None, active: str = None) -> dict:
+        """Update a user (admin only).
+
+        Args:
+            username (str): username
+            display_name (str): optional new display name
+            active (str): optional new active status ('true' or 'false')
+
+        Returns:
+            dict: Result
+        """
+        # Only admin can update users
+        current_user = self.currentUser()
+        if current_user != 'admin':
+            return {'success': False, 'error': 'Unauthorized'}
+
+        dbh = SpiderFootDb(self.config)
+
+        # Check if user exists
+        if not dbh.userGet(username):
+            return {'success': False, 'error': 'User not found'}
+
+        # Convert active string to bool if provided
+        active_bool = None
+        if active is not None:
+            active_bool = active.lower() == 'true'
+
+        if dbh.userUpdate(username, display_name=display_name, active=active_bool):
+            dbh.auditLog(current_user, 'USER_UPDATE', detail=f'Updated user: {username}', ip_address=self.clientIP())
+            return {'success': True, 'message': f'User {username} updated successfully'}
+        else:
+            return {'success': False, 'error': 'Failed to update user'}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def userdelete(self: 'SpiderFootWebUi', username: str) -> dict:
+        """Delete a user (admin only).
+
+        Args:
+            username (str): username to delete
+
+        Returns:
+            dict: Result
+        """
+        # Only admin can delete users
+        current_user = self.currentUser()
+        if current_user != 'admin':
+            return {'success': False, 'error': 'Unauthorized'}
+
+        if username == 'admin':
+            return {'success': False, 'error': 'Cannot delete admin user'}
+
+        dbh = SpiderFootDb(self.config)
+
+        # Check if user exists
+        if not dbh.userGet(username):
+            return {'success': False, 'error': 'User not found'}
+
+        if dbh.userDelete(username):
+            dbh.auditLog(current_user, 'USER_DELETE', detail=f'Deleted user: {username}', ip_address=self.clientIP())
+            return {'success': True, 'message': f'User {username} deleted successfully'}
+        else:
+            return {'success': False, 'error': 'Failed to delete user'}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def userchangepassword(self: 'SpiderFootWebUi', username: str, new_password: str) -> dict:
+        """Change a user's password (admin only).
+
+        Args:
+            username (str): username
+            new_password (str): new password
+
+        Returns:
+            dict: Result
+        """
+        # Only admin can change other users' passwords
+        current_user = self.currentUser()
+        if current_user != 'admin':
+            return {'success': False, 'error': 'Unauthorized'}
+
+        if len(new_password) < 8:
+            return {'success': False, 'error': 'Password must be at least 8 characters'}
+
+        dbh = SpiderFootDb(self.config)
+
+        # Check if user exists
+        if not dbh.userGet(username):
+            return {'success': False, 'error': 'User not found'}
+
+        if dbh.userChangePassword(username, new_password):
+            dbh.auditLog(current_user, 'USER_PASSWORD_CHANGE', detail=f'Changed password for user: {username}', ip_address=self.clientIP())
+            return {'success': True, 'message': f'Password for {username} changed successfully'}
+        else:
+            return {'success': False, 'error': 'Failed to change password'}
 
     @cherrypy.expose
     def auditlog(self: 'SpiderFootWebUi', action: str = None, username: str = None) -> str:
@@ -3188,6 +3365,234 @@ class SpiderFootWebUi:
             # Return empty list on error
 
         return retdata
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def runAiCorrelation(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Run AI cross-scan correlation analysis on a scan.
+
+        Analyzes the current scan's data (including any imported historical data)
+        to find IOCs that appear in both native scan results and imported results.
+        This identifies persistent indicators across multiple scans.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: analysis results with correlation count and status
+        """
+        dbh = SpiderFootDb(self.config)
+
+        # Get scan info
+        scanInfo = dbh.scanInstanceGet(id)
+        if not scanInfo:
+            return {'success': False, 'error': 'Scan not found'}
+
+        target = scanInfo[1]
+        self.log.info(f"Running AI correlation analysis for scan {id} (target: {target})")
+
+        try:
+            # Query to get all events with their imported_from_scan status
+            # We need to identify native vs imported events
+            qry = """SELECT r.generated, r.data, r.module, r.source_event_hash, r.type,
+                            r.confidence, r.visibility, r.risk, r.false_positive,
+                            r.hash, r.imported_from_scan,
+                            COALESCE(si.name, 'Unknown') as source_scan_name,
+                            COALESCE(si.started, '') as source_scan_started
+                     FROM tbl_scan_results r
+                     LEFT JOIN tbl_scan_instance si ON r.imported_from_scan = si.guid
+                     WHERE r.scan_instance_id = ?
+                       AND r.type != 'ROOT'
+                       AND r.false_positive = 0"""
+
+            with dbh.dbhLock:
+                dbh.dbh.execute(qry, [id])
+                all_events = dbh.dbh.fetchall()
+
+            if not all_events:
+                return {
+                    'success': True,
+                    'message': 'No events found in scan',
+                    'correlations_found': 0,
+                    'native_events': 0,
+                    'imported_events': 0
+                }
+
+            # Separate native vs imported events
+            native_iocs = {}  # {ioc_data: [{event_type, timestamp, ...}]}
+            imported_iocs = {}  # {ioc_data: [{scan_id, scan_name, event_type, timestamp, ...}]}
+
+            for event in all_events:
+                # Event format: [0]=generated, [1]=data, [2]=module, [3]=source_event_hash,
+                # [4]=type, [5]=confidence, [6]=visibility, [7]=risk, [8]=false_positive,
+                # [9]=hash, [10]=imported_from_scan, [11]=source_scan_name, [12]=source_scan_started
+                event_data = event[1]
+                event_type = event[4]
+                event_timestamp = event[0]
+                imported_from = event[10]
+                source_scan_name = event[11]
+                source_scan_started = event[12]
+
+                if not event_data:
+                    continue
+
+                if imported_from is None:
+                    # Native event (from current scan)
+                    if event_data not in native_iocs:
+                        native_iocs[event_data] = []
+                    native_iocs[event_data].append({
+                        'event_type': event_type,
+                        'timestamp': event_timestamp
+                    })
+                else:
+                    # Imported event (from historical scan)
+                    if event_data not in imported_iocs:
+                        imported_iocs[event_data] = []
+                    imported_iocs[event_data].append({
+                        'scan_id': imported_from,
+                        'scan_name': source_scan_name,
+                        'scan_date': str(source_scan_started) if source_scan_started else 'Unknown',
+                        'event_type': event_type,
+                        'timestamp': event_timestamp
+                    })
+
+            self.log.info(f"Found {len(native_iocs)} unique native IOCs and {len(imported_iocs)} unique imported IOCs")
+
+            if not imported_iocs:
+                return {
+                    'success': True,
+                    'message': 'No imported historical data found. Import historical scan data first to enable cross-scan correlation.',
+                    'correlations_found': 0,
+                    'native_events': len(native_iocs),
+                    'imported_events': 0
+                }
+
+            # Find IOCs that appear in BOTH native and imported data
+            correlations_found = 0
+            from spiderfoot import SpiderFootEvent
+
+            for ioc_data, native_occurrences in native_iocs.items():
+                if ioc_data in imported_iocs:
+                    imported_occurrences = imported_iocs[ioc_data]
+
+                    # Build source scans list
+                    source_scans = []
+                    seen_scans = set()
+                    timestamps = []
+
+                    for imp in imported_occurrences:
+                        if imp['scan_id'] not in seen_scans:
+                            seen_scans.add(imp['scan_id'])
+                            source_scans.append({
+                                'scan_id': imp['scan_id'],
+                                'scan_name': imp['scan_name'],
+                                'scan_date': imp['scan_date']
+                            })
+                        try:
+                            if isinstance(imp['timestamp'], (int, float)):
+                                timestamps.append(float(imp['timestamp']))
+                        except (ValueError, TypeError):
+                            pass
+
+                    # Total occurrences = native + imported
+                    occurrence_count = len(native_occurrences) + len(imported_occurrences)
+
+                    # Calculate trend
+                    if not timestamps:
+                        trend = "new"
+                    elif occurrence_count <= 2:
+                        trend = "stable"
+                    else:
+                        timestamps.sort()
+                        if len(timestamps) >= 2:
+                            intervals = [timestamps[i+1] - timestamps[i] for i in range(len(timestamps)-1)]
+                            avg_interval = sum(intervals) / len(intervals) if intervals else 0
+                            recent_interval = time.time() - timestamps[-1] if timestamps else 0
+                            if avg_interval > 0:
+                                if recent_interval < avg_interval * 0.5:
+                                    trend = "increasing"
+                                elif recent_interval > avg_interval * 1.5:
+                                    trend = "decreasing"
+                                else:
+                                    trend = "stable"
+                            else:
+                                trend = "stable"
+                        else:
+                            trend = "stable"
+
+                    # Calculate confidence
+                    confidence = min(0.95, 0.5 + (len(seen_scans) * 0.1) + (occurrence_count * 0.05))
+
+                    # Determine first and last seen
+                    if timestamps:
+                        first_seen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(min(timestamps)))
+                        last_seen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(max(timestamps)))
+                    else:
+                        first_seen = "Unknown"
+                        last_seen = "Unknown"
+
+                    # Get event type from native occurrence
+                    event_type = native_occurrences[0]['event_type'] if native_occurrences else 'Unknown'
+
+                    # Generate analysis text
+                    ioc_display = ioc_data[:50] + ('...' if len(ioc_data) > 50 else '')
+                    analysis = f"IOC '{ioc_display}' found in current scan AND {len(imported_occurrences)} imported record(s) from {len(source_scans)} historical scan(s). "
+                    if trend == "increasing":
+                        analysis += "Frequency is INCREASING - this IOC is appearing more often. "
+                    elif trend == "decreasing":
+                        analysis += "Frequency is DECREASING - this IOC is appearing less often. "
+                    else:
+                        analysis += "Frequency is STABLE - this IOC appears consistently. "
+
+                    if confidence >= 0.8:
+                        analysis += "HIGH CONFIDENCE: Persistent indicator across multiple scans."
+                    elif confidence >= 0.6:
+                        analysis += "MEDIUM CONFIDENCE: Repeated indicator worth investigating."
+
+                    # Create correlation data JSON
+                    correlation_data = {
+                        'correlation_id': hashlib.md5(f"{ioc_data}_{time.time()}".encode()).hexdigest(),
+                        'ioc': ioc_data,
+                        'event_type': event_type,
+                        'native_occurrences': len(native_occurrences),
+                        'historical_occurrences': len(imported_occurrences),
+                        'total_occurrences': occurrence_count,
+                        'scans_involved': len(source_scans),
+                        'source_scans': source_scans,
+                        'first_seen': first_seen,
+                        'last_seen': last_seen,
+                        'trend': trend,
+                        'confidence': confidence,
+                        'analysis': analysis
+                    }
+
+                    # Create and store the AI correlation event
+                    correlation_event = SpiderFootEvent(
+                        "AI_CROSS_SCAN_CORRELATION",
+                        json.dumps(correlation_data, default=str),
+                        "sfp__ai_threat_intel",
+                        None  # No parent event
+                    )
+                    correlation_event.confidence = int(confidence * 100)
+                    correlation_event.risk = 50 if trend == "increasing" else 30
+
+                    # Store the event
+                    dbh.scanEventStore(id, correlation_event)
+                    correlations_found += 1
+
+            self.log.info(f"AI correlation analysis complete. Found {correlations_found} cross-scan correlations.")
+
+            return {
+                'success': True,
+                'message': 'AI correlation analysis complete',
+                'correlations_found': correlations_found,
+                'native_iocs': len(native_iocs),
+                'imported_iocs': len(imported_iocs)
+            }
+
+        except Exception as e:
+            self.log.error(f"Error running AI correlation: {e}", exc_info=True)
+            return {'success': False, 'error': f'Error running correlation: {str(e)}'}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()

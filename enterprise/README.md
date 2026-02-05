@@ -65,8 +65,33 @@ Enterprise-grade storage with connection pooling, load balancing, auto-scaling, 
 | IOC Correlation | Automated indicator-of-compromise correlation |
 | Threat Scoring | Dynamic ML-based threat severity scoring |
 | NLP Analysis | Natural language processing for unstructured threat data |
+| **Cross-Scan Correlation** | Correlate IOCs with historical scans of the same target |
+
+#### Cross-Scan Correlation (NEW)
+
+When enabled, the AI module will automatically:
+1. Load IOCs from previous scans against the same target
+2. Correlate current scan findings with historical data
+3. Track IOC trends over time (increasing, decreasing, stable)
+4. Generate `AI_CROSS_SCAN_CORRELATION` events for repeated IOCs
+
+This helps identify:
+- **Persistent threats** - IOCs that appear consistently across scans
+- **Emerging threats** - IOCs appearing with increasing frequency
+- **Historical context** - How long an IOC has been present
+
+**Example output:**
+```
+IOC '192.168.1.100' has been observed in 5 scan(s) across 3 historical scan session(s).
+First seen 45 days ago, indicating persistent presence.
+Frequency is STABLE - this IOC appears consistently across scans.
+HIGH CONFIDENCE: Strong correlation across multiple scans suggests this is a significant indicator requiring attention.
+```
 
 **Tunable Parameters:**
+- `enable_cross_scan_correlation` (default: enabled) - Enable/disable cross-scan correlation
+- `max_historical_scans` (default: 10) - Maximum historical scans to include (0 = unlimited)
+- `historical_lookback_days` (default: 90) - Only include scans from the last N days
 - `anomaly_detection_threshold` (0.0-1.0, default: 0.1)
 - `threat_score_threshold` (0-100, default: 70)
 - `correlation_min_strength` (0.0-1.0, default: 0.3)

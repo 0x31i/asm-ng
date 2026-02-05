@@ -3481,6 +3481,76 @@ class SpiderFootDb:
                     self.conn.rollback()
                 return False
 
+    def userUpdate(self, username: str, display_name: str = None, active: bool = None) -> bool:
+        """Update a user's details.
+
+        Args:
+            username (str): username
+            display_name (str): optional new display name
+            active (bool): optional new active status
+
+        Returns:
+            bool: True if user was updated
+        """
+        updates = []
+        params = []
+
+        if display_name is not None:
+            updates.append("display_name = %s" if self.db_type == 'postgresql' else "display_name = ?")
+            params.append(display_name)
+
+        if active is not None:
+            updates.append("active = %s" if self.db_type == 'postgresql' else "active = ?")
+            params.append(1 if active else 0)
+
+        if not updates:
+            return True  # Nothing to update
+
+        params.append(username)
+
+        if self.db_type == 'sqlite':
+            qry = f"UPDATE tbl_users SET {', '.join(u.replace('%s', '?') for u in updates)} WHERE username = ?"
+        else:
+            qry = f"UPDATE tbl_users SET {', '.join(updates)} WHERE username = %s"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, params)
+                self.conn.commit()
+                return True
+            except (sqlite3.Error, psycopg2.Error):
+                if self.db_type == 'postgresql':
+                    self.conn.rollback()
+                return False
+
+    def userDelete(self, username: str) -> bool:
+        """Delete a user.
+
+        Args:
+            username (str): username to delete
+
+        Returns:
+            bool: True if user was deleted
+        """
+        # Prevent deleting the admin user
+        if username == 'admin':
+            return False
+
+        if self.db_type == 'sqlite':
+            qry = "DELETE FROM tbl_users WHERE username = ?"
+        else:
+            qry = "DELETE FROM tbl_users WHERE username = %s"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [username])
+                self.conn.commit()
+                return self.dbh.rowcount > 0
+            except (sqlite3.Error, psycopg2.Error):
+                if self.db_type == 'postgresql':
+                    self.conn.rollback()
+                return False
+
     #
     # Audit log methods
     #
