@@ -9,7 +9,7 @@ This directory contains everything needed to enable enterprise features on a fre
 bash enterprise/install-deps.sh
 
 # 2. Start SpiderFoot
-python3 sf.py -l 0.0.0.0:5001
+python3 sf.py -l 127.0.0.1:5001
 
 # 3. Go to Settings > IMPORT API KEYS > select enterprise/enterprise-full.cfg
 ```
