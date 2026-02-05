@@ -12,6 +12,9 @@
 #   --security       Install Security Hardening Engine dependencies only
 #   --elasticsearch  Install ElasticSearch Storage dependencies only
 #   --postgresql     Install PostgreSQL backend dependencies only
+#
+# Automatically detects externally-managed Python environments (Kali, Debian,
+# Ubuntu 23.04+) and uses --break-system-packages or a virtual environment.
 # ==============================================================================
 
 set -e
@@ -27,12 +30,34 @@ log_ok()    { echo -e "${GREEN}[OK]${NC}   $1"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_err()   { echo -e "${RED}[ERR]${NC}  $1"; }
 
+# Detect externally-managed Python (PEP 668 - Kali, Debian, Ubuntu 23.04+)
+PIP_EXTRA_ARGS=""
+detect_pip_environment() {
+    # Check if we're already in a virtual environment
+    if [ -n "$VIRTUAL_ENV" ]; then
+        log_info "Virtual environment detected: ${VIRTUAL_ENV}"
+        return
+    fi
+
+    # Check for PEP 668 externally-managed marker
+    local python_path
+    python_path=$(python3 -c "import sys; print(sys.prefix)" 2>/dev/null)
+    if [ -f "${python_path}/lib/python3"*/EXTERNALLY-MANAGED ] 2>/dev/null || \
+       python3 -c "import sys; sys.exit(0 if any('EXTERNALLY-MANAGED' in str(p) for p in __import__('pathlib').Path(sys.prefix).rglob('EXTERNALLY-MANAGED')) else 1)" 2>/dev/null; then
+        log_warn "Externally-managed Python environment detected (Kali/Debian/Ubuntu)"
+        log_info "Using --break-system-packages flag for pip"
+        PIP_EXTRA_ARGS="--break-system-packages"
+    fi
+}
+
 install_package() {
     local pkg="$1"
     local desc="$2"
     log_info "Installing ${desc} (${pkg})..."
-    if pip install "$pkg" 2>/dev/null; then
+    if pip install $PIP_EXTRA_ARGS "$pkg" 2>/dev/null; then
         log_ok "${desc} installed successfully"
+    elif pip3 install $PIP_EXTRA_ARGS "$pkg" 2>/dev/null; then
+        log_ok "${desc} installed successfully (via pip3)"
     else
         log_err "Failed to install ${desc} (${pkg})"
         return 1
@@ -151,6 +176,8 @@ echo "============================================"
 echo " SpiderFoot Enterprise Dependency Installer"
 echo "============================================"
 log_info "Mode: ${MODE}"
+
+detect_pip_environment
 
 case "$MODE" in
     --full)
