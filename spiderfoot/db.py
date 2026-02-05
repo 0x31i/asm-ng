@@ -12,8 +12,10 @@
 
 from pathlib import Path
 import hashlib
+import os
 import random
 import re
+import secrets
 import sqlite3
 import threading
 import time
@@ -132,7 +134,28 @@ class SpiderFootDb:
             UNIQUE(target, event_type, event_data, source_data) \
         )",
         "CREATE INDEX idx_target_val_target ON tbl_target_validated (target)",
-        "CREATE INDEX idx_target_val_lookup ON tbl_target_validated (target, event_type, event_data, source_data)"
+        "CREATE INDEX idx_target_val_lookup ON tbl_target_validated (target, event_type, event_data, source_data)",
+        "CREATE TABLE tbl_users ( \
+            id              INTEGER PRIMARY KEY AUTOINCREMENT, \
+            username        VARCHAR NOT NULL UNIQUE, \
+            password_hash   VARCHAR NOT NULL, \
+            salt            VARCHAR NOT NULL, \
+            display_name    VARCHAR, \
+            active          INT NOT NULL DEFAULT 1, \
+            created         INT NOT NULL, \
+            last_login      INT DEFAULT 0 \
+        )",
+        "CREATE TABLE tbl_audit_log ( \
+            id              INTEGER PRIMARY KEY AUTOINCREMENT, \
+            username        VARCHAR NOT NULL, \
+            action          VARCHAR NOT NULL, \
+            detail          VARCHAR, \
+            ip_address      VARCHAR, \
+            created         INT NOT NULL \
+        )",
+        "CREATE INDEX idx_audit_log_username ON tbl_audit_log (username)",
+        "CREATE INDEX idx_audit_log_created ON tbl_audit_log (created)",
+        "CREATE INDEX idx_audit_log_action ON tbl_audit_log (action)"
     ]
 
     # PostgreSQL-specific schema queries
@@ -230,7 +253,28 @@ class SpiderFootDb:
             UNIQUE(target, event_type, event_data, source_data) \
         )",
         "CREATE INDEX IF NOT EXISTS idx_target_val_target ON tbl_target_validated (target)",
-        "CREATE INDEX IF NOT EXISTS idx_target_val_lookup ON tbl_target_validated (target, event_type, event_data, source_data)"
+        "CREATE INDEX IF NOT EXISTS idx_target_val_lookup ON tbl_target_validated (target, event_type, event_data, source_data)",
+        "CREATE TABLE IF NOT EXISTS tbl_users ( \
+            id              SERIAL PRIMARY KEY, \
+            username        VARCHAR NOT NULL UNIQUE, \
+            password_hash   VARCHAR NOT NULL, \
+            salt            VARCHAR NOT NULL, \
+            display_name    VARCHAR, \
+            active          INT NOT NULL DEFAULT 1, \
+            created         BIGINT NOT NULL, \
+            last_login      BIGINT DEFAULT 0 \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_audit_log ( \
+            id              SERIAL PRIMARY KEY, \
+            username        VARCHAR NOT NULL, \
+            action          VARCHAR NOT NULL, \
+            detail          TEXT, \
+            ip_address      VARCHAR, \
+            created         BIGINT NOT NULL \
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_audit_log_username ON tbl_audit_log (username)",
+        "CREATE INDEX IF NOT EXISTS idx_audit_log_created ON tbl_audit_log (created)",
+        "CREATE INDEX IF NOT EXISTS idx_audit_log_action ON tbl_audit_log (action)"
     ]
 
     eventDetails = [
@@ -603,6 +647,30 @@ class SpiderFootDb:
                     except sqlite3.Error:
                         pass  # Column addition failed, but continue
 
+                # Migration: Add tbl_users table if it doesn't exist
+                try:
+                    self.dbh.execute("SELECT COUNT(*) FROM tbl_users")
+                except sqlite3.Error:
+                    try:
+                        for query in self.createSchemaQueries:
+                            if "tbl_users" in query:
+                                self.dbh.execute(query)
+                        self.conn.commit()
+                    except sqlite3.Error:
+                        pass
+
+                # Migration: Add tbl_audit_log table if it doesn't exist
+                try:
+                    self.dbh.execute("SELECT COUNT(*) FROM tbl_audit_log")
+                except sqlite3.Error:
+                    try:
+                        for query in self.createSchemaQueries:
+                            if "audit_log" in query:
+                                self.dbh.execute(query)
+                        self.conn.commit()
+                    except sqlite3.Error:
+                        pass
+
                 if init:
                     for row in self.eventDetails:
                         event = row[0]
@@ -693,6 +761,32 @@ class SpiderFootDb:
                         self.conn.commit()
                     except psycopg2.Error:
                         self.conn.rollback()  # Column addition failed, but continue
+
+                # Migration: Add tbl_users table if it doesn't exist
+                try:
+                    self.dbh.execute("SELECT COUNT(*) FROM tbl_users")
+                except psycopg2.Error:
+                    self.conn.rollback()
+                    try:
+                        for query in self.createPostgreSQLSchemaQueries:
+                            if "tbl_users" in query:
+                                self.dbh.execute(query)
+                        self.conn.commit()
+                    except psycopg2.Error:
+                        self.conn.rollback()
+
+                # Migration: Add tbl_audit_log table if it doesn't exist
+                try:
+                    self.dbh.execute("SELECT COUNT(*) FROM tbl_audit_log")
+                except psycopg2.Error:
+                    self.conn.rollback()
+                    try:
+                        for query in self.createPostgreSQLSchemaQueries:
+                            if "audit_log" in query:
+                                self.dbh.execute(query)
+                        self.conn.commit()
+                    except psycopg2.Error:
+                        self.conn.rollback()
         else:
             raise ValueError(f"Unsupported database type: {self.db_type}")
 
@@ -3186,3 +3280,287 @@ class SpiderFootDb:
                 return self.dbh.fetchall()
             except (sqlite3.Error, psycopg2.Error) as e:
                 raise IOError("SQL error encountered when getting scans for target") from e
+
+    #
+    # User management methods
+    #
+
+    @staticmethod
+    def hashPassword(password: str, salt: str = None) -> tuple:
+        """Hash a password with a salt using SHA-256.
+
+        Args:
+            password (str): plain text password
+            salt (str): optional salt; generated if not provided
+
+        Returns:
+            tuple: (password_hash, salt)
+        """
+        if salt is None:
+            salt = secrets.token_hex(32)
+        password_hash = hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
+        return password_hash, salt
+
+    def userCreate(self, username: str, password: str, display_name: str = None) -> bool:
+        """Create a new user.
+
+        Args:
+            username (str): username
+            password (str): plain text password (will be hashed)
+            display_name (str): optional display name
+
+        Returns:
+            bool: True if user was created
+        """
+        password_hash, salt = self.hashPassword(password)
+        created = int(time.time() * 1000)
+
+        if self.db_type == 'sqlite':
+            qry = "INSERT INTO tbl_users (username, password_hash, salt, display_name, active, created) VALUES (?, ?, ?, ?, 1, ?)"
+            params = (username, password_hash, salt, display_name or username, created)
+        else:
+            qry = "INSERT INTO tbl_users (username, password_hash, salt, display_name, active, created) VALUES (%s, %s, %s, %s, 1, %s)"
+            params = (username, password_hash, salt, display_name or username, created)
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, params)
+                self.conn.commit()
+                return True
+            except (sqlite3.Error, psycopg2.Error):
+                if self.db_type == 'postgresql':
+                    self.conn.rollback()
+                return False
+
+    def userVerify(self, username: str, password: str) -> bool:
+        """Verify a user's password.
+
+        Args:
+            username (str): username
+            password (str): plain text password
+
+        Returns:
+            bool: True if credentials are valid
+        """
+        if self.db_type == 'sqlite':
+            qry = "SELECT password_hash, salt, active FROM tbl_users WHERE username = ?"
+        else:
+            qry = "SELECT password_hash, salt, active FROM tbl_users WHERE username = %s"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [username])
+                row = self.dbh.fetchone()
+                if not row:
+                    return False
+                stored_hash, salt, active = row[0], row[1], row[2]
+                if not active:
+                    return False
+                check_hash, _ = self.hashPassword(password, salt)
+                return check_hash == stored_hash
+            except (sqlite3.Error, psycopg2.Error):
+                return False
+
+    def userUpdateLastLogin(self, username: str) -> None:
+        """Update the last login timestamp for a user.
+
+        Args:
+            username (str): username
+        """
+        now = int(time.time() * 1000)
+        if self.db_type == 'sqlite':
+            qry = "UPDATE tbl_users SET last_login = ? WHERE username = ?"
+        else:
+            qry = "UPDATE tbl_users SET last_login = %s WHERE username = %s"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [now, username])
+                self.conn.commit()
+            except (sqlite3.Error, psycopg2.Error):
+                if self.db_type == 'postgresql':
+                    self.conn.rollback()
+
+    def userGet(self, username: str) -> dict:
+        """Get user details.
+
+        Args:
+            username (str): username
+
+        Returns:
+            dict: user details or None
+        """
+        if self.db_type == 'sqlite':
+            qry = "SELECT id, username, display_name, active, created, last_login FROM tbl_users WHERE username = ?"
+        else:
+            qry = "SELECT id, username, display_name, active, created, last_login FROM tbl_users WHERE username = %s"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [username])
+                row = self.dbh.fetchone()
+                if not row:
+                    return None
+                return {
+                    'id': row[0],
+                    'username': row[1],
+                    'display_name': row[2],
+                    'active': row[3],
+                    'created': row[4],
+                    'last_login': row[5]
+                }
+            except (sqlite3.Error, psycopg2.Error):
+                return None
+
+    def userList(self) -> list:
+        """List all users.
+
+        Returns:
+            list: list of user dicts
+        """
+        qry = "SELECT id, username, display_name, active, created, last_login FROM tbl_users ORDER BY username"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry)
+                rows = self.dbh.fetchall()
+                return [
+                    {
+                        'id': row[0],
+                        'username': row[1],
+                        'display_name': row[2],
+                        'active': row[3],
+                        'created': row[4],
+                        'last_login': row[5]
+                    }
+                    for row in rows
+                ]
+            except (sqlite3.Error, psycopg2.Error):
+                return []
+
+    def userCount(self) -> int:
+        """Count users in the database.
+
+        Returns:
+            int: number of users
+        """
+        qry = "SELECT COUNT(*) FROM tbl_users"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry)
+                row = self.dbh.fetchone()
+                return row[0] if row else 0
+            except (sqlite3.Error, psycopg2.Error):
+                return 0
+
+    def userChangePassword(self, username: str, new_password: str) -> bool:
+        """Change a user's password.
+
+        Args:
+            username (str): username
+            new_password (str): new plain text password
+
+        Returns:
+            bool: True if password was changed
+        """
+        password_hash, salt = self.hashPassword(new_password)
+
+        if self.db_type == 'sqlite':
+            qry = "UPDATE tbl_users SET password_hash = ?, salt = ? WHERE username = ?"
+        else:
+            qry = "UPDATE tbl_users SET password_hash = %s, salt = %s WHERE username = %s"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [password_hash, salt, username])
+                self.conn.commit()
+                return True
+            except (sqlite3.Error, psycopg2.Error):
+                if self.db_type == 'postgresql':
+                    self.conn.rollback()
+                return False
+
+    #
+    # Audit log methods
+    #
+
+    def auditLog(self, username: str, action: str, detail: str = None, ip_address: str = None) -> None:
+        """Record an audit log entry.
+
+        Args:
+            username (str): the user who performed the action
+            action (str): action type (e.g. LOGIN, SCAN_START, SETTINGS_CHANGE)
+            detail (str): optional detail string
+            ip_address (str): optional IP address of the user
+        """
+        created = int(time.time() * 1000)
+
+        if self.db_type == 'sqlite':
+            qry = "INSERT INTO tbl_audit_log (username, action, detail, ip_address, created) VALUES (?, ?, ?, ?, ?)"
+        else:
+            qry = "INSERT INTO tbl_audit_log (username, action, detail, ip_address, created) VALUES (%s, %s, %s, %s, %s)"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [username, action, detail, ip_address, created])
+                self.conn.commit()
+            except (sqlite3.Error, psycopg2.Error):
+                if self.db_type == 'postgresql':
+                    self.conn.rollback()
+
+    def auditLogGet(self, limit: int = 200, username: str = None, action: str = None) -> list:
+        """Get audit log entries.
+
+        Args:
+            limit (int): max number of entries to return
+            username (str): filter by username
+            action (str): filter by action type
+
+        Returns:
+            list: list of audit log dicts
+        """
+        conditions = []
+        params = []
+
+        if username:
+            if self.db_type == 'sqlite':
+                conditions.append("username = ?")
+            else:
+                conditions.append("username = %s")
+            params.append(username)
+
+        if action:
+            if self.db_type == 'sqlite':
+                conditions.append("action = ?")
+            else:
+                conditions.append("action = %s")
+            params.append(action)
+
+        where = ""
+        if conditions:
+            where = " WHERE " + " AND ".join(conditions)
+
+        if self.db_type == 'sqlite':
+            qry = f"SELECT id, username, action, detail, ip_address, created FROM tbl_audit_log{where} ORDER BY created DESC LIMIT ?"
+        else:
+            qry = f"SELECT id, username, action, detail, ip_address, created FROM tbl_audit_log{where} ORDER BY created DESC LIMIT %s"
+        params.append(limit)
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, params)
+                rows = self.dbh.fetchall()
+                return [
+                    {
+                        'id': row[0],
+                        'username': row[1],
+                        'action': row[2],
+                        'detail': row[3],
+                        'ip_address': row[4],
+                        'created': row[5]
+                    }
+                    for row in rows
+                ]
+            except (sqlite3.Error, psycopg2.Error):
+                return []
