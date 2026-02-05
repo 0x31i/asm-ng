@@ -3192,10 +3192,11 @@ class SpiderFootWebUi:
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def runAiCorrelation(self: 'SpiderFootWebUi', id: str) -> dict:
-        """Run AI cross-scan correlation analysis on a completed scan.
+        """Run AI cross-scan correlation analysis on a scan.
 
-        This allows re-running or running AI correlation analysis on a scan
-        after it has completed, correlating findings with historical scan data.
+        Analyzes the current scan's data (including any imported historical data)
+        to find IOCs that appear in both native scan results and imported results.
+        This identifies persistent indicators across multiple scans.
 
         Args:
             id (str): scan ID
@@ -3211,120 +3212,115 @@ class SpiderFootWebUi:
             return {'success': False, 'error': 'Scan not found'}
 
         target = scanInfo[1]
-        scanStatus = scanInfo[5]
-
         self.log.info(f"Running AI correlation analysis for scan {id} (target: {target})")
 
-        # Get historical scans for this target (excluding current scan)
         try:
-            historical_scans = []
-            qry = """SELECT guid, name, started FROM tbl_scan_instance
-                WHERE seed_target = ? AND guid != ? AND status = 'FINISHED'
-                ORDER BY started DESC LIMIT 10"""
+            # Query to get all events with their imported_from_scan status
+            # We need to identify native vs imported events
+            qry = """SELECT r.generated, r.data, r.module, r.source_event_hash, r.type,
+                            r.confidence, r.visibility, r.risk, r.false_positive,
+                            r.hash, r.imported_from_scan,
+                            COALESCE(si.name, 'Unknown') as source_scan_name,
+                            COALESCE(si.started, '') as source_scan_started
+                     FROM tbl_scan_results r
+                     LEFT JOIN tbl_scan_instance si ON r.imported_from_scan = si.guid
+                     WHERE r.scan_instance_id = ?
+                       AND r.type != 'ROOT'
+                       AND r.false_positive = 0"""
 
             with dbh.dbhLock:
-                dbh.dbh.execute(qry, [target, id])
-                rows = dbh.dbh.fetchall()
-                for row in rows:
-                    historical_scans.append({
-                        'scan_id': row[0],
-                        'scan_name': row[1],
-                        'scan_started': row[2]
-                    })
+                dbh.dbh.execute(qry, [id])
+                all_events = dbh.dbh.fetchall()
 
-            if not historical_scans:
+            if not all_events:
                 return {
                     'success': True,
-                    'message': 'No historical scans found for this target',
+                    'message': 'No events found in scan',
                     'correlations_found': 0,
-                    'historical_scans': 0
+                    'native_events': 0,
+                    'imported_events': 0
                 }
 
-            self.log.info(f"Found {len(historical_scans)} historical scans for correlation")
+            # Separate native vs imported events
+            native_iocs = {}  # {ioc_data: [{event_type, timestamp, ...}]}
+            imported_iocs = {}  # {ioc_data: [{scan_id, scan_name, event_type, timestamp, ...}]}
 
-        except Exception as e:
-            self.log.error(f"Error getting historical scans: {e}")
-            return {'success': False, 'error': f'Error getting historical scans: {str(e)}'}
+            for event in all_events:
+                # Event format: [0]=generated, [1]=data, [2]=module, [3]=source_event_hash,
+                # [4]=type, [5]=confidence, [6]=visibility, [7]=risk, [8]=false_positive,
+                # [9]=hash, [10]=imported_from_scan, [11]=source_scan_name, [12]=source_scan_started
+                event_data = event[1]
+                event_type = event[4]
+                event_timestamp = event[0]
+                imported_from = event[10]
+                source_scan_name = event[11]
+                source_scan_started = event[12]
 
-        # Load historical IOCs (excluding false positives)
-        historical_iocs = {}  # {ioc_data: [{scan_id, scan_name, event_type, timestamp}]}
-        try:
-            for hist_scan in historical_scans:
-                hist_events = dbh.scanResultEvent(hist_scan['scan_id'], 'ALL')
-                for event in hist_events:
-                    # Event format: [0]=generated, [1]=data, [2]=module, [3]=source_event_hash,
-                    # [4]=type, [5]=confidence, [6]=visibility, [7]=risk, [8]=false_positive
-                    event_type = event[4]
-                    event_data = event[1]
-                    event_timestamp = event[0]
-                    false_positive = event[8] if len(event) > 8 else 0
+                if not event_data:
+                    continue
 
-                    # Skip ROOT events, empty data, and false positives
-                    if event_type == 'ROOT' or not event_data or false_positive:
-                        continue
-
-                    if event_data not in historical_iocs:
-                        historical_iocs[event_data] = []
-
-                    historical_iocs[event_data].append({
-                        'scan_id': hist_scan['scan_id'],
-                        'scan_name': hist_scan['scan_name'],
-                        'scan_date': str(hist_scan['scan_started']),
+                if imported_from is None:
+                    # Native event (from current scan)
+                    if event_data not in native_iocs:
+                        native_iocs[event_data] = []
+                    native_iocs[event_data].append({
+                        'event_type': event_type,
+                        'timestamp': event_timestamp
+                    })
+                else:
+                    # Imported event (from historical scan)
+                    if event_data not in imported_iocs:
+                        imported_iocs[event_data] = []
+                    imported_iocs[event_data].append({
+                        'scan_id': imported_from,
+                        'scan_name': source_scan_name,
+                        'scan_date': str(source_scan_started) if source_scan_started else 'Unknown',
                         'event_type': event_type,
                         'timestamp': event_timestamp
                     })
 
-            self.log.info(f"Loaded {len(historical_iocs)} unique historical IOCs")
+            self.log.info(f"Found {len(native_iocs)} unique native IOCs and {len(imported_iocs)} unique imported IOCs")
 
-        except Exception as e:
-            self.log.error(f"Error loading historical IOCs: {e}")
-            return {'success': False, 'error': f'Error loading historical IOCs: {str(e)}'}
+            if not imported_iocs:
+                return {
+                    'success': True,
+                    'message': 'No imported historical data found. Import historical scan data first to enable cross-scan correlation.',
+                    'correlations_found': 0,
+                    'native_events': len(native_iocs),
+                    'imported_events': 0
+                }
 
-        # Get current scan events and find correlations
-        correlations_found = 0
-        try:
-            current_events = dbh.scanResultEvent(id, 'ALL')
-            seen_iocs = set()  # Track IOCs we've already created correlations for
+            # Find IOCs that appear in BOTH native and imported data
+            correlations_found = 0
+            from spiderfoot import SpiderFootEvent
 
-            for event in current_events:
-                event_type = event[4]
-                event_data = event[1]
-                event_hash = event[9] if len(event) > 9 else None
-                false_positive = event[8] if len(event) > 8 else 0
+            for ioc_data, native_occurrences in native_iocs.items():
+                if ioc_data in imported_iocs:
+                    imported_occurrences = imported_iocs[ioc_data]
 
-                # Skip ROOT events, empty data, false positives, and already processed
-                if event_type == 'ROOT' or not event_data or false_positive:
-                    continue
-
-                if event_data in seen_iocs:
-                    continue
-
-                # Check for match in historical IOCs
-                if event_data in historical_iocs:
-                    seen_iocs.add(event_data)
-                    historical_matches = historical_iocs[event_data]
-
-                    # Build correlation data
+                    # Build source scans list
                     source_scans = []
                     seen_scans = set()
                     timestamps = []
 
-                    for match in historical_matches:
-                        if match['scan_id'] not in seen_scans:
-                            seen_scans.add(match['scan_id'])
+                    for imp in imported_occurrences:
+                        if imp['scan_id'] not in seen_scans:
+                            seen_scans.add(imp['scan_id'])
                             source_scans.append({
-                                'scan_id': match['scan_id'],
-                                'scan_name': match['scan_name'],
-                                'scan_date': match['scan_date']
+                                'scan_id': imp['scan_id'],
+                                'scan_name': imp['scan_name'],
+                                'scan_date': imp['scan_date']
                             })
                         try:
-                            if isinstance(match['timestamp'], (int, float)):
-                                timestamps.append(float(match['timestamp']))
+                            if isinstance(imp['timestamp'], (int, float)):
+                                timestamps.append(float(imp['timestamp']))
                         except (ValueError, TypeError):
                             pass
 
+                    # Total occurrences = native + imported
+                    occurrence_count = len(native_occurrences) + len(imported_occurrences)
+
                     # Calculate trend
-                    occurrence_count = len(historical_matches) + 1
                     if not timestamps:
                         trend = "new"
                     elif occurrence_count <= 2:
@@ -3333,12 +3329,15 @@ class SpiderFootWebUi:
                         timestamps.sort()
                         if len(timestamps) >= 2:
                             intervals = [timestamps[i+1] - timestamps[i] for i in range(len(timestamps)-1)]
-                            avg_interval = sum(intervals) / len(intervals)
-                            recent_interval = time.time() - timestamps[-1]
-                            if recent_interval < avg_interval * 0.5:
-                                trend = "increasing"
-                            elif recent_interval > avg_interval * 1.5:
-                                trend = "decreasing"
+                            avg_interval = sum(intervals) / len(intervals) if intervals else 0
+                            recent_interval = time.time() - timestamps[-1] if timestamps else 0
+                            if avg_interval > 0:
+                                if recent_interval < avg_interval * 0.5:
+                                    trend = "increasing"
+                                elif recent_interval > avg_interval * 1.5:
+                                    trend = "decreasing"
+                                else:
+                                    trend = "stable"
                             else:
                                 trend = "stable"
                         else:
@@ -3355,26 +3354,32 @@ class SpiderFootWebUi:
                         first_seen = "Unknown"
                         last_seen = "Unknown"
 
+                    # Get event type from native occurrence
+                    event_type = native_occurrences[0]['event_type'] if native_occurrences else 'Unknown'
+
                     # Generate analysis text
-                    analysis = f"IOC '{event_data[:50]}{'...' if len(event_data) > 50 else ''}' has been observed in {occurrence_count} scan(s) across {len(source_scans)} historical scan session(s). "
+                    ioc_display = ioc_data[:50] + ('...' if len(ioc_data) > 50 else '')
+                    analysis = f"IOC '{ioc_display}' found in current scan AND {len(imported_occurrences)} imported record(s) from {len(source_scans)} historical scan(s). "
                     if trend == "increasing":
-                        analysis += "Frequency is INCREASING - this IOC is appearing more often in recent scans. "
+                        analysis += "Frequency is INCREASING - this IOC is appearing more often. "
                     elif trend == "decreasing":
-                        analysis += "Frequency is DECREASING - this IOC is appearing less often recently. "
+                        analysis += "Frequency is DECREASING - this IOC is appearing less often. "
                     else:
-                        analysis += "Frequency is STABLE - this IOC appears consistently across scans. "
+                        analysis += "Frequency is STABLE - this IOC appears consistently. "
 
                     if confidence >= 0.8:
-                        analysis += "HIGH CONFIDENCE: Strong correlation across multiple scans."
+                        analysis += "HIGH CONFIDENCE: Persistent indicator across multiple scans."
                     elif confidence >= 0.6:
-                        analysis += "MEDIUM CONFIDENCE: Correlation found across scans."
+                        analysis += "MEDIUM CONFIDENCE: Repeated indicator worth investigating."
 
                     # Create correlation data JSON
                     correlation_data = {
-                        'correlation_id': hashlib.md5(f"{event_data}_{time.time()}".encode()).hexdigest(),
-                        'ioc': event_data,
+                        'correlation_id': hashlib.md5(f"{ioc_data}_{time.time()}".encode()).hexdigest(),
+                        'ioc': ioc_data,
                         'event_type': event_type,
-                        'historical_occurrences': occurrence_count - 1,
+                        'native_occurrences': len(native_occurrences),
+                        'historical_occurrences': len(imported_occurrences),
+                        'total_occurrences': occurrence_count,
                         'scans_involved': len(source_scans),
                         'source_scans': source_scans,
                         'first_seen': first_seen,
@@ -3385,7 +3390,6 @@ class SpiderFootWebUi:
                     }
 
                     # Create and store the AI correlation event
-                    from spiderfoot import SpiderFootEvent
                     correlation_event = SpiderFootEvent(
                         "AI_CROSS_SCAN_CORRELATION",
                         json.dumps(correlation_data, default=str),
@@ -3399,14 +3403,14 @@ class SpiderFootWebUi:
                     dbh.scanEventStore(id, correlation_event)
                     correlations_found += 1
 
-            self.log.info(f"AI correlation analysis complete. Found {correlations_found} correlations.")
+            self.log.info(f"AI correlation analysis complete. Found {correlations_found} cross-scan correlations.")
 
             return {
                 'success': True,
-                'message': f'AI correlation analysis complete',
+                'message': 'AI correlation analysis complete',
                 'correlations_found': correlations_found,
-                'historical_scans': len(historical_scans),
-                'unique_historical_iocs': len(historical_iocs)
+                'native_iocs': len(native_iocs),
+                'imported_iocs': len(imported_iocs)
             }
 
         except Exception as e:
