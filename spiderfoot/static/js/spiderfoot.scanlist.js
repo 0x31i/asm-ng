@@ -105,21 +105,27 @@ function exportSelected(type) {
 
     $("#loader").show();
     var efr = document.getElementById('exportframe');
+    sf.log("Exporting scans as " + type + ": " + ids.join(','));
     switch(type) {
         case "gexf":
-            sf.log("Exporting scans as " + type + ": " + ids.join(','));
             efr.src = docroot + '/scanvizmulti?ids=' + ids.join(',');
             break;
         case "csv":
-            sf.log("Exporting scans as " + type + ": " + ids.join(','));
             efr.src = docroot + '/scaneventresultexportmulti?ids=' + ids.join(',');
             break;
         case "excel":
-            sf.log("Exporting scans as " + type + ": " + ids.join(','));
             efr.src = docroot + '/scaneventresultexportmulti?filetype=excel&ids=' + ids.join(',');
             break;
+        case "csv_analysis":
+            efr.src = docroot + '/scaneventresultexportmulti?export_mode=analysis&ids=' + ids.join(',');
+            break;
+        case "excel_analysis":
+            efr.src = docroot + '/scaneventresultexportmulti?filetype=excel&export_mode=analysis&ids=' + ids.join(',');
+            break;
+        case "excel_analysis_correlations":
+            efr.src = docroot + '/scaneventresultexportmulti?filetype=excel&export_mode=analysis_correlations&ids=' + ids.join(',');
+            break;
         case "json":
-            sf.log("Exporting scans as " + type + ": " + ids.join(','));
             efr.src = docroot + '/scanexportjsonmulti?ids=' + ids.join(',');
             break;
         default:
@@ -320,8 +326,16 @@ function showlisttable(types, filter, data) {
         buttons += "<button rel='tooltip' data-title='Refresh' id='btn-refresh' class='btn btn-default btn-success'><i class='glyphicon glyphicon-refresh glyphicon-white'></i></a>";
         buttons += "<button rel='tooltip' data-toggle='dropdown' data-title='Export Selected' id='btn-export' class='btn btn-default btn-success dropdown-toggle download-button'><i class='glyphicon glyphicon-download-alt glyphicon-white'></i></button>";
         buttons += "<ul class='dropdown-menu'>";
+        buttons += "<li class='dropdown-header'>Full Data (All Results)</li>";
         buttons += "<li><a href='javascript:exportSelected(\"csv\")'>CSV</a></li>";
         buttons += "<li><a href='javascript:exportSelected(\"excel\")'>Excel</a></li>";
+        buttons += "<li class='divider'></li>";
+        buttons += "<li class='dropdown-header'>Analysis (No False Positives)</li>";
+        buttons += "<li><a href='javascript:exportSelected(\"csv_analysis\")'>CSV</a></li>";
+        buttons += "<li><a href='javascript:exportSelected(\"excel_analysis\")'>Excel</a></li>";
+        buttons += "<li><a href='javascript:exportSelected(\"excel_analysis_correlations\")'>Excel + Correlations</a></li>";
+        buttons += "<li class='divider'></li>";
+        buttons += "<li class='dropdown-header'>Other Formats</li>";
         buttons += "<li><a href='javascript:exportSelected(\"gexf\")'>GEXF</a></li>";
         buttons += "<li><a href='javascript:exportSelected(\"json\")'>JSON</a></li>";
         buttons += "</ul>";
