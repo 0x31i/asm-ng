@@ -13,11 +13,12 @@
     <input type=hidden id='allopts' name='allopts' value=''>
     <input type=hidden id='token' name='token' value="${token}">
     <input type="file" name='configFile' id="configFile" class='hidden' onChange='$("#savesettingsform").submit()' />
-    <!-- Default toolbar: Import/Export/Reset (no Save Changes) -->
+    <!-- Default toolbar: Import/Export/Reset/Activity Log (no Save Changes) -->
     <div id="toolbar-default">
         <button id="btn-import-config" class='btn btn-info'>Import API Keys</button>
         <button id="btn-opt-export" class='btn btn-info'>Export API Keys</button>
         <button id="btn-reset-settings" class='btn btn-danger'>Reset to Factory Default</button>
+        <a href="${docroot}/auditlog" class='btn btn-default'>Activity Log</a>
     </div>
 </div>
 <!-- Change toolbar: direct child of form so sticky works against full page height -->
