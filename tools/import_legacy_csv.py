@@ -184,7 +184,7 @@ def import_csv(csv_path: str, scan_name: str = None, target: str = None, dry_run
     stats['scan_id'] = scan_id
 
     try:
-        db.scanInstanceNew(scan_id, scan_name, target)
+        db.scanInstanceCreate(scan_id, scan_name, target)
         print(f"\nCreated scan instance: {scan_id}")
     except Exception as e:
         raise RuntimeError(f"Failed to create scan instance: {e}") from e
