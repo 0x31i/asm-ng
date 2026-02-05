@@ -1307,6 +1307,8 @@
                 cssChildRow: 'tablesorter-childRow',
                 sortList: [[1, 1]]  // Sort by Risk column (1) in descending order (1) - HIGH first
             });
+            // Add AI correlation section below regular correlations
+            addAiCorrelationSection(instanceId);
             sf.updateTooltips();
         }
 
@@ -1344,7 +1346,170 @@
             var table = "<div id='scansummary-content' class='alert alert-warning'><h4>No correlations found.</h4>If the scan is still running please reload once it has completed. If the scan is complete, it may not have triggered any correlation rules.</div>";
             $("#loader").fadeOut(500);
             $("#mainbody").append(table);
+            // Add AI correlation button
+            addAiCorrelationSection("${id}");
             sf.updateTooltips();
+        }
+
+        // Add AI cross-scan correlation section
+        function addAiCorrelationSection(instanceId) {
+            var aiSection = "<div id='ai-correlation-section' class='panel panel-default' style='margin-top: 20px;'>";
+            aiSection += "<div class='panel-heading'><i class='glyphicon glyphicon-flash'></i>&nbsp;&nbsp;AI Cross-Scan Correlation</div>";
+            aiSection += "<div class='panel-body'>";
+            aiSection += "<p>Run AI-powered correlation analysis to find IOCs that appear in historical scans of this target.</p>";
+            aiSection += "<button id='btn-run-ai-correlation' class='btn btn-primary' onclick='runAiCorrelation(\"" + instanceId + "\")'>";
+            aiSection += "<i class='glyphicon glyphicon-play'></i>&nbsp;Run AI Correlation Analysis</button>";
+            aiSection += "<div id='ai-correlation-results' style='margin-top: 15px;'></div>";
+            aiSection += "</div></div>";
+            $("#mainbody").append(aiSection);
+
+            // Also load any existing AI correlations
+            loadAiCorrelations(instanceId);
+        }
+
+        // Run AI correlation analysis
+        function runAiCorrelation(instanceId) {
+            $("#btn-run-ai-correlation").prop('disabled', true).html("<i class='glyphicon glyphicon-refresh spinning'></i>&nbsp;Analyzing...");
+            $("#ai-correlation-results").html("<div class='alert alert-info'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;Running AI cross-scan correlation analysis. This may take a moment...</div>");
+
+            sf.fetchData('${docroot}/runAiCorrelation', {'id': instanceId},
+                function(data) {
+                    $("#btn-run-ai-correlation").prop('disabled', false).html("<i class='glyphicon glyphicon-play'></i>&nbsp;Run AI Correlation Analysis");
+
+                    if (data.success) {
+                        var resultHtml = "<div class='alert alert-success'>";
+                        resultHtml += "<h5><i class='glyphicon glyphicon-ok'></i>&nbsp;Analysis Complete</h5>";
+                        resultHtml += "<ul>";
+                        resultHtml += "<li>Historical scans analyzed: " + data.historical_scans + "</li>";
+                        resultHtml += "<li>Unique historical IOCs: " + (data.unique_historical_iocs || 0) + "</li>";
+                        resultHtml += "<li><strong>Correlations found: " + data.correlations_found + "</strong></li>";
+                        resultHtml += "</ul>";
+                        if (data.correlations_found > 0) {
+                            resultHtml += "<p>Scroll down to view the AI correlation findings.</p>";
+                        } else if (data.historical_scans == 0) {
+                            resultHtml += "<p>No historical scans found for this target. Run more scans against this target to enable cross-scan correlation.</p>";
+                        } else {
+                            resultHtml += "<p>No matching IOCs found between this scan and historical scans.</p>";
+                        }
+                        resultHtml += "</div>";
+                        $("#ai-correlation-results").html(resultHtml);
+
+                        // Reload AI correlations to show new results
+                        if (data.correlations_found > 0) {
+                            loadAiCorrelations(instanceId);
+                        }
+                    } else {
+                        $("#ai-correlation-results").html("<div class='alert alert-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Error: " + (data.error || 'Unknown error') + "</div>");
+                    }
+                },
+                function(xhr, textStatus, errorThrown) {
+                    $("#btn-run-ai-correlation").prop('disabled', false).html("<i class='glyphicon glyphicon-play'></i>&nbsp;Run AI Correlation Analysis");
+                    $("#ai-correlation-results").html("<div class='alert alert-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Failed to run AI correlation: " + textStatus + "</div>");
+                }
+            );
+        }
+
+        // Load existing AI cross-scan correlation events
+        function loadAiCorrelations(instanceId) {
+            sf.fetchData('${docroot}/scaneventresults', {'id': instanceId, 'eventType': 'AI_CROSS_SCAN_CORRELATION'},
+                function(data) {
+                    if (!data || data.length == 0) {
+                        return; // No AI correlations to display
+                    }
+
+                    var aiTable = "<div id='ai-correlation-table' style='margin-top: 20px;'>";
+                    aiTable += "<h4><i class='glyphicon glyphicon-flash'></i>&nbsp;AI Cross-Scan Correlation Results (" + data.length + " findings)</h4>";
+                    aiTable += "<table class='table table-bordered table-striped table-condensed small'>";
+                    aiTable += "<thead><tr><th>IOC</th><th>Type</th><th>Historical Occurrences</th><th>Trend</th><th>Confidence</th><th>Details</th></tr></thead><tbody>";
+
+                    for (var i = 0; i < data.length; i++) {
+                        try {
+                            var corrData = JSON.parse(data[i][1]);
+                            var trendBadge = "";
+                            if (corrData.trend == "increasing") {
+                                trendBadge = "<span class='badge alert-danger'>↑ Increasing</span>";
+                            } else if (corrData.trend == "decreasing") {
+                                trendBadge = "<span class='badge alert-success'>↓ Decreasing</span>";
+                            } else {
+                                trendBadge = "<span class='badge alert-info'>→ Stable</span>";
+                            }
+
+                            var confidencePercent = Math.round((corrData.confidence || 0) * 100);
+                            var confidenceBadge = "";
+                            if (confidencePercent >= 80) {
+                                confidenceBadge = "<span class='badge alert-danger'>" + confidencePercent + "%</span>";
+                            } else if (confidencePercent >= 60) {
+                                confidenceBadge = "<span class='badge alert-warning'>" + confidencePercent + "%</span>";
+                            } else {
+                                confidenceBadge = "<span class='badge alert-info'>" + confidencePercent + "%</span>";
+                            }
+
+                            var iocDisplay = corrData.ioc || data[i][1];
+                            if (iocDisplay.length > 60) {
+                                iocDisplay = iocDisplay.substring(0, 60) + "...";
+                            }
+
+                            aiTable += "<tr>";
+                            aiTable += "<td title='" + (corrData.ioc || '').replace(/'/g, "&#39;") + "'>" + iocDisplay + "</td>";
+                            aiTable += "<td>" + (corrData.event_type || 'Unknown') + "</td>";
+                            aiTable += "<td>" + (corrData.historical_occurrences || 0) + " in " + (corrData.scans_involved || 0) + " scan(s)</td>";
+                            aiTable += "<td>" + trendBadge + "</td>";
+                            aiTable += "<td>" + confidenceBadge + "</td>";
+                            aiTable += "<td><button class='btn btn-xs btn-default' onclick='showAiCorrelationDetails(" + i + ", " + JSON.stringify(JSON.stringify(corrData)) + ")'><i class='glyphicon glyphicon-eye-open'></i></button></td>";
+                            aiTable += "</tr>";
+                        } catch (e) {
+                            console.error("Error parsing AI correlation data:", e);
+                        }
+                    }
+
+                    aiTable += "</tbody></table></div>";
+
+                    // Remove existing table if present and add new one
+                    $("#ai-correlation-table").remove();
+                    $("#mainbody").append(aiTable);
+                },
+                function(xhr, textStatus, errorThrown) {
+                    console.error("Error loading AI correlations:", textStatus);
+                }
+            );
+        }
+
+        // Show detailed AI correlation info in a modal
+        function showAiCorrelationDetails(index, corrDataStr) {
+            var corrData = JSON.parse(corrDataStr);
+
+            var modalHtml = "<div class='modal fade' id='aiCorrModal' tabindex='-1'>";
+            modalHtml += "<div class='modal-dialog modal-lg'><div class='modal-content'>";
+            modalHtml += "<div class='modal-header'><button type='button' class='close' data-dismiss='modal'>&times;</button>";
+            modalHtml += "<h4 class='modal-title'><i class='glyphicon glyphicon-flash'></i>&nbsp;AI Cross-Scan Correlation Details</h4></div>";
+            modalHtml += "<div class='modal-body'>";
+
+            modalHtml += "<h5>IOC</h5><p><code>" + (corrData.ioc || 'Unknown') + "</code></p>";
+            modalHtml += "<h5>Event Type</h5><p>" + (corrData.event_type || 'Unknown') + "</p>";
+            modalHtml += "<h5>Analysis</h5><p>" + (corrData.analysis || 'No analysis available') + "</p>";
+
+            modalHtml += "<h5>Timeline</h5><ul>";
+            modalHtml += "<li>First seen: " + (corrData.first_seen || 'Unknown') + "</li>";
+            modalHtml += "<li>Last seen: " + (corrData.last_seen || 'Unknown') + "</li>";
+            modalHtml += "</ul>";
+
+            if (corrData.source_scans && corrData.source_scans.length > 0) {
+                modalHtml += "<h5>Historical Scans</h5><ul>";
+                for (var i = 0; i < corrData.source_scans.length; i++) {
+                    var scan = corrData.source_scans[i];
+                    modalHtml += "<li>" + (scan.scan_name || scan.scan_id) + " (" + (scan.scan_date || 'Unknown date') + ")</li>";
+                }
+                modalHtml += "</ul>";
+            }
+
+            modalHtml += "</div><div class='modal-footer'>";
+            modalHtml += "<button type='button' class='btn btn-default' data-dismiss='modal'>Close</button>";
+            modalHtml += "</div></div></div></div>";
+
+            // Remove existing modal and add new one
+            $("#aiCorrModal").remove();
+            $("body").append(modalHtml);
+            $("#aiCorrModal").modal('show');
         }
 
         // Logs for the scan

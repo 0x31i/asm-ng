@@ -3191,6 +3191,230 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
+    def runAiCorrelation(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Run AI cross-scan correlation analysis on a completed scan.
+
+        This allows re-running or running AI correlation analysis on a scan
+        after it has completed, correlating findings with historical scan data.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: analysis results with correlation count and status
+        """
+        dbh = SpiderFootDb(self.config)
+
+        # Get scan info
+        scanInfo = dbh.scanInstanceGet(id)
+        if not scanInfo:
+            return {'success': False, 'error': 'Scan not found'}
+
+        target = scanInfo[1]
+        scanStatus = scanInfo[5]
+
+        self.log.info(f"Running AI correlation analysis for scan {id} (target: {target})")
+
+        # Get historical scans for this target (excluding current scan)
+        try:
+            historical_scans = []
+            qry = """SELECT guid, name, started FROM tbl_scan_instance
+                WHERE seed_target = ? AND guid != ? AND status = 'FINISHED'
+                ORDER BY started DESC LIMIT 10"""
+
+            with dbh.dbhLock:
+                dbh.dbh.execute(qry, [target, id])
+                rows = dbh.dbh.fetchall()
+                for row in rows:
+                    historical_scans.append({
+                        'scan_id': row[0],
+                        'scan_name': row[1],
+                        'scan_started': row[2]
+                    })
+
+            if not historical_scans:
+                return {
+                    'success': True,
+                    'message': 'No historical scans found for this target',
+                    'correlations_found': 0,
+                    'historical_scans': 0
+                }
+
+            self.log.info(f"Found {len(historical_scans)} historical scans for correlation")
+
+        except Exception as e:
+            self.log.error(f"Error getting historical scans: {e}")
+            return {'success': False, 'error': f'Error getting historical scans: {str(e)}'}
+
+        # Load historical IOCs (excluding false positives)
+        historical_iocs = {}  # {ioc_data: [{scan_id, scan_name, event_type, timestamp}]}
+        try:
+            for hist_scan in historical_scans:
+                hist_events = dbh.scanResultEvent(hist_scan['scan_id'], 'ALL')
+                for event in hist_events:
+                    # Event format: [0]=generated, [1]=data, [2]=module, [3]=source_event_hash,
+                    # [4]=type, [5]=confidence, [6]=visibility, [7]=risk, [8]=false_positive
+                    event_type = event[4]
+                    event_data = event[1]
+                    event_timestamp = event[0]
+                    false_positive = event[8] if len(event) > 8 else 0
+
+                    # Skip ROOT events, empty data, and false positives
+                    if event_type == 'ROOT' or not event_data or false_positive:
+                        continue
+
+                    if event_data not in historical_iocs:
+                        historical_iocs[event_data] = []
+
+                    historical_iocs[event_data].append({
+                        'scan_id': hist_scan['scan_id'],
+                        'scan_name': hist_scan['scan_name'],
+                        'scan_date': str(hist_scan['scan_started']),
+                        'event_type': event_type,
+                        'timestamp': event_timestamp
+                    })
+
+            self.log.info(f"Loaded {len(historical_iocs)} unique historical IOCs")
+
+        except Exception as e:
+            self.log.error(f"Error loading historical IOCs: {e}")
+            return {'success': False, 'error': f'Error loading historical IOCs: {str(e)}'}
+
+        # Get current scan events and find correlations
+        correlations_found = 0
+        try:
+            current_events = dbh.scanResultEvent(id, 'ALL')
+            seen_iocs = set()  # Track IOCs we've already created correlations for
+
+            for event in current_events:
+                event_type = event[4]
+                event_data = event[1]
+                event_hash = event[9] if len(event) > 9 else None
+                false_positive = event[8] if len(event) > 8 else 0
+
+                # Skip ROOT events, empty data, false positives, and already processed
+                if event_type == 'ROOT' or not event_data or false_positive:
+                    continue
+
+                if event_data in seen_iocs:
+                    continue
+
+                # Check for match in historical IOCs
+                if event_data in historical_iocs:
+                    seen_iocs.add(event_data)
+                    historical_matches = historical_iocs[event_data]
+
+                    # Build correlation data
+                    source_scans = []
+                    seen_scans = set()
+                    timestamps = []
+
+                    for match in historical_matches:
+                        if match['scan_id'] not in seen_scans:
+                            seen_scans.add(match['scan_id'])
+                            source_scans.append({
+                                'scan_id': match['scan_id'],
+                                'scan_name': match['scan_name'],
+                                'scan_date': match['scan_date']
+                            })
+                        try:
+                            if isinstance(match['timestamp'], (int, float)):
+                                timestamps.append(float(match['timestamp']))
+                        except (ValueError, TypeError):
+                            pass
+
+                    # Calculate trend
+                    occurrence_count = len(historical_matches) + 1
+                    if not timestamps:
+                        trend = "new"
+                    elif occurrence_count <= 2:
+                        trend = "stable"
+                    else:
+                        timestamps.sort()
+                        if len(timestamps) >= 2:
+                            intervals = [timestamps[i+1] - timestamps[i] for i in range(len(timestamps)-1)]
+                            avg_interval = sum(intervals) / len(intervals)
+                            recent_interval = time.time() - timestamps[-1]
+                            if recent_interval < avg_interval * 0.5:
+                                trend = "increasing"
+                            elif recent_interval > avg_interval * 1.5:
+                                trend = "decreasing"
+                            else:
+                                trend = "stable"
+                        else:
+                            trend = "stable"
+
+                    # Calculate confidence
+                    confidence = min(0.95, 0.5 + (len(seen_scans) * 0.1) + (occurrence_count * 0.05))
+
+                    # Determine first and last seen
+                    if timestamps:
+                        first_seen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(min(timestamps)))
+                        last_seen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(max(timestamps)))
+                    else:
+                        first_seen = "Unknown"
+                        last_seen = "Unknown"
+
+                    # Generate analysis text
+                    analysis = f"IOC '{event_data[:50]}{'...' if len(event_data) > 50 else ''}' has been observed in {occurrence_count} scan(s) across {len(source_scans)} historical scan session(s). "
+                    if trend == "increasing":
+                        analysis += "Frequency is INCREASING - this IOC is appearing more often in recent scans. "
+                    elif trend == "decreasing":
+                        analysis += "Frequency is DECREASING - this IOC is appearing less often recently. "
+                    else:
+                        analysis += "Frequency is STABLE - this IOC appears consistently across scans. "
+
+                    if confidence >= 0.8:
+                        analysis += "HIGH CONFIDENCE: Strong correlation across multiple scans."
+                    elif confidence >= 0.6:
+                        analysis += "MEDIUM CONFIDENCE: Correlation found across scans."
+
+                    # Create correlation data JSON
+                    correlation_data = {
+                        'correlation_id': hashlib.md5(f"{event_data}_{time.time()}".encode()).hexdigest(),
+                        'ioc': event_data,
+                        'event_type': event_type,
+                        'historical_occurrences': occurrence_count - 1,
+                        'scans_involved': len(source_scans),
+                        'source_scans': source_scans,
+                        'first_seen': first_seen,
+                        'last_seen': last_seen,
+                        'trend': trend,
+                        'confidence': confidence,
+                        'analysis': analysis
+                    }
+
+                    # Create and store the AI correlation event
+                    from spiderfoot import SpiderFootEvent
+                    correlation_event = SpiderFootEvent(
+                        "AI_CROSS_SCAN_CORRELATION",
+                        json.dumps(correlation_data, default=str),
+                        "sfp__ai_threat_intel",
+                        None  # No parent event
+                    )
+                    correlation_event.confidence = int(confidence * 100)
+                    correlation_event.risk = 50 if trend == "increasing" else 30
+
+                    # Store the event
+                    dbh.scanEventStore(id, correlation_event)
+                    correlations_found += 1
+
+            self.log.info(f"AI correlation analysis complete. Found {correlations_found} correlations.")
+
+            return {
+                'success': True,
+                'message': f'AI correlation analysis complete',
+                'correlations_found': correlations_found,
+                'historical_scans': len(historical_scans),
+                'unique_historical_iocs': len(historical_iocs)
+            }
+
+        except Exception as e:
+            self.log.error(f"Error running AI correlation: {e}", exc_info=True)
+            return {'success': False, 'error': f'Error running correlation: {str(e)}'}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
     def scaneventresults(self: 'SpiderFootWebUi', id: str, eventType: str = None, filterfp: bool = False, correlationId: str = None) -> list:
         """Return all event results for a scan as JSON.
 
