@@ -1443,9 +1443,14 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
                 event_timestamp = event[0]
                 confidence = event[5] if len(event) > 5 else 50
                 risk = event[7] if len(event) > 7 else 0
+                false_positive = event[8] if len(event) > 8 else 0
 
-                # Skip ROOT events and empty data
+                # Skip ROOT events, empty data, and false positives
                 if event_type == 'ROOT' or not event_data:
+                    continue
+
+                # Skip false positives - they should not be included in correlation
+                if false_positive:
                     continue
 
                 # Store in historical IOCs dictionary
@@ -1529,6 +1534,10 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
         current_ioc = sfEvent.data
 
         if not current_ioc or current_ioc == 'ROOT':
+            return
+
+        # Skip false positives - they should not generate correlation events
+        if getattr(sfEvent, 'false_positive', False):
             return
 
         # Check for exact match in historical IOCs
