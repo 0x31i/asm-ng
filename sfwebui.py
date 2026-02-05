@@ -283,13 +283,34 @@ class SpiderFootWebUi:
 
         return retdata
 
-    def buildExcel(self: 'SpiderFootWebUi', data: list, columnNames: list, sheetNameIndex: int = 0) -> str:
+    def _compute_fp_flag(self, row_fp_field, event_type, event_data, source_data, targetFps):
+        """Compute the false positive flag value.
+
+        Args:
+            row_fp_field: the false_positive field from the DB row
+            event_type: event type string
+            event_data: event data string
+            source_data: source data string
+            targetFps: set of (event_type, event_data, source_data) tuples from target-level FPs
+
+        Returns:
+            int: 0=Unverified, 1=False Positive, 2=Verified
+        """
+        if row_fp_field == 1 or (event_type, event_data, source_data) in targetFps:
+            return 1
+        if row_fp_field == 2:
+            return 2
+        return 0
+
+    def buildExcel(self: 'SpiderFootWebUi', data: list, columnNames: list, sheetNameIndex: int = 0, prepend_sheets: list = None) -> str:
         """Convert supplied raw data into Excel format.
 
         Args:
             data (list): Scan result as list
             columnNames (list): column names
             sheetNameIndex (int): TBD
+            prepend_sheets (list): optional list of dicts with keys "name", "headers", "rows"
+                                   to insert as sheets at the front of the workbook
 
         Returns:
             str: Excel workbook
@@ -299,7 +320,7 @@ class SpiderFootWebUi:
         defaultSheet = workbook.active
         columnNames.pop(sheetNameIndex)
         allowed_sheet_chars = string.ascii_uppercase + string.digits + '_'
-        
+
         for row in data:
             sheetName = "".join(
                 [c for c in str(row.pop(sheetNameIndex)) if c.upper() in allowed_sheet_chars])
@@ -319,11 +340,21 @@ class SpiderFootWebUi:
 
             rowNums[sheetName] += 1
 
-        if rowNums:
+        if rowNums or prepend_sheets:
             workbook.remove(defaultSheet)
 
         # Sort sheets alphabetically
         workbook._sheets.sort(key=lambda ws: ws.title)
+
+        # Add any prepend sheets at the beginning of the workbook
+        if prepend_sheets:
+            for sheet_info in reversed(prepend_sheets):
+                ws = workbook.create_sheet(sheet_info["name"], 0)
+                for col_num, header in enumerate(sheet_info["headers"], 1):
+                    ws.cell(row=1, column=col_num, value=header)
+                for row_num, row_data in enumerate(sheet_info["rows"], 2):
+                    for col_num, cell_value in enumerate(row_data, 1):
+                        ws.cell(row=row_num, column=col_num, value=str(cell_value))
 
         # Save workbook
         with BytesIO() as f:
@@ -505,7 +536,7 @@ class SpiderFootWebUi:
         return self.error("Invalid export filetype.")
 
     @cherrypy.expose
-    def scaneventresultexport(self: 'SpiderFootWebUi', id: str, type: str, filetype: str = "csv", dialect: str = "excel") -> str:
+    def scaneventresultexport(self: 'SpiderFootWebUi', id: str, type: str, filetype: str = "csv", dialect: str = "excel", export_mode: str = "full") -> str:
         """Get scan event result data in CSV, Excel, or HTML format.
 
         Args:
@@ -513,12 +544,19 @@ class SpiderFootWebUi:
             type (str): TBD
             filetype (str): type of file ("xlsx|excel", "csv", or "html")
             dialect (str): CSV dialect (default: excel)
+            export_mode (str): "full" (all data), "analysis" (no FPs),
+                               or "analysis_correlations" (no FPs + correlations tab, Excel only)
 
         Returns:
             str: results in CSV, Excel, or HTML format
         """
         dbh = SpiderFootDb(self.config)
         data = dbh.scanResultEvent(id, type)
+        filter_fps = export_mode in ("analysis", "analysis_correlations")
+
+        # Force Excel for analysis_correlations mode (correlations tab requires .xlsx)
+        if export_mode == "analysis_correlations":
+            filetype = "excel"
 
         # Get target-level false positives for this scan
         scanInfo = dbh.scanInstanceGet(id)
@@ -530,28 +568,58 @@ class SpiderFootWebUi:
             except Exception:
                 pass  # Table may not exist in older databases
 
+        # Build correlations prepend sheet if requested
+        prepend_sheets = None
+        if export_mode == "analysis_correlations":
+            correlation_rows = []
+            try:
+                corr_data = dbh.scanCorrelationList(id)
+                for corr_row in corr_data:
+                    correlation_rows.append([
+                        str(corr_row[1]),   # Title
+                        str(corr_row[4]),   # Rule Name
+                        str(corr_row[3]),   # Risk
+                        str(corr_row[5]),   # Description
+                        str(corr_row[6]),   # Rule Logic
+                        str(corr_row[7]),   # Event Count
+                    ])
+            except Exception:
+                pass
+            prepend_sheets = [{
+                "name": "Correlations",
+                "headers": ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"],
+                "rows": correlation_rows
+            }]
+
         if filetype.lower() in ["xlsx", "excel"]:
             rows = []
             for row in data:
                 if row[4] == "ROOT":
+                    continue
+                fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
+                if filter_fps and fp_flag == 1:
                     continue
                 lastseen = time.strftime(
                     "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
                 event_type = translate_event_type(str(row[4]))
-                # Check both per-event FP flag and target-level FPs (including source for granular matching)
-                fp_flag = 1 if row[13] or (row[4], row[1], row[2]) in targetFps else 0
                 rows.append([lastseen, event_type, str(row[3]),
                             str(row[2]), fp_flag, datafield])
 
-            fname = "SpiderFoot.xlsx"
+            if export_mode == "analysis_correlations":
+                fname = "SpiderFoot-Analysis-Correlations.xlsx"
+            elif export_mode == "analysis":
+                fname = "SpiderFoot-Analysis.xlsx"
+            else:
+                fname = "SpiderFoot.xlsx"
             cherrypy.response.headers[
                 'Content-Disposition'] = f"attachment; filename={fname}"
             cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             cherrypy.response.headers['Pragma'] = "no-cache"
             return self.buildExcel(rows, ["Updated", "Type", "Module", "Source",
-                                   "F/P", "Data"], sheetNameIndex=1)
+                                   "F/P", "Data"], sheetNameIndex=1,
+                                   prepend_sheets=prepend_sheets)
 
         if filetype.lower() == 'csv':
             fileobj = StringIO()
@@ -561,17 +629,21 @@ class SpiderFootWebUi:
             for row in data:
                 if row[4] == "ROOT":
                     continue
+                fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
+                if filter_fps and fp_flag == 1:
+                    continue
                 lastseen = time.strftime(
                     "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
                 event_type = translate_event_type(str(row[4]))
-                # Check both per-event FP flag and target-level FPs (including source for granular matching)
-                fp_flag = 1 if row[13] or (row[4], row[1], row[2]) in targetFps else 0
                 parser.writerow([lastseen, event_type, str(
                     row[3]), str(row[2]), fp_flag, datafield])
 
-            fname = "SpiderFoot.csv"
+            if export_mode == "analysis":
+                fname = "SpiderFoot-Analysis.csv"
+            else:
+                fname = "SpiderFoot.csv"
             cherrypy.response.headers[
                 'Content-Disposition'] = f"attachment; filename={fname}"
             cherrypy.response.headers['Content-Type'] = "application/csv"
@@ -638,7 +710,7 @@ class SpiderFootWebUi:
                 # Escape HTML entities
                 datafield = datafield.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 event_type = translate_event_type(str(row[4]))
-                fp_flag = row[13] or (row[4], row[1]) in targetFps
+                fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
                 fp_display = '<span class="fp-yes">Yes</span>' if fp_flag else '<span class="fp-no">No</span>'
 
                 html_content += f"""                <tr>
@@ -668,7 +740,7 @@ class SpiderFootWebUi:
         return self.error("Invalid export filetype.")
 
     @cherrypy.expose
-    def scaneventresultexportmulti(self: 'SpiderFootWebUi', ids: str, filetype: str = "csv", dialect: str = "excel") -> str:
+    def scaneventresultexportmulti(self: 'SpiderFootWebUi', ids: str, filetype: str = "csv", dialect: str = "excel", export_mode: str = "full") -> str:
         """Get scan event result data in CSV, Excel, or HTML format for multiple
         scans.
 
@@ -676,6 +748,8 @@ class SpiderFootWebUi:
             ids (str): comma separated list of scan IDs
             filetype (str): type of file ("xlsx|excel", "csv", or "html")
             dialect (str): CSV dialect (default: excel)
+            export_mode (str): "full" (all data), "analysis" (no FPs),
+                               or "analysis_correlations" (no FPs + correlations tab, Excel only)
 
         Returns:
             str: results in CSV, Excel, or HTML format
@@ -685,6 +759,11 @@ class SpiderFootWebUi:
         targetFpsPerScan = dict()  # Store target FPs per scan ID
         data = list()
         scan_name = ""
+        filter_fps = export_mode in ("analysis", "analysis_correlations")
+
+        # Force Excel for analysis_correlations mode (correlations tab requires .xlsx)
+        if export_mode == "analysis_correlations":
+            filetype = "excel"
 
         for id in ids.split(','):
             scaninfo[id] = dbh.scanInstanceGet(id)
@@ -704,34 +783,74 @@ class SpiderFootWebUi:
         if not data:
             return None
 
+        # Build correlations prepend sheet if requested
+        prepend_sheets = None
+        if export_mode == "analysis_correlations":
+            correlation_rows = []
+            for scan_id in ids.split(','):
+                if scan_id not in scaninfo or scaninfo[scan_id] is None:
+                    continue
+                try:
+                    corr_data = dbh.scanCorrelationList(scan_id)
+                    scan_name_display = scaninfo[scan_id][0] if scaninfo[scan_id] else "Unknown"
+                    for corr_row in corr_data:
+                        correlation_rows.append([
+                            scan_name_display,
+                            str(corr_row[1]),   # Title
+                            str(corr_row[4]),   # Rule Name
+                            str(corr_row[3]),   # Risk
+                            str(corr_row[5]),   # Description
+                            str(corr_row[6]),   # Rule Logic
+                            str(corr_row[7]),   # Event Count
+                        ])
+                except Exception:
+                    pass
+            prepend_sheets = [{
+                "name": "Correlations",
+                "headers": ["Scan Name", "Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"],
+                "rows": correlation_rows
+            }]
+
         if filetype.lower() in ["xlsx", "excel"]:
             rows = []
             for row in data:
                 if row[4] == "ROOT":
+                    continue
+                scan_id = row[12]
+                targetFps = targetFpsPerScan.get(scan_id, set())
+                fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
+                if filter_fps and fp_flag == 1:
                     continue
                 lastseen = time.strftime(
                     "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
                 event_type = translate_event_type(str(row[4]))
-                # Check both per-event FP flag and target-level FPs (including source for granular matching)
-                scan_id = row[12]
-                targetFps = targetFpsPerScan.get(scan_id, set())
-                fp_flag = 1 if row[13] or (row[4], row[1], row[2]) in targetFps else 0
                 rows.append([scaninfo[row[12]][0], lastseen, event_type, str(row[3]),
                             str(row[2]), fp_flag, datafield])
 
             if len(ids.split(',')) > 1 or scan_name == "":
-                fname = "SpiderFoot.xlsx"
+                if export_mode == "analysis_correlations":
+                    fname = "SpiderFoot-Analysis-Correlations.xlsx"
+                elif export_mode == "analysis":
+                    fname = "SpiderFoot-Analysis.xlsx"
+                else:
+                    fname = "SpiderFoot.xlsx"
             else:
-                fname = scan_name + "-SpiderFoot.xlsx"
+                if export_mode == "analysis_correlations":
+                    fname = scan_name + "-SpiderFoot-Analysis-Correlations.xlsx"
+                elif export_mode == "analysis":
+                    fname = scan_name + "-SpiderFoot-Analysis.xlsx"
+                else:
+                    fname = scan_name + "-SpiderFoot.xlsx"
 
             cherrypy.response.headers[
                 'Content-Disposition'] = f"attachment; filename={fname}"
             cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             cherrypy.response.headers['Pragma'] = "no-cache"
             return self.buildExcel(rows, ["Scan Name", "Updated", "Type", "Module",
-                                   "Source", "F/P", "Data"], sheetNameIndex=2)
+                                   "Source", "F/P", "Data"], sheetNameIndex=2,
+                                   prepend_sheets=prepend_sheets)
 
         if filetype.lower() == 'csv':
             fileobj = StringIO()
@@ -741,22 +860,29 @@ class SpiderFootWebUi:
             for row in data:
                 if row[4] == "ROOT":
                     continue
+                scan_id = row[12]
+                targetFps = targetFpsPerScan.get(scan_id, set())
+                fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
+                if filter_fps and fp_flag == 1:
+                    continue
                 lastseen = time.strftime(
                     "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
                 event_type = translate_event_type(str(row[4]))
-                # Check both per-event FP flag and target-level FPs (including source for granular matching)
-                scan_id = row[12]
-                targetFps = targetFpsPerScan.get(scan_id, set())
-                fp_flag = 1 if row[13] or (row[4], row[1], row[2]) in targetFps else 0
                 parser.writerow([scaninfo[row[12]][0], lastseen, event_type, str(row[3]),
                                 str(row[2]), fp_flag, datafield])
 
             if len(ids.split(',')) > 1 or scan_name == "":
-                fname = "SpiderFoot.csv"
+                if export_mode == "analysis":
+                    fname = "SpiderFoot-Analysis.csv"
+                else:
+                    fname = "SpiderFoot.csv"
             else:
-                fname = scan_name + "-SpiderFoot.csv"
+                if export_mode == "analysis":
+                    fname = scan_name + "-SpiderFoot-Analysis.csv"
+                else:
+                    fname = scan_name + "-SpiderFoot.csv"
 
             cherrypy.response.headers[
                 'Content-Disposition'] = f"attachment; filename={fname}"
@@ -827,7 +953,7 @@ class SpiderFootWebUi:
                 scan_id = row[12]
                 scan_name_display = scaninfo[scan_id][0] if scan_id in scaninfo and scaninfo[scan_id] else "Unknown"
                 targetFps = targetFpsPerScan.get(scan_id, set())
-                fp_flag = row[13] or (row[4], row[1]) in targetFps
+                fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
                 fp_display = '<span class="fp-yes">Yes</span>' if fp_flag else '<span class="fp-no">No</span>'
 
                 html_content += f"""                <tr>
@@ -863,7 +989,7 @@ class SpiderFootWebUi:
         return self.error("Invalid export filetype.")
 
     @cherrypy.expose
-    def scansearchresultexport(self: 'SpiderFootWebUi', id: str, eventType: str = None, value: str = None, filetype: str = "csv", dialect: str = "excel") -> str:
+    def scansearchresultexport(self: 'SpiderFootWebUi', id: str, eventType: str = None, value: str = None, filetype: str = "csv", dialect: str = "excel", export_mode: str = "full") -> str:
         """Get search result data in CSV or Excel format.
 
         Args:
@@ -872,11 +998,18 @@ class SpiderFootWebUi:
             value (str): TBD
             filetype (str): type of file ("xlsx|excel" or "csv")
             dialect (str): CSV dialect (default: excel)
+            export_mode (str): "full" (all data), "analysis" (no FPs),
+                               or "analysis_correlations" (no FPs + correlations tab, Excel only)
 
         Returns:
             str: results in CSV or Excel format
         """
         data = self.searchBase(id, eventType, value)
+        filter_fps = export_mode in ("analysis", "analysis_correlations")
+
+        # Force Excel for analysis_correlations mode (correlations tab requires .xlsx)
+        if export_mode == "analysis_correlations":
+            filetype = "excel"
 
         if not data:
             return None
@@ -892,23 +1025,55 @@ class SpiderFootWebUi:
             except Exception:
                 pass  # Table may not exist in older databases
 
+        # Build correlations prepend sheet if requested
+        prepend_sheets = None
+        if export_mode == "analysis_correlations":
+            correlation_rows = []
+            try:
+                corr_data = dbh.scanCorrelationList(id)
+                for corr_row in corr_data:
+                    correlation_rows.append([
+                        str(corr_row[1]),   # Title
+                        str(corr_row[4]),   # Rule Name
+                        str(corr_row[3]),   # Risk
+                        str(corr_row[5]),   # Description
+                        str(corr_row[6]),   # Rule Logic
+                        str(corr_row[7]),   # Event Count
+                    ])
+            except Exception:
+                pass
+            prepend_sheets = [{
+                "name": "Correlations",
+                "headers": ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"],
+                "rows": correlation_rows
+            }]
+
         if filetype.lower() in ["xlsx", "excel"]:
             rows = []
             for row in data:
                 if row[10] == "ROOT":
                     continue
+                fp_flag = self._compute_fp_flag(row[11], row[10], row[1], row[2], targetFps)
+                if filter_fps and fp_flag == 1:
+                    continue
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
                 event_type = translate_event_type(str(row[10]))
-                # Check both per-event FP flag and target-level FPs (including source for granular matching)
-                fp_flag = 1 if row[11] or (row[10], row[1], row[2]) in targetFps else 0
                 rows.append([row[0], event_type, str(row[3]),
                             str(row[2]), fp_flag, datafield])
-            cherrypy.response.headers['Content-Disposition'] = "attachment; filename=SpiderFoot.xlsx"
+
+            if export_mode == "analysis_correlations":
+                fname = "SpiderFoot-Analysis-Correlations.xlsx"
+            elif export_mode == "analysis":
+                fname = "SpiderFoot-Analysis.xlsx"
+            else:
+                fname = "SpiderFoot.xlsx"
+            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
             cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             cherrypy.response.headers['Pragma'] = "no-cache"
             return self.buildExcel(rows, ["Updated", "Type", "Module", "Source",
-                                   "F/P", "Data"], sheetNameIndex=1)
+                                   "F/P", "Data"], sheetNameIndex=1,
+                                   prepend_sheets=prepend_sheets)
 
         if filetype.lower() == 'csv':
             fileobj = StringIO()
@@ -918,15 +1083,20 @@ class SpiderFootWebUi:
             for row in data:
                 if row[10] == "ROOT":
                     continue
+                fp_flag = self._compute_fp_flag(row[11], row[10], row[1], row[2], targetFps)
+                if filter_fps and fp_flag == 1:
+                    continue
                 datafield = str(row[1]).replace(
                     "<SFURL>", "").replace("</SFURL>", "")
                 event_type = translate_event_type(str(row[10]))
-                # Check both per-event FP flag and target-level FPs (including source for granular matching)
-                fp_flag = 1 if row[11] or (row[10], row[1], row[2]) in targetFps else 0
                 parser.writerow([row[0], event_type, str(
                     row[3]), str(row[2]), fp_flag, datafield])
 
-            cherrypy.response.headers['Content-Disposition'] = "attachment; filename=SpiderFoot.csv"
+            if export_mode == "analysis":
+                fname = "SpiderFoot-Analysis.csv"
+            else:
+                fname = "SpiderFoot.csv"
+            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
             cherrypy.response.headers['Content-Type'] = "application/csv"
             cherrypy.response.headers['Pragma'] = "no-cache"
             return fileobj.getvalue().encode('utf-8')
