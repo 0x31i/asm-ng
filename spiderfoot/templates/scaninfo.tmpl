@@ -385,11 +385,11 @@
                     } else {
                         preview = selectedDataElements.length + " unique values";
                     }
-                    $("#match-data-preview").text(preview);
-                    $("#data-match-count").text(selectedDataElements.length);
-                    $("#match-data-element").show();
+                    $("#match-source-preview").text(preview);
+                    $("#source-match-count").text(selectedDataElements.length);
+                    $("#match-source-element").show();
                 } else {
-                    $("#match-data-element").hide();
+                    $("#match-source-element").hide();
                 }
 
                 // Show source element match option with count
@@ -401,11 +401,11 @@
                     } else {
                         preview = selectedSourceElements.length + " unique values";
                     }
-                    $("#match-source-preview").text(preview);
-                    $("#source-match-count").text(selectedSourceElements.length);
-                    $("#match-source-element").show();
+                    $("#match-data-preview").text(preview);
+                    $("#data-match-count").text(selectedSourceElements.length);
+                    $("#match-data-element").show();
                 } else {
-                    $("#match-source-element").hide();
+                    $("#match-data-element").hide();
                 }
             } else {
                 hideSelectionToolbar();
