@@ -1646,7 +1646,7 @@
                             filterBar += "</div>";
                             filterBar += "<div class='stats-bar-right'>";
                             var fpBtnClass = filterFP ? 'filter-btn filter-btn-active filter-btn-fp' : 'filter-btn filter-btn-fp';
-                            var fpBtnText = filterFP ? 'SHOWING ALL' : 'HIDE FP';
+                            var fpBtnText = filterFP ? 'SHOW ALL' : 'HIDE FALSE POSITIVES';
                             filterBar += "<button class='" + fpBtnClass + "' onclick=\"browseEventData('" + instanceId + "', '" + eventTypeLabel + "', '" + eventType + "', '" + format + "', " + (!filterFP ? 1 : 0) + ")\">" + fpBtnText + "</button>";
                             filterBar += "</div></div>";
 
