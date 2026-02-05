@@ -189,6 +189,15 @@ def import_csv(csv_path: str, scan_name: str = None, target: str = None, dry_run
     except Exception as e:
         raise RuntimeError(f"Failed to create scan instance: {e}") from e
 
+    # Create ROOT event so the web UI self-JOIN can resolve source_event_hash = 'ROOT'
+    root_qry = """INSERT INTO tbl_scan_results
+        (scan_instance_id, hash, type, generated, confidence,
+        visibility, risk, module, data, false_positive, source_event_hash)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+    root_qvals = [scan_id, 'ROOT', 'ROOT', int(time.time() * 1000),
+                  100, 100, 0, '', target, 0, 'ROOT']
+    db.dbh.execute(root_qry, root_qvals)
+
     # Import events
     print("\nImporting events...")
 
