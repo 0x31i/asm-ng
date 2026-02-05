@@ -25,8 +25,8 @@ from copy import deepcopy
 from pathlib import Path
 
 import cherrypy
+import cherrypy.lib.sessions
 import cherrypy_cors
-from cherrypy.lib import auth_digest
 
 from sflib import SpiderFoot
 from sfscan import startSpiderFootScanner
@@ -1002,10 +1002,20 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
         web_root = sfWebUiConfig.get('root', '/')
         cors_origins = sfWebUiConfig.get('cors_origins', [])
 
+        # Configure sessions for authentication
+        session_dir = os.path.join(SpiderFootHelpers.dataPath(), 'sessions')
+        os.makedirs(session_dir, exist_ok=True)
+
         cherrypy.config.update({
             'log.screen': False,
             'server.socket_host': web_host,
-            'server.socket_port': int(web_port)
+            'server.socket_port': int(web_port),
+            'tools.sessions.on': True,
+            'tools.sessions.storage_class': cherrypy.lib.sessions.FileSession,
+            'tools.sessions.storage_path': session_dir,
+            'tools.sessions.timeout': 480,
+            'tools.sessions.httponly': True,
+            'tools.sessions.secure': False,
         })
 
         log.info(f"Starting web server at {web_host}:{web_port} ...")
@@ -1020,53 +1030,16 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
                 'tools.staticdir.on': True,
                 'tools.staticdir.dir': 'static',
                 'tools.staticdir.root': f"{os.path.dirname(os.path.abspath(__file__))}/spiderfoot"
+            },
+            '/': {
+                'tools.auth_check.on': True,
+            },
+            '/login': {
+                'tools.auth_check.on': False,
             }
         }
 
-        secrets = dict()
-        passwd_file = SpiderFootHelpers.dataPath() + '/passwd'
-        if os.path.isfile(passwd_file):
-            if not os.access(passwd_file, os.R_OK):
-                log.error("Could not read passwd file. Permission denied.")
-                sys.exit(-1)
-
-            with open(passwd_file, 'r') as f:
-                passwd_data = f.readlines()
-
-            for line in passwd_data:
-                if line.strip() == '':
-                    continue
-
-                if ':' not in line:
-                    log.error(
-                        "Incorrect format of passwd file, must be username:password on each line.")
-                    sys.exit(-1)
-
-                u = line.strip().split(":")[0]
-                p = ':'.join(line.strip().split(":")[1:])
-
-                if not u or not p:
-                    log.error(
-                        "Incorrect format of passwd file, must be username:password on each line.")
-                    sys.exit(-1)
-
-                secrets[u] = p
-
-        if secrets:
-            log.info("Enabling authentication based on supplied passwd file.")
-            conf['/'] = {
-                'tools.auth_digest.on': True,
-                'tools.auth_digest.realm': web_host,
-                'tools.auth_digest.get_ha1': auth_digest.get_ha1_dict_plain(secrets),
-                'tools.auth_digest.key': random.SystemRandom().randint(0, 99999999)
-            }
-        else:
-            warn_msg = "\n********************************************************************\n"
-            warn_msg += "Warning: passwd file contains no passwords. Authentication disabled.\n"
-            warn_msg += "Please consider adding authentication to protect this instance!\n"
-            warn_msg += "Refer to https://github.com/poppopjmp/spiderfoot/wiki. \n"
-            warn_msg += "********************************************************************\n"
-            log.warning(warn_msg)
+        log.info("Session-based authentication enabled.")
 
         using_ssl = False
         key_path = SpiderFootHelpers.dataPath() + '/spiderfoot.key'

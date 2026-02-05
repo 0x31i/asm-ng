@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>ASM-NG v${version} - Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ASM-NG - Attack Surface Management">
+    <link rel="icon" type="image/png" href="${docroot}/static/img/spiderfoot-icon.png">
+    <link href="${docroot}/static/node_modules/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <script>
+        var isDark = localStorage.getItem("theme") === "dark-theme";
+        var cssFile = isDark ? "dark.css" : "spiderfoot.css";
+        var cacheBust = "?v=" + Date.now();
+        document.write('<link id="theme-css" href="${docroot}/static/css/' + cssFile + cacheBust + '" rel="stylesheet">');
+    </script>
+    <noscript>
+        <link href="${docroot}/static/css/spiderfoot.css" rel="stylesheet">
+    </noscript>
+
+    <style>
+      .login-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 20px;
+      }
+      .login-card {
+        width: 100%;
+        max-width: 400px;
+        padding: 40px;
+        border-radius: 12px;
+        background: var(--bg-elevated, #fff);
+        border: 1px solid var(--glass-border, rgba(0,0,0,0.1));
+        box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      }
+      .login-card h2 {
+        text-align: center;
+        margin-bottom: 8px;
+        font-family: var(--font-mono, monospace);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        font-size: 1.4em;
+      }
+      .login-card .subtitle {
+        text-align: center;
+        color: var(--text-muted, #6b7280);
+        margin-bottom: 30px;
+        font-size: 0.9em;
+      }
+      .login-card .form-group {
+        margin-bottom: 18px;
+      }
+      .login-card label {
+        font-family: var(--font-mono, monospace);
+        text-transform: uppercase;
+        font-size: 0.75em;
+        letter-spacing: 1px;
+        margin-bottom: 6px;
+        display: block;
+      }
+      .login-card .form-control {
+        border-radius: 6px;
+        padding: 10px 14px;
+        font-size: 14px;
+      }
+      .login-card .btn-login {
+        width: 100%;
+        padding: 10px;
+        font-family: var(--font-mono, monospace);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        font-weight: 600;
+        border-radius: 6px;
+        margin-top: 10px;
+      }
+      .login-logo {
+        text-align: center;
+        margin-bottom: 24px;
+      }
+      .login-logo video, .login-logo img {
+        max-width: 200px;
+        height: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="login-wrapper">
+      <div class="login-card">
+        <div class="login-logo">
+          <video autoplay loop muted playsinline style="max-width:200px;">
+            <source src="${docroot}/static/img/asm-ng-logo.mp4" type="video/mp4">
+            <img src="${docroot}/static/img/asm-ng-logo.png" alt="ASM-NG" />
+          </video>
+        </div>
+        <h2>Login</h2>
+        <p class="subtitle">Attack Surface Management</p>
+
+% if error:
+        <div class="alert alert-danger" style="font-size: 0.9em;">
+          ${error}
+        </div>
+% endif
+
+        <form method="POST" action="${docroot}/login">
+          <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" class="form-control" id="username" name="username" required autofocus autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" class="form-control" id="password" name="password" required autocomplete="current-password">
+          </div>
+          <button type="submit" class="btn btn-primary btn-login">Sign In</button>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>

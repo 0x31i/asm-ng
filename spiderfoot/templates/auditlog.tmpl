@@ -1,0 +1,89 @@
+<%include file="HEADER.tmpl"/>
+    <h2>Activity Log</h2>
+    <p style="color: var(--text-muted, #6b7280); margin-bottom: 20px;">
+      Record of user actions across the system.
+    </p>
+
+    <div class="row" style="margin-bottom: 15px;">
+      <div class="col-md-3">
+        <select id="filter-action" class="form-control" style="font-size: 13px;">
+          <option value="">All Actions</option>
+          <option value="LOGIN">Login</option>
+          <option value="LOGIN_FAILED">Login Failed</option>
+          <option value="LOGOUT">Logout</option>
+          <option value="SCAN_START">Scan Started</option>
+          <option value="SCAN_STOP">Scan Stopped</option>
+          <option value="SCAN_DELETE">Scan Deleted</option>
+          <option value="SETTINGS_SAVE">Settings Saved</option>
+          <option value="SETTINGS_RESET">Settings Reset</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select id="filter-user" class="form-control" style="font-size: 13px;">
+          <option value="">All Users</option>
+% for user in users:
+          <option value="${user}">${user}</option>
+% endfor
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button id="btn-filter" class="btn btn-primary btn-sm" style="margin-top: 2px;">Filter</button>
+      </div>
+    </div>
+
+    <table class="table table-striped table-condensed" style="font-size: 13px;">
+      <thead>
+        <tr>
+          <th style="width: 180px;">Time</th>
+          <th style="width: 120px;">User</th>
+          <th style="width: 140px;">Action</th>
+          <th>Details</th>
+          <th style="width: 130px;">IP Address</th>
+        </tr>
+      </thead>
+      <tbody id="audit-rows">
+% for entry in logs:
+        <tr>
+          <td><span class="text-muted">${entry['time_str']}</span></td>
+          <td><strong>${entry['username']}</strong></td>
+          <td>
+<%
+action_classes = {
+    'LOGIN': 'label-success',
+    'LOGIN_FAILED': 'label-danger',
+    'LOGOUT': 'label-default',
+    'SCAN_START': 'label-info',
+    'SCAN_STOP': 'label-warning',
+    'SCAN_DELETE': 'label-danger',
+    'SETTINGS_SAVE': 'label-primary',
+    'SETTINGS_RESET': 'label-warning',
+}
+cls = action_classes.get(entry['action'], 'label-default')
+%>
+            <span class="label ${cls}">${entry['action']}</span>
+          </td>
+          <td>${entry['detail'] or ''}</td>
+          <td><code>${entry['ip_address'] or ''}</code></td>
+        </tr>
+% endfor
+% if not logs:
+        <tr>
+          <td colspan="5" class="text-center text-muted" style="padding: 30px;">No activity recorded yet.</td>
+        </tr>
+% endif
+      </tbody>
+    </table>
+
+<script>
+document.getElementById('btn-filter').addEventListener('click', function() {
+    var action = document.getElementById('filter-action').value;
+    var user = document.getElementById('filter-user').value;
+    var params = [];
+    if (action) params.push('action=' + encodeURIComponent(action));
+    if (user) params.push('username=' + encodeURIComponent(user));
+    var qs = params.length > 0 ? '?' + params.join('&') : '';
+    window.location.href = docroot + '/auditlog' + qs;
+});
+</script>
+
+<%include file="FOOTER.tmpl"/>

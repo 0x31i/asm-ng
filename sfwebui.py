@@ -104,6 +104,35 @@ class SpiderFootWebUi:
             'request.error_response': self.error_page
         })
 
+        # Create default admin user if no users exist
+        dbh_init = SpiderFootDb(self.config, init=True)
+        if dbh_init.userCount() == 0:
+            import secrets as _secrets
+            default_password = _secrets.token_urlsafe(12)
+            dbh_init.userCreate('admin', default_password, display_name='Administrator')
+            self._default_password = default_password
+            self.log.info(f"Created default admin user. Password: {default_password}")
+            print("")
+            print("*************************************************************")
+            print(f" Default login credentials created:")
+            print(f"   Username: admin")
+            print(f"   Password: {default_password}")
+            print(f" Please change this password after first login!")
+            print("*************************************************************")
+            print("")
+
+        # Register a CherryPy tool to enforce auth on all requests
+        def check_auth():
+            """Before handler: redirect to login if not authenticated."""
+            path = cherrypy.request.path_info
+            # Allow access to login page, static files, and ping endpoint
+            if path.endswith('/login') or '/static/' in path or path.endswith('/ping'):
+                return
+            if not cherrypy.session.get('username'):
+                raise cherrypy.HTTPRedirect(f"{self.docroot}/login")
+
+        cherrypy.tools.auth_check = cherrypy.Tool('before_handler', check_auth)
+
         csp = (
             secure.ContentSecurityPolicy()
                 .default_src("'self'")
@@ -126,6 +155,68 @@ class SpiderFootWebUi:
             "tools.response_headers.on": True,
             "tools.response_headers.headers": secure_headers.framework.cherrypy()
         })
+
+    def currentUser(self: 'SpiderFootWebUi') -> str:
+        """Get the currently logged-in username from the session.
+
+        Returns:
+            str: username or None if not authenticated
+        """
+        return cherrypy.session.get('username')
+
+    def requireAuth(self: 'SpiderFootWebUi') -> None:
+        """Redirect to login page if user is not authenticated."""
+        if not self.currentUser():
+            raise cherrypy.HTTPRedirect(f"{self.docroot}/login")
+
+    def clientIP(self: 'SpiderFootWebUi') -> str:
+        """Get the client IP address from the request.
+
+        Returns:
+            str: client IP address
+        """
+        return cherrypy.request.remote.ip
+
+    @cherrypy.expose
+    def login(self: 'SpiderFootWebUi', username: str = None, password: str = None) -> str:
+        """Login page and handler.
+
+        Args:
+            username (str): username for POST
+            password (str): password for POST
+
+        Returns:
+            str: login page HTML or redirect
+        """
+        error = None
+
+        if cherrypy.request.method == 'POST' and username and password:
+            dbh = SpiderFootDb(self.config)
+            if dbh.userVerify(username, password):
+                cherrypy.session['username'] = username
+                dbh.userUpdateLastLogin(username)
+                dbh.auditLog(username, 'LOGIN', detail='Successful login', ip_address=self.clientIP())
+                self.log.info(f"User '{username}' logged in from {self.clientIP()}")
+                raise cherrypy.HTTPRedirect(f"{self.docroot}/")
+            else:
+                dbh.auditLog(username, 'LOGIN_FAILED', detail='Invalid credentials', ip_address=self.clientIP())
+                self.log.warning(f"Failed login attempt for user '{username}' from {self.clientIP()}")
+                error = "Invalid username or password."
+
+        templ = Template(
+            filename='spiderfoot/templates/login.tmpl', lookup=self.lookup)
+        return templ.render(docroot=self.docroot, version=__version__, error=error)
+
+    @cherrypy.expose
+    def logout(self: 'SpiderFootWebUi') -> None:
+        """Logout the current user."""
+        username = self.currentUser()
+        if username:
+            dbh = SpiderFootDb(self.config)
+            dbh.auditLog(username, 'LOGOUT', ip_address=self.clientIP())
+            self.log.info(f"User '{username}' logged out")
+        cherrypy.session.clear()
+        raise cherrypy.HTTPRedirect(f"{self.docroot}/login")
 
     def error_page(self: 'SpiderFootWebUi') -> None:
         """Error page."""
@@ -1829,6 +1920,34 @@ class SpiderFootWebUi:
                             updated=updated, docroot=self.docroot)
 
     @cherrypy.expose
+    def auditlog(self: 'SpiderFootWebUi', action: str = None, username: str = None) -> str:
+        """Show the activity/audit log page.
+
+        Args:
+            action (str): optional action type filter
+            username (str): optional username filter
+
+        Returns:
+            str: audit log page HTML
+        """
+        dbh = SpiderFootDb(self.config)
+        logs = dbh.auditLogGet(limit=500, username=username, action=action)
+
+        # Format timestamps for display
+        for entry in logs:
+            entry['time_str'] = time.strftime(
+                "%Y-%m-%d %H:%M:%S", time.localtime(entry['created'] / 1000))
+
+        # Get unique usernames for filter dropdown
+        users = sorted(set(entry['username'] for entry in logs))
+
+        templ = Template(
+            filename='spiderfoot/templates/auditlog.tmpl', lookup=self.lookup)
+        return templ.render(
+            pageid='AUDITLOG', docroot=self.docroot, version=__version__,
+            logs=logs, users=users)
+
+    @cherrypy.expose
     def workspaces(self: 'SpiderFootWebUi') -> str:
         """Show workspace management page.
 
@@ -1920,6 +2039,13 @@ class SpiderFootWebUi:
         for scan_id in ids:
             dbh.scanInstanceDelete(scan_id)
 
+        # Audit log: scan deleted
+        dbh.auditLog(
+            self.currentUser() or 'unknown', 'SCAN_DELETE',
+            detail=f"Deleted scan(s): {id}",
+            ip_address=self.clientIP()
+        )
+
         return ""
 
     @cherrypy.expose
@@ -1966,6 +2092,12 @@ class SpiderFootWebUi:
         # Reset config to default
         if allopts == "RESET":
             if self.reset_settings():
+                dbh_audit = SpiderFootDb(self.config)
+                dbh_audit.auditLog(
+                    self.currentUser() or 'unknown', 'SETTINGS_RESET',
+                    detail='Settings reset to factory default',
+                    ip_address=self.clientIP()
+                )
                 raise cherrypy.HTTPRedirect(f"{self.docroot}/opts?updated=1")
             return self.error("Failed to reset settings")
 
@@ -1993,6 +2125,13 @@ class SpiderFootWebUi:
             logging.exception("Error processing user input in savesettings")
             return self.error(f"Processing one or more of your inputs failed: {e}")
 
+        # Audit log: settings saved
+        dbh.auditLog(
+            self.currentUser() or 'unknown', 'SETTINGS_SAVE',
+            detail='Settings saved via web UI',
+            ip_address=self.clientIP()
+        )
+
         raise cherrypy.HTTPRedirect(f"{self.docroot}/opts?updated=1")
 
     @cherrypy.expose
@@ -2014,6 +2153,12 @@ class SpiderFootWebUi:
         # Reset config to default
         if allopts == "RESET":
             if self.reset_settings():
+                dbh_audit = SpiderFootDb(self.config)
+                dbh_audit.auditLog(
+                    self.currentUser() or 'unknown', 'SETTINGS_RESET',
+                    detail='Settings reset to factory default (raw)',
+                    ip_address=self.clientIP()
+                )
                 return json.dumps(["SUCCESS", ""]).encode('utf-8')
             return json.dumps(["ERROR", "Failed to reset settings"]).encode('utf-8')
 
@@ -2034,6 +2179,13 @@ class SpiderFootWebUi:
             dbh.configSet(sf.configSerialize(self.config))
         except Exception as e:
             return json.dumps(["ERROR", f"Processing one or more of your inputs failed: {e}"]).encode('utf-8')
+
+        # Audit log: settings saved
+        dbh.auditLog(
+            self.currentUser() or 'unknown', 'SETTINGS_SAVE',
+            detail='Settings saved via raw API',
+            ip_address=self.clientIP()
+        )
 
         return json.dumps(["SUCCESS", ""]).encode('utf-8')
 
@@ -2630,6 +2782,13 @@ class SpiderFootWebUi:
             self.log.info("Waiting for the scan to initialize...")
             time.sleep(1)
 
+        # Audit log: scan started
+        dbh.auditLog(
+            self.currentUser() or 'unknown', 'SCAN_START',
+            detail=f"Scan '{scanname}' on target '{scantarget}' (ID: {scanId})",
+            ip_address=self.clientIP()
+        )
+
         if cherrypy.request.headers.get('Accept') and 'application/json' in cherrypy.request.headers.get('Accept'):
             cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
             return json.dumps(["SUCCESS", scanId]).encode('utf-8')
@@ -2671,6 +2830,13 @@ class SpiderFootWebUi:
 
         for scan_id in ids:
             dbh.scanInstanceSet(scan_id, status="ABORT-REQUESTED")
+
+        # Audit log: scan stopped
+        dbh.auditLog(
+            self.currentUser() or 'unknown', 'SCAN_STOP',
+            detail=f"Stopped scan(s): {id}",
+            ip_address=self.clientIP()
+        )
 
         return ""
 
