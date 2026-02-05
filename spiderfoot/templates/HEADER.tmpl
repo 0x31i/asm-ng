@@ -57,6 +57,16 @@
       </a>
     </li>
     <li
+% if pageid == "IMPORT":
+    class="active"
+% endif
+    >
+      <a id="nav-link-import" href="${docroot}/importscans">
+        <i class="glyphicon glyphicon-import nav-icon"></i>
+        <span class="nav-text">Import</span>
+      </a>
+    </li>
+    <li
 % if pageid == "SCANLIST":
     class="active"
 % endif
