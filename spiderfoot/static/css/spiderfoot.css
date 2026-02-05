@@ -5579,13 +5579,19 @@ i.glyphicon-white,
   font-size: 15px;
   margin: 0 0 8px 0;
   color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
 }
 
 .import-card-desc {
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
   color: var(--text-secondary);
   margin: 0 0 10px 0;
-  line-height: 1.4;
+  line-height: 1.5;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .import-card-filetype {
@@ -5597,6 +5603,8 @@ i.glyphicon-white,
   border-radius: var(--radius-sm);
   background: var(--bg-tertiary);
   color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .import-card-badge {
@@ -5619,10 +5627,123 @@ i.glyphicon-white,
   margin-top: 10px;
 }
 
+#import-form-section label {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
 #import-form-section .form-control {
+  font-family: var(--font-mono);
+  font-size: 13px;
   background: var(--bg-elevated);
   border-color: var(--glass-border);
   color: var(--text-primary);
+  border-radius: 0;
+}
+
+#import-form-section .form-text {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+#import-form-section .btn {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-radius: 0;
+}
+
+/* Custom file input */
+.import-file-hidden {
+  position: absolute;
+  left: -9999px;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.import-file-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-import-browse {
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 8px 18px;
+  border: 1px solid var(--glass-border);
+  border-radius: 0 !important;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.btn-import-browse:hover {
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+  background: var(--bg-elevated);
+}
+
+.import-file-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.import-file-name.has-file {
+  color: var(--accent-green);
+  font-weight: 600;
+}
+
+/* Preview section */
+#import-preview-section {
+  margin-top: 10px;
+}
+
+#import-preview-section h3,
+#import-results-section h3 {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+#import-preview-section .btn,
+#import-results-section .btn {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-radius: 0;
+}
+
+/* Stats table */
+.import-stats-table {
+  max-width: 500px;
+  background: var(--bg-elevated);
+}
+
+.import-stats-table td {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 #import-results-section .table {

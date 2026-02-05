@@ -11,9 +11,9 @@
       <div class="import-card-icon">
         <i class="glyphicon glyphicon-file"></i>
       </div>
-      <h4 class="import-card-title">Legacy Scan</h4>
-      <p class="import-card-desc">Import CSV exports from older SpiderFoot versions.</p>
-      <span class="import-card-filetype">.csv</span>
+      <h4 class="import-card-title">LEGACY SCAN</h4>
+      <p class="import-card-desc">IMPORT CSV EXPORTS FROM OLDER SPIDERFOOT VERSIONS.</p>
+      <span class="import-card-filetype">.CSV</span>
     </div>
   </div>
 
@@ -23,9 +23,9 @@
       <div class="import-card-icon">
         <i class="glyphicon glyphicon-refresh"></i>
       </div>
-      <h4 class="import-card-title">Scan Backup</h4>
-      <p class="import-card-desc">Restore scans from SpiderFoot CSV backups.</p>
-      <span class="import-card-filetype">.csv</span>
+      <h4 class="import-card-title">SCAN BACKUP</h4>
+      <p class="import-card-desc">RESTORE SCANS FROM SPIDERFOOT CSV BACKUPS.</p>
+      <span class="import-card-filetype">.CSV</span>
     </div>
   </div>
 
@@ -35,10 +35,10 @@
       <div class="import-card-icon">
         <i class="glyphicon glyphicon-globe"></i>
       </div>
-      <h4 class="import-card-title">Burp Suite</h4>
-      <p class="import-card-desc">Import findings from Burp Suite XML exports.</p>
-      <span class="import-card-filetype">.xml</span>
-      <span class="import-card-badge">Coming Soon</span>
+      <h4 class="import-card-title">BURP SUITE</h4>
+      <p class="import-card-desc">IMPORT FINDINGS FROM BURP SUITE XML EXPORTS.</p>
+      <span class="import-card-filetype">.XML</span>
+      <span class="import-card-badge">COMING SOON</span>
     </div>
   </div>
 
@@ -48,10 +48,10 @@
       <div class="import-card-icon">
         <i class="glyphicon glyphicon-shield"></i>
       </div>
-      <h4 class="import-card-title">Nessus Pro</h4>
-      <p class="import-card-desc">Import vulnerability data from Nessus exports.</p>
-      <span class="import-card-filetype">.nessus</span>
-      <span class="import-card-badge">Coming Soon</span>
+      <h4 class="import-card-title">NESSUS PRO</h4>
+      <p class="import-card-desc">IMPORT VULNERABILITY DATA FROM NESSUS EXPORTS.</p>
+      <span class="import-card-filetype">.NESSUS</span>
+      <span class="import-card-badge">COMING SOON</span>
     </div>
   </div>
 
@@ -60,16 +60,22 @@
 <!-- Import Form (hidden by default, shown when a card is selected) -->
 <div id="import-form-section" style="display: none;">
   <hr>
-  <h3 id="import-form-title">Import</h3>
+  <h3 id="import-form-title">IMPORT</h3>
   <form id="import-form" enctype="multipart/form-data">
     <input type="hidden" id="import-type" name="import_type" value="">
 
     <div class="row">
       <div class="col-sm-6">
         <div class="form-group">
-          <label for="import-file">Select File</label>
-          <input type="file" class="form-control" id="import-file" name="importfile" accept=".csv">
-          <small class="form-text text-muted" id="import-file-hint">Accepted format: CSV</small>
+          <label for="import-file">SELECT FILE</label>
+          <div class="import-file-wrapper">
+            <button type="button" class="btn btn-import-browse" id="btn-browse">
+              <i class="glyphicon glyphicon-folder-open"></i> SELECT FILE
+            </button>
+            <span class="import-file-name" id="import-file-name">NO FILE SELECTED</span>
+            <input type="file" class="import-file-hidden" id="import-file" name="importfile" accept=".csv">
+          </div>
+          <small class="form-text text-muted" id="import-file-hint">ACCEPTED FORMAT: CSV</small>
         </div>
       </div>
     </div>
@@ -77,25 +83,14 @@
     <div class="row">
       <div class="col-sm-4">
         <div class="form-group">
-          <label for="import-scan-name">Scan Name <small class="text-muted">(optional)</small></label>
+          <label for="import-scan-name">SCAN NAME <small class="text-muted">(OPTIONAL)</small></label>
           <input type="text" class="form-control" id="import-scan-name" name="scan_name" placeholder="Auto-generated from filename if blank">
         </div>
       </div>
       <div class="col-sm-4">
         <div class="form-group">
-          <label for="import-target">Target <small class="text-muted">(optional)</small></label>
+          <label for="import-target">TARGET <small class="text-muted">(OPTIONAL)</small></label>
           <input type="text" class="form-control" id="import-target" name="target" placeholder="Auto-detected from data if blank">
-        </div>
-      </div>
-    </div>
-
-    <div class="row">
-      <div class="col-sm-12">
-        <div class="checkbox">
-          <label>
-            <input type="checkbox" id="import-dry-run" name="dry_run" value="1">
-            <strong>Dry Run</strong> &mdash; Validate the file without importing (preview only)
-          </label>
         </div>
       </div>
     </div>
@@ -103,20 +98,35 @@
     <div class="row" style="margin-top: 15px;">
       <div class="col-sm-12">
         <button type="submit" class="btn btn-danger" id="btn-import">
-          <i class="glyphicon glyphicon-import"></i> Import
+          <i class="glyphicon glyphicon-import"></i> IMPORT
         </button>
         <button type="button" class="btn btn-default" id="btn-import-cancel" style="margin-left: 10px;">
-          Cancel
+          CANCEL
         </button>
       </div>
     </div>
   </form>
 </div>
 
-<!-- Results section (shown after import) -->
+<!-- Preview section (shown after dry-run) -->
+<div id="import-preview-section" style="display: none;">
+  <hr>
+  <h3 id="import-preview-title">IMPORT PREVIEW</h3>
+  <div id="import-preview-content"></div>
+  <div style="margin-top: 15px;">
+    <button type="button" class="btn btn-danger" id="btn-confirm-import" style="display: none;">
+      <i class="glyphicon glyphicon-ok"></i> CONFIRM IMPORT
+    </button>
+    <button type="button" class="btn btn-default" id="btn-preview-cancel" style="margin-left: 10px;">
+      CANCEL
+    </button>
+  </div>
+</div>
+
+<!-- Results section (shown after actual import) -->
 <div id="import-results-section" style="display: none;">
   <hr>
-  <h3 id="import-results-title">Import Results</h3>
+  <h3 id="import-results-title">IMPORT RESULTS</h3>
   <div id="import-results-content"></div>
 </div>
 
