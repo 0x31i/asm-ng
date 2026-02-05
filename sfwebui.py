@@ -11,6 +11,7 @@
 # -----------------------------------------------------------------
 
 import csv
+import hashlib
 import html
 import json
 import logging
@@ -21,6 +22,8 @@ import re
 import string
 import time
 import os
+import uuid
+from datetime import datetime as dt_datetime
 from copy import deepcopy
 from io import BytesIO, StringIO
 from operator import itemgetter
@@ -1472,6 +1475,262 @@ class SpiderFootWebUi:
         return templ.render(pageid='NEWSCAN', types=types, docroot=self.docroot,
                             modules=self.config['__modules__'], scanname="",
                             selectedmods="", scantarget="", version=__version__)
+
+    @cherrypy.expose
+    def importscans(self: 'SpiderFootWebUi') -> str:
+        """Show the import data page.
+
+        Returns:
+            str: Import page HTML
+        """
+        templ = Template(
+            filename='spiderfoot/templates/import.tmpl', lookup=self.lookup)
+        return templ.render(pageid='IMPORT', docroot=self.docroot,
+                            version=__version__)
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def processimport(self: 'SpiderFootWebUi', importfile=None,
+                      import_type: str = 'legacy', scan_name: str = None,
+                      target: str = None, dry_run: str = None) -> dict:
+        """Process an uploaded file for import.
+
+        Args:
+            importfile: uploaded file (CherryPy file upload Part)
+            import_type (str): type of import (legacy, scan, burp, nessus)
+            scan_name (str): optional name for the imported scan
+            target (str): optional target for the scan
+            dry_run (str): if '1', validate only without importing
+
+        Returns:
+            dict: import results
+        """
+        if import_type in ('burp', 'nessus'):
+            return {
+                'success': False,
+                'message': f'{import_type.title()} import is not yet supported.'
+            }
+
+        if importfile is None:
+            return {'success': False, 'message': 'No file was uploaded.'}
+
+        is_dry_run = dry_run == '1'
+
+        # Read the uploaded file content
+        try:
+            raw = importfile.file.read()
+            content = raw.decode('utf-8', errors='replace')
+        except Exception as e:
+            return {'success': False, 'message': f'Failed to read uploaded file: {e}'}
+
+        if not content.strip():
+            return {'success': False, 'message': 'Uploaded file is empty.'}
+
+        # Parse CSV
+        try:
+            reader = csv.reader(StringIO(content))
+            headers = next(reader)
+        except Exception as e:
+            return {'success': False, 'message': f'Failed to parse CSV headers: {e}'}
+
+        # Detect format
+        headers_lower = [h.lower().strip() for h in headers]
+
+        fp_index = None
+        for name in ['f/p', 'fp', 'status', 'validated']:
+            if name in headers_lower:
+                fp_index = headers_lower.index(name)
+                break
+
+        try:
+            col_map = {}
+            if 'scan name' in headers_lower:
+                col_map['format'] = 'multi'
+                col_map['scan_name'] = headers_lower.index('scan name')
+            else:
+                col_map['format'] = 'single'
+            col_map['updated'] = headers_lower.index('updated')
+            col_map['type'] = headers_lower.index('type')
+            col_map['module'] = headers_lower.index('module')
+            col_map['source'] = headers_lower.index('source')
+            col_map['fp'] = fp_index
+            col_map['data'] = headers_lower.index('data')
+        except ValueError:
+            return {
+                'success': False,
+                'message': f'CSV format not recognized. Expected columns: Updated, Type, Module, Source, Data. Found: {", ".join(headers)}'
+            }
+
+        rows = list(reader)
+        if not rows:
+            return {'success': False, 'message': 'CSV file contains no data rows.'}
+
+        # Determine target
+        if not target:
+            first_row = rows[0]
+            target = first_row[col_map['source']] if first_row[col_map['source']] else 'imported_target'
+
+        # Default scan name
+        if not scan_name:
+            filename = getattr(importfile, 'filename', 'import')
+            scan_name = f'Imported: {filename.rsplit(".", 1)[0] if "." in filename else filename}'
+
+        stats = {
+            'rows_read': len(rows),
+            'rows_imported': 0,
+            'rows_skipped': 0,
+            'fps_imported': 0,
+            'validated_imported': 0,
+            'errors': [],
+            'scan_id': None,
+            'event_types': set(),
+        }
+
+        if is_dry_run:
+            # Just validate and count
+            for row in rows:
+                try:
+                    event_type = row[col_map['type']]
+                    stats['event_types'].add(event_type)
+                    if event_type == 'ROOT':
+                        stats['rows_skipped'] += 1
+                    else:
+                        stats['rows_imported'] += 1
+                except (IndexError, KeyError):
+                    stats['rows_skipped'] += 1
+
+            return {
+                'success': True,
+                'dry_run': True,
+                'message': f'Validation passed. {stats["rows_imported"]} rows ready to import.',
+                'rows_read': stats['rows_read'],
+                'rows_imported': stats['rows_imported'],
+                'rows_skipped': stats['rows_skipped'],
+                'fps_imported': 0,
+                'validated_imported': 0,
+                'event_types_count': len(stats['event_types']),
+                'errors': stats['errors'],
+            }
+
+        # Actual import
+        dbh = SpiderFootDb(self.config)
+        scan_id = str(uuid.uuid4())
+        stats['scan_id'] = scan_id
+
+        try:
+            dbh.scanInstanceCreate(scan_id, scan_name, target)
+        except Exception as e:
+            return {'success': False, 'message': f'Failed to create scan instance: {e}'}
+
+        # Create ROOT event for web UI browse compatibility
+        try:
+            root_qry = """INSERT INTO tbl_scan_results
+                (scan_instance_id, hash, type, generated, confidence,
+                visibility, risk, module, data, false_positive, source_event_hash)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+            root_qvals = [scan_id, 'ROOT', 'ROOT', int(time.time() * 1000),
+                          100, 100, 0, '', target, 0, 'ROOT']
+            dbh.dbh.execute(root_qry, root_qvals)
+        except Exception as e:
+            return {'success': False, 'message': f'Failed to create ROOT event: {e}'}
+
+        # Import each row
+        for i, row in enumerate(rows):
+            try:
+                event_type = row[col_map['type']]
+                module = row[col_map['module']]
+                source = row[col_map['source']]
+                data = row[col_map['data']]
+
+                # Parse timestamp
+                timestamp_str = row[col_map['updated']]
+                timestamp = int(time.time() * 1000)
+                for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S", "%m/%d/%Y %H:%M:%S"]:
+                    try:
+                        dt = dt_datetime.strptime(timestamp_str.strip(), fmt)
+                        timestamp = int(dt.timestamp() * 1000)
+                        break
+                    except ValueError:
+                        continue
+
+                # Parse status flag
+                fp = 0
+                if col_map['fp'] is not None and len(row) > col_map['fp']:
+                    fp_val = row[col_map['fp']].strip().lower() if row[col_map['fp']] else ''
+                    if fp_val in ('1', 'true', 'yes', 'fp', 'false positive'):
+                        fp = 1
+                    elif fp_val in ('2', 'validated', 'valid', 'confirmed'):
+                        fp = 2
+                    elif fp_val and fp_val.isdigit():
+                        fp = int(fp_val) if int(fp_val) in (0, 1, 2) else 0
+
+                # Skip ROOT events
+                if event_type == 'ROOT':
+                    stats['rows_skipped'] += 1
+                    continue
+
+                # Generate hash
+                hash_input = f"{scan_id}|{event_type}|{data}|{source}|{time.time()}"
+                event_hash = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()[:32]
+
+                qry = """INSERT INTO tbl_scan_results
+                    (scan_instance_id, hash, type, generated, confidence,
+                    visibility, risk, module, data, false_positive, source_event_hash)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                qvals = [scan_id, event_hash, event_type, timestamp,
+                         100, 100, 0, module, data, fp, 'ROOT']
+                dbh.dbh.execute(qry, qvals)
+
+                # Save target-level false positives
+                if fp == 1:
+                    try:
+                        fp_qry = """INSERT OR IGNORE INTO tbl_target_false_positives
+                            (target, event_type, event_data, source_data, date_added, notes)
+                            VALUES (?, ?, ?, ?, ?, ?)"""
+                        fp_qvals = [target, event_type, data, source, int(time.time() * 1000),
+                                    f'Imported via web UI: {scan_name}']
+                        dbh.dbh.execute(fp_qry, fp_qvals)
+                        stats['fps_imported'] += 1
+                    except Exception:
+                        pass
+
+                # Save target-level validated entries
+                if fp == 2:
+                    try:
+                        val_qry = """INSERT OR IGNORE INTO tbl_target_validated
+                            (target, event_type, event_data, source_data, date_added, notes)
+                            VALUES (?, ?, ?, ?, ?, ?)"""
+                        val_qvals = [target, event_type, data, source, int(time.time() * 1000),
+                                     f'Imported via web UI: {scan_name}']
+                        dbh.dbh.execute(val_qry, val_qvals)
+                        stats['validated_imported'] += 1
+                    except Exception:
+                        pass
+
+                stats['event_types'].add(event_type)
+                stats['rows_imported'] += 1
+
+            except Exception as e:
+                stats['errors'].append(f'Row {i + 1}: {str(e)}')
+                stats['rows_skipped'] += 1
+
+        # Commit and finalize
+        dbh.conn.commit()
+        dbh.scanInstanceSet(scan_id, status='FINISHED', ended=time.time() * 1000)
+
+        return {
+            'success': True,
+            'dry_run': False,
+            'message': f'Successfully imported {stats["rows_imported"]} rows into scan "{scan_name}".',
+            'scan_id': scan_id,
+            'rows_read': stats['rows_read'],
+            'rows_imported': stats['rows_imported'],
+            'rows_skipped': stats['rows_skipped'],
+            'fps_imported': stats['fps_imported'],
+            'validated_imported': stats['validated_imported'],
+            'event_types_count': len(stats['event_types']),
+            'errors': stats['errors'],
+        }
 
     @cherrypy.expose
     def clonescan(self: 'SpiderFootWebUi', id: str) -> str:
