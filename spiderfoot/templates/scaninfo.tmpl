@@ -1640,7 +1640,7 @@
                 }
                 sf.fetchData('${docroot}/scaneventresultsunique', {'id': instanceId, 'eventType': eventType, 'filterfp': filterFP }, function(data) {
                             // Filter bar for unique view
-                            var filterBar = "<div class='stats-bar-fullwidth stats-bar-simple'>";
+                            var filterBar = "<div id='stats-bar' class='stats-bar-fullwidth stats-bar-simple'>";
                             filterBar += "<div class='stats-bar-left'>";
                             filterBar += "<div class='stats-item'><span class='stats-value'>" + data.length + "</span><span class='stats-label'>UNIQUE ITEMS</span></div>";
                             filterBar += "</div>";
