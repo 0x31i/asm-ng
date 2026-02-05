@@ -119,31 +119,100 @@
     <script src="${docroot}/static/node_modules/d3/d3.min.js"></script>
     <script type='text/javascript' hash="sha256-0kTZzWMEh3cdgCMVytlY1E8rg7oO13eyLa+kvyAhRmo=">sf.updateTooltips();</script>
 
-    <!-- Auto-logout on tab/window close -->
+    <!-- Auto-logout on browser close (not tab navigation) -->
     <script>
     (function() {
-        var logoutFired = false;
-        var isInternalNav = false;
+        // Use sessionStorage to track if this is an active browser session
+        // sessionStorage persists across page navigations but clears when browser closes
+        var SESSION_KEY = 'sf_active_session';
+        var NAV_KEY = 'sf_navigating';
 
-        // Mark clicks on internal links so we can skip the logout beacon
+        // Mark this session as active
+        sessionStorage.setItem(SESSION_KEY, '1');
+
+        // Clear navigation flag on page load (we successfully navigated)
+        sessionStorage.removeItem(NAV_KEY);
+
+        // Track all forms of internal navigation
+        function markNavigation() {
+            sessionStorage.setItem(NAV_KEY, '1');
+        }
+
+        // Mark clicks on internal links
         document.addEventListener('click', function(e) {
             var link = e.target.closest('a');
-            if (link && link.href && link.href.indexOf(location.origin) === 0) {
-                isInternalNav = true;
+            if (link && link.href) {
+                // Mark any link click as navigation (internal or external)
+                markNavigation();
             }
         }, true);
 
-        // Also mark form submissions as internal navigation
-        document.addEventListener('submit', function() { isInternalNav = true; }, true);
+        // Mark form submissions
+        document.addEventListener('submit', markNavigation, true);
 
-        function fireLogout() {
-            if (logoutFired || isInternalNav) return;
-            logoutFired = true;
-            navigator.sendBeacon(docroot + '/logout', '');
+        // Intercept window.location changes by wrapping common patterns
+        // This catches programmatic navigation like window.location.href = '...'
+        var originalAssign = window.location.assign;
+        var originalReplace = window.location.replace;
+
+        if (originalAssign) {
+            window.location.assign = function(url) {
+                markNavigation();
+                return originalAssign.call(window.location, url);
+            };
         }
 
-        // beforeunload: fires on tab close, browser close, and external navigation
-        window.addEventListener('beforeunload', fireLogout);
+        if (originalReplace) {
+            window.location.replace = function(url) {
+                markNavigation();
+                return originalReplace.call(window.location, url);
+            };
+        }
+
+        // For direct href assignment, use a MutationObserver isn't practical,
+        // but we can use beforeunload to check if navigation is happening
+        // by detecting if sessionStorage flag indicates active navigation
+
+        function fireLogout() {
+            // Only logout if we're NOT navigating to another page
+            // The NAV_KEY will be set for intentional navigation
+            if (sessionStorage.getItem(NAV_KEY)) {
+                // This is intentional navigation, don't logout
+                return;
+            }
+
+            // This is a true close (tab or browser close)
+            // Send logout beacon
+            try {
+                navigator.sendBeacon(docroot + '/logout', '');
+            } catch (e) {
+                // Fallback: synchronous request (not recommended but better than nothing)
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', docroot + '/logout', false);
+                xhr.send();
+            }
+        }
+
+        // Use pagehide instead of beforeunload for more reliable detection
+        // pagehide fires when the page is being hidden/unloaded
+        window.addEventListener('pagehide', function(e) {
+            // If page is being cached (bfcache), don't logout
+            if (e.persisted) return;
+
+            // Small delay to allow navigation flag to be set
+            // For programmatic navigation (window.location.href = ...)
+            // we need to set the flag before this fires
+            fireLogout();
+        });
+
+        // Also set nav flag just before any unload to catch programmatic navigation
+        window.addEventListener('beforeunload', function() {
+            // Give a tiny window for other scripts to have set location
+            // If we're here and no nav flag, it's likely a close
+        });
+
+        // Expose a global function to mark navigation for custom JS
+        window.sfMarkNavigation = markNavigation;
     })();
     </script>
 

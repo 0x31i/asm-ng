@@ -1078,6 +1078,7 @@ function removeTarget(workspaceId, targetId) {
 }
 
 function viewScanResults(scanId) {
+    if (window.sfMarkNavigation) window.sfMarkNavigation();
     window.location.href = '${docroot}/scaninfo?id=' + scanId;
 }
 
@@ -2097,6 +2098,7 @@ function runPeriodicScanNow(scheduleId) {
                     alertify.success('Periodic scan started! Scan ID: ' + data.scan_id);
                     // Optionally redirect to scan info
                     setTimeout(function() {
+                        if (window.sfMarkNavigation) window.sfMarkNavigation();
                         window.location.href = '${docroot}/scaninfo?id=' + data.scan_id;
                     }, 2000);
                 } else {

@@ -1931,8 +1931,185 @@ class SpiderFootWebUi:
         templ = Template(
             filename='spiderfoot/templates/opts.tmpl', lookup=self.lookup)
         self.token = random.SystemRandom().randint(0, 99999999)
+        current_user = self.currentUser()
         return templ.render(opts=self.config, pageid='SETTINGS', token=self.token, version=__version__,
-                            updated=updated, docroot=self.docroot)
+                            updated=updated, docroot=self.docroot, current_user=current_user)
+
+    @cherrypy.expose
+    def users(self: 'SpiderFootWebUi') -> str:
+        """Show user management page (admin only).
+
+        Returns:
+            str: User management page HTML or redirect
+        """
+        # Only admin can access user management
+        current_user = self.currentUser()
+        if current_user != 'admin':
+            raise cherrypy.HTTPRedirect(f"{self.docroot}/opts")
+
+        dbh = SpiderFootDb(self.config)
+        users_list = dbh.userList()
+
+        templ = Template(
+            filename='spiderfoot/templates/users.tmpl', lookup=self.lookup)
+        return templ.render(
+            pageid='USERS', docroot=self.docroot, version=__version__,
+            users=users_list, current_user=current_user)
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def userlist(self: 'SpiderFootWebUi') -> list:
+        """List all users (admin only).
+
+        Returns:
+            list: List of user dicts
+        """
+        # Only admin can list users
+        current_user = self.currentUser()
+        if current_user != 'admin':
+            return {'success': False, 'error': 'Unauthorized'}
+
+        dbh = SpiderFootDb(self.config)
+        users = dbh.userList()
+        return {'success': True, 'users': users}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def usercreate(self: 'SpiderFootWebUi', username: str, password: str, display_name: str = None) -> dict:
+        """Create a new user (admin only).
+
+        Args:
+            username (str): username
+            password (str): password
+            display_name (str): optional display name
+
+        Returns:
+            dict: Result
+        """
+        # Only admin can create users
+        current_user = self.currentUser()
+        if current_user != 'admin':
+            return {'success': False, 'error': 'Unauthorized'}
+
+        if not username or not password:
+            return {'success': False, 'error': 'Username and password are required'}
+
+        # Validate username format
+        if not username.isalnum() or len(username) < 3:
+            return {'success': False, 'error': 'Username must be at least 3 alphanumeric characters'}
+
+        if len(password) < 8:
+            return {'success': False, 'error': 'Password must be at least 8 characters'}
+
+        dbh = SpiderFootDb(self.config)
+
+        # Check if username already exists
+        if dbh.userGet(username):
+            return {'success': False, 'error': 'Username already exists'}
+
+        if dbh.userCreate(username, password, display_name):
+            dbh.auditLog(current_user, 'USER_CREATE', detail=f'Created user: {username}', ip_address=self.clientIP())
+            return {'success': True, 'message': f'User {username} created successfully'}
+        else:
+            return {'success': False, 'error': 'Failed to create user'}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def userupdate(self: 'SpiderFootWebUi', username: str, display_name: str = None, active: str = None) -> dict:
+        """Update a user (admin only).
+
+        Args:
+            username (str): username
+            display_name (str): optional new display name
+            active (str): optional new active status ('true' or 'false')
+
+        Returns:
+            dict: Result
+        """
+        # Only admin can update users
+        current_user = self.currentUser()
+        if current_user != 'admin':
+            return {'success': False, 'error': 'Unauthorized'}
+
+        dbh = SpiderFootDb(self.config)
+
+        # Check if user exists
+        if not dbh.userGet(username):
+            return {'success': False, 'error': 'User not found'}
+
+        # Convert active string to bool if provided
+        active_bool = None
+        if active is not None:
+            active_bool = active.lower() == 'true'
+
+        if dbh.userUpdate(username, display_name=display_name, active=active_bool):
+            dbh.auditLog(current_user, 'USER_UPDATE', detail=f'Updated user: {username}', ip_address=self.clientIP())
+            return {'success': True, 'message': f'User {username} updated successfully'}
+        else:
+            return {'success': False, 'error': 'Failed to update user'}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def userdelete(self: 'SpiderFootWebUi', username: str) -> dict:
+        """Delete a user (admin only).
+
+        Args:
+            username (str): username to delete
+
+        Returns:
+            dict: Result
+        """
+        # Only admin can delete users
+        current_user = self.currentUser()
+        if current_user != 'admin':
+            return {'success': False, 'error': 'Unauthorized'}
+
+        if username == 'admin':
+            return {'success': False, 'error': 'Cannot delete admin user'}
+
+        dbh = SpiderFootDb(self.config)
+
+        # Check if user exists
+        if not dbh.userGet(username):
+            return {'success': False, 'error': 'User not found'}
+
+        if dbh.userDelete(username):
+            dbh.auditLog(current_user, 'USER_DELETE', detail=f'Deleted user: {username}', ip_address=self.clientIP())
+            return {'success': True, 'message': f'User {username} deleted successfully'}
+        else:
+            return {'success': False, 'error': 'Failed to delete user'}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def userchangepassword(self: 'SpiderFootWebUi', username: str, new_password: str) -> dict:
+        """Change a user's password (admin only).
+
+        Args:
+            username (str): username
+            new_password (str): new password
+
+        Returns:
+            dict: Result
+        """
+        # Only admin can change other users' passwords
+        current_user = self.currentUser()
+        if current_user != 'admin':
+            return {'success': False, 'error': 'Unauthorized'}
+
+        if len(new_password) < 8:
+            return {'success': False, 'error': 'Password must be at least 8 characters'}
+
+        dbh = SpiderFootDb(self.config)
+
+        # Check if user exists
+        if not dbh.userGet(username):
+            return {'success': False, 'error': 'User not found'}
+
+        if dbh.userChangePassword(username, new_password):
+            dbh.auditLog(current_user, 'USER_PASSWORD_CHANGE', detail=f'Changed password for user: {username}', ip_address=self.clientIP())
+            return {'success': True, 'message': f'Password for {username} changed successfully'}
+        else:
+            return {'success': False, 'error': 'Failed to change password'}
 
     @cherrypy.expose
     def auditlog(self: 'SpiderFootWebUi', action: str = None, username: str = None) -> str:
