@@ -128,6 +128,21 @@ class IOCCorrelation:
     campaign_id: Optional[str] = None
 
 
+@dataclass
+class CrossScanCorrelation:
+    """Represents correlation findings across multiple scans."""
+    correlation_id: str
+    current_ioc: str
+    historical_iocs: List[str]
+    source_scans: List[Dict[str, Any]]  # [{scan_id, scan_name, scan_date}]
+    correlation_type: str  # "exact_match", "related", "pattern"
+    confidence: float
+    first_seen: datetime
+    last_seen: datetime
+    occurrence_count: int
+    trend: str  # "increasing", "decreasing", "stable", "new"
+
+
 class PatternRecognitionEngine:
     """Advanced pattern recognition using machine learning."""
     
@@ -1054,6 +1069,9 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
         'enable_ioc_correlation': True,
         'enable_threat_scoring': True,
         'enable_nlp_analysis': True,
+        'enable_cross_scan_correlation': True,
+        'max_historical_scans': 10,
+        'historical_lookback_days': 90,
         'anomaly_detection_threshold': 0.1,
         'threat_score_threshold': 70,
         'correlation_min_strength': 0.3,
@@ -1068,6 +1086,9 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
         'enable_ioc_correlation': "Enable automated IOC correlation",
         'enable_threat_scoring': "Enable dynamic ML-based threat scoring",
         'enable_nlp_analysis': "Enable natural language processing for threat analysis",
+        'enable_cross_scan_correlation': "Enable correlation with historical scan data for the same target",
+        'max_historical_scans': "Maximum number of historical scans to include (0 = unlimited)",
+        'historical_lookback_days': "Only include scans from the last N days",
         'anomaly_detection_threshold': "Threshold for anomaly detection (0.0-1.0)",
         'threat_score_threshold': "Minimum threat score to trigger alerts (0-100)",
         'correlation_min_strength': "Minimum correlation strength for IOC relationships",
@@ -1079,6 +1100,7 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
         """Set up the AI threat intelligence module."""
         self.sf = sfc
         self.errorState = False
+        self._historical_data_loaded = False  # Flag for lazy loading of historical data
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -1093,16 +1115,16 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
         try:
             if self.opts['enable_pattern_recognition']:
                 self.pattern_engine = PatternRecognitionEngine()
-            
+
             if self.opts['enable_predictive_analytics']:
                 self.predictive_engine = PredictiveAnalyticsEngine()
-            
+
             if self.opts['enable_ioc_correlation']:
                 self.correlation_engine = IOCCorrelationEngine()
-            
+
             if self.opts['enable_threat_scoring']:
                 self.scoring_engine = ThreatScoringEngine()
-            
+
             if self.opts['enable_nlp_analysis']:
                 self.nlp_analyzer = NLPThreatAnalyzer()
 
@@ -1120,17 +1142,26 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
         """Define the events this module produces."""
         return [
             "AI_THREAT_SIGNATURE",
-            "AI_THREAT_PREDICTION", 
+            "AI_THREAT_PREDICTION",
             "AI_IOC_CORRELATION",
             "AI_THREAT_SCORE",
             "AI_ANOMALY_DETECTED",
-            "AI_NLP_ANALYSIS"
+            "AI_NLP_ANALYSIS",
+            "AI_CROSS_SCAN_CORRELATION"
         ]
 
     def handleEvent(self, sfEvent):
         """Handle events with AI-powered analysis."""
         if self.errorState:
             return
+
+        # Lazy load historical data on first event (when scan ID and DB are available)
+        if not self._historical_data_loaded and self.opts.get('enable_cross_scan_correlation', True):
+            self._historical_data_loaded = True
+            try:
+                self._load_historical_data()
+            except Exception as e:
+                self.error(f"Failed to load historical data for cross-scan correlation: {e}")
 
         # Convert event to analysis format
         event_data = {
@@ -1269,5 +1300,391 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
 
             except Exception as e:
                 self.error(f"NLP analysis failed: {e}")
+
+        # 6. Cross-Scan Correlation
+        if self.opts.get('enable_cross_scan_correlation', True) and hasattr(self, '_historical_iocs'):
+            try:
+                self._check_cross_scan_correlation(sfEvent, event_data)
+            except Exception as e:
+                self.error(f"Cross-scan correlation failed: {e}")
+
+    def _load_historical_data(self):
+        """Pre-populate AI engines with historical scan data for the same target.
+
+        This method queries the database for previous scans against the same target
+        and loads their IOCs into the correlation engine for cross-scan analysis.
+        """
+        if not self.opts.get('enable_cross_scan_correlation', True):
+            self.debug("Cross-scan correlation disabled")
+            return
+
+        # Initialize historical data storage
+        self._historical_iocs = {}  # {ioc_data: [{scan_id, scan_name, scan_date, event_type}]}
+        self._historical_scans = []  # List of historical scan info
+        self._historical_events_loaded = 0
+
+        try:
+            # Get current scan info (target)
+            scan_info = self.__sfdb__.scanInstanceGet(self.__scanId__)
+            if not scan_info:
+                self.debug("Could not get scan info for cross-scan correlation")
+                return
+
+            target = scan_info[1]  # seed_target
+            self.debug(f"Loading historical data for target: {target}")
+
+            # Get historical scans for this target
+            historical_scans = self._get_historical_scans(target)
+
+            if not historical_scans:
+                self.debug("No historical scans found for this target")
+                return
+
+            self._historical_scans = historical_scans
+            self.info(f"Found {len(historical_scans)} historical scan(s) for cross-scan correlation")
+
+            # Load historical events and populate engines
+            for scan_id, scan_name, scan_started in historical_scans:
+                events_loaded = self._populate_engines_from_scan(scan_id, scan_name, scan_started)
+                self._historical_events_loaded += events_loaded
+
+            self.info(f"Loaded {self._historical_events_loaded} historical IOCs for cross-scan correlation")
+
+        except Exception as e:
+            self.error(f"Failed to load historical data: {e}")
+
+    def _get_historical_scans(self, target: str) -> List[Tuple[str, str, str]]:
+        """Get list of historical scan IDs for the same target.
+
+        Args:
+            target: The scan target (domain, IP, etc.)
+
+        Returns:
+            List of tuples: [(scan_id, scan_name, scan_started), ...]
+        """
+        historical_scans = []
+
+        try:
+            # Calculate cutoff date
+            lookback_days = self.opts.get('historical_lookback_days', 90)
+            cutoff_timestamp = time.time() - (lookback_days * 24 * 3600)
+
+            # Get max scans limit
+            max_scans = self.opts.get('max_historical_scans', 10)
+
+            # Query the database directly for historical scans
+            # Note: Using the internal database handle
+            qry = """SELECT guid, name, started FROM tbl_scan_instance
+                WHERE seed_target = ? AND guid != ? AND status = 'FINISHED'
+                ORDER BY started DESC"""
+
+            if max_scans > 0:
+                qry += f" LIMIT {max_scans}"
+
+            with self.__sfdb__.dbhLock:
+                self.__sfdb__.dbh.execute(qry, [target, self.__scanId__])
+                rows = self.__sfdb__.dbh.fetchall()
+
+                for row in rows:
+                    scan_id = row[0]
+                    scan_name = row[1]
+                    scan_started = row[2]
+
+                    # Check if scan is within lookback period
+                    # scan_started is typically a timestamp or datetime string
+                    try:
+                        if isinstance(scan_started, (int, float)):
+                            scan_timestamp = scan_started
+                        else:
+                            # Try parsing as datetime string
+                            scan_timestamp = datetime.strptime(
+                                str(scan_started)[:19],
+                                '%Y-%m-%d %H:%M:%S'
+                            ).timestamp()
+
+                        if scan_timestamp >= cutoff_timestamp:
+                            historical_scans.append((scan_id, scan_name, scan_started))
+                    except (ValueError, TypeError):
+                        # Include scan if we can't parse the date
+                        historical_scans.append((scan_id, scan_name, scan_started))
+
+        except Exception as e:
+            self.error(f"Failed to get historical scans: {e}")
+
+        return historical_scans
+
+    def _populate_engines_from_scan(self, scan_id: str, scan_name: str, scan_started: str) -> int:
+        """Load events from a historical scan into AI engines.
+
+        Args:
+            scan_id: Historical scan instance ID
+            scan_name: Name of the historical scan
+            scan_started: When the historical scan started
+
+        Returns:
+            Number of events loaded
+        """
+        events_loaded = 0
+
+        try:
+            # Get events from the historical scan
+            events = self.__sfdb__.scanResultEvent(scan_id, 'ALL')
+
+            if not events:
+                return 0
+
+            for event in events:
+                # Event format from scanResultEvent:
+                # [0]=generated, [1]=data, [2]=module, [3]=source_event_hash,
+                # [4]=type, [5]=confidence, [6]=visibility, [7]=risk, [8]=false_positive
+
+                event_type = event[4]
+                event_data = event[1]
+                event_timestamp = event[0]
+                confidence = event[5] if len(event) > 5 else 50
+                risk = event[7] if len(event) > 7 else 0
+
+                # Skip ROOT events and empty data
+                if event_type == 'ROOT' or not event_data:
+                    continue
+
+                # Store in historical IOCs dictionary
+                if event_data not in self._historical_iocs:
+                    self._historical_iocs[event_data] = []
+
+                self._historical_iocs[event_data].append({
+                    'scan_id': scan_id,
+                    'scan_name': scan_name,
+                    'scan_date': scan_started,
+                    'event_type': event_type,
+                    'timestamp': event_timestamp,
+                    'confidence': confidence,
+                    'risk': risk
+                })
+
+                # Populate IOC correlation engine with relationships
+                if hasattr(self, 'correlation_engine'):
+                    # Convert timestamp to float if needed
+                    try:
+                        if isinstance(event_timestamp, (int, float)):
+                            ts = float(event_timestamp)
+                        else:
+                            ts = datetime.strptime(
+                                str(event_timestamp)[:19],
+                                '%Y-%m-%d %H:%M:%S'
+                            ).timestamp()
+                    except (ValueError, TypeError):
+                        ts = time.time()
+
+                    self.correlation_engine.add_ioc_relationship(
+                        event_data,
+                        f"historical:{scan_id}",
+                        'historical_scan',
+                        ts
+                    )
+
+                # Record in predictive engine for threat forecasting
+                if hasattr(self, 'predictive_engine'):
+                    try:
+                        if isinstance(event_timestamp, (int, float)):
+                            ts = float(event_timestamp)
+                        else:
+                            ts = datetime.strptime(
+                                str(event_timestamp)[:19],
+                                '%Y-%m-%d %H:%M:%S'
+                            ).timestamp()
+                    except (ValueError, TypeError):
+                        ts = time.time()
+
+                    # Determine severity from risk score
+                    if risk >= 80:
+                        severity = 'critical'
+                    elif risk >= 60:
+                        severity = 'high'
+                    elif risk >= 40:
+                        severity = 'medium'
+                    else:
+                        severity = 'low'
+
+                    self.predictive_engine.record_threat_event(
+                        event_type,
+                        ts,
+                        severity
+                    )
+
+                events_loaded += 1
+
+        except Exception as e:
+            self.error(f"Failed to populate engines from scan {scan_id}: {e}")
+
+        return events_loaded
+
+    def _check_cross_scan_correlation(self, sfEvent, event_data: Dict[str, Any]):
+        """Check if current event correlates with historical scan data.
+
+        Args:
+            sfEvent: The SpiderFoot event object
+            event_data: Processed event data dictionary
+        """
+        current_ioc = sfEvent.data
+
+        if not current_ioc or current_ioc == 'ROOT':
+            return
+
+        # Check for exact match in historical IOCs
+        if current_ioc in self._historical_iocs:
+            historical_matches = self._historical_iocs[current_ioc]
+
+            # Build cross-scan correlation result
+            source_scans = []
+            seen_scans = set()
+            timestamps = []
+
+            for match in historical_matches:
+                if match['scan_id'] not in seen_scans:
+                    seen_scans.add(match['scan_id'])
+                    source_scans.append({
+                        'scan_id': match['scan_id'],
+                        'scan_name': match['scan_name'],
+                        'scan_date': str(match['scan_date'])
+                    })
+
+                # Collect timestamps for trend analysis
+                try:
+                    if isinstance(match['timestamp'], (int, float)):
+                        timestamps.append(float(match['timestamp']))
+                    else:
+                        ts = datetime.strptime(
+                            str(match['timestamp'])[:19],
+                            '%Y-%m-%d %H:%M:%S'
+                        ).timestamp()
+                        timestamps.append(ts)
+                except (ValueError, TypeError):
+                    pass
+
+            # Determine trend
+            occurrence_count = len(historical_matches) + 1  # +1 for current
+            if not timestamps:
+                trend = "new"
+            elif occurrence_count <= 2:
+                trend = "stable"
+            else:
+                # Simple trend analysis based on time intervals
+                timestamps.sort()
+                if len(timestamps) >= 2:
+                    intervals = [timestamps[i+1] - timestamps[i] for i in range(len(timestamps)-1)]
+                    avg_interval = sum(intervals) / len(intervals)
+                    recent_interval = time.time() - timestamps[-1]
+
+                    if recent_interval < avg_interval * 0.5:
+                        trend = "increasing"
+                    elif recent_interval > avg_interval * 1.5:
+                        trend = "decreasing"
+                    else:
+                        trend = "stable"
+                else:
+                    trend = "stable"
+
+            # Calculate confidence based on occurrence count and scan diversity
+            confidence = min(0.95, 0.5 + (len(seen_scans) * 0.1) + (occurrence_count * 0.05))
+
+            # Determine first and last seen
+            if timestamps:
+                first_seen = datetime.fromtimestamp(min(timestamps))
+                last_seen = datetime.fromtimestamp(max(timestamps))
+            else:
+                first_seen = datetime.now()
+                last_seen = datetime.now()
+
+            # Create correlation object
+            correlation = CrossScanCorrelation(
+                correlation_id=hashlib.md5(f"{current_ioc}_{time.time()}".encode()).hexdigest(),
+                current_ioc=current_ioc,
+                historical_iocs=[current_ioc],  # Exact match
+                source_scans=source_scans,
+                correlation_type="exact_match",
+                confidence=confidence,
+                first_seen=first_seen,
+                last_seen=last_seen,
+                occurrence_count=occurrence_count,
+                trend=trend
+            )
+
+            # Generate cross-scan correlation event
+            correlation_data = {
+                'correlation_id': correlation.correlation_id,
+                'ioc': correlation.current_ioc,
+                'event_type': sfEvent.eventType,
+                'historical_occurrences': occurrence_count - 1,
+                'scans_involved': len(source_scans),
+                'source_scans': source_scans,
+                'first_seen': correlation.first_seen.isoformat(),
+                'last_seen': correlation.last_seen.isoformat(),
+                'trend': correlation.trend,
+                'confidence': correlation.confidence,
+                'analysis': self._generate_cross_scan_analysis(correlation, sfEvent.eventType)
+            }
+
+            cross_scan_event = SpiderFootEvent(
+                "AI_CROSS_SCAN_CORRELATION",
+                json.dumps(correlation_data, default=str),
+                self.__name__,
+                sfEvent
+            )
+            self.notifyListeners(cross_scan_event)
+
+    def _generate_cross_scan_analysis(self, correlation: CrossScanCorrelation, event_type: str) -> str:
+        """Generate human-readable analysis for cross-scan correlation.
+
+        Args:
+            correlation: The CrossScanCorrelation object
+            event_type: The type of event
+
+        Returns:
+            Analysis string
+        """
+        analysis_parts = []
+
+        # Basic finding
+        analysis_parts.append(
+            f"IOC '{correlation.current_ioc}' has been observed in "
+            f"{correlation.occurrence_count} scan(s) across {len(correlation.source_scans)} "
+            f"historical scan session(s)."
+        )
+
+        # Time span
+        time_span = correlation.last_seen - correlation.first_seen
+        if time_span.days > 0:
+            analysis_parts.append(
+                f"First seen {time_span.days} days ago, indicating persistent presence."
+            )
+
+        # Trend analysis
+        if correlation.trend == "increasing":
+            analysis_parts.append(
+                "Frequency is INCREASING - this IOC is appearing more often in recent scans."
+            )
+        elif correlation.trend == "decreasing":
+            analysis_parts.append(
+                "Frequency is DECREASING - this IOC is appearing less often recently."
+            )
+        elif correlation.trend == "stable":
+            analysis_parts.append(
+                "Frequency is STABLE - this IOC appears consistently across scans."
+            )
+
+        # Confidence and recommendation
+        if correlation.confidence >= 0.8:
+            analysis_parts.append(
+                "HIGH CONFIDENCE: Strong correlation across multiple scans suggests "
+                "this is a significant indicator requiring attention."
+            )
+        elif correlation.confidence >= 0.6:
+            analysis_parts.append(
+                "MEDIUM CONFIDENCE: Correlation found across scans. "
+                "Consider investigating further."
+            )
+
+        return " ".join(analysis_parts)
 
 # End of AI Threat Intelligence Engine
