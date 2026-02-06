@@ -123,8 +123,8 @@ a:hover, a:focus {
 }
 
 /* Keep white text on colored buttons */
-.btn-success, .btn-danger, .btn-warning, .btn-info, .btn-primary,
-.btn-success *, .btn-danger *, .btn-warning *, .btn-info *, .btn-primary *,
+.btn-success, .btn-danger, .btn-warning, .btn-info, .btn-primary, .btn-critical,
+.btn-success *, .btn-danger *, .btn-warning *, .btn-info *, .btn-primary *, .btn-critical *,
 .label-success, .label-danger, .label-warning, .label-info, .label-primary,
 .badge.alert-success, .badge.alert-danger, .badge.alert-warning, .badge.alert-info, .badge.alert-critical,
 .bg-success, .bg-danger, .bg-warning, .bg-info, .bg-primary {
@@ -403,6 +403,22 @@ a:hover {
 .btn-info:focus {
   background: linear-gradient(135deg, var(--accent-blue) 0%, #2563eb 100%) !important;
   box-shadow: 0 0 25px var(--glow-blue), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Critical button - Purple gradient with glow */
+.btn-critical {
+  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 0 15px rgba(124, 58, 237, 0.5);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.btn-critical:hover,
+.btn-critical:focus {
+  background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%) !important;
+  box-shadow: 0 0 25px rgba(124, 58, 237, 0.7), 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
 /* ============================================
@@ -2541,6 +2557,18 @@ tr.active td {
   text-transform: uppercase !important;
   letter-spacing: 0.5px !important;
   border-radius: 0 !important;
+}
+
+/* Correlation CRITICAL button - Bright purple with strong glow */
+.panel-body .btn-toolbar .btn-group > .btn-critical,
+.panel-body .btn-toolbar .btn-group > .btn-critical.disabled,
+.panel-body .btn-toolbar .btn-group > .btn-critical:disabled {
+  background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 0 15px rgba(167, 139, 250, 0.7), 0 0 30px rgba(167, 139, 250, 0.4) !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 /* Correlation HIGH button - Bright red with strong glow */
