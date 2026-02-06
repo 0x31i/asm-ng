@@ -1063,11 +1063,13 @@
             grid += "<div class='panel panel-default'>";
             grid += "<div class='panel-heading'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;&nbsp;Correlations</div><div class='panel-body' style='padding: 5px'>";
             grid += "<div class='btn-toolbar text-center'>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md' style='cursor: default; background-color: #7c3aed; color: white; font-weight: 700; text-transform: uppercase;'>Critical</span></button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='corr-critical' style='cursor: default;'>?</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-danger' style='cursor: default;'>High</span></button>";
             grid += "<button class='btn disabled btn-md btn-default' id='corr-high' style='cursor: default;'>?</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-warning' style='cursor: default;'>Medium</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='corr-medium' style='cursor: default;'>?</button></div>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-primary' style='cursor: default;'>Low</button>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-info' style='cursor: default;'>Low</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='corr-low' style='cursor: default;'>?</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-success' style='cursor: default;'>Info</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='corr-info' style='cursor: default;'>?</button></div>";
@@ -1106,6 +1108,7 @@
                         scanStatus = data[5];
                         scanCorrelations = data[6];
 
+                        $("#corr-critical").html(scanCorrelations['CRITICAL']);
                         $("#corr-high").html(scanCorrelations['HIGH']);
                         $("#corr-medium").html(scanCorrelations['MEDIUM']);
                         $("#corr-low").html(scanCorrelations['LOW']);
