@@ -1,6 +1,6 @@
-# SpiderFoot Wiki Index
+# ASM-NG Wiki Index
 
-Welcome to the SpiderFoot documentation! This wiki provides a structured, up-to-date, and webapp-aligned reference for users, developers, and administrators.
+Welcome to the ASM-NG documentation! This wiki provides a structured, up-to-date, and webapp-aligned reference for users, developers, and administrators.
 
 ## 📚 Sections
 

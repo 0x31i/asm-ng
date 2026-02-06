@@ -1,5 +1,5 @@
 #!/bin/bash
-# SpiderFoot Docker startup script
+# ASM-NG Docker startup script
 
 # Ensure the correct database and logs directory structure
 mkdir -p /home/spiderfoot/.spiderfoot/logs
@@ -33,7 +33,7 @@ chown -R spiderfoot:spiderfoot /home/spiderfoot/data
 chmod -R 755 /home/spiderfoot/logs
 
 echo "Database will be created at: /home/spiderfoot/data/spiderfoot.db"
-echo "Starting SpiderFoot..."
+echo "Starting ASM-NG..."
 
 # Execute the original command
 exec "$@"

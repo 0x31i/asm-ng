@@ -1,6 +1,6 @@
 # Developer Guide
 
-This guide is for developers who want to contribute to SpiderFoot, build custom modules, or extend its capabilities. Here you'll find resources, best practices, and technical details to help you get started and succeed as a SpiderFoot contributor.
+This guide is for developers who want to contribute to ASM-NG, build custom modules, or extend its capabilities. Here you'll find resources, best practices, and technical details to help you get started and succeed as an ASM-NG contributor.
 
 ---
 
@@ -10,7 +10,7 @@ We welcome contributions of all kinds! Please read the [Contributing Guide](../d
 
 ## Module Development
 
-SpiderFoot's modular architecture makes it easy to add new functionality. The [Module Development Guide](../docs/developer/module_development.md) explains how to create, test, and document your own modules, including:
+ASM-NG's modular architecture makes it easy to add new functionality. The [Module Development Guide](../docs/developer/module_development.md) explains how to create, test, and document your own modules, including:
 
 - Module structure and naming conventions
 - Required and optional methods
@@ -19,11 +19,11 @@ SpiderFoot's modular architecture makes it easy to add new functionality. The [M
 
 ## API Development
 
-SpiderFoot provides a RESTful API for automation and integration. See the [API Development Guide](../docs/developer/api_development.md) for details on available endpoints, authentication, and usage examples.
+ASM-NG provides a RESTful API for automation and integration. See the [API Development Guide](../docs/developer/api_development.md) for details on available endpoints, authentication, and usage examples.
 
 ## Version Management
 
-Learn how SpiderFoot manages releases, versioning, and changelogs in the [Version Management Guide](../docs/VERSION_MANAGEMENT.md). This is essential for maintaining compatibility and tracking changes.
+Learn how ASM-NG manages releases, versioning, and changelogs in the [Version Management Guide](../docs/VERSION_MANAGEMENT.md). This is essential for maintaining compatibility and tracking changes.
 
 ## Documentation Build
 

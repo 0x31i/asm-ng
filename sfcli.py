@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # -------------------------------------------------------------------------------
 # Name:        sfcli
-# Purpose:     Command Line Interface for SpiderFoot.
+# Purpose:     Command Line Interface for ASM-NG (Attack Surface Management - Next Generation).
 #
 # Author:      Steve Micallef <steve@binarypool.com>
 #
@@ -33,14 +33,15 @@ from spiderfoot import __version__
 
 
 ASCII_LOGO = r"""
-  _________      .__    .___          ___________            __
- /   _____/_____ |__| __| _/__________\_   _____/___   _____/  |_
- \_____  \\____ \|  |/ __ |/ __ \_  __ \    __)/  _ \ /  _ \   __\
- /        \  |_> >  / /_/ \  ___/|  | \/     \(  <_> |  <_> )  |
-/_______  /   __/|__\____ |\___  >__|  \___  / \____/ \____/|__|
-        \/|__|           \/    \/          \/
-                Open Source Intelligence Automation."""
-COPYRIGHT_INFO = "               by Poppopjmp | @spiderfoot\n"
+     _    ____  __  __       _   _  ____
+    / \  / ___||  \/  |     | \ | |/ ___|
+   / _ \ \___ \| |\/| |_____|  \| | |  _
+  / ___ \ ___) | |  | |_____| |\  | |_| |
+ /_/   \_\____/|_|  |_|     |_| \_|\____|
+
+    Attack Surface Management - Next Generation
+           OSINT Automation Platform"""
+COPYRIGHT_INFO = "               by 0x31i | van1shland.io\n"
 
 try:
     import readline
@@ -372,7 +373,7 @@ class SpiderFootCli(cmd.Cmd):
         # requests_log.setLevel(logging.DEBUG)
         # requests_log.propagate = True
         headers = {
-            "User-agent": "SpiderFoot-CLI/" + self.version,
+            "User-agent": "ASM-NG-CLI/" + self.version,
             "Accept": "application/json"
         }
 
@@ -565,7 +566,7 @@ class SpiderFootCli(cmd.Cmd):
 
     # Ping the server.
     def do_ping(self, line):
-        """Ping Ping the SpiderFoot server to ensure it's responding."""
+        """Ping Ping the ASM-NG server to ensure it's responding."""
         d = self.request(self.ownopts['cli.server_baseurl'] + "/ping")
         if not d:
             return
@@ -643,7 +644,7 @@ class SpiderFootCli(cmd.Cmd):
 
     # Load commands from a file.
     def do_load(self, line):
-        """Load <file> Execute SpiderFoot CLI commands found in <file>."""
+        """Load <file> Execute ASM-NG CLI commands found in <file>."""
         pass
 
     # Get scan info and config.
@@ -1170,8 +1171,8 @@ class SpiderFootCli(cmd.Cmd):
             ["history", "Enable/Disable/List command history."],
             ["spool", "Enable/Disable spooling output."],
             ["shell", "Execute a shell command."],
-            ["exit", "Exit the SpiderFoot CLI (won't impact running scans)."],
-            ["ping", "Test connectivity to the SpiderFoot server."],
+            ["exit", "Exit the ASM-NG CLI (won't impact running scans)."],
+            ["ping", "Test connectivity to the ASM-NG server."],
             ["modules", "List available modules."],
             ["types", "List available data types."],
             ["correlationrules", "List available correlation rules."],
@@ -1186,7 +1187,7 @@ class SpiderFootCli(cmd.Cmd):
             ["correlations", "Show correlation results from a scan."],
             ["summary", "Scan result summary."],
             ["find", "Search for data within scan results."],
-            ["query", "Run SQL against the SpiderFoot SQLite database."],
+            ["query", "Run SQL against the ASM-NG SQLite database."],
             ["logs", "View/watch logs from a scan."]
         ]
 
@@ -1199,7 +1200,7 @@ class SpiderFootCli(cmd.Cmd):
 
     # Get/Set configuration
     def do_set(self, line):
-        """Set [opt [= <val>]] Set a configuration variable in SpiderFoot."""
+        """Set [opt [= <val>]] Set a configuration variable in ASM-NG."""
 
         c = self.myparseline(line, replace=False)
         cfg = None
@@ -1236,7 +1237,7 @@ class SpiderFootCli(cmd.Cmd):
         # Get the server-side config
         d = self.request(self.ownopts['cli.server_baseurl'] + "/optsraw")
         if not d:
-            self.edprint("Unable to obtain SpiderFoot server-side config.")
+            self.edprint("Unable to obtain ASM-NG server-side config.")
             return
 
         j = list()
@@ -1244,7 +1245,7 @@ class SpiderFootCli(cmd.Cmd):
         token = ""  # nosec
         j = json.loads(d)
         if j[0] == "ERROR":
-            self.edprint("Error fetching SpiderFoot server-side config.")
+            self.edprint("Error fetching ASM-NG server-side config.")
             return
 
         serverconfig = j[1]['data']
@@ -1330,13 +1331,13 @@ class SpiderFootCli(cmd.Cmd):
             j = list()
 
             if not d:
-                self.edprint("Unable to set SpiderFoot server-side config.")
+                self.edprint("Unable to set ASM-NG server-side config.")
                 return
 
             j = json.loads(d)
             if j[0] == "ERROR":
                 self.edprint(
-                    f"Error setting SpiderFoot server-side config: {j[1]}")
+                    f"Error setting ASM-NG server-side config: {j[1]}")
                 return
 
             self.dprint(f"{cfg} set to {val}")
@@ -1359,29 +1360,29 @@ class SpiderFootCli(cmd.Cmd):
 
     # Exit the CLI
     def do_exit(self, line):
-        """Exit Exit the SpiderFoot CLI."""
+        """Exit Exit the ASM-NG CLI."""
         return True
 
     # Ctrl-D
     def do_EOF(self, line):
-        """EOF (Ctrl-D) Exit the SpiderFoot CLI."""
+        """EOF (Ctrl-D) Exit the ASM-NG CLI."""
         print("\n")
         return True
 
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(
-        description='SpiderFoot: Open Source Intelligence Automation.')
+        description='ASM-NG: Attack Surface Management - Next Generation OSINT Platform.')
     p.add_argument("-d", "--debug", help="Enable debug output.",
                    action='store_true')
     p.add_argument("-s", metavar="URL", type=str,
-                   help="Connect to SpiderFoot server on URL. By default, a connection to http://127.0.0.1:5001 will be attempted.")
+                   help="Connect to ASM-NG server on URL. By default, a connection to http://127.0.0.1:5001 will be attempted.")
     p.add_argument("-u", metavar="USER", type=str,
-                   help="Username to authenticate to SpiderFoot server.")
+                   help="Username to authenticate to ASM-NG server.")
     p.add_argument("-p", metavar="PASS", type=str,
-                   help="Password to authenticate to SpiderFoot server. Consider using -P PASSFILE instead so that your password isn't visible in your shell history or in process lists!")
+                   help="Password to authenticate to ASM-NG server. Consider using -P PASSFILE instead so that your password isn't visible in your shell history or in process lists!")
     p.add_argument("-P", metavar="PASSFILE", type=str,
-                   help="File containing password to authenticate to SpiderFoot server. Ensure permissions on the file are set appropriately!")
+                   help="File containing password to authenticate to ASM-NG server. Ensure permissions on the file are set appropriately!")
     p.add_argument("-e", metavar="FILE", type=str,
                    help="Execute commands from FILE.")
     p.add_argument("-l", metavar="FILE", type=str,

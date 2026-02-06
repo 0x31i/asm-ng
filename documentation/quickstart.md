@@ -2,13 +2,13 @@
 
 *Author: poppopjmp*
 
-This guide will help you run your first scan in minutes using either the web interface or the command line. Follow these steps for a fast and successful start with SpiderFoot.
+This guide will help you run your first scan in minutes using either the web interface or the command line. Follow these steps for a fast and successful start with ASM-NG.
 
 ---
 
 ## Web Interface
 
-1. **Start SpiderFoot:**
+1. **Start ASM-NG:**
 
    ```sh
    python sf.py -l 127.0.0.1:5001

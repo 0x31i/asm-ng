@@ -1,6 +1,6 @@
 # FAQ
 
-This FAQ addresses common questions, troubleshooting steps, and best practices for SpiderFoot users. If your question isn't answered here, check the full documentation or visit the community forums for more help.
+This FAQ addresses common questions, troubleshooting steps, and best practices for ASM-NG users. If your question isn't answered here, check the full documentation or visit the community forums for more help.
 
 ---
 
@@ -19,21 +19,21 @@ A: In the web UI, go to **Settings → Module Settings**. Each module that requi
 A: Example:  
 `python sf.py -s example.com -t DOMAIN_NAME -m sfp_dnsresolve,sfp_ssl`
 
-**Q: Can I run SpiderFoot in Docker?**  
+**Q: Can I run ASM-NG in Docker?**  
 A: Yes! See the [Docker Deployment Guide](../docs/docker_deployment.md) for details. Docker is recommended for easy setup and isolation.
 
-**Q: How do I update SpiderFoot?**  
+**Q: How do I update ASM-NG?**  
 A: Pull the latest code from GitHub and reinstall dependencies as needed. For Docker, pull the latest image and recreate your container.
 
 **Q: Where are logs stored?**  
 A: Logs are stored in the `logs/` directory by default. For Docker, use `docker logs <container>`.
 
 **Q: How do I reset my admin password?**  
-A: Stop SpiderFoot, delete the `spiderfoot.db` file, and restart. You will be prompted to create a new admin account.  
+A: Stop ASM-NG, delete the `spiderfoot.db` file, and restart. You will be prompted to create a new admin account.  
 **Warning:** This deletes all data, including scan results and settings.
 
 **Q: Where can I get more help?**  
-A: Visit the [GitHub Issues page](https://github.com/poppopjmp/spiderfoot/issues) or join the [Discord community](https://discord.gg/vyvztrG).
+A: Visit the [GitHub Issues page](https://github.com/0x31i/asm-ng/issues) or join the [Discord community](https://discord.gg/vyvztrG).
 
 ---
 
@@ -82,7 +82,7 @@ A:
   `python sf.py --debug`
 - For Docker, set the environment variable `SF_DEBUG=1`.
 
-**Q: How do I run SpiderFoot headless (no web UI)?**  
+**Q: How do I run ASM-NG headless (no web UI)?**  
 A:  
 - Use the CLI:  
   `python sf.py -s <target> -t <type> -m <modules>`
@@ -97,7 +97,7 @@ A:
 
 ```mermaid
 flowchart TD
-    A[SpiderFoot Not Working] --> B{Is it a UI or CLI issue?}
+    A[ASM-NG Not Working] --> B{Is it a UI or CLI issue?}
     B -->|UI| C[Check browser console & logs/]
     B -->|CLI| D[Check terminal output & logs/]
     C --> E{Error in logs?}

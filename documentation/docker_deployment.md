@@ -1,14 +1,14 @@
 # Docker Deployment Guide
 
-This guide covers deploying SpiderFoot using Docker for both development and production environments.
+This guide covers deploying ASM-NG using Docker for both development and production environments.
 
 ## Quick Start
 
 ### Using Docker Hub Image
 
 ```bash
-# Pull and run SpiderFoot
-docker run -d -p 5001:5001 --name spiderfoot spiderfoot/spiderfoot
+# Pull and run ASM-NG
+docker run -d -p 5001:5001 --name asm-ng 0x31i/asm-ng
 
 # Access web interface
 open http://localhost:5001
@@ -18,13 +18,13 @@ open http://localhost:5001
 
 ```bash
 # Create data directory
-mkdir spiderfoot-data
+mkdir asm-ng-data
 
 # Run with volume mount
 docker run -d -p 5001:5001 \
-  -v $(pwd)/spiderfoot-data:/var/lib/spiderfoot/data \
-  --name spiderfoot \
-  spiderfoot/spiderfoot
+  -v $(pwd)/asm-ng-data:/var/lib/spiderfoot/data \
+  --name asm-ng \
+  0x31i/asm-ng
 ```
 
 ## Building from Source
@@ -57,7 +57,7 @@ USER spiderfoot
 # Expose port
 EXPOSE 5001
 
-# Start SpiderFoot
+# Start ASM-NG
 CMD ["python", "sf.py", "-l", "0.0.0.0:5001"]
 ```
 
@@ -65,10 +65,10 @@ CMD ["python", "sf.py", "-l", "0.0.0.0:5001"]
 
 ```bash
 # Build image
-docker build -t spiderfoot:local .
+docker build -t asm-ng:local .
 
 # Run container
-docker run -d -p 5001:5001 --name spiderfoot spiderfoot:local
+docker run -d -p 5001:5001 --name asm-ng asm-ng:local
 ```
 
 ## Production Deployment
@@ -101,7 +101,7 @@ RUN apt-get update && apt-get install -y \
     ...
 ```
 
-*For full details, see the original Docker Deployment Guide in the old docs folder. This file is now the canonical version for SpiderFoot Docker deployment.*
+*For full details, see the original Docker Deployment Guide in the old docs folder. This file is now the canonical version for ASM-NG Docker deployment.*
 
 ---
 

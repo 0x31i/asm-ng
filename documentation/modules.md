@@ -2,7 +2,7 @@
 
 *Author: poppopjmp*
 
-SpiderFoot includes over 200 modules for data gathering, enrichment, and analysis. Modules can be combined to create powerful OSINT workflows tailored to your needs.
+ASM-NG includes over 200 modules for data gathering, enrichment, and analysis. Modules can be combined to create powerful OSINT workflows tailored to your needs.
 
 ---
 
@@ -109,7 +109,7 @@ Below is a complete list of all documented modules. Click a module name to view 
 
 ## Developing Your Own Modules
 
-- SpiderFoot's modular architecture makes it easy to add new modules.
+- ASM-NG's modular architecture makes it easy to add new modules.
 - See the [Developer Guide](developer_guide.md) for instructions, templates, and best practices.
 - Community contributions are welcome!
 

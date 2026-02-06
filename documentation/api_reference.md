@@ -2,13 +2,13 @@
 
 *Author: poppopjmp*
 
-SpiderFoot provides both a REST API and a Python API for integration, automation, and advanced workflows. Use the API to automate scans, retrieve results, and integrate SpiderFoot with other tools and platforms.
+ASM-NG provides both a REST API and a Python API for integration, automation, and advanced workflows. Use the API to automate scans, retrieve results, and integrate ASM-NG with other tools and platforms.
 
 ---
 
 ## REST API
 
-The REST API allows you to manage scans, retrieve results, and interact with SpiderFoot programmatically.
+The REST API allows you to manage scans, retrieve results, and interact with ASM-NG programmatically.
 
 - **List scans:**
   - `GET /api/scans` — Returns a list of all scans.
@@ -37,7 +37,7 @@ curl -X POST http://127.0.0.1:5001/api/scans \
 
 ## Python API Example
 
-You can also use SpiderFoot as a Python library for custom automation:
+You can also use ASM-NG as a Python library for custom automation:
 
 ```python
 from sflib import SpiderFoot
@@ -52,7 +52,7 @@ scanner = startSpiderFootScanner(
 ```
 
 - See the source code and docstrings for more advanced usage.
-- The Python API is ideal for integrating SpiderFoot into custom scripts and pipelines.
+- The Python API is ideal for integrating ASM-NG into custom scripts and pipelines.
 
 ---
 

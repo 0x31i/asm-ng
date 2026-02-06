@@ -2,7 +2,7 @@
 
 *Author: poppopjmp*
 
-This guide will walk you through installing SpiderFoot on Linux, macOS, or Windows, as well as deploying with Docker for easy setup and portability.
+This guide will walk you through installing ASM-NG on Linux, macOS, or Windows, as well as deploying with Docker for easy setup and portability.
 
 ---
 
@@ -18,8 +18,8 @@ This guide will walk you through installing SpiderFoot on Linux, macOS, or Windo
 1. **Clone the repository:**
 
    ```sh
-   git clone https://github.com/poppopjmp/spiderfoot.git
-   cd spiderfoot
+   git clone https://github.com/0x31i/asm-ng.git
+   cd asm-ng
    ```
 
 2. **Install dependencies:**
@@ -36,7 +36,7 @@ This guide will walk you through installing SpiderFoot on Linux, macOS, or Windo
      pip install -r requirements.txt
      ```
 
-3. **Run SpiderFoot:**
+3. **Run ASM-NG:**
 
    ```sh
    python sf.py -l 127.0.0.1:5001
@@ -50,12 +50,12 @@ This guide will walk you through installing SpiderFoot on Linux, macOS, or Windo
 
 ## Docker Installation
 
-Docker is the easiest way to run SpiderFoot in a portable, isolated environment.
+Docker is the easiest way to run ASM-NG in a portable, isolated environment.
 
 - **Run with Docker:**
 
   ```sh
-  docker run -p 5001:5001 poppopjmp/spiderfoot
+  docker run -p 5001:5001 0x31i/asm-ng
   ```
 
 - **Run with Docker Compose:**
@@ -68,7 +68,7 @@ Docker is the easiest way to run SpiderFoot in a portable, isolated environment.
 
 ---
 
-## Upgrading SpiderFoot
+## Upgrading ASM-NG
 
 - To upgrade, pull the latest code from GitHub and reinstall dependencies:
 
@@ -79,7 +79,7 @@ Docker is the easiest way to run SpiderFoot in a portable, isolated environment.
 - For Docker, pull the latest image:
 
   ```sh
-  docker pull poppopjmp/spiderfoot
+  docker pull 0x31i/asm-ng
   ```
 
 ---

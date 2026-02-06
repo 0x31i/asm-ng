@@ -49,7 +49,7 @@ jobs:
       run: |
         set -e
         IMAGE=ghcr.io/${{ github.repository }}:${{ github.sha }}
-        CONTAINER=spiderfoot-test
+        CONTAINER=asm-ng-test
 
         # CLI tests
         docker run --rm $IMAGE sf.py -h || { echo 'sf.py -h failed'; exit 1; }

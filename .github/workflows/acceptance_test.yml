@@ -1,5 +1,5 @@
 # Make the Workflow run only over acceptance branches
-name: SpiderFoot Acceptance Tests
+name: ASM-NG Acceptance Tests
 
 on:
   push:
@@ -47,23 +47,23 @@ jobs:
           sudo chmod +x /usr/local/bin/chromedriver
           chromedriver --version
 
-      - name: Start SpiderFoot container
+      - name: Start ASM-NG container
         run: |
           set -e
-          docker run -d -p 5001:5001 --name spiderfoot ghcr.io/poppopjmp/spiderfoot:v5.2.7
+          docker run -d -p 5001:5001 --name asm-ng ghcr.io/0x31i/asm-ng:v5.2.9
 
-      - name: Wait for SpiderFoot to start
+      - name: Wait for ASM-NG to start
         run: |
           set -e
           for i in {1..60}; do
             if curl -sSf http://127.0.0.1:5001/ping > /dev/null; then
-              echo "SpiderFoot is up!"
+              echo "ASM-NG is up!"
               exit 0
             fi
             sleep 1
           done
-          echo "SpiderFoot did not start in time" >&2
-          docker logs spiderfoot || true
+          echo "ASM-NG did not start in time" >&2
+          docker logs asm-ng || true
           exit 1
 
       - name: Run Robot Framework tests
@@ -73,9 +73,9 @@ jobs:
           if [ ! -f scan-chrome.robot ]; then echo "scan-chrome.robot not found!"; exit 1; fi
           robot --variable BROWSER:Chrome --outputdir results scan-chrome.robot
 
-      - name: Stop SpiderFoot container
+      - name: Stop ASM-NG container
         if: always()
-        run: docker stop spiderfoot || true
+        run: docker stop asm-ng || true
 
       - name: Upload Robot Framework results
         if: always()
@@ -130,23 +130,23 @@ jobs:
           sudo mv geckodriver /usr/local/bin/
           geckodriver --version
 
-      - name: Start SpiderFoot container
+      - name: Start ASM-NG container
         run: |
           set -e
-          docker run -d -p 5001:5001 --name spiderfoot ghcr.io/poppopjmp/spiderfoot:v5.2.7
+          docker run -d -p 5001:5001 --name asm-ng ghcr.io/0x31i/asm-ng:v5.2.9
 
-      - name: Wait for SpiderFoot to start
+      - name: Wait for ASM-NG to start
         run: |
           set -e
           for i in {1..60}; do
             if curl -sSf http://127.0.0.1:5001/ping > /dev/null; then
-              echo "SpiderFoot is up!"
+              echo "ASM-NG is up!"
               exit 0
             fi
             sleep 1
           done
-          echo "SpiderFoot did not start in time" >&2
-          docker logs spiderfoot || true
+          echo "ASM-NG did not start in time" >&2
+          docker logs asm-ng || true
           exit 1
 
       - name: Run Robot Framework tests with Firefox
@@ -156,9 +156,9 @@ jobs:
           if [ ! -f scan-firefox.robot ]; then echo "scan-firefox.robot not found!"; exit 1; fi
           robot --variable BROWSER:Firefox --outputdir results scan-firefox.robot
 
-      - name: Stop SpiderFoot container
+      - name: Stop ASM-NG container
         if: always()
-        run: docker stop spiderfoot || true
+        run: docker stop asm-ng || true
 
       - name: Upload Robot Framework results
         if: always()

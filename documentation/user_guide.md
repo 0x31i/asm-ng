@@ -2,7 +2,7 @@
 
 *Author: poppopjmp*
 
-This guide covers the main features, workflows, and best practices for SpiderFoot, including the web interface, CLI, workspaces, exporting data, automation, and troubleshooting.
+This guide covers the main features, workflows, and best practices for ASM-NG, including the web interface, CLI, workspaces, exporting data, automation, and troubleshooting.
 
 ---
 
@@ -101,7 +101,7 @@ python sf.py -s user@example.com -t EMAILADDR -m sfp_hunter,sfp_haveibeen,sfp_em
 - Escalate to active scanning only when necessary
 - Document findings and keep records
 - Configure API keys for maximum coverage
-- Regularly update SpiderFoot and modules
+- Regularly update ASM-NG and modules
 - Use workspaces to keep projects organized
 - Tune thread counts and timeouts for performance
 - Respect authorization and legal boundaries

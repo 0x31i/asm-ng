@@ -1,6 +1,6 @@
 # Troubleshooting
 
-If you encounter issues with SpiderFoot, use this guide to diagnose and resolve common problems. For additional help, consult the documentation, GitHub Issues, or the Discord community.
+If you encounter issues with ASM-NG, use this guide to diagnose and resolve common problems. For additional help, consult the documentation, GitHub Issues, or the Discord community.
 
 ---
 
@@ -8,18 +8,18 @@ If you encounter issues with SpiderFoot, use this guide to diagnose and resolve 
 
 - **Check logs:** Review logs in the `logs/` directory for error messages and stack traces.
 - **Verify dependencies:** Ensure all required Python packages are installed. Use `pip install -r requirements.txt` to install missing dependencies.
-- **Restart the application:** Sometimes, simply restarting SpiderFoot or your Docker container resolves transient issues.
-- **Check for updates:** Make sure you are running the latest version of SpiderFoot and its dependencies.
+- **Restart the application:** Sometimes, simply restarting ASM-NG or your Docker container resolves transient issues.
+- **Check for updates:** Make sure you are running the latest version of ASM-NG and its dependencies.
 
 ---
 
 ## Troubleshooting Workflow Diagram
 
-Below is a simple troubleshooting workflow for SpiderFoot. Follow the arrows to diagnose and resolve issues efficiently.
+Below is a simple troubleshooting workflow for ASM-NG. Follow the arrows to diagnose and resolve issues efficiently.
 
 ```mermaid
 flowchart TD
-    A[SpiderFoot Issue Detected] --> B{Is there an error in logs?}
+    A[ASM-NG Issue Detected] --> B{Is there an error in logs?}
     B -- Yes --> C[Read error message]
     C --> D{Is it a dependency error?}
     D -- Yes --> E[Run pip install -r requirements.txt]
@@ -31,7 +31,7 @@ flowchart TD
     J -- Yes --> K[Check volume permissions, ports, and restart container]
     J -- No --> L[Ask for help on GitHub or Discord]
     H --> L
-    G --> M[Restart SpiderFoot]
+    G --> M[Restart ASM-NG]
     E --> M
     K --> M
     M --> N[Issue resolved?]
@@ -124,19 +124,19 @@ flowchart TD
 | `Address already in use`             | Port conflict                       | Change port in config or command         |
 | `Permission denied`                  | File or directory permissions       | Check file permissions, run as admin     |
 | `API key not set`                    | Missing API key for a module        | Set API key in web UI                    |
-| `Database locked`                    | SQLite concurrency issue            | Restart SpiderFoot, avoid multiple runs  |
+| `Database locked`                    | SQLite concurrency issue            | Restart ASM-NG, avoid multiple runs  |
 
 ---
 
 ## Getting More Help
 
-If you can't resolve your issue, visit the [GitHub Issues page](https://github.com/poppopjmp/spiderfoot/issues) or join the Discord community for support. Please provide detailed information about your environment and the problem (OS, Python version, Docker version, error messages, steps to reproduce, etc.).
+If you can't resolve your issue, visit the [GitHub Issues page](https://github.com/0x31i/asm-ng/issues) or join the Discord community for support. Please provide detailed information about your environment and the problem (OS, Python version, Docker version, error messages, steps to reproduce, etc.).
 
 ---
 
 ## Wiki & Further Reading
 
-- [Official Documentation](https://github.com/poppopjmp/spiderfoot/wiki)
+- [Official Documentation](https://github.com/0x31i/asm-ng/wiki)
 - [User Guide](user_guide.md)
 - [API Reference](api_reference.md)
 - [Modules Index](modules.md)

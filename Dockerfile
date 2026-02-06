@@ -1,5 +1,5 @@
 #
-# Spiderfoot Dockerfile - Enterprise Edition
+# ASM-NG Dockerfile - Enterprise Edition
 # Improved version with virtual environment support and FastAPI
 #
 
@@ -96,7 +96,7 @@ ENV SPIDERFOOT_DATA=/home/spiderfoot/data \
 # Create user and directories
 RUN addgroup --system spiderfoot && \
     adduser --system --ingroup spiderfoot --home /home/spiderfoot \
-            --shell /usr/sbin/nologin --gecos "SpiderFoot User" spiderfoot && \
+            --shell /usr/sbin/nologin --gecos "ASM-NG User" spiderfoot && \
     mkdir -p /home/spiderfoot/data /home/spiderfoot/logs /home/spiderfoot/cache /home/spiderfoot/.spiderfoot/logs && \
     # Do NOT chown bind-mounted folders here; this causes errors if the host directory is mounted at runtime.
     # Only set ownership for files inside the image.

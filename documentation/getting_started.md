@@ -2,7 +2,7 @@
 
 *Author: poppopjmp*
 
-Welcome to SpiderFoot! This guide will help you set up, configure, and run your first scan, whether you are a new user or an experienced security professional. Follow these steps to get SpiderFoot up and running quickly.
+Welcome to ASM-NG! This guide will help you set up, configure, and run your first scan, whether you are a new user or an experienced security professional. Follow these steps to get ASM-NG up and running quickly.
 
 ---
 
@@ -12,15 +12,15 @@ See the [Installation Guide](installation.md) for detailed steps. In summary:
 
 - **Clone the repository:**
   ```sh
-  git clone https://github.com/poppopjmp/spiderfoot.git
-  cd spiderfoot
+  git clone https://github.com/0x31i/asm-ng.git
+  cd asm-ng
   ```
 - **Install dependencies:**
   ```sh
   pip install -r requirements.txt
   ```
 - **(Optional) Use Docker:**
-  Docker provides an easy, isolated way to run SpiderFoot. See the [Docker section](installation.md#docker-installation) for details.
+  Docker provides an easy, isolated way to run ASM-NG. See the [Docker section](installation.md#docker-installation) for details.
 
 ## 2. Launching the Web Interface
 

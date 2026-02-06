@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Setup script for SpiderFoot."""
+"""Setup script for ASM-NG (Attack Surface Management - Next Generation)."""
 
 import os
 import pathlib
@@ -23,14 +23,14 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
     ]
 
 setup(
-    name="spiderfoot",
+    name="asm-ng",
     version=version,
-    author="Steve Micallef, Agostino Panico",
-    author_email="steve@binarypool.com, van1sh@van1shland.io",
-    description="SpiderFoot - Open Source Intelligence Automation Tool",
+    author="0x31i",
+    author_email="van1sh@van1shland.io",
+    description="ASM-NG - Attack Surface Management, Next Generation OSINT Platform",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/poppopjmp/spiderfoot",
+    url="https://github.com/0x31i/asm-ng",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 5 - Production/Stable",
@@ -50,6 +50,11 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
+            # New ASM-NG commands
+            "asm-ng=sf:main",
+            "asm-ng-cli=sfcli:main",
+            "asm-ng-api=sfapi:main",
+            # Legacy aliases (kept for backward compatibility)
             "spiderfoot=sf:main",
             "spiderfoot-cli=sfcli:main",
             "spiderfoot-api=sfapi:main",

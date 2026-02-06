@@ -1,7 +1,7 @@
 # ...moved from root, see previous content...
 
 parts:
-  spiderfoot:
+  asm-ng:
     plugin: python
     source: .
     python-packages:

@@ -2,7 +2,7 @@
 
 *Author: poppopjmp*
 
-SpiderFoot can be configured via the web UI, configuration file, and environment variables. Proper configuration ensures you get the most out of all modules and integrations, and helps tailor SpiderFoot to your environment and use case.
+ASM-NG can be configured via the web UI, configuration file, and environment variables. Proper configuration ensures you get the most out of all modules and integrations, and helps tailor ASM-NG to your environment and use case.
 
 ---
 
