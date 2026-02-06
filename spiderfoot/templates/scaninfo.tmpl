@@ -1038,7 +1038,18 @@
             grid += "<button class='btn disabled btn-md btn-default' id='status' style='cursor: default;'>?</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-secondary' style='cursor: default;'>Errors</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='errors' style='cursor: default;'>?</button></div>";
-            grid += "</div></div></div></div>";
+            grid += "</div>";
+            // Progress bar inside Scan Status panel (shown only for active scans)
+            grid += "<div id='summary-progress-container' style='display: none; padding: 8px 10px 4px 10px;'>";
+            grid += "<div style='display: flex; align-items: center; gap: 8px;'>";
+            grid += "<div class='progress' style='flex: 1; height: 14px; margin-bottom: 0;'>";
+            grid += "<div id='summary-progress-bar' class='progress-bar progress-bar-striped active' role='progressbar' style='width: 0%; min-width: 2em; text-align: center; line-height: 14px; font-size: 10px;'>0%</div>";
+            grid += "</div>";
+            grid += "<small id='summary-progress-pct' style='white-space: nowrap; font-weight: bold; min-width: 30px;'></small>";
+            grid += "</div>";
+            grid += "<div id='summary-progress-details' style='margin-top: 3px; font-size: 10px; color: #888; display: flex; gap: 12px; flex-wrap: wrap;'></div>";
+            grid += "</div>";
+            grid += "</div></div></div>";
             grid += "<div class='col-sm-5'>";
             grid += "<div class='panel panel-default'>";
             grid += "<div class='panel-heading'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;&nbsp;Correlations</div><div class='panel-body' style='padding: 5px'>";
@@ -1094,6 +1105,41 @@
                 function() {
                     sf.fetchData('${docroot}/scanerrors', {'id': instanceId}, function(data) {
                         $("#errors").html(data.length);
+                    });
+                }
+            );
+
+            // Progress bar inside Scan Status panel
+            dataloaders.push(
+                function() {
+                    sf.fetchData('${docroot}/scanprogress', {'id': instanceId}, function(data) {
+                        var container = $('#summary-progress-container');
+                        var bar = $('#summary-progress-bar');
+                        var status = data.status;
+
+                        if (status == 'FINISHED' || status == 'ABORTED' || status == 'ERROR-FAILED') {
+                            container.hide();
+                            return;
+                        }
+
+                        if (status == 'CREATED' || status == 'INITIALIZING' || status == 'STARTING' || status == 'STARTED' || status == 'RUNNING') {
+                            container.show();
+                            var pct = data.progressPercent || 0;
+                            bar.css('width', pct + '%').attr('aria-valuenow', pct).text(pct + '%');
+                            $('#summary-progress-pct').text('~' + pct + '%');
+
+                            var details = '';
+                            details += '<span><i class="glyphicon glyphicon-th-list"></i> ' + data.modulesWithResults + '/' + data.modulesTotal + ' modules</span>';
+                            details += '<span><i class="glyphicon glyphicon-play"></i> ' + data.modulesRunning + ' running</span>';
+                            var ql = data.eventsQueued; if (ql > 999) ql = (ql/1000).toFixed(1) + 'k';
+                            details += '<span><i class="glyphicon glyphicon-inbox"></i> ' + ql + ' queued</span>';
+                            var tl = data.totalEvents; if (tl > 999) tl = (tl/1000).toFixed(1) + 'k';
+                            details += '<span><i class="glyphicon glyphicon-signal"></i> ' + tl + ' events</span>';
+                            details += '<span><i class="glyphicon glyphicon-dashboard"></i> ' + data.eventsPerSecond + '/sec</span>';
+                            $('#summary-progress-details').html(details);
+                        } else {
+                            container.hide();
+                        }
                     });
                 }
             );

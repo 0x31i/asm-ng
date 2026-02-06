@@ -317,6 +317,36 @@ function fallbackCopyTextToClipboard(text) {
     document.body.removeChild(textArea);
 }
 
+function updateScanListProgress() {
+    $('.scanlist-progress').each(function() {
+        var el = $(this);
+        var scanId = el.data('scanid');
+        if (!scanId) return;
+
+        sf.fetchData(docroot + '/scanprogress', {'id': scanId}, function(data) {
+            var bar = el.find('.progress-bar');
+            var info = el.find('.scanlist-progress-info');
+            var status = data.status;
+
+            if (status == 'FINISHED' || status == 'ABORTED' || status == 'ERROR-FAILED') {
+                el.fadeOut(500);
+                return;
+            }
+
+            var pct = data.progressPercent || 0;
+            bar.css('width', pct + '%').text(pct + '%');
+            var ql = data.eventsQueued; if (ql > 999) ql = (ql/1000).toFixed(1) + 'k';
+            var tl = data.totalEvents; if (tl > 999) tl = (tl/1000).toFixed(1) + 'k';
+            info.html(data.modulesRunning + ' running &middot; ' + ql + ' queued &middot; ' + tl + ' events &middot; ' + data.eventsPerSecond + '/s');
+        });
+    });
+
+    // Stop polling if no running scans remain
+    if ($('.scanlist-progress:visible').length === 0 && window._scanlistProgressInterval) {
+        clearInterval(window._scanlistProgressInterval);
+    }
+}
+
 function showlisttable(types, filter, data) {
     try {
         if (filter == null) {
@@ -415,7 +445,16 @@ function showlisttable(types, filter, data) {
             } else {
                 statusy = "alert-info";
             }
-            table += "<td class='text-center'><span class='badge " + statusy + "'>" + data[i][6] + "</span></td>";
+            table += "<td class='text-center'><span class='badge " + statusy + "'>" + data[i][6] + "</span>";
+            if (data[i][6] == "RUNNING" || data[i][6] == "STARTING" || data[i][6] == "STARTED" || data[i][6] == "INITIALIZING") {
+                table += "<div class='scanlist-progress' data-scanid='" + data[i][0] + "' style='margin-top: 4px;'>";
+                table += "<div class='progress' style='height: 10px; margin-bottom: 0; min-width: 80px;'>";
+                table += "<div class='progress-bar progress-bar-striped active' role='progressbar' style='width: 0%; font-size: 9px; line-height: 10px;'>0%</div>";
+                table += "</div>";
+                table += "<div class='scanlist-progress-info' style='font-size: 9px; color: #888; margin-top: 2px; white-space: nowrap;'></div>";
+                table += "</div>";
+            }
+            table += "</td>";
             table += "<td class='text-center'>" + data[i][7] + "</td>";
             table += "<td class='text-center'>";
             table += "<span class='badge alert-danger'>" + data[i][8]['HIGH'] + "</span>";
@@ -496,6 +535,12 @@ function showlisttable(types, filter, data) {
             $("#btn-rerun").click(function() { rerunSelected(); });
             $("#btn-stop").click(function() { stopSelected(); });
             $("#checkall").click(function() { switchSelectAll(); });
+
+            // Fetch progress for all running scans
+            updateScanListProgress();
+            // Poll every 5 seconds
+            if (window._scanlistProgressInterval) clearInterval(window._scanlistProgressInterval);
+            window._scanlistProgressInterval = setInterval(updateScanListProgress, 5000);
         });
     } catch (e) {
         console.error("Exception in showlisttable:", e);
