@@ -1299,6 +1299,96 @@ class SpiderFootDb:
                 raise IOError(
                     "SQL error encountered when fetching result summary") from e
 
+    def scanProgress(self, instanceId: str) -> dict:
+        """Estimate scan progress based on how many modules have produced results
+        versus total modules enabled for the scan.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            dict: progress info with keys: modulesTotal, modulesWithResults,
+                  progressPercent, status
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(
+                f"instanceId is {type(instanceId)}; expected str()") from None
+
+        result = {
+            'modulesTotal': 0,
+            'modulesWithResults': 0,
+            'progressPercent': 0,
+            'status': 'UNKNOWN'
+        }
+
+        with self.dbhLock:
+            try:
+                # Get scan status
+                self.dbh.execute(
+                    "SELECT status FROM tbl_scan_instance WHERE guid = ?",
+                    [instanceId])
+                row = self.dbh.fetchone()
+                if not row:
+                    return result
+                result['status'] = row[0]
+
+                # If scan is finished/aborted/failed, progress is 100%
+                if row[0] in ('FINISHED', 'ABORTED', 'ERROR-FAILED'):
+                    # Get total modules from config
+                    self.dbh.execute(
+                        "SELECT val FROM tbl_scan_config WHERE scan_instance_id = ? "
+                        "AND component = 'GLOBAL' AND opt = '_modulesenabled'",
+                        [instanceId])
+                    modrow = self.dbh.fetchone()
+                    if modrow and modrow[0]:
+                        mods = [m for m in modrow[0].split(',') if m]
+                        result['modulesTotal'] = len(mods)
+                    result['modulesWithResults'] = result['modulesTotal']
+                    result['progressPercent'] = 100
+                    return result
+
+                # Get total enabled modules from scan config
+                self.dbh.execute(
+                    "SELECT val FROM tbl_scan_config WHERE scan_instance_id = ? "
+                    "AND component = 'GLOBAL' AND opt = '_modulesenabled'",
+                    [instanceId])
+                modrow = self.dbh.fetchone()
+                if not modrow or not modrow[0]:
+                    return result
+
+                enabled_modules = [m for m in modrow[0].split(',') if m]
+                result['modulesTotal'] = len(enabled_modules)
+
+                if result['modulesTotal'] == 0:
+                    return result
+
+                # Count distinct modules that have produced results
+                self.dbh.execute(
+                    "SELECT COUNT(DISTINCT module) FROM tbl_scan_results "
+                    "WHERE scan_instance_id = ?",
+                    [instanceId])
+                countrow = self.dbh.fetchone()
+                if countrow:
+                    result['modulesWithResults'] = countrow[0]
+
+                # Calculate percentage (cap at 95% while still running since
+                # even when all modules have produced some results, work may
+                # still be ongoing)
+                pct = int((result['modulesWithResults'] / result['modulesTotal']) * 100)
+                if pct > 95 and result['status'] not in ('FINISHED', 'ABORTED', 'ERROR-FAILED'):
+                    pct = 95
+                result['progressPercent'] = pct
+
+                return result
+
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError(
+                    "SQL error encountered when fetching scan progress") from e
+
     def scanCorrelationSummary(self, instanceId: str, by: str = "rule") -> list:
         """Obtain a summary of the correlations, filtered by rule or risk.
 
