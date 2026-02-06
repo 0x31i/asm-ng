@@ -471,6 +471,10 @@ class SpiderFootDb:
         ['WEBSERVER_TECHNOLOGY', 'Web Technology', 0, 'DESCRIPTOR'],
         ['WIFI_ACCESS_POINT', 'WiFi Access Point Nearby', 0, 'ENTITY'],
         ['WIKIPEDIA_PAGE_EDIT', 'Wikipedia Page Edit', 0, 'DESCRIPTOR'],
+        ['AI_SINGLE_SCAN_CORRELATION',
+            'AI Correlation - Single Scan', 0, 'DESCRIPTOR'],
+        ['AI_CROSS_SCAN_CORRELATION',
+            'AI Correlation - Cross Scan', 0, 'DESCRIPTOR'],
     ]
 
     def __init__(self, opts: dict, init: bool = False) -> None:
@@ -671,6 +675,22 @@ class SpiderFootDb:
                     except sqlite3.Error:
                         pass
 
+                # Migration: Ensure AI correlation event types exist
+                for ai_type in ('AI_SINGLE_SCAN_CORRELATION', 'AI_CROSS_SCAN_CORRELATION'):
+                    try:
+                        self.dbh.execute("SELECT event FROM tbl_event_types WHERE event = ?", (ai_type,))
+                        if not self.dbh.fetchone():
+                            for row in self.eventDetails:
+                                if row[0] == ai_type:
+                                    self.dbh.execute(
+                                        "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (?, ?, ?, ?)",
+                                        (row[0], row[1], row[2], row[3])
+                                    )
+                                    break
+                        self.conn.commit()
+                    except sqlite3.Error:
+                        pass
+
                 if init:
                     for row in self.eventDetails:
                         event = row[0]
@@ -724,6 +744,22 @@ class SpiderFootDb:
                         except Exception:
                             continue
                     self.conn.commit()
+
+                # Migration: Ensure AI correlation event types exist
+                for ai_type in ('AI_SINGLE_SCAN_CORRELATION', 'AI_CROSS_SCAN_CORRELATION'):
+                    try:
+                        self.dbh.execute("SELECT event FROM tbl_event_types WHERE event = %s", (ai_type,))
+                        if not self.dbh.fetchone():
+                            for row in self.eventDetails:
+                                if row[0] == ai_type:
+                                    self.dbh.execute(
+                                        "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (%s, %s, %s, %s)",
+                                        (row[0], row[1], row[2], row[3])
+                                    )
+                                    break
+                        self.conn.commit()
+                    except psycopg2.Error:
+                        self.conn.rollback()
 
                 # Migration: Add source_data column and update UNIQUE constraint
                 try:
