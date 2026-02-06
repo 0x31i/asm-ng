@@ -18,9 +18,9 @@
         <button id="btn-import-config" class='btn btn-info'>Import API Keys</button>
         <button id="btn-opt-export" class='btn btn-info'>Export API Keys</button>
         <button id="btn-reset-settings" class='btn btn-danger'>Reset to Factory Default</button>
-        <a href="${docroot}/auditlog" class='btn btn-default'>Activity Log</a>
+        <a href="${docroot}/auditlog" id="btn-activity-log" class='btn btn-default'>Activity Log</a>
 % if current_user == 'admin':
-        <a href="${docroot}/users" class='btn btn-warning'><i class="glyphicon glyphicon-user"></i> User Management</a>
+        <a href="${docroot}/users" id="btn-user-management" class='btn btn-warning'><i class="glyphicon glyphicon-user"></i> User Management</a>
 % endif
     </div>
 </div>
