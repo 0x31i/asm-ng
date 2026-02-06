@@ -1299,6 +1299,154 @@ class SpiderFootDb:
                 raise IOError(
                     "SQL error encountered when fetching result summary") from e
 
+    def scanProgress(self, instanceId: str) -> dict:
+        """Estimate scan progress using multiple signals: module completion,
+        live queue state from the scanner, and event production rate.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            dict: progress info
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        import json as _json
+
+        if not isinstance(instanceId, str):
+            raise TypeError(
+                f"instanceId is {type(instanceId)}; expected str()") from None
+
+        result = {
+            'status': 'UNKNOWN',
+            'modulesTotal': 0,
+            'modulesWithResults': 0,
+            'modulesRunning': 0,
+            'modulesIdle': 0,
+            'modulesErrored': 0,
+            'eventsQueued': 0,
+            'totalEvents': 0,
+            'eventsPerSecond': 0.0,
+            'progressPercent': 0,
+        }
+
+        with self.dbhLock:
+            try:
+                # Get scan status and timing
+                self.dbh.execute(
+                    "SELECT status, ROUND(started/1000) AS started "
+                    "FROM tbl_scan_instance WHERE guid = ?",
+                    [instanceId])
+                row = self.dbh.fetchone()
+                if not row:
+                    return result
+                result['status'] = row[0]
+                scan_started = row[1] or 0
+
+                # Terminal states -> 100%
+                if row[0] in ('FINISHED', 'ABORTED', 'ERROR-FAILED'):
+                    self.dbh.execute(
+                        "SELECT val FROM tbl_scan_config WHERE scan_instance_id = ? "
+                        "AND component = 'GLOBAL' AND opt = '_modulesenabled'",
+                        [instanceId])
+                    modrow = self.dbh.fetchone()
+                    if modrow and modrow[0]:
+                        mods = [m for m in modrow[0].split(',') if m]
+                        result['modulesTotal'] = len(mods)
+                    result['modulesWithResults'] = result['modulesTotal']
+                    result['modulesIdle'] = result['modulesTotal']
+                    result['progressPercent'] = 100
+                    return result
+
+                # --- Module count from config ---
+                self.dbh.execute(
+                    "SELECT val FROM tbl_scan_config WHERE scan_instance_id = ? "
+                    "AND component = 'GLOBAL' AND opt = '_modulesenabled'",
+                    [instanceId])
+                modrow = self.dbh.fetchone()
+                if not modrow or not modrow[0]:
+                    return result
+
+                enabled_modules = [m for m in modrow[0].split(',') if m]
+                modules_total = len(enabled_modules)
+                result['modulesTotal'] = modules_total
+
+                if modules_total == 0:
+                    return result
+
+                # --- Modules that have produced results ---
+                self.dbh.execute(
+                    "SELECT COUNT(DISTINCT module) FROM tbl_scan_results "
+                    "WHERE scan_instance_id = ?",
+                    [instanceId])
+                countrow = self.dbh.fetchone()
+                modules_with_results = countrow[0] if countrow else 0
+                result['modulesWithResults'] = modules_with_results
+
+                # --- Total events produced ---
+                self.dbh.execute(
+                    "SELECT COUNT(*) FROM tbl_scan_results "
+                    "WHERE scan_instance_id = ?",
+                    [instanceId])
+                countrow = self.dbh.fetchone()
+                result['totalEvents'] = countrow[0] if countrow else 0
+
+                # --- Event production rate (events in last 10 seconds) ---
+                self.dbh.execute(
+                    "SELECT COUNT(*) FROM tbl_scan_results "
+                    "WHERE scan_instance_id = ? "
+                    "AND generated > (CAST(strftime('%%s', 'now') AS INTEGER) * 1000 - 10000)",
+                    [instanceId])
+                raterow = self.dbh.fetchone()
+                events_recent = raterow[0] if raterow else 0
+                result['eventsPerSecond'] = round(events_recent / 10.0, 1)
+
+                # --- Live queue/running state from scanner snapshots ---
+                # Read the most recent PROGRESS log entry
+                self.dbh.execute(
+                    "SELECT message FROM tbl_scan_log "
+                    "WHERE scan_instance_id = ? AND type = 'PROGRESS' "
+                    "ORDER BY generated DESC LIMIT 1",
+                    [instanceId])
+                logrow = self.dbh.fetchone()
+                if logrow and logrow[0]:
+                    try:
+                        snap = _json.loads(logrow[0])
+                        result['eventsQueued'] = snap.get('totalQueued', 0)
+                        result['modulesRunning'] = snap.get('modulesRunning', 0)
+                        result['modulesIdle'] = snap.get('modulesIdle', 0)
+                        result['modulesErrored'] = snap.get('modulesErrored', 0)
+                    except (ValueError, KeyError):
+                        pass
+
+                # --- Composite progress estimate ---
+                # Weight multiple signals:
+                #   40% - module reporting ratio (modules with results / total)
+                #   40% - module idle ratio (idle modules / total)
+                #   20% - queue drain (inverse of queued events, diminishing)
+                module_report_pct = (modules_with_results / modules_total) * 100
+                idle_pct = (result['modulesIdle'] / modules_total) * 100
+                # Queue drain: 100% when 0 queued, dropping as queue grows
+                queued = result['eventsQueued']
+                queue_drain_pct = max(0, 100 - min(queued, 100))
+
+                pct = int(
+                    module_report_pct * 0.4
+                    + idle_pct * 0.4
+                    + queue_drain_pct * 0.2
+                )
+                # Clamp to [0, 95] while still running
+                pct = max(0, min(95, pct))
+                result['progressPercent'] = pct
+
+                return result
+
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError(
+                    "SQL error encountered when fetching scan progress") from e
+
     def scanCorrelationSummary(self, instanceId: str, by: str = "rule") -> list:
         """Obtain a summary of the correlations, filtered by rule or risk.
 

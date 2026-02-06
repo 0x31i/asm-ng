@@ -3184,6 +3184,24 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
+    def scanprogress(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Return estimated scan progress as a percentage.
+
+        Progress is estimated by comparing how many modules have produced
+        results versus the total number of modules enabled for the scan.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: progress info (modulesTotal, modulesWithResults,
+                  progressPercent, status)
+        """
+        dbh = SpiderFootDb(self.config)
+        return dbh.scanProgress(id)
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
     def scansummary(self: 'SpiderFootWebUi', id: str, by: str) -> list:
         """Summary of scan results.
 
