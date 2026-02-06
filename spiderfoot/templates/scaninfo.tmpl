@@ -804,6 +804,7 @@
         function searchResults(instanceId, query, typeName) {
             // Remove pre-existing tables if they exist
             $("#scansummary-content").remove();
+            $("#ai-correlation-section").remove();
             $("#scanlogs-content").remove();
             $("#stats-bar").remove();
             navTo("btn-search");
@@ -861,6 +862,7 @@
             grid += "</div>"
 
             $("#scansummary-content").remove();
+            $("#ai-correlation-section").remove();
             $("#scanlogs-content").remove();
             $("#stats-bar").remove();
             $("#loader").show();
@@ -1070,6 +1072,7 @@
             grid += "</div></div></div></div>";
 
             $("#scansummary-content").remove();
+            $("#ai-correlation-section").remove();
             $("#scanlogs-content").remove();
             $("#stats-bar").remove();
             $("#loader").show();
@@ -1239,6 +1242,7 @@
         // Correlation results for the scan
         function browseCorrelations(instanceId) {
             $("#scansummary-content").remove();
+            $("#ai-correlation-section").remove();
             $("#stats-bar").remove();
             $("#loader").show();
             $("#btn-search").hide();
@@ -1355,6 +1359,8 @@
             
             table += "</tbody></table>";
             $("#loader").fadeOut(500);
+            // Add AI correlation section above regular correlations for visibility
+            addAiCorrelationSection(instanceId);
             $("#mainbody").append(table);
             $.tablesorter.addParser({
                 id: 'criticality',
@@ -1371,8 +1377,6 @@
                 cssChildRow: 'tablesorter-childRow',
                 sortList: [[1, 1]]  // Sort by Risk column (1) in descending order (1) - HIGH first
             });
-            // Add AI correlation section below regular correlations
-            addAiCorrelationSection(instanceId);
             sf.updateTooltips();
         }
 
@@ -1409,9 +1413,9 @@
         function noCorrelationsFound() {
             var table = "<div id='scansummary-content' class='alert alert-warning'><h4>No correlations found.</h4>If the scan is still running please reload once it has completed. If the scan is complete, it may not have triggered any correlation rules.</div>";
             $("#loader").fadeOut(500);
-            $("#mainbody").append(table);
-            // Add AI correlation button
+            // Add AI correlation section first for visibility
             addAiCorrelationSection("${id}");
+            $("#mainbody").append(table);
             sf.updateTooltips();
         }
 
@@ -1592,6 +1596,7 @@
         // Logs for the scan
         function viewScanLog(instanceId) {
             $("#scansummary-content").remove();
+            $("#ai-correlation-section").remove();
             $("#scanlogs-content").remove();
             $("#stats-bar").remove();
             $("#loader").show();
@@ -1630,6 +1635,7 @@
 
             // Remove pre-existing tables if they exist
             $("#scansummary-content").remove();
+            $("#ai-correlation-section").remove();
             $("#scanlogs-content").remove();
             $("#stats-bar").remove();
             navTo("btn-browse");
@@ -1675,6 +1681,7 @@
                 filterImportedEntries = false;  // Default: show imported entries
             }
             $("#scansummary-content").remove();
+            $("#ai-correlation-section").remove();
             $("#scanlogs-content").remove();
             $("#breadcrumbs").remove();
             $("#stats-bar").remove();
@@ -1994,6 +2001,7 @@
         // View the configuration that was used for this scan
         function viewScanConfig(instanceId) {
             $("#scansummary-content").remove();
+            $("#ai-correlation-section").remove();
             $("#scanlogs-content").remove();
             $("#stats-bar").remove();
             $("#loader").show();

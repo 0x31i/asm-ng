@@ -3489,6 +3489,9 @@ class SpiderFootWebUi:
             correlations_found = 0
             from spiderfoot import SpiderFootEvent
 
+            # Create a ROOT event to serve as the parent for AI correlation events
+            root_event = SpiderFootEvent("ROOT", target, "sfp__ai_threat_intel")
+
             for ioc_data, native_occurrences in native_iocs.items():
                 if ioc_data in imported_iocs:
                     imported_occurrences = imported_iocs[ioc_data]
@@ -3589,7 +3592,7 @@ class SpiderFootWebUi:
                         "AI_CROSS_SCAN_CORRELATION",
                         json.dumps(correlation_data, default=str),
                         "sfp__ai_threat_intel",
-                        None  # No parent event
+                        root_event
                     )
                     correlation_event.confidence = int(confidence * 100)
                     correlation_event.risk = 50 if trend == "increasing" else 30
