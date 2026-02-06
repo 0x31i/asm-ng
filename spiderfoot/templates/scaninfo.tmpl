@@ -198,6 +198,11 @@
             }
         });
 
+        function escapeHtml(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
         function switchSelectAll() {
             if (!$("#checkall")[0].checked) {
                 $("input[id*=cb_]").prop('checked', false);
@@ -1346,8 +1351,8 @@
             try {
                 for (var i = 0; i < data.length; i++) {
                     table += "<tr>";
-                    table += "<td><a style='cursor: pointer' onClick='toggleCorrelation(\"" + instanceId + "\",\"" + data[i][0] + "\")'>" + data[i][1] + "</a>&nbsp;&nbsp;";
-                    table += "<i class='glyphicon glyphicon-question-sign' style='color: #ccc' rel='tooltip' data-title=\"" + data[i][5] + "\"></i>";
+                    table += "<td><a style='cursor: pointer' onClick='toggleCorrelation(\"" + instanceId + "\",\"" + data[i][0] + "\")'>" + escapeHtml(data[i][1]) + "</a>&nbsp;&nbsp;";
+                    table += "<i class='glyphicon glyphicon-question-sign' style='color: #ccc' rel='tooltip' data-title=\"" + escapeHtml(data[i][5]) + "\"></i>";
                     table += "</td>";
                     var statusy = "";
                     if (data[i][3] == "CRITICAL") {

@@ -3756,6 +3756,7 @@ class SpiderFootWebUi:
             type_label = type_descr.get(primary_type, primary_type)
 
             ioc_display = ioc_data[:80] + ('...' if len(ioc_data) > 80 else '')
+            ioc_display = html.escape(ioc_display)
 
             if len(modules) >= 2:
                 headline = f"{type_label} corroborated by {len(modules)} modules: {ioc_display}"
@@ -3919,6 +3920,7 @@ class SpiderFootWebUi:
             type_label = type_descr.get(primary_type, primary_type)
 
             ioc_display = ioc_data[:80] + ('...' if len(ioc_data) > 80 else '')
+            ioc_display = html.escape(ioc_display)
 
             # Determine risk level from event type classification + corroboration
             all_event_types_set = set(all_event_types)
