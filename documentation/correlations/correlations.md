@@ -6,7 +6,7 @@ This page provides a reference for built-in and custom correlation rules, with l
 
 ## Built-in Correlation Rules
 
-Below are some of the key built-in rules included with SpiderFoot. Each rule is a YAML file in the `/correlations` directory. Click the rule name to view its YAML source and documentation:
+Below are some of the key built-in rules included with ASM-NG. Each rule is a YAML file in the `/correlations` directory. Click the rule name to view its YAML source and documentation:
 
 | Rule Name | Description | YAML Source |
 |-----------|-------------|-------------|
@@ -49,4 +49,4 @@ For a full list, see the `/correlations` folder in your installation.
 
 ---
 
-*Maintainers: Steve Micallef <steve@binarypool.com>, poppopjmp <van1sh@van1shland.io>*
+*Maintainer: 0x31i <elias@sims.dev>*

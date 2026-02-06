@@ -1,6 +1,6 @@
-# SpiderFoot Enterprise Features
+# ASM-NG Enterprise Features
 
-This directory contains everything needed to enable enterprise features on a fresh or existing SpiderFoot installation.
+This directory contains everything needed to enable enterprise features on a fresh or existing ASM-NG installation.
 
 ## Quick Start
 
@@ -8,7 +8,7 @@ This directory contains everything needed to enable enterprise features on a fre
 # 1. Install all enterprise dependencies
 bash enterprise/install-deps.sh
 
-# 2. Start SpiderFoot
+# 2. Start ASM-NG
 python3 sf.py -l 127.0.0.1:5001
 
 # 3. Go to Settings > IMPORT API KEYS > select enterprise/enterprise-full.cfg
@@ -160,20 +160,20 @@ Skip the install entirely and import `enterprise-lite.cfg` instead. This enables
 ## Importing the Config
 
 ### Via Web UI
-1. Open SpiderFoot in your browser
+1. Open ASM-NG in your browser
 2. Navigate to **Settings**
 3. Click **IMPORT API KEYS**
 4. Select either `enterprise-full.cfg` or `enterprise-lite.cfg`
 5. Settings are applied immediately
 
 ### Via Config File on Launch
-You can also apply settings by placing them in the SpiderFoot database. The import via web UI is the simplest method for fresh installs.
+You can also apply settings by placing them in the ASM-NG database. The import via web UI is the simplest method for fresh installs.
 
 ---
 
 ## Free Module Optimizations (Part 2 of Config)
 
-Both config files include a "Part 2" section that turns ON useful features in modules that are completely free (no API key required). These are disabled by default in SpiderFoot but provide significantly more thorough scanning when enabled.
+Both config files include a "Part 2" section that turns ON useful features in modules that are completely free (no API key required). These are disabled by default but provide significantly more thorough scanning when enabled.
 
 ### What Gets Enabled
 

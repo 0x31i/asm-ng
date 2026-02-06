@@ -1,6 +1,6 @@
-# Correlations in SpiderFoot
+# Correlations in ASM-NG
 
-> This section documents the Correlations feature, its rule engine, and how to write and manage correlation rules in SpiderFoot. This content is based on the latest updates as of 2025.
+> This section documents the Correlations feature, its rule engine, and how to write and manage correlation rules in ASM-NG. This content is based on the latest updates as of 2025.
 
 ---
 
@@ -8,7 +8,7 @@
 
 - **New Correlation Rules:** Added rules for Fofa, RocketReach, and ZoomEye exposed services/contacts, and more.
 - **Advanced Analysis Methods:** The engine now supports additional analysis methods such as `outlier`, `first_collection_only`, and `match_all_to_first_collection`.
-- **Improved Error Handling:** If a rule contains syntax errors, SpiderFoot will now skip the invalid rule and continue loading others, providing detailed error messages at startup.
+- **Improved Error Handling:** If a rule contains syntax errors, ASM-NG will now skip the invalid rule and continue loading others, providing detailed error messages at startup.
 - **Rule ID and Filename:** The `id` field in each rule must exactly match the filename (excluding `.yaml`).
 - **Terminology Consistency:** All references to rule components now use consistent terminology (e.g., "collections", "aggregation").
 
@@ -16,11 +16,11 @@
 
 ## Background
 
-SpiderFoot’s goal is to automate OSINT collection and analysis to the greatest extent possible. Since its inception, SpiderFoot has heavily focused on automating OSINT collection and entity extraction, but the automation of common analysis tasks -- beyond some reporting and visualisations -- has been left entirely to the user. The meant that the strength of SpiderFoot's data collection capabilities has sometimes been its weakness since with so much data collected, users have often needed to export it and use other tools to weed out data of interest.
+ASM-NG's goal is to automate OSINT collection and analysis to the greatest extent possible. The platform has heavily focused on automating OSINT collection and entity extraction, but the automation of common analysis tasks -- beyond some reporting and visualisations -- has been left entirely to the user. This meant that the strength of the data collection capabilities has sometimes been its weakness since with so much data collected, users have often needed to export it and use other tools to weed out data of interest.
 
 ## Introducing Correlations
 
-We started tackling this analysis gap with the launch of SpiderFoot  in 2019 through the introduction of the "Correlations" feature. This feature was represented by some 30 "correlation rules" that ran with each scan, analyzing data and presenting results reflecting SpiderFoot's opinionated view on what may be important or interesting. Here are a few of those rules as examples:
+We started tackling this analysis gap with the introduction of the "Correlations" feature. This feature was represented by some 30 "correlation rules" that ran with each scan, analyzing data and presenting results reflecting an opinionated view on what may be important or interesting. Here are a few of those rules as examples:
 
 - Hosts/IPs reported as malicious by multiple data sources
 - Outlier web servers (can be an indication of shadow IT)
@@ -36,7 +36,7 @@ With that said, let's get into what these rules look like and how to write one.
 The rules themselves are written in YAML. Why YAML? It’s easy to read, write, allows for comments and is increasingly commonplace in many modern tools.
 
 ### Rule structure
-The simplest way to think of a SpiderFoot correlation rule is like a simple database query that consists of a few sections:
+The simplest way to think of an ASM-NG correlation rule is like a simple database query that consists of a few sections:
 
 1. Defining the rule itself (`id`, `version` and `meta` sections).
 2. Stating what you'd like to extract from the scan results (`collections` section).
@@ -45,7 +45,7 @@ The simplest way to think of a SpiderFoot correlation rule is like a simple data
 5. Presenting the results (`headline` section).
 
 ### Example rule
-Here's an example rule that looks at SpiderFoot scan results for data revealing open TCP ports where the banner (the data returned upon connecting to the port) reports a software version. It does so by applying some regular expressions to the content of `TCP_PORT_OPEN_BANNER` data elements, filtering out some false positives and then grouping the results by the banner itself  so that one correlation result is created per banner revealing a version:
+Here's an example rule that looks at ASM-NG scan results for data revealing open TCP ports where the banner (the data returned upon connecting to the port) reports a software version. It does so by applying some regular expressions to the content of `TCP_PORT_OPEN_BANNER` data elements, filtering out some false positives and then grouping the results by the banner itself  so that one correlation result is created per banner revealing a version:
 
 ```yaml
 id: open_port_version
