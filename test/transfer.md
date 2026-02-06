@@ -1,15 +1,13 @@
-```
-1. Check if workspace data exists in the database:
+# 1. Merge the rebrand PR on spiderfoot first (via GitHub UI)
 
-sqlite3 /home/kali/Desktop/ASM-TEST/spiderfoot/data/spiderfoot.db "SELECT * FROM tbl_workspaces;"
+# 2. Delete all claude/* branches from spiderfoot
+git clone https://github.com/0x31i/spiderfoot.git
+cd spiderfoot
+git branch -r | grep 'origin/claude/' | sed 's|origin/||' | xargs -I{} git push origin --delete {}
 
-2. Check if the table exists:
-
-sqlite3 /home/kali/Desktop/ASM-TEST/spiderfoot/data/spiderfoot.db ".tables"
-
-3. Check for any errors in browser console:
-
-Open browser DevTools (F12)
-Go to Console tab
-Look for any JavaScript errors when loading the Workspaces page
-```
+# 3. Re-mirror to asm-ng (this replaces EVERYTHING)
+cd ..
+git clone --bare https://github.com/0x31i/spiderfoot.git
+cd spiderfoot.git
+git push --mirror https://github.com/0x31i/asm-ng.git
+cd .. && rm -rf spiderfoot.git spiderfoot
