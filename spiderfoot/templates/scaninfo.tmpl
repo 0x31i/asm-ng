@@ -1268,9 +1268,10 @@
                     
                     // Check if we have correlation data in the status response
                     if (statusData && statusData[6] && (
-                        statusData[6]['HIGH'] > 0 || 
-                        statusData[6]['MEDIUM'] > 0 || 
-                        statusData[6]['LOW'] > 0 || 
+                        (statusData[6]['CRITICAL'] || 0) > 0 ||
+                        statusData[6]['HIGH'] > 0 ||
+                        statusData[6]['MEDIUM'] > 0 ||
+                        statusData[6]['LOW'] > 0 ||
                         statusData[6]['INFO'] > 0
                     )) {
                         console.log("Correlation counts from status: ", statusData[6]);
@@ -1341,16 +1342,15 @@
                     table += "<i class='glyphicon glyphicon-question-sign' style='color: #ccc' rel='tooltip' data-title=\"" + data[i][5] + "\"></i>";
                     table += "</td>";
                     var statusy = "";
-                    if (data[i][3] == "HIGH") {
+                    if (data[i][3] == "CRITICAL") {
+                        statusy = "alert-critical";
+                    } else if (data[i][3] == "HIGH") {
                         statusy = "alert-danger";
-                    }
-                    if (data[i][3] == "MEDIUM") {
+                    } else if (data[i][3] == "MEDIUM") {
                         statusy = "alert-warning";
-                    }
-                    if (data[i][3] == "LOW") {
+                    } else if (data[i][3] == "LOW") {
                         statusy = "alert-info";
-                    }
-                    if (data[i][3] == "INFO") {
+                    } else if (data[i][3] == "INFO") {
                         statusy = "alert-success";
                     }
                     table += "<td><span class='badge " + statusy + "'>" + data[i][3] + "</span></td>";
@@ -1376,7 +1376,7 @@
                     return false;
                 },
                 format: function(s) {
-                    return s.toLowerCase().replace(/high/,3).replace(/medium/,2).replace(/low/,1).replace(/info/,0);
+                    return s.toLowerCase().replace(/critical/,4).replace(/high/,3).replace(/medium/,2).replace(/low/,1).replace(/info/,0);
                 },
                 type: 'numeric'
             });
@@ -1438,13 +1438,16 @@
             aiSection += "<div id='ai-correlation-mode-select' style='margin-bottom: 15px;'>";
             aiSection += "<button id='btn-run-single-correlation' class='btn btn-primary' style='margin-right: 10px;' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
             aiSection += "<i class='glyphicon glyphicon-search'></i>&nbsp;Single Scan Analysis</button>";
-            aiSection += "<button id='btn-run-cross-correlation' class='btn btn-info' onclick='runAiCorrelation(\"" + instanceId + "\", \"cross\")'>";
+            aiSection += "<button id='btn-run-cross-correlation' class='btn btn-info' style='margin-right: 10px;' onclick='runAiCorrelation(\"" + instanceId + "\", \"cross\")'>";
             aiSection += "<i class='glyphicon glyphicon-transfer'></i>&nbsp;Cross-Scan Analysis</button>";
+            aiSection += "<button id='btn-run-dedup' class='btn btn-warning' onclick='runDeduplication(\"" + instanceId + "\")'>";
+            aiSection += "<i class='glyphicon glyphicon-duplicate'></i>&nbsp;Deduplication Check</button>";
             aiSection += "</div>";
 
             aiSection += "<div id='ai-mode-descriptions'>";
             aiSection += "<p class='text-muted small' id='ai-single-desc'><strong>Single Scan:</strong> Analyze the current scan to find IOCs corroborated by multiple modules or event types.</p>";
             aiSection += "<p class='text-muted small' id='ai-cross-desc'><strong>Cross-Scan:</strong> Compare current scan results with imported historical scan data to find persistent IOCs.</p>";
+            aiSection += "<p class='text-muted small'><strong>Deduplication:</strong> Remove duplicate entries matching on Data Element + Source Data Element + Source Module. Keeps oldest, preserves FP status.</p>";
             aiSection += "</div>";
 
             aiSection += "<div id='ai-correlation-results' style='margin-top: 15px;'></div>";
@@ -1511,6 +1514,48 @@
                 function(xhr, textStatus, errorThrown) {
                     $(btnId).prop('disabled', false).html("<i class='glyphicon " + icon + "'></i>&nbsp;" + label);
                     $("#ai-correlation-results").html("<div class='alert alert-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Failed to run analysis: " + textStatus + "</div>");
+                }
+            );
+        }
+
+        // Run deduplication check on scan results
+        function runDeduplication(instanceId) {
+            $("#btn-run-dedup").prop('disabled', true).html("<i class='glyphicon glyphicon-refresh spinning'></i>&nbsp;Deduplicating...");
+            $("#ai-correlation-results").html("<div class='alert alert-info'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;Running deduplication check. This may take a moment...</div>");
+
+            sf.fetchData('${docroot}/deduplicatescan', {'id': instanceId},
+                function(data) {
+                    $("#btn-run-dedup").prop('disabled', false).html("<i class='glyphicon glyphicon-duplicate'></i>&nbsp;Deduplication Check");
+
+                    if (data.success) {
+                        var cls = data.removed > 0 ? 'alert-success' : 'alert-info';
+                        var resultHtml = "<div class='" + cls + "'>";
+                        resultHtml += "<h5><i class='glyphicon glyphicon-ok'></i>&nbsp;Deduplication Complete</h5>";
+                        resultHtml += "<ul>";
+                        resultHtml += "<li>Duplicates removed: <strong>" + data.removed + "</strong></li>";
+                        if (data.fp_preserved > 0) {
+                            resultHtml += "<li>False positive status preserved on: <strong>" + data.fp_preserved + "</strong> kept row(s)</li>";
+                        }
+                        resultHtml += "</ul>";
+                        if (data.removed > 0) {
+                            resultHtml += "<p>The correlations view will refresh to reflect deduplicated data.</p>";
+                        } else {
+                            resultHtml += "<p>No duplicates found. Scan data is already clean.</p>";
+                        }
+                        resultHtml += "</div>";
+                        $("#ai-correlation-results").html(resultHtml);
+
+                        if (data.removed > 0) {
+                            // Refresh the correlations view after a brief delay
+                            setTimeout(function() { browseCorrelations(instanceId); }, 1500);
+                        }
+                    } else {
+                        $("#ai-correlation-results").html("<div class='alert alert-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Error: " + (data.message || 'Unknown error') + "</div>");
+                    }
+                },
+                function(xhr, textStatus, errorThrown) {
+                    $("#btn-run-dedup").prop('disabled', false).html("<i class='glyphicon glyphicon-duplicate'></i>&nbsp;Deduplication Check");
+                    $("#ai-correlation-results").html("<div class='alert alert-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Failed to run deduplication: " + textStatus + "</div>");
                 }
             );
         }

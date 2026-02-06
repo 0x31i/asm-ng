@@ -3121,6 +3121,7 @@ class SpiderFootWebUi:
             created = time.strftime(
                 "%Y-%m-%d %H:%M:%S", time.localtime(row[3]))
             riskmatrix = {
+                "CRITICAL": 0,
                 "HIGH": 0,
                 "MEDIUM": 0,
                 "LOW": 0,
@@ -3129,7 +3130,8 @@ class SpiderFootWebUi:
             correlations = dbh.scanCorrelationSummary(row[0], by="risk")
             if correlations:
                 for c in correlations:
-                    riskmatrix[c[0]] = c[1]
+                    if c[0] in riskmatrix:
+                        riskmatrix[c[0]] = c[1]
 
             if row[4] == 0:
                 started = "Not yet"
@@ -3170,6 +3172,7 @@ class SpiderFootWebUi:
         started = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(data[3]))
         ended = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(data[4]))
         riskmatrix = {
+            "CRITICAL": 0,
             "HIGH": 0,
             "MEDIUM": 0,
             "LOW": 0,
@@ -3178,7 +3181,8 @@ class SpiderFootWebUi:
         correlations = dbh.scanCorrelationSummary(id, by="risk")
         if correlations:
             for c in correlations:
-                riskmatrix[c[0]] = c[1]
+                if c[0] in riskmatrix:
+                    riskmatrix[c[0]] = c[1]
 
         return [data[0], data[1], created, started, ended, data[5], riskmatrix]
 
@@ -3261,6 +3265,12 @@ class SpiderFootWebUi:
                 importResult = dbh.importEntriesFromOlderScans(id)
                 result['importedCount'] = importResult['imported']
                 result['importStatus'] = f"Imported {importResult['imported']} entries from previous scans"
+                # Deduplicate after auto-import
+                if importResult['imported'] > 0:
+                    try:
+                        dbh.deduplicateScanResults(id)
+                    except Exception:
+                        pass
             else:
                 result['importStatus'] = 'already_imported' if result['importedCount'] > 0 else 'not_applicable'
 
@@ -3290,11 +3300,18 @@ class SpiderFootWebUi:
             # Perform the import
             result = dbh.importEntriesFromOlderScans(id)
 
+            # Deduplicate after import to remove any cross-scan duplicates
+            dedup = dbh.deduplicateScanResults(id)
+
             return {
                 'success': True,
                 'imported': result['imported'],
                 'skipped': result['skipped'],
-                'message': f"Imported {result['imported']} entries, skipped {result['skipped']} duplicates"
+                'dedup_removed': dedup['removed'],
+                'message': (
+                    f"Imported {result['imported']} entries, skipped {result['skipped']} duplicates. "
+                    f"Deduplication removed {dedup['removed']} additional duplicate(s)."
+                )
             }
         except Exception as e:
             return {'success': False, 'imported': 0, 'skipped': 0, 'message': f'Error: {str(e)}'}
@@ -3324,15 +3341,60 @@ class SpiderFootWebUi:
             # Re-import from older scans
             result = dbh.importEntriesFromOlderScans(id)
 
+            # Deduplicate after re-import
+            dedup = dbh.deduplicateScanResults(id)
+
             return {
                 'success': True,
                 'deleted': deleted,
                 'imported': result['imported'],
                 'skipped': result['skipped'],
-                'message': f"Deleted {deleted} old imports, imported {result['imported']} entries fresh"
+                'dedup_removed': dedup['removed'],
+                'message': (
+                    f"Deleted {deleted} old imports, imported {result['imported']} entries fresh. "
+                    f"Deduplication removed {dedup['removed']} additional duplicate(s)."
+                )
             }
         except Exception as e:
             return {'success': False, 'deleted': 0, 'imported': 0, 'skipped': 0, 'message': f'Error: {str(e)}'}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def deduplicatescan(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Deduplicate scan results by removing entries with identical
+        (Data Element, Source Data Element, Source Module) tuples.
+
+        Keeps the oldest entry, preserves false_positive status.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: {success: bool, removed: int, fp_preserved: int, message: str}
+        """
+        dbh = SpiderFootDb(self.config)
+
+        try:
+            scanInfo = dbh.scanInstanceGet(id)
+            if not scanInfo:
+                return {'success': False, 'removed': 0, 'fp_preserved': 0,
+                        'message': 'Scan not found'}
+
+            result = dbh.deduplicateScanResults(id)
+
+            return {
+                'success': True,
+                'removed': result['removed'],
+                'fp_preserved': result['fp_preserved'],
+                'message': (
+                    f"Removed {result['removed']} duplicate(s). "
+                    f"Preserved FP status on {result['fp_preserved']} kept row(s)."
+                )
+            }
+        except Exception as e:
+            self.log.error(f"Error deduplicating scan: {e}", exc_info=True)
+            return {'success': False, 'removed': 0, 'fp_preserved': 0,
+                    'message': f'Error: {str(e)}'}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -3459,6 +3521,14 @@ class SpiderFootWebUi:
         target = scanInfo[1]
         self.log.info(f"Running AI {mode} correlation analysis for scan {id} (target: {target})")
 
+        # Deduplicate before running correlations to avoid inflated results
+        try:
+            dedup = dbh.deduplicateScanResults(id)
+            if dedup['removed'] > 0:
+                self.log.info(f"Pre-correlation dedup removed {dedup['removed']} duplicate(s)")
+        except Exception as e:
+            self.log.warning(f"Pre-correlation dedup failed (continuing anyway): {e}")
+
         try:
             if mode == 'single':
                 return self._runSingleScanCorrelation(dbh, id, target)
@@ -3468,6 +3538,113 @@ class SpiderFootWebUi:
         except Exception as e:
             self.log.error(f"Error running AI correlation: {e}", exc_info=True)
             return {'success': False, 'error': f'Error running correlation: {str(e)}'}
+
+    @staticmethod
+    def _classifyEventTypeRisk(event_type_code: str) -> int:
+        """Return an intrinsic risk score (0-100) based on event type code.
+
+        Since most SpiderFoot modules store risk=0 on events, this method
+        derives a meaningful risk score from the event type itself.
+        """
+        code = event_type_code.upper()
+
+        # Critical risk (80-100): actively malicious or compromised
+        if any(k in code for k in [
+            'MALICIOUS_', 'VULNERABILITY_CVE_CRITICAL', 'DEFACED_',
+            'PASSWORD_COMPROMISED', 'HASH_COMPROMISED',
+        ]):
+            return 90
+        if any(k in code for k in [
+            'BLACKLISTED_', 'DARKNET_', 'LEAKSITE_',
+        ]):
+            return 85
+
+        # High risk (60-79): compromised accounts, high-severity vulns
+        if any(k in code for k in [
+            'COMPROMISED', 'VULNERABILITY_CVE_HIGH', 'VULNERABILITY_GENERAL',
+            'VULNERABILITY_DISCLOSURE',
+        ]):
+            return 70
+        if any(k in code for k in [
+            'CREDIT_CARD_NUMBER', 'IBAN_NUMBER',
+        ]):
+            return 65
+
+        # Medium risk (40-59): open ports, interesting findings, hijackable
+        if any(k in code for k in [
+            'VULNERABILITY_CVE_MEDIUM', 'TCP_PORT_OPEN', 'UDP_PORT_OPEN',
+            'HIJACKABLE', 'CLOUD_STORAGE_BUCKET_OPEN',
+            'SSL_CERTIFICATE_EXPIRED', 'SSL_CERTIFICATE_MISMATCH',
+        ]):
+            return 50
+        if any(k in code for k in [
+            'PHONE_NUMBER', 'PHYSICAL_ADDRESS', 'PHYSICAL_COORDINATES',
+            'INTERESTING_FILE', 'URL_PASSWORD', 'URL_UPLOAD',
+            'PROXY_HOST', 'VPN_HOST', 'TOR_EXIT_NODE',
+        ]):
+            return 45
+
+        # Low risk (20-39): affiliates, external accounts, similar domains
+        if any(k in code for k in [
+            'VULNERABILITY_CVE_LOW', 'AFFILIATE_', 'SIMILARDOMAIN',
+            'CO_HOSTED_SITE', 'SOCIAL_MEDIA', 'PUBLIC_CODE_REPO',
+            'ACCOUNT_EXTERNAL_OWNED', 'SIMILAR_ACCOUNT',
+            'WEBSERVER_STRANGEHEADER', 'SSL_CERTIFICATE_EXPIRING',
+            'PROVIDER_JAVASCRIPT', 'JUNK_FILE',
+        ]):
+            return 25
+
+        # Info (0-19): basic entity data, descriptors
+        if any(k in code for k in [
+            'DOMAIN_NAME', 'IP_ADDRESS', 'IPV6_ADDRESS', 'EMAILADDR',
+            'INTERNET_NAME', 'HUMAN_NAME', 'PERSON_NAME', 'USERNAME',
+            'COMPANY_NAME', 'COUNTRY_NAME', 'BGP_AS_', 'NETBLOCK_',
+            'DNS_', 'HTTP_CODE', 'GEOINFO', 'WEBSERVER_BANNER',
+            'WEBSERVER_TECHNOLOGY', 'WEB_ANALYTICS', 'DESCRIPTION_',
+            'LINKED_URL_', 'SOFTWARE_USED', 'SSL_CERTIFICATE_ISSUE',
+            'HASH', 'RAW_', 'BASE64_', 'TARGET_WEB_', 'BITCOIN_',
+            'ETHEREUM_', 'SEARCH_ENGINE_',
+        ]):
+            return 10
+
+        return 15  # default for unknown types
+
+    @staticmethod
+    def _deriveCorrelationRisk(event_types: set, num_modules: int, num_occurrences: int,
+                               classify_fn) -> str:
+        """Determine the risk level for a correlation based on event types and corroboration.
+
+        Combines the intrinsic risk of the highest-risk event type with
+        boosts for multi-module confirmation and high occurrence counts.
+        """
+        # Base risk from highest-risk event type
+        base_risk = max(classify_fn(et) for et in event_types) if event_types else 0
+
+        # Boost for multi-module corroboration
+        if num_modules >= 4:
+            base_risk += 20
+        elif num_modules >= 3:
+            base_risk += 15
+        elif num_modules >= 2:
+            base_risk += 10
+
+        # Boost for high occurrence count
+        if num_occurrences >= 10:
+            base_risk += 10
+        elif num_occurrences >= 5:
+            base_risk += 5
+
+        base_risk = min(base_risk, 100)
+
+        if base_risk >= 90:
+            return "CRITICAL"
+        if base_risk >= 65:
+            return "HIGH"
+        if base_risk >= 40:
+            return "MEDIUM"
+        if base_risk >= 20:
+            return "LOW"
+        return "INFO"
 
     def _runSingleScanCorrelation(self, dbh, id: str, target: str) -> dict:
         """Analyze a single scan's results to find significant patterns.
@@ -3535,18 +3712,12 @@ class SpiderFootWebUi:
             if len(modules) < 2 and len(event_types) < 2 and total < 3:
                 continue
 
-            max_risk = max(o['risk'] for o in occurrences)
             event_hashes = [o['hash'] for o in occurrences]
 
-            # Determine risk level
-            if max_risk >= 70:
-                risk_level = "HIGH"
-            elif max_risk >= 40:
-                risk_level = "MEDIUM"
-            elif max_risk >= 10:
-                risk_level = "LOW"
-            else:
-                risk_level = "INFO"
+            # Determine risk level from event type classification + corroboration
+            risk_level = self._deriveCorrelationRisk(
+                event_types, len(modules), total, self._classifyEventTypeRisk
+            )
 
             # Generate a meaningful headline
             primary_type = max(event_types, key=lambda t: sum(1 for o in occurrences if o['event_type'] == t))
@@ -3710,25 +3881,20 @@ class SpiderFootWebUi:
             # Collect all event hashes for linking
             event_hashes = [o['hash'] for o in native_occurrences] + [o['hash'] for o in imported_occurrences]
 
-            # Determine risk level from max risk across all occurrences
-            all_risks = [o['risk'] for o in native_occurrences] + [o['risk'] for o in imported_occurrences]
-            max_risk = max(all_risks) if all_risks else 0
-
-            if max_risk >= 70:
-                risk_level = "HIGH"
-            elif max_risk >= 40:
-                risk_level = "MEDIUM"
-            elif max_risk >= 10:
-                risk_level = "LOW"
-            else:
-                risk_level = "INFO"
-
             # Determine the primary event type for the headline
             all_event_types = [o['event_type'] for o in native_occurrences] + [o['event_type'] for o in imported_occurrences]
             primary_type = max(set(all_event_types), key=all_event_types.count)
             type_label = type_descr.get(primary_type, primary_type)
 
             ioc_display = ioc_data[:80] + ('...' if len(ioc_data) > 80 else '')
+
+            # Determine risk level from event type classification + corroboration
+            all_event_types_set = set(all_event_types)
+            all_modules = set(o['module'] for o in native_occurrences) | set(o['module'] for o in imported_occurrences)
+            risk_level = self._deriveCorrelationRisk(
+                all_event_types_set, len(all_modules), occurrence_count,
+                self._classifyEventTypeRisk
+            )
 
             # Generate meaningful headline
             scan_names = sorted(set(imp['scan_name'] for imp in imported_occurrences))

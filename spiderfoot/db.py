@@ -3436,6 +3436,136 @@ class SpiderFootDb:
             except (sqlite3.Error, psycopg2.Error) as e:
                 raise IOError("SQL error encountered when importing entries") from e
 
+    def deduplicateScanResults(self, instanceId: str) -> dict:
+        """Remove duplicate events based on (data, source_data, module) match.
+
+        For each group of duplicates that share the same Data Element,
+        Source Data Element, and Source Module:
+        - Keeps the OLDEST event (lowest generated timestamp)
+        - Deletes all newer duplicates
+        - If ANY duplicate had false_positive=1, the kept row inherits it
+        - Also cleans up correlation result references to deleted hashes
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            dict: {removed: int, fp_preserved: int} counts
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(f"instanceId is {type(instanceId)}; expected str()") from None
+
+        removed = 0
+        fp_preserved = 0
+
+        with self.dbhLock:
+            try:
+                # Fetch all non-ROOT events with their source data
+                # We JOIN to get the source event's data field
+                qry = """
+                    SELECT r.hash, r.data, r.module, r.generated,
+                           r.false_positive, r.source_event_hash,
+                           COALESCE(sr.data, 'ROOT') as source_data
+                    FROM tbl_scan_results r
+                    LEFT JOIN tbl_scan_results sr
+                        ON sr.scan_instance_id = r.scan_instance_id
+                        AND sr.hash = r.source_event_hash
+                    WHERE r.scan_instance_id = ?
+                      AND r.type != 'ROOT'
+                    ORDER BY r.generated ASC
+                """
+                self.dbh.execute(qry, [instanceId])
+                all_events = self.dbh.fetchall()
+
+                if not all_events:
+                    return {'removed': 0, 'fp_preserved': 0}
+
+                # Group by (data, source_data, module)
+                groups = {}
+                for event in all_events:
+                    event_hash = event[0]
+                    data = (event[1] or '').strip()
+                    module = (event[2] or '').strip()
+                    generated = event[3]
+                    fp = event[4]
+                    source_data = (event[6] or 'ROOT').strip()
+
+                    key = (data, source_data, module)
+                    if key not in groups:
+                        groups[key] = []
+                    groups[key].append({
+                        'hash': event_hash,
+                        'generated': generated,
+                        'fp': fp,
+                    })
+
+                hashes_to_delete = []
+
+                for key, entries in groups.items():
+                    if len(entries) < 2:
+                        continue
+
+                    # Already sorted by generated ASC (from ORDER BY)
+                    # First entry is the oldest - we keep it
+                    keeper = entries[0]
+                    duplicates = entries[1:]
+
+                    # Check if any duplicate has false_positive=1
+                    any_fp = keeper['fp'] == 1 or any(d['fp'] == 1 for d in duplicates)
+
+                    # If the keeper doesn't have FP but a duplicate does, update keeper
+                    if any_fp and keeper['fp'] != 1:
+                        update_qry = """UPDATE tbl_scan_results
+                            SET false_positive = 1
+                            WHERE scan_instance_id = ? AND hash = ?"""
+                        self.dbh.execute(update_qry, [instanceId, keeper['hash']])
+                        fp_preserved += 1
+
+                    # Collect hashes to delete
+                    for dup in duplicates:
+                        hashes_to_delete.append(dup['hash'])
+
+                if not hashes_to_delete:
+                    self.conn.commit()
+                    return {'removed': 0, 'fp_preserved': fp_preserved}
+
+                # Delete in batches to avoid SQL parameter limits
+                batch_size = 500
+                for i in range(0, len(hashes_to_delete), batch_size):
+                    batch = hashes_to_delete[i:i + batch_size]
+                    placeholders = ','.join(['?'] * len(batch))
+
+                    # Remove correlation event references pointing to deleted hashes
+                    del_corr_qry = f"""DELETE FROM tbl_scan_correlation_results_events
+                        WHERE event_hash IN ({placeholders})"""
+                    self.dbh.execute(del_corr_qry, batch)
+
+                    # Delete the duplicate scan results
+                    del_qry = f"""DELETE FROM tbl_scan_results
+                        WHERE scan_instance_id = ? AND hash IN ({placeholders})"""
+                    self.dbh.execute(del_qry, [instanceId] + batch)
+
+                    removed += len(batch)
+
+                # Clean up any correlation results that now have zero events
+                cleanup_qry = """DELETE FROM tbl_scan_correlation_results
+                    WHERE scan_instance_id = ?
+                      AND id NOT IN (
+                          SELECT DISTINCT correlation_id
+                          FROM tbl_scan_correlation_results_events
+                      )"""
+                self.dbh.execute(cleanup_qry, [instanceId])
+
+                self.conn.commit()
+                return {'removed': removed, 'fp_preserved': fp_preserved}
+
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when deduplicating scan results") from e
+
     def getScansByTarget(self, target: str) -> list:
         """Get all scans for a target, ordered by started date (newest first).
 

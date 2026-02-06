@@ -126,7 +126,7 @@ a:hover, a:focus {
 .btn-success, .btn-danger, .btn-warning, .btn-info, .btn-primary,
 .btn-success *, .btn-danger *, .btn-warning *, .btn-info *, .btn-primary *,
 .label-success, .label-danger, .label-warning, .label-info, .label-primary,
-.badge.alert-success, .badge.alert-danger, .badge.alert-warning, .badge.alert-info,
+.badge.alert-success, .badge.alert-danger, .badge.alert-warning, .badge.alert-info, .badge.alert-critical,
 .bg-success, .bg-danger, .bg-warning, .bg-info, .bg-primary {
   color: #ffffff !important;
 }
@@ -2116,6 +2116,14 @@ input[type="radio"]:checked::after {
   background: var(--accent-red) !important;
   color: white !important;
   box-shadow: 0 0 12px var(--glow-red);
+}
+
+.badge.alert-critical {
+  background: #dc2626 !important;
+  color: white !important;
+  box-shadow: 0 0 16px rgba(220, 38, 38, 0.8), 0 0 30px rgba(220, 38, 38, 0.4);
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 /* ============================================

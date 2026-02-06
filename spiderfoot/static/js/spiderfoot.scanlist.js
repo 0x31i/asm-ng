@@ -457,6 +457,9 @@ function showlisttable(types, filter, data) {
             table += "</td>";
             table += "<td class='text-center'>" + data[i][7] + "</td>";
             table += "<td class='text-center'>";
+            if (data[i][8]['CRITICAL'] > 0) {
+                table += "<span class='badge alert-critical'>" + data[i][8]['CRITICAL'] + "</span>";
+            }
             table += "<span class='badge alert-danger'>" + data[i][8]['HIGH'] + "</span>";
             table += "<span class='badge alert-warning'>" + data[i][8]['MEDIUM'] + "</span>";
             table += "<span class='badge alert-info'>" + data[i][8]['LOW'] + "</span>";
