@@ -1740,6 +1740,35 @@ class SpiderFootWebUi:
         except Exception as e:
             return {'success': False, 'message': f'Failed to create ROOT event: {e}'}
 
+        # Build synthetic source events so that each imported event
+        # points to the correct source data element instead of ROOT.
+        source_hash_map = {}
+        for row in rows:
+            try:
+                event_type = row[col_map['type']]
+                if event_type == 'ROOT':
+                    continue
+                source_val = row[col_map['source']]
+                if source_val and source_val not in source_hash_map:
+                    src_hash_input = f"{scan_id}|SOURCE_EVENT|{source_val}"
+                    src_hash = hashlib.sha256(src_hash_input.encode('utf-8')).hexdigest()[:32]
+                    source_hash_map[source_val] = src_hash
+            except (IndexError, KeyError):
+                continue
+
+        # Insert synthetic source events (children of ROOT)
+        src_qry = """INSERT INTO tbl_scan_results
+            (scan_instance_id, hash, type, generated, confidence,
+            visibility, risk, module, data, false_positive, source_event_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+        for source_val, src_hash in source_hash_map.items():
+            try:
+                src_qvals = [scan_id, src_hash, 'ROOT', int(time.time() * 1000),
+                             100, 100, 0, '', source_val, 0, 'ROOT']
+                dbh.dbh.execute(src_qry, src_qvals)
+            except Exception:
+                pass
+
         # Import each row
         for i, row in enumerate(rows):
             try:
@@ -1779,12 +1808,15 @@ class SpiderFootWebUi:
                 hash_input = f"{scan_id}|{event_type}|{data}|{source}|{time.time()}"
                 event_hash = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()[:32]
 
+                # Resolve source event hash from synthetic source events
+                source_event_hash = source_hash_map.get(source, 'ROOT')
+
                 qry = """INSERT INTO tbl_scan_results
                     (scan_instance_id, hash, type, generated, confidence,
                     visibility, risk, module, data, false_positive, source_event_hash)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
                 qvals = [scan_id, event_hash, event_type, timestamp,
-                         100, 100, 0, module, data, fp, 'ROOT']
+                         100, 100, 0, module, data, fp, source_event_hash]
                 dbh.dbh.execute(qry, qvals)
 
                 # Save target-level false positives
