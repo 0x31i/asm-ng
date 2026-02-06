@@ -355,6 +355,22 @@ a:hover {
   box-shadow: 0 0 25px var(--glow-blue), 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
+/* Critical button - Purple gradient with glow */
+.btn-critical {
+  background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 0 15px rgba(167, 139, 250, 0.5);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.btn-critical:hover,
+.btn-critical:focus {
+  background: linear-gradient(135deg, #ddd6fe 0%, #c4b5fd 100%) !important;
+  box-shadow: 0 0 25px rgba(167, 139, 250, 0.7), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
 /* ============================================
    Global: White icons/text for ALL colored buttons
    NUCLEAR OPTION - Forces white on ALL children
@@ -390,7 +406,13 @@ a:hover {
 .btn-info:hover,
 .btn-info:hover *,
 .btn-info:focus,
-.btn-info:focus * {
+.btn-info:focus *,
+.btn-critical,
+.btn-critical *,
+.btn-critical:hover,
+.btn-critical:hover *,
+.btn-critical:focus,
+.btn-critical:focus * {
   color: #ffffff !important;
 }
 
@@ -399,7 +421,8 @@ a:hover {
 .btn-success::after,
 .btn-warning::after,
 .btn-danger::after,
-.btn-info::after {
+.btn-info::after,
+.btn-critical::after {
   background-color: #ffffff !important;
 }
 
@@ -2563,6 +2586,18 @@ tr.active td {
   text-transform: uppercase !important;
   letter-spacing: 0.5px !important;
   border-radius: 0 !important;
+}
+
+/* Correlation CRITICAL button - Bright purple with strong glow */
+.panel-body .btn-toolbar .btn-group > .btn-critical,
+.panel-body .btn-toolbar .btn-group > .btn-critical.disabled,
+.panel-body .btn-toolbar .btn-group > .btn-critical:disabled {
+  background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 0 15px rgba(167, 139, 250, 0.7), 0 0 30px rgba(167, 139, 250, 0.4) !important;
+  opacity: 1 !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* Correlation HIGH button - Bright red with strong glow */
