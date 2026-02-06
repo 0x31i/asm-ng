@@ -16,13 +16,20 @@
 <h2>${name}&nbsp;<span id='scanstatusbadge' class='badge ${statusy}'>${status}</span><span id='latestbadge' class='badge' style='display: none; background-color: #3b82f6; color: white; margin-left: 5px;'>LATEST</span><span id='syncbadge' class='badge' style='display: none; background-color: #10b981; color: white; margin-left: 5px; cursor: pointer;' onclick='resyncScanEntries()' title='Click to sync entries from previous scans'>SYNC</span><span id='importedbadge' class='badge' style='display: none; background-color: #8b5cf6; color: white; margin-left: 5px;'></span>&nbsp;<img id="loader" src="${docroot}/static/img/loader.gif"></h2>
   <div id="scan-progress-container" style="display: none; margin-bottom: 10px;">
     <div style="display: flex; align-items: center; gap: 10px;">
-      <div class="progress" style="flex: 1; height: 16px; margin-bottom: 0;">
+      <div class="progress" style="flex: 1; height: 18px; margin-bottom: 0;">
         <div id="scan-progress-bar" class="progress-bar progress-bar-striped active" role="progressbar"
-             aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%; min-width: 2em; text-align: center; line-height: 16px; font-size: 11px;">
+             aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%; min-width: 2em; text-align: center; line-height: 18px; font-size: 11px;">
           0%
         </div>
       </div>
-      <small id="scan-progress-label" style="white-space: nowrap; color: #777;"></small>
+      <small id="scan-progress-pct" style="white-space: nowrap; font-weight: bold; min-width: 30px;"></small>
+    </div>
+    <div id="scan-progress-details" style="margin-top: 4px; font-size: 11px; color: #888; display: flex; gap: 15px; flex-wrap: wrap;">
+      <span id="sp-modules" title="Modules that have reported results / total modules"></span>
+      <span id="sp-running" title="Modules actively processing events"></span>
+      <span id="sp-queued" title="Events waiting to be processed by modules"></span>
+      <span id="sp-events" title="Total events produced so far"></span>
+      <span id="sp-rate" title="Events produced per second (recent)"></span>
     </div>
   </div>
   <div class="btn-toolbar" role="toolbar" style='padding-bottom: 10px'>
@@ -2032,11 +2039,9 @@
             sf.fetchData('${docroot}/scanprogress', {'id': '${id}'}, function(data) {
                 var container = $('#scan-progress-container');
                 var bar = $('#scan-progress-bar');
-                var label = $('#scan-progress-label');
                 var status = data.status;
 
                 if (status == 'FINISHED' || status == 'ABORTED' || status == 'ERROR-FAILED') {
-                    // Scan is done - show 100% briefly then hide
                     bar.css('width', '100%').attr('aria-valuenow', 100).text('100%');
                     bar.removeClass('active progress-bar-striped');
                     if (status == 'FINISHED') {
@@ -2046,9 +2051,9 @@
                     } else {
                         bar.addClass('progress-bar-danger');
                     }
-                    label.text(status);
+                    $('#scan-progress-pct').text('Done');
+                    $('#scan-progress-details').html('<span>' + status + '</span>');
                     clearInterval(progressInterval);
-                    // Fade out after a short delay
                     setTimeout(function() { container.fadeOut(1000); }, 3000);
                     return;
                 }
@@ -2057,7 +2062,23 @@
                     container.show();
                     var pct = data.progressPercent || 0;
                     bar.css('width', pct + '%').attr('aria-valuenow', pct).text(pct + '%');
-                    label.text(data.modulesWithResults + ' / ' + data.modulesTotal + ' modules reporting');
+                    $('#scan-progress-pct').text('~' + pct + '%');
+
+                    // Detail metrics
+                    $('#sp-modules').html('<i class="glyphicon glyphicon-th-list"></i> ' +
+                        data.modulesWithResults + '/' + data.modulesTotal + ' modules reported');
+                    $('#sp-running').html('<i class="glyphicon glyphicon-play"></i> ' +
+                        data.modulesRunning + ' running');
+                    var queuedLabel = data.eventsQueued;
+                    if (queuedLabel > 999) queuedLabel = (queuedLabel / 1000).toFixed(1) + 'k';
+                    $('#sp-queued').html('<i class="glyphicon glyphicon-inbox"></i> ' +
+                        queuedLabel + ' queued');
+                    var totalLabel = data.totalEvents;
+                    if (totalLabel > 999) totalLabel = (totalLabel / 1000).toFixed(1) + 'k';
+                    $('#sp-events').html('<i class="glyphicon glyphicon-signal"></i> ' +
+                        totalLabel + ' events');
+                    $('#sp-rate').html('<i class="glyphicon glyphicon-dashboard"></i> ' +
+                        data.eventsPerSecond + '/sec');
                 } else {
                     container.hide();
                 }

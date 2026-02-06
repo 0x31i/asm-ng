@@ -10,6 +10,7 @@
 # Copyright:    (c) Steve Micallef 2013
 # License:      MIT
 # -----------------------------------------------------------------
+import json
 import socket
 import time
 import queue
@@ -645,18 +646,33 @@ class SpiderFootScanner():
                         mod.incomingEventQueue.get_nowait()
 
         if log_status:
+            total_queued = sum([m[-1] for m in modules_waiting])
             events_queued = ", ".join(
                 [f"{mod}: {qsize:,}" for mod, qsize in modules_waiting[:5] if qsize > 0])
             if not events_queued:
                 events_queued = 'None'
             self.__sf.debug(
-                f"Events queued: {sum([m[-1] for m in modules_waiting]):,} ({events_queued})")
+                f"Events queued: {total_queued:,} ({events_queued})")
             if modules_running:
                 self.__sf.debug(
                     f"Modules running: {len(modules_running):,} ({', '.join(modules_running)})")
             if modules_errored:
                 self.__sf.debug(
                     f"Modules errored: {len(modules_errored):,} ({', '.join(modules_errored)})")
+
+            # Persist a progress snapshot so the UI can read it
+            modules_idle = sum(1 for empty in queues_empty if empty) - len(modules_errored)
+            modules_total = len(self.__moduleInstances)
+            snapshot = json.dumps({
+                "totalQueued": total_queued,
+                "modulesRunning": len(modules_running),
+                "modulesIdle": max(0, modules_idle),
+                "modulesErrored": len(modules_errored),
+                "modulesTotal": modules_total,
+            })
+            with suppress(Exception):
+                self.__dbh.scanLogEvent(
+                    self.__scanId, "PROGRESS", snapshot, "SpiderFoot")
 
         if all(queues_empty) and not modules_running:
             return True
