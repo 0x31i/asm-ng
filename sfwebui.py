@@ -3460,28 +3460,27 @@ class SpiderFootWebUi:
         self.log.info(f"Running AI {mode} correlation analysis for scan {id} (target: {target})")
 
         try:
-            from spiderfoot import SpiderFootEvent
-
-            # Create a ROOT event to serve as the parent for AI correlation events
-            root_event = SpiderFootEvent("ROOT", target, "sfp__ai_threat_intel")
-
             if mode == 'single':
-                return self._runSingleScanCorrelation(dbh, id, target, root_event)
+                return self._runSingleScanCorrelation(dbh, id, target)
             else:
-                return self._runCrossScanCorrelation(dbh, id, target, root_event)
+                return self._runCrossScanCorrelation(dbh, id, target)
 
         except Exception as e:
             self.log.error(f"Error running AI correlation: {e}", exc_info=True)
             return {'success': False, 'error': f'Error running correlation: {str(e)}'}
 
-    def _runSingleScanCorrelation(self, dbh, id: str, target: str, root_event) -> dict:
+    def _runSingleScanCorrelation(self, dbh, id: str, target: str) -> dict:
         """Analyze a single scan's results to find significant patterns.
 
         Groups IOCs by data value across modules/event types. IOCs detected
-        by multiple modules or appearing in multiple event types are flagged
-        as higher-confidence findings.
+        by multiple modules or appearing in multiple event types are stored
+        as correlation results in tbl_scan_correlation_results so they appear
+        in the standard correlations table.
         """
-        from spiderfoot import SpiderFootEvent
+        # Build event type description lookup
+        type_descr = {}
+        for row in dbh.eventTypes():
+            type_descr[row[1]] = row[0]  # event_code -> description
 
         qry = """SELECT r.generated, r.data, r.module, r.type,
                         r.confidence, r.risk, r.hash
@@ -3507,7 +3506,7 @@ class SpiderFootWebUi:
             }
 
         # Group events by data value
-        # ioc_data -> [{module, event_type, timestamp, confidence, risk}]
+        # ioc_data -> [{module, event_type, timestamp, confidence, risk, hash}]
         ioc_map = {}
         for event in all_events:
             data = event[1]
@@ -3521,6 +3520,7 @@ class SpiderFootWebUi:
                 'event_type': event[3],
                 'confidence': event[4],
                 'risk': event[5],
+                'hash': event[6],
             })
 
         correlations_found = 0
@@ -3535,68 +3535,62 @@ class SpiderFootWebUi:
             if len(modules) < 2 and len(event_types) < 2 and total < 3:
                 continue
 
-            # Calculate significance
             max_risk = max(o['risk'] for o in occurrences)
-            avg_confidence = sum(o['confidence'] for o in occurrences) / total
-            confidence = min(0.95, 0.4 + (len(modules) * 0.15) + (len(event_types) * 0.1) + (total * 0.02))
+            event_hashes = [o['hash'] for o in occurrences]
 
-            timestamps = []
-            for o in occurrences:
-                try:
-                    if isinstance(o['timestamp'], (int, float)):
-                        timestamps.append(float(o['timestamp']))
-                except (ValueError, TypeError):
-                    pass
-
-            if timestamps:
-                first_seen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(min(timestamps)))
-                last_seen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(max(timestamps)))
-            else:
-                first_seen = "Unknown"
-                last_seen = "Unknown"
-
-            primary_type = max(set(o['event_type'] for o in occurrences),
-                              key=lambda t: sum(1 for o in occurrences if o['event_type'] == t))
-
-            ioc_display = ioc_data[:50] + ('...' if len(ioc_data) > 50 else '')
-            analysis = f"IOC '{ioc_display}' detected by {len(modules)} module(s) across {len(event_types)} event type(s) with {total} total occurrence(s). "
-            if len(modules) >= 3:
-                analysis += "HIGH SIGNIFICANCE: Multiple independent modules confirm this finding. "
-            elif len(modules) >= 2:
-                analysis += "NOTABLE: Corroborated by multiple modules. "
+            # Determine risk level
             if max_risk >= 70:
-                analysis += f"Risk level: HIGH ({max_risk}/100)."
+                risk_level = "HIGH"
             elif max_risk >= 40:
-                analysis += f"Risk level: MEDIUM ({max_risk}/100)."
+                risk_level = "MEDIUM"
+            elif max_risk >= 10:
+                risk_level = "LOW"
+            else:
+                risk_level = "INFO"
 
-            correlation_data = {
-                'correlation_id': hashlib.md5(f"{ioc_data}_{time.time()}".encode()).hexdigest(),
-                'ioc': ioc_data,
-                'event_type': primary_type,
-                'event_types': list(event_types),
-                'modules': list(modules),
-                'total_occurrences': total,
-                'module_count': len(modules),
-                'type_count': len(event_types),
-                'max_risk': max_risk,
-                'avg_confidence': round(avg_confidence),
-                'first_seen': first_seen,
-                'last_seen': last_seen,
-                'confidence': confidence,
-                'analysis': analysis
-            }
+            # Generate a meaningful headline
+            primary_type = max(event_types, key=lambda t: sum(1 for o in occurrences if o['event_type'] == t))
+            type_label = type_descr.get(primary_type, primary_type)
 
-            correlation_event = SpiderFootEvent(
-                "AI_SINGLE_SCAN_CORRELATION",
-                json.dumps(correlation_data, default=str),
-                "sfp__ai_threat_intel",
-                root_event
+            ioc_display = ioc_data[:80] + ('...' if len(ioc_data) > 80 else '')
+
+            if len(modules) >= 2:
+                headline = f"{type_label} corroborated by {len(modules)} modules: {ioc_display}"
+            elif len(event_types) >= 2:
+                headline = f"{type_label} found across {len(event_types)} event types: {ioc_display}"
+            else:
+                headline = f"{type_label} detected {total} times: {ioc_display}"
+
+            # Build description
+            module_list = ', '.join(sorted(modules))
+            type_list = ', '.join(sorted(type_descr.get(t, t) for t in event_types))
+            description = (
+                f"This indicator was detected by {len(modules)} module(s) ({module_list}) "
+                f"across {len(event_types)} event type(s) ({type_list}) "
+                f"with {total} total occurrence(s). "
             )
-            correlation_event.confidence = int(confidence * 100)
-            correlation_event.risk = min(100, max_risk)
+            if len(modules) >= 3:
+                description += "Multiple independent modules confirm this finding, indicating high significance."
+            elif len(modules) >= 2:
+                description += "Corroborated by multiple modules, increasing confidence in this finding."
 
-            dbh.scanEventStore(id, correlation_event)
-            correlations_found += 1
+            # Store as a standard correlation result
+            try:
+                dbh.correlationResultCreate(
+                    instanceId=id,
+                    event_hash=event_hashes[0],
+                    ruleId="ai_single_scan_correlation",
+                    ruleName="AI Single Scan Correlation",
+                    ruleDescr=description,
+                    ruleRisk=risk_level,
+                    ruleYaml="",
+                    correlationTitle=headline,
+                    eventHashes=event_hashes
+                )
+                correlations_found += 1
+            except Exception as e:
+                self.log.warning(f"Failed to store AI correlation: {e}")
+                continue
 
         self.log.info(f"Single-scan correlation complete. Found {correlations_found} correlated IOCs.")
 
@@ -3609,9 +3603,17 @@ class SpiderFootWebUi:
             'unique_iocs': len(ioc_map)
         }
 
-    def _runCrossScanCorrelation(self, dbh, id: str, target: str, root_event) -> dict:
-        """Find IOCs that appear in both native and imported scan data."""
-        from spiderfoot import SpiderFootEvent
+    def _runCrossScanCorrelation(self, dbh, id: str, target: str) -> dict:
+        """Find IOCs that appear in both native and imported scan data.
+
+        Matches IOCs across native and imported events, then stores results
+        in tbl_scan_correlation_results so they appear in the standard
+        correlations table with expandable detail rows.
+        """
+        # Build event type description lookup
+        type_descr = {}
+        for row in dbh.eventTypes():
+            type_descr[row[1]] = row[0]  # event_code -> description
 
         qry = """SELECT r.generated, r.data, r.module, r.source_event_hash, r.type,
                         r.confidence, r.visibility, r.risk, r.false_positive,
@@ -3650,7 +3652,8 @@ class SpiderFootWebUi:
             event_timestamp = event[0]
             imported_from = event[10]
             source_scan_name = event[11]
-            source_scan_started = event[12]
+            event_hash = event[9]
+            event_risk = event[7]
 
             if not event_data:
                 continue
@@ -3660,7 +3663,10 @@ class SpiderFootWebUi:
                     native_iocs[event_data] = []
                 native_iocs[event_data].append({
                     'event_type': event_type,
-                    'timestamp': event_timestamp
+                    'timestamp': event_timestamp,
+                    'hash': event_hash,
+                    'risk': event_risk,
+                    'module': event[2],
                 })
             else:
                 if event_data not in imported_iocs:
@@ -3668,9 +3674,11 @@ class SpiderFootWebUi:
                 imported_iocs[event_data].append({
                     'scan_id': imported_from,
                     'scan_name': source_scan_name,
-                    'scan_date': str(source_scan_started) if source_scan_started else 'Unknown',
                     'event_type': event_type,
-                    'timestamp': event_timestamp
+                    'timestamp': event_timestamp,
+                    'hash': event_hash,
+                    'risk': event_risk,
+                    'module': event[2],
                 })
 
         self.log.info(f"Found {len(native_iocs)} unique native IOCs and {len(imported_iocs)} unique imported IOCs")
@@ -3688,103 +3696,71 @@ class SpiderFootWebUi:
         correlations_found = 0
 
         for ioc_data, native_occurrences in native_iocs.items():
-            if ioc_data in imported_iocs:
-                imported_occurrences = imported_iocs[ioc_data]
+            if ioc_data not in imported_iocs:
+                continue
 
-                source_scans = []
-                seen_scans = set()
-                timestamps = []
+            imported_occurrences = imported_iocs[ioc_data]
 
-                for imp in imported_occurrences:
-                    if imp['scan_id'] not in seen_scans:
-                        seen_scans.add(imp['scan_id'])
-                        source_scans.append({
-                            'scan_id': imp['scan_id'],
-                            'scan_name': imp['scan_name'],
-                            'scan_date': imp['scan_date']
-                        })
-                    try:
-                        if isinstance(imp['timestamp'], (int, float)):
-                            timestamps.append(float(imp['timestamp']))
-                    except (ValueError, TypeError):
-                        pass
+            seen_scans = set()
+            for imp in imported_occurrences:
+                seen_scans.add(imp['scan_id'])
 
-                occurrence_count = len(native_occurrences) + len(imported_occurrences)
+            occurrence_count = len(native_occurrences) + len(imported_occurrences)
 
-                if not timestamps:
-                    trend = "new"
-                elif occurrence_count <= 2:
-                    trend = "stable"
-                else:
-                    timestamps.sort()
-                    if len(timestamps) >= 2:
-                        intervals = [timestamps[i+1] - timestamps[i] for i in range(len(timestamps)-1)]
-                        avg_interval = sum(intervals) / len(intervals) if intervals else 0
-                        recent_interval = time.time() - timestamps[-1] if timestamps else 0
-                        if avg_interval > 0:
-                            if recent_interval < avg_interval * 0.5:
-                                trend = "increasing"
-                            elif recent_interval > avg_interval * 1.5:
-                                trend = "decreasing"
-                            else:
-                                trend = "stable"
-                        else:
-                            trend = "stable"
-                    else:
-                        trend = "stable"
+            # Collect all event hashes for linking
+            event_hashes = [o['hash'] for o in native_occurrences] + [o['hash'] for o in imported_occurrences]
 
-                confidence = min(0.95, 0.5 + (len(seen_scans) * 0.1) + (occurrence_count * 0.05))
+            # Determine risk level from max risk across all occurrences
+            all_risks = [o['risk'] for o in native_occurrences] + [o['risk'] for o in imported_occurrences]
+            max_risk = max(all_risks) if all_risks else 0
 
-                if timestamps:
-                    first_seen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(min(timestamps)))
-                    last_seen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(max(timestamps)))
-                else:
-                    first_seen = "Unknown"
-                    last_seen = "Unknown"
+            if max_risk >= 70:
+                risk_level = "HIGH"
+            elif max_risk >= 40:
+                risk_level = "MEDIUM"
+            elif max_risk >= 10:
+                risk_level = "LOW"
+            else:
+                risk_level = "INFO"
 
-                event_type = native_occurrences[0]['event_type'] if native_occurrences else 'Unknown'
+            # Determine the primary event type for the headline
+            all_event_types = [o['event_type'] for o in native_occurrences] + [o['event_type'] for o in imported_occurrences]
+            primary_type = max(set(all_event_types), key=all_event_types.count)
+            type_label = type_descr.get(primary_type, primary_type)
 
-                ioc_display = ioc_data[:50] + ('...' if len(ioc_data) > 50 else '')
-                analysis = f"IOC '{ioc_display}' found in current scan AND {len(imported_occurrences)} imported record(s) from {len(source_scans)} historical scan(s). "
-                if trend == "increasing":
-                    analysis += "Frequency is INCREASING - this IOC is appearing more often. "
-                elif trend == "decreasing":
-                    analysis += "Frequency is DECREASING - this IOC is appearing less often. "
-                else:
-                    analysis += "Frequency is STABLE - this IOC appears consistently. "
+            ioc_display = ioc_data[:80] + ('...' if len(ioc_data) > 80 else '')
 
-                if confidence >= 0.8:
-                    analysis += "HIGH CONFIDENCE: Persistent indicator across multiple scans."
-                elif confidence >= 0.6:
-                    analysis += "MEDIUM CONFIDENCE: Repeated indicator worth investigating."
+            # Generate meaningful headline
+            scan_names = sorted(set(imp['scan_name'] for imp in imported_occurrences))
+            headline = f"{type_label} persists across {len(seen_scans)} historical scan(s): {ioc_display}"
 
-                correlation_data = {
-                    'correlation_id': hashlib.md5(f"{ioc_data}_{time.time()}".encode()).hexdigest(),
-                    'ioc': ioc_data,
-                    'event_type': event_type,
-                    'native_occurrences': len(native_occurrences),
-                    'historical_occurrences': len(imported_occurrences),
-                    'total_occurrences': occurrence_count,
-                    'scans_involved': len(source_scans),
-                    'source_scans': source_scans,
-                    'first_seen': first_seen,
-                    'last_seen': last_seen,
-                    'trend': trend,
-                    'confidence': confidence,
-                    'analysis': analysis
-                }
+            # Build description
+            native_modules = sorted(set(o['module'] for o in native_occurrences))
+            imported_modules = sorted(set(o['module'] for o in imported_occurrences))
+            description = (
+                f"This indicator was found in the current scan ({len(native_occurrences)} occurrence(s) "
+                f"via {', '.join(native_modules)}) AND in {len(imported_occurrences)} imported record(s) "
+                f"from {len(seen_scans)} historical scan(s) ({', '.join(scan_names)}). "
+                f"Persistence across scans indicates this is a recurring indicator worth investigation."
+            )
 
-                correlation_event = SpiderFootEvent(
-                    "AI_CROSS_SCAN_CORRELATION",
-                    json.dumps(correlation_data, default=str),
-                    "sfp__ai_threat_intel",
-                    root_event
+            # Store as a standard correlation result
+            try:
+                dbh.correlationResultCreate(
+                    instanceId=id,
+                    event_hash=event_hashes[0],
+                    ruleId="ai_cross_scan_correlation",
+                    ruleName="AI Cross-Scan Correlation",
+                    ruleDescr=description,
+                    ruleRisk=risk_level,
+                    ruleYaml="",
+                    correlationTitle=headline,
+                    eventHashes=event_hashes
                 )
-                correlation_event.confidence = int(confidence * 100)
-                correlation_event.risk = 50 if trend == "increasing" else 30
-
-                dbh.scanEventStore(id, correlation_event)
                 correlations_found += 1
+            except Exception as e:
+                self.log.warning(f"Failed to store cross-scan correlation: {e}")
+                continue
 
         self.log.info(f"Cross-scan correlation complete. Found {correlations_found} correlations.")
 
