@@ -2153,6 +2153,20 @@ input[type="radio"]:checked::after {
   box-shadow: 0 0 12px var(--glow-red);
 }
 
+.badge.alert-critical {
+  background: #dc2626 !important;
+  color: white !important;
+  box-shadow: 0 0 16px rgba(220, 38, 38, 0.8), 0 0 30px rgba(220, 38, 38, 0.4);
+  font-weight: 700;
+  text-transform: uppercase;
+  animation: critical-pulse 2s ease-in-out infinite;
+}
+
+@keyframes critical-pulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(220, 38, 38, 0.8), 0 0 30px rgba(220, 38, 38, 0.4); }
+  50% { box-shadow: 0 0 24px rgba(220, 38, 38, 1), 0 0 40px rgba(220, 38, 38, 0.6); }
+}
+
 /* ============================================
    Label Glow Effects
    ============================================ */
