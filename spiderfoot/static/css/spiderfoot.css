@@ -2119,9 +2119,9 @@ input[type="radio"]:checked::after {
 }
 
 .badge.alert-critical {
-  background: #dc2626 !important;
+  background: #7c3aed !important;
   color: white !important;
-  box-shadow: 0 0 16px rgba(220, 38, 38, 0.8), 0 0 30px rgba(220, 38, 38, 0.4);
+  box-shadow: 0 0 16px rgba(124, 58, 237, 0.8), 0 0 30px rgba(124, 58, 237, 0.4);
   font-weight: 700;
   text-transform: uppercase;
 }
