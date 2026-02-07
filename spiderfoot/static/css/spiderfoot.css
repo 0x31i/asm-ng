@@ -6421,3 +6421,33 @@ i.glyphicon-white,
   word-break: break-all;
 }
 
+/* ============================================================
+   VULNERABILITY (NESSUS/BURP) TABLE STYLES
+   ============================================================ */
+
+#nessus-table.findings-table,
+#burp-table.findings-table {
+  table-layout: auto;
+}
+
+#nessus-table.findings-table .cell-clamp,
+#burp-table.findings-table .cell-clamp {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#nessus-table.findings-table thead th,
+#burp-table.findings-table thead th {
+  white-space: nowrap;
+}
+
+.finding-row.finding-none {
+  border-left: 3px solid #6c757d;
+}
+
+.finding-row.finding-information {
+  border-left: 3px solid #28a745;
+}
+
