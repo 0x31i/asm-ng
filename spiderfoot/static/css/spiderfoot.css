@@ -6430,12 +6430,19 @@ i.glyphicon-white,
   table-layout: auto;
 }
 
-#nessus-table.findings-table .cell-clamp,
-#burp-table.findings-table .cell-clamp {
+#nessus-table.findings-table .cell-clamp {
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+#burp-table.findings-table .cell-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 300px;
 }
 
 #nessus-table.findings-table thead th,
@@ -6449,5 +6456,62 @@ i.glyphicon-white,
 
 .finding-row.finding-information {
   border-left: 3px solid #28a745;
+}
+
+.finding-detail-row.finding-none td { border-left-color: #6c757d; }
+.finding-detail-row.finding-information td { border-left-color: #28a745; }
+
+/* Burp detail grid - auto columns that wrap */
+.burp-detail-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* Burp detail section colors */
+.finding-detail-section.detail-solutions {
+  border-left-color: #16a34a;
+}
+
+.finding-detail-section.detail-solutions .finding-detail-label {
+  color: #16a34a;
+}
+
+.finding-detail-section.detail-see-also {
+  border-left-color: #8b5cf6;
+}
+
+.finding-detail-section.detail-see-also .finding-detail-label {
+  color: #8b5cf6;
+}
+
+.finding-detail-section.detail-issue-detail {
+  border-left-color: #3b82f6;
+}
+
+.finding-detail-section.detail-issue-detail .finding-detail-label {
+  color: #3b82f6;
+}
+
+.finding-detail-section.detail-request {
+  border-left-color: #f59e0b;
+}
+
+.finding-detail-section.detail-request .finding-detail-label {
+  color: #f59e0b;
+}
+
+.finding-detail-section.detail-response {
+  border-left-color: #ef4444;
+}
+
+.finding-detail-section.detail-response .finding-detail-label {
+  color: #ef4444;
+}
+
+.finding-detail-section.detail-request .finding-detail-text,
+.finding-detail-section.detail-response .finding-detail-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
