@@ -22,10 +22,11 @@ $(document).ready(function() {
 
     // File type configuration per import type
     var fileTypeConfig = {
-        'legacy': { accept: '.csv', hint: 'ACCEPTED FORMAT: CSV' },
-        'scan':   { accept: '.csv', hint: 'ACCEPTED FORMAT: CSV' },
-        'burp':   { accept: '.xml', hint: 'ACCEPTED FORMAT: XML (BURP SUITE EXPORT)' },
-        'nessus': { accept: '.nessus,.xml', hint: 'ACCEPTED FORMAT: NESSUS (.nessus)' }
+        'legacy':    { accept: '.csv', hint: 'ACCEPTED FORMAT: CSV' },
+        'scan':      { accept: '.csv', hint: 'ACCEPTED FORMAT: CSV' },
+        'burp':      { accept: '.xml', hint: 'ACCEPTED FORMAT: XML (BURP SUITE EXPORT)' },
+        'burp_html': { accept: '.html,.htm', hint: 'ACCEPTED FORMAT: HTML (BURP SUITE PRO REPORT)' },
+        'nessus':    { accept: '.nessus,.xml', hint: 'ACCEPTED FORMAT: NESSUS (.nessus)' }
     };
 
     // Card click handlers
