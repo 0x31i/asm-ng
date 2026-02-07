@@ -51,7 +51,7 @@ Create a use case scan
 Scan info page should render tabs
     Element Should Be Visible    id:btn-status
     Element Should Be Visible    id:btn-browse
-    Element Should Be Visible    id:btn-correlations
+    Element Should Be Visible    id:btn-findings
     Element Should Be Visible    id:btn-graph
     Element Should Be Visible    id:btn-info
     Element Should Be Visible    id:btn-log

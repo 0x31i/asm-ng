@@ -35,7 +35,7 @@
   <div class="btn-toolbar" role="toolbar" style='padding-bottom: 10px'>
    <div class="btn-group">
       <a id='btn-status' class="btn btn-default" onClick='scanSummaryView("${id}")'><i class='glyphicon glyphicon-eye-open'></i>&nbsp;Summary</a>
-      <a id='btn-correlations' class="btn btn-default" onClick='browseCorrelations("${id}")'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Correlations</a>
+      <a id='btn-findings' class="btn btn-default" onClick='viewFindings("${id}")'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Findings</a>
       <a id='btn-browse' class="btn btn-default" onClick='browseEventList("${id}")'><i class='glyphicon glyphicon-th-list'></i>&nbsp;Browse</a>
       <a id='btn-graph' class="btn btn-default" onClick='viewVulnerabilities("${id}")'><i class='glyphicon glyphicon-asterisk'></i>&nbsp;Vulnerabilities</a>
       <a id='btn-info' class="btn btn-default" onClick='viewScanConfig("${id}")'><i class='glyphicon glyphicon-cog'></i>&nbsp;Manage</a>
@@ -82,14 +82,14 @@
               <li class="dropdown-header">Analysis (No False Positives)</li>
               <li><a class='link' onClick='exportEventData("${id}", currentType, "csv", "analysis")'>CSV</a></li>
               <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "analysis")'>Excel</a></li>
-              <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "analysis_correlations")'>Excel + Correlations</a></li>
+              <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "analysis_correlations")'>Excel + Findings & Correlations</a></li>
               <li class="divider"></li>
               <li class="dropdown-header">Legacy Export (v4.0 Types)</li>
               <li><a class='link' onClick='exportEventData("${id}", currentType, "csv", "full", true)'>CSV</a></li>
               <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "full", true)'>Excel</a></li>
               <li><a class='link' onClick='exportEventData("${id}", currentType, "csv", "analysis", true)'>CSV Analysis</a></li>
               <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "analysis", true)'>Excel Analysis</a></li>
-              <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "analysis_correlations", true)'>Excel Analysis + Correlations</a></li>
+              <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "analysis_correlations", true)'>Excel Analysis + Findings & Correlations</a></li>
             </ul>
         </div>
     <div class='btn-group search-group'>
@@ -746,7 +746,7 @@
         // Page title mappings
         var pageTitles = {
             "btn-status": "SUMMARY",
-            "btn-correlations": "CORRELATIONS",
+            "btn-findings": "FINDINGS",
             "btn-browse": "BROWSE",
             "btn-graph": "VULNERABILITIES",
             "btn-info": "MANAGE",
@@ -768,7 +768,7 @@
         function navTo(target) {
             var targets = [ "btn-browse", "btn-info",
                 "btn-export", "btn-download-logs", "btn-viz",
-                "btn-status", "btn-graph", "btn-correlations" ]
+                "btn-status", "btn-graph", "btn-findings" ]
             for (var i = 0; i < targets.length; i++) {
                 if (targets[i] == target) {
                     $("#" + targets[i]).addClass("active");
@@ -921,6 +921,366 @@
         // Legacy graphEvents - redirects to vulnerabilities
         function graphEvents(instanceId) {
             viewVulnerabilities(instanceId);
+        }
+
+        // ============================================================
+        // FINDINGS PAGE - Two tabs: FINDINGS (Excel import) + CORRELATIONS
+        // ============================================================
+        var findingsActiveTab = 'findings';
+
+        function viewFindings(instanceId) {
+            $("#scansummary-content").remove();
+            $("#ai-correlation-section").remove();
+            $("#ai-correlation-table-single").remove();
+            $("#ai-correlation-table-cross").remove();
+            $("#scanlogs-content").remove();
+            $("#stats-bar").remove();
+            $("#dedup-bar").remove();
+            $("#btn-export").hide();
+            $("#btn-download-logs").hide();
+            $("#btn-refresh").show();
+            $("#btn-search").hide();
+            $("#scanreminder").hide();
+            navTo("btn-findings");
+            refresh = function() { viewFindings(instanceId); }
+
+            var grid = "<div id='scansummary-content'>";
+            grid += "<div class='vuln-container'>";
+            grid += "<div class='vuln-tab-bar'>";
+            grid += "<button id='findings-btn-findings' class='vuln-tab-btn active' onclick='switchFindingsTab(\"findings\", \"" + instanceId + "\")'>";
+            grid += "<span class='vuln-btn-icon'><i class='glyphicon glyphicon-list-alt'></i></span>";
+            grid += "<span class='vuln-btn-label'>FINDINGS</span>";
+            grid += "<span class='vuln-btn-sub'>All Finding Analysis</span>";
+            grid += "</button>";
+            grid += "<button id='findings-btn-correlations' class='vuln-tab-btn' onclick='switchFindingsTab(\"correlations\", \"" + instanceId + "\")'>";
+            grid += "<span class='vuln-btn-icon'><i class='glyphicon glyphicon-exclamation-sign'></i></span>";
+            grid += "<span class='vuln-btn-label'>CORRELATIONS</span>";
+            grid += "<span class='vuln-btn-sub'>Rule-Based Analysis</span>";
+            grid += "</button>";
+            grid += "</div>";
+            grid += "<div class='vuln-content'>";
+            grid += "<div id='findings-findings-content' class='vuln-panel'></div>";
+            grid += "<div id='findings-correlations-content' class='vuln-panel' style='display:none'></div>";
+            grid += "</div></div></div>";
+
+            $("#mainbody").append(grid);
+            $("#loader").hide();
+
+            // Load findings data into the findings tab
+            loadFindingsData(instanceId);
+        }
+
+        function switchFindingsTab(tab, instanceId) {
+            // Update tab buttons
+            $('#findings-btn-findings').removeClass('active');
+            $('#findings-btn-correlations').removeClass('active');
+            $('#findings-btn-' + tab).addClass('active');
+
+            // Show/hide panels
+            $('#findings-findings-content').hide();
+            $('#findings-correlations-content').hide();
+            $('#findings-' + tab + '-content').show();
+
+            findingsActiveTab = tab;
+
+            // Load correlations data on first switch
+            if (tab === 'correlations' && $('#findings-correlations-content').html() === '') {
+                loadCorrelationsIntoPanel(instanceId);
+            }
+        }
+
+        function loadFindingsData(instanceId) {
+            var panel = $('#findings-findings-content');
+
+            // First check if findings already exist
+            sf.fetchData('${docroot}/scanfindingscount', {'id': instanceId},
+                function(data) {
+                    if (data.success && data.count > 0) {
+                        // Findings exist - load and display them
+                        loadFindingsTable(instanceId);
+                    } else {
+                        // No findings - show upload placeholder
+                        showFindingsUploadPlaceholder(instanceId);
+                    }
+                },
+                function() {
+                    showFindingsUploadPlaceholder(instanceId);
+                }
+            );
+        }
+
+        function showFindingsUploadPlaceholder(instanceId) {
+            var panel = $('#findings-findings-content');
+            var html = "<div class='vuln-placeholder'>";
+            html += "<i class='glyphicon glyphicon-import' style='font-size: 32px; opacity: 0.4;'></i>";
+            html += "<p>Import Finding Analysis results (.xlsx)</p>";
+            html += "<p class='text-muted' style='font-size: 12px;'>Upload an Excel file with Priority, Category, Tab, Item, Description, Recommendation columns</p>";
+            html += "<div style='margin-top: 20px;'>";
+            html += "<button class='btn btn-danger' onclick='triggerFindingsUpload(\"" + instanceId + "\")'>";
+            html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;&nbsp;UPLOAD FINDINGS ANALYSIS";
+            html += "</button>";
+            html += "<input type='file' id='findings-file-input' accept='.xlsx,.xls' style='display:none' onchange='handleFindingsUpload(\"" + instanceId + "\", this)'>";
+            html += "</div></div>";
+            panel.html(html);
+        }
+
+        function triggerFindingsUpload(instanceId) {
+            $('#findings-file-input').click();
+        }
+
+        function handleFindingsUpload(instanceId, input) {
+            if (!input.files || !input.files[0]) return;
+
+            var file = input.files[0];
+            var fname = file.name.toLowerCase();
+            if (!fname.endsWith('.xlsx') && !fname.endsWith('.xls')) {
+                alert('Please select an Excel file (.xlsx)');
+                return;
+            }
+
+            var formData = new FormData();
+            formData.append('importfile', file);
+            formData.append('id', instanceId);
+
+            var panel = $('#findings-findings-content');
+            panel.html("<div class='vuln-placeholder'><i class='glyphicon glyphicon-refresh spinning' style='font-size: 32px;'></i><p>Importing findings...</p></div>");
+
+            $.ajax({
+                url: '${docroot}/importfindings',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                dataType: 'json',
+                success: function(data) {
+                    if (data.success) {
+                        loadFindingsTable(instanceId);
+                    } else {
+                        panel.html("<div class='alert alert-danger' style='margin: 20px;'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;" + data.message + "</div>");
+                        setTimeout(function() { showFindingsUploadPlaceholder(instanceId); }, 3000);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    panel.html("<div class='alert alert-danger' style='margin: 20px;'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Upload failed: " + status + "</div>");
+                    setTimeout(function() { showFindingsUploadPlaceholder(instanceId); }, 3000);
+                }
+            });
+        }
+
+        function loadFindingsTable(instanceId) {
+            var panel = $('#findings-findings-content');
+            panel.html("<div class='vuln-placeholder'><i class='glyphicon glyphicon-refresh spinning' style='font-size: 24px;'></i><p>Loading findings...</p></div>");
+
+            sf.fetchData('${docroot}/scanfindings', {'id': instanceId},
+                function(data) {
+                    if (!data || data.length === 0) {
+                        showFindingsUploadPlaceholder(instanceId);
+                        return;
+                    }
+
+                    // Toolbar with reimport + export
+                    var html = "<div class='findings-toolbar'>";
+                    html += "<div class='findings-toolbar-left'>";
+                    html += "<span class='findings-count'><i class='glyphicon glyphicon-list-alt'></i>&nbsp;" + data.length + " FINDINGS</span>";
+                    html += "</div>";
+                    html += "<div class='findings-toolbar-right'>";
+                    html += "<button class='btn btn-sm btn-default' onclick='reimportFindings(\"" + instanceId + "\")'>";
+                    html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT</button>&nbsp;";
+                    html += "<a class='btn btn-sm btn-default' href='${docroot}/scanfindingsexport?id=" + instanceId + "&filetype=xlsx'>";
+                    html += "<i class='glyphicon glyphicon-download-alt'></i>&nbsp;EXPORT</a>";
+                    html += "</div></div>";
+
+                    // Build findings table
+                    html += "<div class='findings-table-wrapper'>";
+                    html += "<table id='findings-table' class='table findings-table tablesorter small'>";
+                    html += "<thead><tr>";
+                    html += "<th>Priority</th>";
+                    html += "<th>Category</th>";
+                    html += "<th>Tab</th>";
+                    html += "<th>Item</th>";
+                    html += "<th>Description</th>";
+                    html += "<th>Recommendation</th>";
+                    html += "</tr></thead><tbody>";
+
+                    for (var i = 0; i < data.length; i++) {
+                        var priority = data[i][1];
+                        var rowClass = 'finding-row finding-' + priority.toLowerCase();
+                        var badgeClass = '';
+
+                        if (priority === 'CRITICAL') badgeClass = 'alert-critical';
+                        else if (priority === 'HIGH') badgeClass = 'alert-danger';
+                        else if (priority === 'MEDIUM') badgeClass = 'alert-warning';
+                        else if (priority === 'LOW') badgeClass = 'alert-info';
+                        else if (priority === 'INFO') badgeClass = 'alert-success';
+
+                        html += "<tr class='" + rowClass + "'>";
+                        html += "<td><span class='badge " + badgeClass + "'>" + priority + "</span></td>";
+                        html += "<td>" + (data[i][2] || '') + "</td>";
+                        html += "<td>" + (data[i][3] || '') + "</td>";
+                        html += "<td>" + (data[i][4] || '') + "</td>";
+                        html += "<td class='findings-desc-cell'>" + (data[i][5] || '') + "</td>";
+                        html += "<td class='findings-rec-cell'>" + (data[i][6] || '') + "</td>";
+                        html += "</tr>";
+                    }
+
+                    html += "</tbody></table></div>";
+                    html += "<input type='file' id='findings-file-input' accept='.xlsx,.xls' style='display:none' onchange='handleFindingsUpload(\"" + instanceId + "\", this)'>";
+
+                    panel.html(html);
+
+                    // Enable table sorting
+                    $.tablesorter.addParser({
+                        id: 'findingsPriority',
+                        is: function(s) { return false; },
+                        format: function(s) {
+                            return s.toLowerCase().replace(/critical/,0).replace(/high/,1).replace(/medium/,2).replace(/low/,3).replace(/info/,4);
+                        },
+                        type: 'numeric'
+                    });
+
+                    $("#findings-table").tablesorter({
+                        headers: { 0: { sorter: 'findingsPriority' } },
+                        sortList: [[0, 0]]
+                    });
+                },
+                function() {
+                    showFindingsUploadPlaceholder(instanceId);
+                }
+            );
+        }
+
+        function reimportFindings(instanceId) {
+            if (confirm('FINDINGS ANALYSIS HAS ALREADY BEEN PERFORMED - WOULD YOU LIKE TO REPLACE THE CURRENT FINDINGS?')) {
+                $('#findings-file-input').click();
+            }
+        }
+
+        // Load correlations data into the correlations tab panel
+        function loadCorrelationsIntoPanel(instanceId) {
+            var panel = $('#findings-correlations-content');
+            panel.html("<div class='vuln-placeholder'><i class='glyphicon glyphicon-refresh spinning' style='font-size: 24px;'></i><p>Loading correlations...</p></div>");
+
+            sf.fetchData('${docroot}/scanstatus', {'id': instanceId},
+                function(statusData) {
+                    if (statusData && statusData[6] && (
+                        (statusData[6]['CRITICAL'] || 0) > 0 ||
+                        statusData[6]['HIGH'] > 0 ||
+                        statusData[6]['MEDIUM'] > 0 ||
+                        statusData[6]['LOW'] > 0 ||
+                        statusData[6]['INFO'] > 0
+                    )) {
+                        sf.fetchData('${docroot}/scancorrelations', {'id': instanceId},
+                            function(data) {
+                                renderCorrelationsPanel(instanceId, data, statusData[6]);
+                            },
+                            function() {
+                                renderCorrelationsPanelEmpty(instanceId);
+                            }
+                        );
+                    } else {
+                        renderCorrelationsPanelEmpty(instanceId);
+                    }
+                },
+                function() {
+                    sf.fetchData('${docroot}/scancorrelations', {'id': instanceId},
+                        function(data) {
+                            renderCorrelationsPanel(instanceId, data);
+                        },
+                        function() {
+                            renderCorrelationsPanelEmpty(instanceId);
+                        }
+                    );
+                }
+            );
+        }
+
+        function renderCorrelationsPanel(instanceId, data, counts) {
+            var panel = $('#findings-correlations-content');
+
+            if (!data || data.length == 0) {
+                renderCorrelationsPanelEmpty(instanceId);
+                return;
+            }
+
+            var html = "<table id='correlations-panel-table' class='table table-bordered table-striped table-condensed tablesorter small'>";
+            html += "<thead><tr><th>Correlation</th><th>Risk</th><th>Data Elements</th></tr></thead><tbody>";
+
+            for (var i = 0; i < data.length; i++) {
+                html += "<tr>";
+                html += "<td><a style='cursor: pointer' onClick='toggleCorrelation(\"" + instanceId + "\",\"" + data[i][0] + "\")'>" + data[i][1] + "</a>&nbsp;&nbsp;";
+                html += "<i class='glyphicon glyphicon-question-sign' style='color: #ccc' rel='tooltip' data-title=\"" + data[i][5] + "\"></i>";
+                html += "</td>";
+                var statusy = "";
+                if (data[i][3] == "CRITICAL") statusy = "alert-critical";
+                else if (data[i][3] == "HIGH") statusy = "alert-danger";
+                else if (data[i][3] == "MEDIUM") statusy = "alert-warning";
+                else if (data[i][3] == "LOW") statusy = "alert-info";
+                else if (data[i][3] == "INFO") statusy = "alert-success";
+                html += "<td><span class='badge " + statusy + "'>" + data[i][3] + "</span></td>";
+                html += "<td>" + data[i][7] + "</td>";
+                html += "</tr><tr class='hidden tablesorter-childRow' id='corrwell_tr_" + data[i][0] + "'><td colspan=3 id='corrwell_td_" + data[i][0] + "'></td></tr>";
+            }
+
+            html += "</tbody></table>";
+            panel.html(html);
+
+            // AI Correlation section
+            addAiCorrelationSectionToPanel(instanceId);
+
+            $.tablesorter.addParser({
+                id: 'correlationPanelCriticality',
+                is: function(s) { return false; },
+                format: function(s) {
+                    return s.toLowerCase().replace(/critical/,4).replace(/high/,3).replace(/medium/,2).replace(/low/,1).replace(/info/,0);
+                },
+                type: 'numeric'
+            });
+
+            $("#correlations-panel-table").tablesorter({
+                headers: { 1: { sorter: 'correlationPanelCriticality' } },
+                cssChildRow: 'tablesorter-childRow',
+                sortList: [[1, 1]]
+            });
+            sf.updateTooltips();
+        }
+
+        function renderCorrelationsPanelEmpty(instanceId) {
+            var panel = $('#findings-correlations-content');
+            var html = "<div class='alert alert-warning' style='margin: 20px;'><h4>No correlations found.</h4>If the scan is still running please reload once it has completed. If the scan is complete, it may not have triggered any correlation rules.</div>";
+            panel.html(html);
+            addAiCorrelationSectionToPanel(instanceId);
+        }
+
+        function addAiCorrelationSectionToPanel(instanceId) {
+            var panel = $('#findings-correlations-content');
+            var aiSection = "<div id='ai-correlation-section-panel' class='panel panel-default' style='margin-top: 20px;'>";
+            aiSection += "<div class='panel-heading'><i class='glyphicon glyphicon-flash'></i>&nbsp;&nbsp;AI Correlation Analysis</div>";
+            aiSection += "<div class='panel-body'>";
+            aiSection += "<p>Run AI-powered analysis to identify significant and recurring indicators in scan data.</p>";
+            aiSection += "<div style='margin-bottom: 15px;'>";
+            aiSection += "<button id='btn-panel-single-correlation' class='btn btn-primary' style='margin-right: 10px;' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
+            aiSection += "<i class='glyphicon glyphicon-search'></i>&nbsp;Single Scan Analysis</button>";
+            aiSection += "<button id='btn-panel-cross-correlation' class='btn btn-info' style='margin-right: 10px;' onclick='runAiCorrelation(\"" + instanceId + "\", \"cross\")'>";
+            aiSection += "<i class='glyphicon glyphicon-transfer'></i>&nbsp;Cross-Scan Analysis</button>";
+            aiSection += "</div>";
+            aiSection += "<div id='ai-correlation-results'></div>";
+            aiSection += "</div></div>";
+            panel.append(aiSection);
+
+            sf.fetchData('${docroot}/checkAiCorrelationModes', {'id': instanceId},
+                function(data) {
+                    if (data.success) {
+                        if (!data.cross_scan_available) {
+                            $("#btn-panel-cross-correlation").prop('disabled', true).addClass('disabled')
+                                .attr('title', 'No imported historical data detected.');
+                        }
+                        if (!data.single_scan_available) {
+                            $("#btn-panel-single-correlation").prop('disabled', true).addClass('disabled');
+                        }
+                    }
+                },
+                function() { }
+            );
         }
 
         // Scan status
@@ -1144,8 +1504,18 @@
             });
         }
 
-        // Correlation results for the scan
+        // Legacy browseCorrelations - redirect to Findings page with Correlations tab
         function browseCorrelations(instanceId) {
+            viewFindings(instanceId);
+            // Switch to correlations tab after a short delay to let the DOM render
+            setTimeout(function() {
+                switchFindingsTab('correlations', instanceId);
+            }, 100);
+            return;
+        }
+
+        // Original correlation data fetching (kept for reference by AI correlation refresh)
+        function browseCorrelationsLegacy(instanceId) {
             $("#scansummary-content").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
@@ -1156,7 +1526,7 @@
             $("#btn-search").hide();
             $("#btn-export").hide();
             $("#scanreminder").hide();
-            navTo("btn-correlations");
+            navTo("btn-findings");
             refresh = function() { browseCorrelations(instanceId); }
             
             console.log("Fetching correlation data for scan ID: " + instanceId);
@@ -1388,9 +1758,8 @@
 
                     if (data.success) {
                         if (data.correlations_found > 0) {
-                            // Refresh the entire correlations view to show AI results
-                            // in the standard correlations table
-                            browseCorrelations(instanceId);
+                            // Refresh the correlations panel to show AI results
+                            loadCorrelationsIntoPanel(instanceId);
                         } else {
                             var resultHtml = "<div class='alert alert-info'>";
                             resultHtml += "<h5><i class='glyphicon glyphicon-info-sign'></i>&nbsp;Analysis Complete</h5>";
