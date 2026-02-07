@@ -4821,6 +4821,31 @@ class SpiderFootDb:
             except (sqlite3.Error, psycopg2.Error):
                 return 0
 
+    def scanBurpEnhanced(self, instanceId: str) -> bool:
+        """Check if Burp results have been enhanced with HTML report data.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            bool: True if any records have issue_detail or solutions populated
+        """
+        if self.db_type == 'sqlite':
+            qry = ("SELECT COUNT(*) FROM tbl_scan_burp_results "
+                   "WHERE scan_instance_id = ? "
+                   "AND (issue_detail IS NOT NULL AND issue_detail != '')")
+        else:
+            qry = ("SELECT COUNT(*) FROM tbl_scan_burp_results "
+                   "WHERE scan_instance_id = %s "
+                   "AND (issue_detail IS NOT NULL AND issue_detail != '')")
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [instanceId])
+                return self.dbh.fetchone()[0] > 0
+            except (sqlite3.Error, psycopg2.Error):
+                return False
+
     def scanNessusUpdateTracking(self, instanceId: str, resultId: int, tracking: int) -> bool:
         """Update the tracking status for a Nessus result.
 
