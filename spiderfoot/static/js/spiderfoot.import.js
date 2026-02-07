@@ -93,19 +93,25 @@ $(document).ready(function() {
             return;
         }
 
-        var formData = new FormData();
-        formData.append('importfile', fileInput.files[0]);
-        formData.append('import_type', $('#import-type').val());
-
         var scanName = $('#import-scan-name').val().trim();
-        if (scanName) {
-            formData.append('scan_name', scanName);
+        if (!scanName) {
+            alertify.error('PLEASE ENTER A SCAN NAME.');
+            $('#import-scan-name').focus();
+            return;
         }
 
         var target = $('#import-target').val().trim();
-        if (target) {
-            formData.append('target', target);
+        if (!target) {
+            alertify.error('PLEASE ENTER A TARGET.');
+            $('#import-target').focus();
+            return;
         }
+
+        var formData = new FormData();
+        formData.append('importfile', fileInput.files[0]);
+        formData.append('import_type', $('#import-type').val());
+        formData.append('scan_name', scanName);
+        formData.append('target', target);
 
         // Always dry-run first
         formData.append('dry_run', '1');
@@ -203,16 +209,8 @@ $(document).ready(function() {
         var formData = new FormData();
         formData.append('importfile', fileInput.files[0]);
         formData.append('import_type', $('#import-type').val());
-
-        var scanName = $('#import-scan-name').val().trim();
-        if (scanName) {
-            formData.append('scan_name', scanName);
-        }
-
-        var target = $('#import-target').val().trim();
-        if (target) {
-            formData.append('target', target);
-        }
+        formData.append('scan_name', $('#import-scan-name').val().trim());
+        formData.append('target', $('#import-target').val().trim());
 
         // No dry_run flag = actual import
 

@@ -1,7 +1,31 @@
 <%include file="HEADER.tmpl"/>
 <script>document.write('<script type="text/javascript" src="${docroot}/static/js/spiderfoot.import.js?v=' + Date.now() + '"><\/script>');</script>
 <h2>Import Data</h2>
-<p class="text-muted" style="margin-bottom: 25px;">Import scan data from CSV exports into ASM-NG.</p>
+
+<!-- Info Panel -->
+<div class="import-info-panel">
+  <div class="import-info-header">
+    <i class="glyphicon glyphicon-info-sign"></i> CSV IMPORT FEATURES
+  </div>
+  <div class="import-info-body">
+    <div class="row">
+      <div class="col-sm-6">
+        <ul class="import-info-list">
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>FALSE POSITIVE PRESERVATION</strong> &mdash; All F/P and validated status flags from your original scans are maintained during import.</li>
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>AUTO-POPULATE ALL MODULES</strong> &mdash; Imported data automatically populates all relevant ASM-NG modules, views, and data tables.</li>
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>DISCOVERY PATH RECONSTRUCTION</strong> &mdash; Source-to-target discovery paths and entity relationships are fully rebuilt from the CSV data.</li>
+        </ul>
+      </div>
+      <div class="col-sm-6">
+        <ul class="import-info-list">
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>AI CORRELATION PROCESSING</strong> &mdash; After import, the local AI engine runs correlation analysis to identify patterns, link related findings, and surface insights.</li>
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>DRY-RUN VALIDATION</strong> &mdash; Every import is validated first with a dry-run preview showing row counts, event types, and any warnings before committing.</li>
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>SCAN METADATA DETECTION</strong> &mdash; Target, scan name, and timestamps are auto-detected from the CSV data so you can import with zero manual configuration.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="row import-cards-row">
 
@@ -31,31 +55,6 @@
 
 </div>
 
-<!-- Info Panel -->
-<div class="import-info-panel">
-  <div class="import-info-header">
-    <i class="glyphicon glyphicon-info-sign"></i> CSV IMPORT FEATURES
-  </div>
-  <div class="import-info-body">
-    <div class="row">
-      <div class="col-sm-6">
-        <ul class="import-info-list">
-          <li><i class="glyphicon glyphicon-ok"></i> <strong>FALSE POSITIVE PRESERVATION</strong> &mdash; All F/P and validated status flags from your original scans are maintained during import.</li>
-          <li><i class="glyphicon glyphicon-ok"></i> <strong>AUTO-POPULATE ALL MODULES</strong> &mdash; Imported data automatically populates all relevant ASM-NG modules, views, and data tables.</li>
-          <li><i class="glyphicon glyphicon-ok"></i> <strong>DISCOVERY PATH RECONSTRUCTION</strong> &mdash; Source-to-target discovery paths and entity relationships are fully rebuilt from the CSV data.</li>
-        </ul>
-      </div>
-      <div class="col-sm-6">
-        <ul class="import-info-list">
-          <li><i class="glyphicon glyphicon-ok"></i> <strong>AI CORRELATION PROCESSING</strong> &mdash; After import, the local AI engine runs correlation analysis to identify patterns, link related findings, and surface insights.</li>
-          <li><i class="glyphicon glyphicon-ok"></i> <strong>DRY-RUN VALIDATION</strong> &mdash; Every import is validated first with a dry-run preview showing row counts, event types, and any warnings before committing.</li>
-          <li><i class="glyphicon glyphicon-ok"></i> <strong>SCAN METADATA DETECTION</strong> &mdash; Target, scan name, and timestamps are auto-detected from the CSV data so you can import with zero manual configuration.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- Import Form (hidden by default, shown when a card is selected) -->
 <div id="import-form-section" style="display: none;">
   <hr>
@@ -82,14 +81,14 @@
     <div class="row">
       <div class="col-sm-4">
         <div class="form-group">
-          <label for="import-scan-name">SCAN NAME <small class="text-muted">(OPTIONAL)</small></label>
-          <input type="text" class="form-control" id="import-scan-name" name="scan_name" placeholder="Auto-generated from filename if blank">
+          <label for="import-scan-name">SCAN NAME <small class="text-danger">*</small></label>
+          <input type="text" class="form-control" id="import-scan-name" name="scan_name" placeholder="Enter a name for this scan" required>
         </div>
       </div>
       <div class="col-sm-4">
         <div class="form-group">
-          <label for="import-target">TARGET <small class="text-muted">(OPTIONAL)</small></label>
-          <input type="text" class="form-control" id="import-target" name="target" placeholder="Auto-detected from data if blank">
+          <label for="import-target">TARGET <small class="text-danger">*</small></label>
+          <input type="text" class="form-control" id="import-target" name="target" placeholder="Enter the scan target (e.g. domain.com)" required>
         </div>
       </div>
     </div>
