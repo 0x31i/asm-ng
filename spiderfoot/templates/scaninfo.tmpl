@@ -37,9 +37,8 @@
       <a id='btn-status' class="btn btn-default" onClick='scanSummaryView("${id}")'><i class='glyphicon glyphicon-eye-open'></i>&nbsp;Summary</a>
       <a id='btn-correlations' class="btn btn-default" onClick='browseCorrelations("${id}")'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Correlations</a>
       <a id='btn-browse' class="btn btn-default" onClick='browseEventList("${id}")'><i class='glyphicon glyphicon-th-list'></i>&nbsp;Browse</a>
-      <a id='btn-graph' class="btn btn-default" onClick='graphEvents("${id}")'><i class='glyphicon glyphicon-asterisk'></i>&nbsp;Graph</a>
-      <a id='btn-info' class="btn btn-default" onClick='viewScanConfig("${id}")'><i class='glyphicon glyphicon-cog'></i>&nbsp;Scan Settings</a>
-      <a id='btn-log' class="btn btn-default" onClick='viewScanLog("${id}")'><i class='glyphicon glyphicon-book'></i>&nbsp;Log</a>
+      <a id='btn-graph' class="btn btn-default" onClick='viewVulnerabilities("${id}")'><i class='glyphicon glyphicon-asterisk'></i>&nbsp;Vulnerabilities</a>
+      <a id='btn-info' class="btn btn-default" onClick='viewScanConfig("${id}")'><i class='glyphicon glyphicon-cog'></i>&nbsp;Manage</a>
     </div>
         <div id='modifyactions' role="group" class="btn-group">
             <a id='btn-setfp' rel="tooltip" data-title="Set validation status" class="btn-warning btn btn-default dropdown-toggle" data-toggle="dropdown"><i class='glyphicon glyphicon-ok-circle glyphicon glyphicon-white'></i></a>
@@ -749,9 +748,8 @@
             "btn-status": "SUMMARY",
             "btn-correlations": "CORRELATIONS",
             "btn-browse": "BROWSE",
-            "btn-graph": "GRAPH",
-            "btn-info": "SCAN SETTINGS",
-            "btn-log": "LOG",
+            "btn-graph": "VULNERABILITIES",
+            "btn-info": "MANAGE",
             "btn-search": "SEARCH RESULTS"
         };
 
@@ -768,7 +766,7 @@
         }
 
         function navTo(target) {
-            var targets = [ "btn-browse", "btn-info", "btn-log",
+            var targets = [ "btn-browse", "btn-info",
                 "btn-export", "btn-download-logs", "btn-viz",
                 "btn-status", "btn-graph", "btn-correlations" ]
             for (var i = 0; i < targets.length; i++) {
@@ -860,12 +858,8 @@
             });
         }
 
-        // Visualisation
-        function graphEvents(instanceId) {
-            grid = "<div id='scansummary-content'><br />"
-            grid += "<div class='col-md-12 graph-container' id='graph-container'></div>"
-            grid += "</div>"
-
+        // Vulnerabilities page - placeholder for NESSUS and BURP imports
+        function viewVulnerabilities(instanceId) {
             $("#scansummary-content").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
@@ -873,163 +867,60 @@
             $("#scanlogs-content").remove();
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
-            $("#loader").show();
-            $("#btn-export").show();
+            $("#btn-export").hide();
             $("#btn-download-logs").hide();
             $("#btn-refresh").show();
             $("#btn-search").hide();
-            $("#btn-graph").show();
             $("#scanreminder").hide();
-            refresh = function() { graphEvents(instanceId); }
             navTo("btn-graph");
-            $("#customvizview").show();
+            refresh = function() { viewVulnerabilities(instanceId); }
+
+            var activeTab = 'nessus';
+
+            var grid = "<div id='scansummary-content'>";
+            grid += "<div class='vuln-container'>";
+            grid += "<div class='vuln-tab-bar'>";
+            grid += "<button id='vuln-btn-nessus' class='vuln-tab-btn active' onclick='switchVulnTab(\"nessus\")'>";
+            grid += "<span class='vuln-btn-icon'><i class='glyphicon glyphicon-shield'></i></span>";
+            grid += "<span class='vuln-btn-label'>NESSUS</span>";
+            grid += "<span class='vuln-btn-sub'>Tenable Pro Scanner</span>";
+            grid += "</button>";
+            grid += "<button id='vuln-btn-burp' class='vuln-tab-btn' onclick='switchVulnTab(\"burp\")'>";
+            grid += "<span class='vuln-btn-icon'><i class='glyphicon glyphicon-globe'></i></span>";
+            grid += "<span class='vuln-btn-label'>BURP</span>";
+            grid += "<span class='vuln-btn-sub'>PortSwigger Pro Scanner</span>";
+            grid += "</button>";
+            grid += "</div>";
+            grid += "<div class='vuln-content'>";
+            grid += "<div id='vuln-nessus-content' class='vuln-panel'>";
+            grid += "<div class='vuln-placeholder'>";
+            grid += "<i class='glyphicon glyphicon-import' style='font-size: 32px; opacity: 0.4;'></i>";
+            grid += "<p>Import Nessus Pro scan results (.nessus)</p>";
+            grid += "<p class='text-muted' style='font-size: 12px;'>No vulnerability scans imported yet</p>";
+            grid += "</div></div>";
+            grid += "<div id='vuln-burp-content' class='vuln-panel' style='display:none'>";
+            grid += "<div class='vuln-placeholder'>";
+            grid += "<i class='glyphicon glyphicon-import' style='font-size: 32px; opacity: 0.4;'></i>";
+            grid += "<p>Import Burp Pro scan results (.xml)</p>";
+            grid += "<p class='text-muted' style='font-size: 12px;'>No vulnerability scans imported yet</p>";
+            grid += "</div></div>";
+            grid += "</div></div></div>";
+
             $("#mainbody").append(grid);
-            $("#btn-forceatlas").removeClass("active");
-            $("#btn-random").addClass("active");
-
-            sigma.renderers.def = sigma.renderers.canvas
-            sigma.parsers.json("${docroot}/scanviz?id=" + instanceId + "&gexf=0", {
-                container: 'graph-container'
-            }, function(s) {
-                if (s.renderers[0].nodesOnScreen.length == 0) {
-                    $("#graph-container").append("<div class='alert alert-danger'>Insufficient data to produce a graph.</div>");
-                    $("#loader").hide();
-                    return;
-                }
-                sharedSigma = s;
-
-                // Detect dark mode and use appropriate colors
-                var isDarkMode = document.body.classList.contains('dark-mode') ||
-                                 document.documentElement.getAttribute('data-theme') === 'dark' ||
-                                 window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-                var edgeColor = isDarkMode ? 'rgba(100, 200, 150, 0.4)' : 'rgba(100, 100, 100, 0.3)';
-                var defaultNodeColor = isDarkMode ? '#4ade80' : '#3b82f6';
-
-                // Update node colors for better visibility
-                s.graph.nodes().forEach(function(n) {
-                    if (n.color === '#000' || n.color === '#000000') {
-                        n.color = defaultNodeColor;
-                    }
-                });
-
-                // Store original colors for reset
-                var originalNodeColors = {};
-                var originalEdgeColors = {};
-                var selectedNodeId = null;
-                var highlightColor = isDarkMode ? '#22d3ee' : '#0891b2'; // cyan
-                var pathColor = isDarkMode ? '#4ade80' : '#3b82f6'; // green/blue
-                var dimmedNodeColor = isDarkMode ? 'rgba(74, 222, 128, 0.15)' : 'rgba(59, 130, 246, 0.2)';
-                var dimmedEdgeColor = isDarkMode ? 'rgba(100, 200, 150, 0.08)' : 'rgba(100, 100, 100, 0.08)';
-
-                s.graph.nodes().forEach(function(n) {
-                    originalNodeColors[n.id] = n.color;
-                });
-                s.graph.edges().forEach(function(e) {
-                    originalEdgeColors[e.id] = e.color || edgeColor;
-                });
-
-                s.settings({
-                    edgeColor: 'default',
-                    defaultEdgeColor: edgeColor,
-                    maxNodeSize: 5,
-                    minEdgeSize: 0.5,
-                    maxEdgeSize: 1,
-                    defaultLabelColor: isDarkMode ? '#e5e7eb' : '#1f2937',
-                    labelThreshold: 5,
-                    fontStyle: 'bold',
-                    defaultLabelSize: 11,
-                    labelSize: 'proportional',
-                    labelSizeRatio: 1.5
-                });
-
-                // Click handler for node path highlighting
-                s.bind('clickNode', function(e) {
-                    var clickedNodeId = e.data.node.id;
-
-                    // If clicking the same node, deselect
-                    if (selectedNodeId === clickedNodeId) {
-                        resetHighlighting();
-                        return;
-                    }
-
-                    selectedNodeId = clickedNodeId;
-
-                    // Get all edges connected to the clicked node
-                    var connectedNodeIds = {};
-                    connectedNodeIds[clickedNodeId] = true;
-
-                    s.graph.edges().forEach(function(edge) {
-                        if (edge.source === clickedNodeId || edge.target === clickedNodeId) {
-                            connectedNodeIds[edge.source] = true;
-                            connectedNodeIds[edge.target] = true;
-                        }
-                    });
-
-                    // Highlight connected nodes and dim others
-                    s.graph.nodes().forEach(function(n) {
-                        if (n.id === clickedNodeId) {
-                            n.color = highlightColor;
-                        } else if (connectedNodeIds[n.id]) {
-                            n.color = pathColor;
-                        } else {
-                            n.color = dimmedNodeColor;
-                        }
-                    });
-
-                    // Highlight connected edges and dim others
-                    s.graph.edges().forEach(function(edge) {
-                        if (edge.source === clickedNodeId || edge.target === clickedNodeId) {
-                            edge.color = highlightColor;
-                        } else {
-                            edge.color = dimmedEdgeColor;
-                        }
-                    });
-
-                    s.refresh();
-                });
-
-                // Click on background to reset
-                s.bind('clickStage', function(e) {
-                    resetHighlighting();
-                });
-
-                function resetHighlighting() {
-                    selectedNodeId = null;
-                    s.graph.nodes().forEach(function(n) {
-                        n.color = originalNodeColors[n.id] || defaultNodeColor;
-                    });
-                    s.graph.edges().forEach(function(edge) {
-                        edge.color = originalEdgeColors[edge.id] || edgeColor;
-                    });
-                    s.refresh();
-                }
-
-                sigma.plugins.dragNodes(s, s.renderers[0])
-                s.refresh()
-                $("#loader").hide();
-            });
+            $("#loader").hide();
         }
 
-        function vizUpdate(method) {
-            s = sharedSigma
-            if (method == "force") {
-                $("#btn-forceatlas").addClass("active");
-                $("#btn-random").removeClass("active");
-                s.startForceAtlas2();
-                s.refresh();
-                setTimeout(function() { s.stopForceAtlas2() }, 5000);
-            }
+        // Switch between NESSUS and BURP vulnerability tabs
+        function switchVulnTab(tab) {
+            $('.vuln-tab-btn').removeClass('active');
+            $('#vuln-btn-' + tab).addClass('active');
+            $('.vuln-panel').hide();
+            $('#vuln-' + tab + '-content').show();
+        }
 
-            if (method == "random") {
-                $("#btn-forceatlas").removeClass("active");
-                $("#btn-random").addClass("active");
-                refresh();
-            }
-
-            if (method == "download") {
-                s.renderers[0].snapshot({download: true});
-            }
+        // Legacy graphEvents - redirects to vulnerabilities
+        function graphEvents(instanceId) {
+            viewVulnerabilities(instanceId);
         }
 
         // Scan status
@@ -2208,11 +2099,6 @@
                 }
             }
 
-            if (currentSection == "btn-graph") {
-                sf.log("Loading visualisation for scan: " + instanceId);
-                efr.src = '${docroot}/scanviz?id=' + instanceId + '&gexf=1';
-            }
-
             $("#loader").fadeOut(500);
         }
 
@@ -2232,10 +2118,18 @@
             $("#btn-search").hide();
             $("#scanreminder").hide();
             navTo("btn-info");
+            scanLogLoaded = false;
             refresh = function() { viewScanConfig(instanceId); }
             sf.fetchData('${docroot}/scanopts', {'id': instanceId}, function(data) {
-                table = "<div id='scansummary-content'>";
+                var table = "<div id='scansummary-content'>";
+
+                // Meta Information - collapsible, collapsed by default
+                table += "<div class='manage-section'>";
+                table += "<div class='manage-section-header collapsed' onclick='toggleManageSection(this)'>";
+                table += "<i class='glyphicon glyphicon-chevron-right section-chevron'></i>";
                 table += "<h4>Meta Information</h4>";
+                table += "</div>";
+                table += "<div class='manage-section-body' style='display:none'>";
                 table += "<table class='table table-bordered table-striped'>";
                 table += "<tr><td>Name:</td><td>" + data['meta'][0] + "</td></tr>";
                 table += "<tr><td>Internal ID:</td><td>${id}</td></tr>";
@@ -2244,7 +2138,15 @@
                 table += "<tr><td>Completed:</td><td>" + data['meta'][4] + "</td></tr>";
                 table += "<tr><td>Status:</td><td>" + data['meta'][5] + "</td></tr>";
                 table += "</table>";
+                table += "</div></div>";
+
+                // Global Settings - collapsible, collapsed by default
+                table += "<div class='manage-section'>";
+                table += "<div class='manage-section-header collapsed' onclick='toggleManageSection(this)'>";
+                table += "<i class='glyphicon glyphicon-chevron-right section-chevron'></i>";
                 table += "<h4>Global Settings</h4>";
+                table += "</div>";
+                table += "<div class='manage-section-body' style='display:none'>";
                 table += "<table class='table table-bordered table-striped' style='table-layout: fixed'>";
                 table += "<thead><tr><th>Option</th><th>Value</th></tr></thead><tbody>";
                 for (var key in data['config']) {
@@ -2253,28 +2155,110 @@
                     }
                     table += "<tr><td width=100%>" + data['configdesc'][key] + "</td><td>" + data['config'][key] + "</td></tr>";
                 }
-                table += "</table>";
+                table += "</tbody></table>";
+                table += "</div></div>";
+
+                // Module Settings - collapsible, collapsed by default
+                table += "<div class='manage-section'>";
+                table += "<div class='manage-section-header collapsed' onclick='toggleManageSection(this)'>";
+                table += "<i class='glyphicon glyphicon-chevron-right section-chevron'></i>";
                 table += "<h4>Module Settings</h4>";
+                table += "</div>";
+                table += "<div class='manage-section-body' style='display:none'>";
                 table += "<div class='table-responsive'><table class='table table-bordered table-striped' style='table-layout: fixed'>";
                 table += "<thead><tr><th>Module</th> <th>Option</th> <th>Value</th></tr></thead><tbody>";
-                keys = [];
+                var keys = [];
                 for (var key in data['config']) {
                     keys.push(key);
                 }
-                keys_s = keys.sort();
-
+                var keys_s = keys.sort();
                 for (var i = 0; i < keys_s.length; i++) {
-                    key = keys_s[i];
+                    var key = keys_s[i];
                     if (key.indexOf(":") > 0) {
-                        bits = key.split(":");
+                        var bits = key.split(":");
                         table += "<tr><td>" + bits[0] + "</td><td>" + data['configdesc'][key] + "</td><td>" + data['config'][key] + "</td></tr>";
                     }
                 }
-                table += "</table></div></div>";
+                table += "</tbody></table></div>";
+                table += "</div></div>";
+
+                // Scan Log - collapsible button at the bottom
+                table += "<div class='manage-section'>";
+                table += "<div class='manage-section-header collapsed' id='scan-log-header' onclick='toggleScanLog(this, \"" + instanceId + "\")'>";
+                table += "<i class='glyphicon glyphicon-chevron-right section-chevron'></i>";
+                table += "<h4><i class='glyphicon glyphicon-book'></i>&nbsp;Scan Log</h4>";
+                table += "</div>";
+                table += "<div class='manage-section-body' id='scan-log-body' style='display:none'>";
+                table += "<div id='scan-log-loader' style='text-align:center; padding: 20px; display:none'><img src=\"${docroot}/static/img/loader.gif\"></div>";
+                table += "<div id='scan-log-content'></div>";
+                table += "</div></div>";
+
+                table += "</div>";
 
                 $("#loader").fadeOut(500);
                 $("#mainbody").append(table);
             });
+        }
+
+        // Toggle collapsible manage sections
+        function toggleManageSection(header) {
+            var $header = $(header);
+            var $body = $header.next('.manage-section-body');
+            var $chevron = $header.find('.section-chevron');
+
+            if ($header.hasClass('collapsed')) {
+                $header.removeClass('collapsed');
+                $chevron.removeClass('glyphicon-chevron-right').addClass('glyphicon-chevron-down');
+                $body.slideDown(200);
+            } else {
+                $header.addClass('collapsed');
+                $chevron.removeClass('glyphicon-chevron-down').addClass('glyphicon-chevron-right');
+                $body.slideUp(200);
+            }
+        }
+
+        // Toggle scan log section - fetches logs on first expand
+        var scanLogLoaded = false;
+        function toggleScanLog(header, instanceId) {
+            var $header = $(header);
+            var $body = $('#scan-log-body');
+            var $chevron = $header.find('.section-chevron');
+
+            if ($header.hasClass('collapsed')) {
+                $header.removeClass('collapsed');
+                $chevron.removeClass('glyphicon-chevron-right').addClass('glyphicon-chevron-down');
+                $body.slideDown(200);
+
+                // Fetch logs on first expand
+                if (!scanLogLoaded) {
+                    scanLogLoaded = true;
+                    $('#scan-log-loader').show();
+                    sf.fetchData('${docroot}/scanlog', {'id': instanceId}, function(data) {
+                        var logTable = "<table class='table table-bordered table-striped table-condensed small tablesorter' style='table-layout: fixed'>";
+                        logTable += "<thead><tr><th>Time</th><th>Component</th><th>Type</th><th>Event</th></tr></thead><tbody>";
+                        for (var i = 0; i < data.length; i++) {
+                            if (data[i][2] == "ERROR") {
+                                logTable += "<tr class='danger'>";
+                            } else {
+                                logTable += "<tr>";
+                            }
+                            logTable += "<td>" + data[i][0] + "</td>";
+                            logTable += "<td>" + data[i][1] + "</td>";
+                            logTable += "<td>" + data[i][2] + "</td>";
+                            logTable += "<td>" + data[i][3] + "</td>";
+                            logTable += "</tr>";
+                        }
+                        logTable += "</tbody></table>";
+                        $('#scan-log-loader').hide();
+                        $('#scan-log-content').html(logTable);
+                        $('#scan-log-content .tablesorter').tablesorter({widgets: ["filter"], widgetOptions : { filter_searchDelay : 300, filter_hideFilters : false }});
+                    });
+                }
+            } else {
+                $header.addClass('collapsed');
+                $chevron.removeClass('glyphicon-chevron-down').addClass('glyphicon-chevron-right');
+                $body.slideUp(200);
+            }
         }
 
         if ("${status}" == "CREATED" || "${status}" == "RUNNING" || "${status}" == "STARTING" || "${status}" == "STARTED" || "${status}" == "UNKNOWN" || "${status}" == "INITIALIZING") {
