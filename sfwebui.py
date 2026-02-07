@@ -845,6 +845,96 @@ class SpiderFootWebUi:
         return self.error("Invalid export filetype.")
 
     @cherrypy.expose
+    def scandiscoverypathexport(self: 'SpiderFootWebUi', id: str, eventType: str, filetype: str = "csv", dialect: str = "excel") -> str:
+        """Export discovery path data as CSV or Excel.
+
+        Flattens the hierarchical discovery path tree into table rows,
+        each showing the leaf data, its type, source module, and the
+        full root-to-leaf lineage.
+
+        Args:
+            id (str): scan ID
+            eventType (str): event type filter
+            filetype (str): "csv" or "xlsx"/"excel"
+            dialect (str): CSV dialect (default: excel)
+
+        Returns:
+            str: CSV or Excel data as file download
+        """
+        dbh = SpiderFootDb(self.config)
+        pc = dict()
+        datamap = dict()
+
+        try:
+            leafSet = dbh.scanResultEvent(id, eventType, filterFp=True)
+            [datamap, pc] = dbh.scanElementSourcesAll(id, leafSet)
+        except Exception:
+            cherrypy.response.headers['Content-Disposition'] = 'attachment; filename=SpiderFoot-DiscoveryPath.csv'
+            cherrypy.response.headers['Content-Type'] = 'application/csv'
+            cherrypy.response.headers['Pragma'] = 'no-cache'
+            return b''
+
+        if 'ROOT' in pc:
+            del pc['ROOT']
+        tree = SpiderFootHelpers.dataParentChildToTree(pc)
+
+        # Flatten the tree into rows by walking from root to each leaf
+        rows = []
+
+        def walk(node, path_so_far):
+            node_name = node.get('name', '')
+            node_data = datamap.get(node_name)
+            current_path = list(path_so_far)
+            if node_data and str(node_data[4]) != 'ROOT':
+                data_str = str(node_data[1]).replace('<SFURL>', '').replace('</SFURL>', '')
+                current_path.append(data_str)
+
+            children = node.get('children')
+            if not children:
+                # Leaf node - emit a row
+                if node_data and str(node_data[4]) != 'ROOT':
+                    leaf_data = str(node_data[1]).replace('<SFURL>', '').replace('</SFURL>', '')
+                    rows.append([
+                        str(node_data[10]),  # Type (event_descr)
+                        str(node_data[3]),   # Source Module
+                        leaf_data,           # Data
+                        ' -> '.join(current_path)  # Discovery Path
+                    ])
+            else:
+                for child in children:
+                    walk(child, current_path)
+
+        if tree:
+            walk(tree, [])
+
+        column_names = ["Type", "Source Module", "Data", "Discovery Path"]
+
+        if filetype.lower() in ["xlsx", "excel"]:
+            # buildExcel pops sheetNameIndex column to use as sheet name,
+            # so prepend Type as the sheet name column
+            excel_rows = []
+            for row in rows:
+                excel_rows.append([row[0]] + list(row))
+            excel_col_names = ["Type"] + column_names
+
+            cherrypy.response.headers['Content-Disposition'] = 'attachment; filename=SpiderFoot-DiscoveryPath.xlsx'
+            cherrypy.response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            cherrypy.response.headers['Pragma'] = 'no-cache'
+            return self.buildExcel(excel_rows, excel_col_names, sheetNameIndex=0)
+
+        # Default: CSV
+        fileobj = StringIO()
+        parser = csv.writer(fileobj, dialect=dialect)
+        parser.writerow(column_names)
+        for row in rows:
+            parser.writerow(row)
+
+        cherrypy.response.headers['Content-Disposition'] = 'attachment; filename=SpiderFoot-DiscoveryPath.csv'
+        cherrypy.response.headers['Content-Type'] = 'application/csv'
+        cherrypy.response.headers['Pragma'] = 'no-cache'
+        return fileobj.getvalue().encode('utf-8')
+
+    @cherrypy.expose
     def scaneventresultexportmulti(self: 'SpiderFootWebUi', ids: str, filetype: str = "csv", dialect: str = "excel", export_mode: str = "full", legacy: str = "0") -> str:
         """Get scan event result data in CSV, Excel, or HTML format for multiple
         scans.
