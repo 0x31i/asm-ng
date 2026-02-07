@@ -920,8 +920,10 @@ class SpiderFootWebUi:
                 prefix = "Root"
             elif d == max_depth - 1 and max_depth > 1:
                 prefix = "Leaf"
+            elif max_depth <= 3:
+                prefix = "Parent"
             else:
-                prefix = f"Node {d + 1}"
+                prefix = f"Parent {d}"
             column_names.extend([f"{prefix} Type", f"{prefix} Source Module", f"{prefix} Data"])
 
         # Build rows in leafSet order (same as full data view)

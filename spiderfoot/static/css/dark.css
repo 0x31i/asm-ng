@@ -5410,7 +5410,21 @@ button[data-target="#createWorkspaceModal"]:hover,
 .discovery-path-cell .dp-type strong,
 .discovery-path-cell .dp-module strong,
 .discovery-path-cell .dp-data strong {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.discovery-path-cell .dp-value {
+  color: #e5e7eb;
+  font-weight: 500;
+}
+
+/* Expand/collapse toggle in dark mode */
+.dp-collapsed .dp-expand-toggle::after {
+  border-left-color: rgba(255, 255, 255, 0.5);
+}
+
+.dp-expanded .dp-expand-toggle::after {
+  border-top-color: rgba(255, 255, 255, 0.5);
 }
 
 /* Responsive adjustments */

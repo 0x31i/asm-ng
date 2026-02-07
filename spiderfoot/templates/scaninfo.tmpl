@@ -1978,7 +1978,11 @@
                     table += "<th class='text-center validation-status' " + thStyle + ">Status</th>";
                     // Dynamic node columns: Root on left, Leaf on right
                     for (var d = 0; d < maxDepth; d++) {
-                        var colLabel = (d === 0) ? "Root" : (d === maxDepth - 1 ? "Leaf" : "Node " + (d + 1));
+                        var colLabel;
+                        if (d === 0) colLabel = "Root";
+                        else if (d === maxDepth - 1) colLabel = "Leaf";
+                        else if (maxDepth <= 3) colLabel = "Parent";
+                        else colLabel = "Parent " + d;
                         table += "<th " + thStyle + ">" + colLabel + "</th>";
                     }
                     table += "</tr></thead><tbody>";
@@ -2013,29 +2017,29 @@
                         table += "</td>";
 
                         // Node columns (Root -> ... -> Leaf)
+                        function buildCell(type, module, data) {
+                            var html = "<td class='discovery-path-cell dp-collapsed'>";
+                            html += "<div class='dp-type'><strong>TYPE:</strong> <span class='dp-value'>" + type + "</span></div>";
+                            html += "<div class='dp-module'><strong>SOURCE MODULE:</strong> <span class='dp-value'>" + module + "</span></div>";
+                            html += "<div class='dp-data'><strong>DATA:</strong> <span class='dp-value'>" + data + "</span></div>";
+                            html += "<div class='dp-expand-toggle' title='Click to expand'></div>";
+                            html += "</td>";
+                            return html;
+                        }
+
                         if (path && path.length > 0) {
                             for (var n = 0; n < maxDepth; n++) {
                                 if (n < path.length) {
-                                    var node = path[n];
-                                    table += "<td class='discovery-path-cell'>";
-                                    table += "<div class='dp-type'><strong>TYPE:</strong> " + node.type + "</div>";
-                                    table += "<div class='dp-module'><strong>SOURCE MODULE:</strong> " + node.module + "</div>";
-                                    table += "<div class='dp-data'><strong>DATA:</strong> " + node.data + "</div>";
-                                    table += "</td>";
+                                    table += buildCell(path[n].type, path[n].module, path[n].data);
                                 } else {
                                     table += "<td></td>";
                                 }
                             }
                         } else {
-                            // No path found - fill with leaf data in last column
                             for (var n = 0; n < maxDepth - 1; n++) {
                                 table += "<td></td>";
                             }
-                            table += "<td class='discovery-path-cell'>";
-                            table += "<div class='dp-type'><strong>TYPE:</strong> " + d[10] + "</div>";
-                            table += "<div class='dp-module'><strong>SOURCE MODULE:</strong> " + d[3] + "</div>";
-                            table += "<div class='dp-data'><strong>DATA:</strong> " + sf.remove_sfurltag(d[1]) + "</div>";
-                            table += "</td>";
+                            table += buildCell(d[10], d[3], sf.remove_sfurltag(d[1]));
                         }
 
                         table += "</tr>";
@@ -2045,6 +2049,28 @@
                     $("#loader").fadeOut(500);
                     $("#mainbody").append(statsBar + table);
                     $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false }, 1: { sorter: false } } });
+
+                    // Show expand toggle only on cells that are actually truncated
+                    $("#scansummary-content .discovery-path-cell").each(function() {
+                        var cell = $(this);
+                        var hasOverflow = false;
+                        cell.find('.dp-type, .dp-module, .dp-data').each(function() {
+                            if (this.scrollWidth > this.clientWidth) {
+                                hasOverflow = true;
+                            }
+                        });
+                        if (!hasOverflow) {
+                            cell.find('.dp-expand-toggle').hide();
+                            cell.removeClass('dp-collapsed');
+                        }
+                    });
+
+                    // Click handler for expand/collapse toggle
+                    $(document).on('click', '.dp-expand-toggle', function(e) {
+                        e.stopPropagation();
+                        var cell = $(this).closest('.discovery-path-cell');
+                        cell.toggleClass('dp-collapsed dp-expanded');
+                    });
 
                     // Apply any active client-side filters
                     if (clientFilterState.fp || clientFilterState.validated || clientFilterState.imported) {
