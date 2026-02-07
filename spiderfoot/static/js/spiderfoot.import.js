@@ -25,7 +25,7 @@ $(document).ready(function() {
         'legacy':    { accept: '.csv', hint: 'ACCEPTED FORMAT: CSV' },
         'scan':      { accept: '.csv', hint: 'ACCEPTED FORMAT: CSV' },
         'burp':      { accept: '.xml', hint: 'ACCEPTED FORMAT: XML (BURP SUITE EXPORT)' },
-        'burp_html': { accept: '.html,.htm', hint: 'ACCEPTED FORMAT: HTML (BURP SUITE PRO REPORT)' },
+        'burp_html': { accept: '.html,.htm', hint: 'ACCEPTED FORMAT: HTML (BURP SUITE PRO REPORT) - ENHANCES EXISTING BURP XML DATA' },
         'nessus':    { accept: '.nessus,.xml', hint: 'ACCEPTED FORMAT: NESSUS (.nessus)' }
     };
 
@@ -35,7 +35,11 @@ $(document).ready(function() {
 
         // Disabled cards show alert
         if ($(this).hasClass('import-card-disabled')) {
-            alertify.warning($(this).find('.import-card-title').text() + ' IMPORT IS COMING SOON.');
+            if (importType === 'burp_html') {
+                alertify.warning('HTML ENHANCE works from within a scan. Import Burp XML first, then use the HTML ENHANCE button in the scan\'s BURP tab.');
+            } else {
+                alertify.warning($(this).find('.import-card-title').text() + ' IMPORT IS COMING SOON.');
+            }
             return;
         }
 

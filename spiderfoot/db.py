@@ -4557,6 +4557,123 @@ class SpiderFootDb:
                 raise IOError(
                     "SQL error encountered when storing Burp results") from e
 
+    def scanBurpEnhance(self, instanceId: str, enhancements: list) -> dict:
+        """Enhance existing Burp results with additional data from HTML reports.
+
+        Matches existing records by plugin_name and updates fields that are
+        empty/missing in the existing record but present in the enhancement data.
+        Also fills in host_ip and host_name if they are missing.
+
+        Args:
+            instanceId (str): scan instance ID
+            enhancements (list): list of dicts with enhanced Burp data (from HTML parsing)
+
+        Returns:
+            dict: stats with 'enhanced', 'added', 'skipped' counts
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(
+                f"instanceId is {type(instanceId)}; expected str()") from None
+
+        import time
+        now = int(time.time())
+
+        stats = {'enhanced': 0, 'added': 0, 'skipped': 0}
+
+        # Map from result dict keys to DB column names
+        field_to_col = {
+            'host_ip': 'host_ip',
+            'host_name': 'host_name',
+            'issue_type': 'issue_type',
+            'path': 'path',
+            'location': 'location',
+            'confidence': 'confidence',
+            'issue_background': 'issue_background',
+            'issue_detail': 'issue_detail',
+            'solutions': 'solutions',
+            'see_also': 'see_also',
+            'references': 'reference_links',
+            'vulnerability_classifications': 'vulnerability_classifications',
+            'request': 'request',
+            'response': 'response',
+        }
+
+        with self.dbhLock:
+            try:
+                # Fetch existing records for this scan
+                ph = '?' if self.db_type == 'sqlite' else '%s'
+                self.dbh.execute(
+                    f"SELECT id, plugin_name, host_ip, host_name, issue_type, "
+                    f"path, location, confidence, issue_background, issue_detail, "
+                    f"solutions, see_also, reference_links, vulnerability_classifications, "
+                    f"request, response FROM tbl_scan_burp_results "
+                    f"WHERE scan_instance_id = {ph}", [instanceId]
+                )
+                existing_rows = self.dbh.fetchall()
+
+                # Build lookup: plugin_name -> list of (id, field_values)
+                existing_by_name = {}
+                for row in existing_rows:
+                    row_id = row[0]
+                    plugin_name = row[1] or ''
+                    fields = {
+                        'host_ip': row[2] or '',
+                        'host_name': row[3] or '',
+                        'issue_type': row[4] or '',
+                        'path': row[5] or '',
+                        'location': row[6] or '',
+                        'confidence': row[7] or '',
+                        'issue_background': row[8] or '',
+                        'issue_detail': row[9] or '',
+                        'solutions': row[10] or '',
+                        'see_also': row[11] or '',
+                        'reference_links': row[12] or '',
+                        'vulnerability_classifications': row[13] or '',
+                        'request': row[14] or '',
+                        'response': row[15] or '',
+                    }
+                    if plugin_name not in existing_by_name:
+                        existing_by_name[plugin_name] = []
+                    existing_by_name[plugin_name].append({'id': row_id, 'fields': fields})
+
+                for enh in enhancements:
+                    plugin_name = str(enh.get('plugin_name', ''))
+                    if not plugin_name:
+                        stats['skipped'] += 1
+                        continue
+
+                    matches = existing_by_name.get(plugin_name, [])
+                    if not matches:
+                        stats['skipped'] += 1
+                        continue
+
+                    # Enhance each matching record
+                    for match in matches:
+                        updates = []
+                        values = []
+                        for enh_key, col_name in field_to_col.items():
+                            new_val = str(enh.get(enh_key, '')).strip()
+                            existing_val = match['fields'].get(col_name, '').strip()
+                            if new_val and not existing_val:
+                                updates.append(f"{col_name} = {ph}")
+                                values.append(new_val)
+
+                        if updates:
+                            values.append(match['id'])
+                            update_sql = f"UPDATE tbl_scan_burp_results SET {', '.join(updates)} WHERE id = {ph}"
+                            self.dbh.execute(update_sql, values)
+                            stats['enhanced'] += 1
+
+                self.conn.commit()
+                return stats
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError(
+                    "SQL error encountered when enhancing Burp results") from e
+
     def scanBurpList(self, instanceId: str) -> list:
         """Obtain a list of Burp results imported for a scan.
 

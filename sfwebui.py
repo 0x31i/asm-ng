@@ -1850,9 +1850,9 @@ class SpiderFootWebUi:
         if import_type == 'burp':
             return self._processBurpImport(content, scan_name, target, importfile, is_dry_run)
 
-        # Handle Burp HTML import
+        # Handle Burp HTML Enhance (requires existing scan with Burp XML data)
         if import_type == 'burp_html':
-            return self._processBurpHtmlImport(content, scan_name, target, importfile, is_dry_run)
+            return self._processBurpHtmlEnhance(content, scan_name, target, importfile, is_dry_run)
 
         # Parse CSV for legacy/scan imports
         try:
@@ -2408,13 +2408,16 @@ class SpiderFootWebUi:
             'errors': [],
         }
 
-    def _processBurpHtmlImport(self, content: str, scan_name: str, target: str,
-                               importfile=None, is_dry_run: bool = False,
-                               existing_scan_id: str = None) -> dict:
-        """Parse and import a Burp Suite Pro HTML report.
+    def _processBurpHtmlEnhance(self, content: str, scan_name: str, target: str,
+                                importfile=None, is_dry_run: bool = False,
+                                existing_scan_id: str = None) -> dict:
+        """Parse a Burp Suite Pro HTML report and enhance existing Burp XML results.
 
-        Parses the classic Burp Pro HTML report format. Uses sequential
-        iteration over all elements to handle nested structures reliably.
+        Parses the classic Burp Pro HTML report format and matches findings
+        against existing Burp XML results by plugin_name. For each match,
+        empty fields in the existing record are filled with data from the
+        HTML report (issue_detail, issue_background, solutions, references,
+        vulnerability_classifications, host_ip, host_name, request, response).
 
         Structure:
           BODH0 = issue type group (e.g. "1. TLS cookie without secure flag set")
@@ -2425,14 +2428,14 @@ class SpiderFootWebUi:
 
         Args:
             content (str): HTML file content
-            scan_name (str): optional scan name
-            target (str): optional target
+            scan_name (str): optional scan name (unused for enhance)
+            target (str): optional target (unused for enhance)
             importfile: uploaded file object (for filename)
             is_dry_run (bool): if True, validate only
-            existing_scan_id (str): if set, import into existing scan
+            existing_scan_id (str): scan ID to enhance (required)
 
         Returns:
-            dict: import results
+            dict: enhance results
         """
         try:
             from bs4 import BeautifulSoup, Tag
@@ -2704,61 +2707,50 @@ class SpiderFootWebUi:
             filename = getattr(importfile, 'filename', 'burp_html_import')
             scan_name = f'Burp HTML Import: {filename.rsplit(".", 1)[0] if "." in filename else filename}'
 
+        if not existing_scan_id:
+            return {'success': False, 'message': 'HTML ENHANCE requires an existing scan with Burp XML data. Import Burp XML first, then use HTML ENHANCE to add details.'}
+
         if is_dry_run:
             severity_counts = {}
             for r in results:
                 sev = r['severity'] or 'Unknown'
                 severity_counts[sev] = severity_counts.get(sev, 0) + 1
 
+            # Check how many existing records could be matched
+            dbh = SpiderFootDb(self.config)
+            existing_count = dbh.scanBurpCount(existing_scan_id)
+            html_names = set(r['plugin_name'] for r in results if r['plugin_name'])
+
             return {
                 'success': True,
                 'dry_run': True,
-                'message': f'Validation passed. {len(results)} issues found across {len(hosts_seen)} host(s).',
+                'message': f'Validation passed. {len(results)} issues parsed from HTML across {len(hosts_seen)} host(s). {existing_count} existing Burp records will be checked for enhancement.',
                 'rows_read': len(results),
                 'rows_imported': len(results),
                 'rows_skipped': 0,
-                'event_types_count': len(severity_counts),
+                'event_types_count': len(html_names),
                 'errors': [],
             }
 
-        # Actual import
+        # Actual enhance
         dbh = SpiderFootDb(self.config)
-        scan_id = existing_scan_id
-
-        if not scan_id:
-            scan_id = str(uuid.uuid4())
-            try:
-                dbh.scanInstanceCreate(scan_id, scan_name, target)
-                root_qry = """INSERT INTO tbl_scan_results
-                    (scan_instance_id, hash, type, generated, confidence,
-                    visibility, risk, module, data, false_positive, source_event_hash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
-                root_qvals = [scan_id, 'ROOT', 'ROOT', int(time.time() * 1000),
-                              100, 100, 0, '', target, 0, 'ROOT']
-                dbh.dbh.execute(root_qry, root_qvals)
-                dbh.conn.commit()
-            except Exception as e:
-                return {'success': False, 'message': f'Failed to create scan instance: {e}'}
 
         try:
-            count = dbh.scanBurpStore(scan_id, results)
+            stats = dbh.scanBurpEnhance(existing_scan_id, results)
         except Exception as e:
-            return {'success': False, 'message': f'Failed to store Burp HTML results: {e}'}
-
-        if not existing_scan_id:
-            dbh.scanInstanceSet(scan_id, status='FINISHED', ended=time.time() * 1000)
+            return {'success': False, 'message': f'Failed to enhance Burp results: {e}'}
 
         return {
             'success': True,
             'dry_run': False,
-            'message': f'Successfully imported {count} Burp issues from HTML report into scan "{scan_name}".',
-            'scan_id': scan_id,
+            'message': f'Enhanced {stats["enhanced"]} existing Burp records with HTML data. {stats["skipped"]} HTML issues had no matching XML record.',
+            'scan_id': existing_scan_id,
             'rows_read': len(results),
-            'rows_imported': count,
-            'rows_skipped': 0,
+            'rows_imported': stats['enhanced'],
+            'rows_skipped': stats['skipped'],
             'fps_imported': 0,
             'validated_imported': 0,
-            'event_types_count': len(set(r['severity'] for r in results if r['severity'])),
+            'event_types_count': len(set(r['plugin_name'] for r in results if r['plugin_name'])),
             'errors': [],
         }
 
@@ -4681,14 +4673,18 @@ class SpiderFootWebUi:
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def importburphtml(self: 'SpiderFootWebUi', id: str = None, importfile=None) -> dict:
-        """Import Burp results from an HTML report into an existing scan.
+        """Enhance existing Burp results with data from an HTML report.
+
+        Parses the HTML report and merges additional details (issue_detail,
+        issue_background, solutions, references, etc.) into existing Burp
+        XML results matched by plugin_name.
 
         Args:
-            id (str): scan instance ID
+            id (str): scan instance ID (must already have Burp XML data)
             importfile: uploaded .html file
 
         Returns:
-            dict: import results
+            dict: enhance results
         """
         if not id:
             return {'success': False, 'message': 'No scan ID provided.'}
@@ -4705,8 +4701,8 @@ class SpiderFootWebUi:
         if not content.strip():
             return {'success': False, 'message': 'Uploaded file is empty.'}
 
-        return self._processBurpHtmlImport(content, None, None, importfile,
-                                           is_dry_run=False, existing_scan_id=id)
+        return self._processBurpHtmlEnhance(content, None, None, importfile,
+                                            is_dry_run=False, existing_scan_id=id)
 
     @cherrypy.expose
     def scanfindingsexport(self: 'SpiderFootWebUi', id: str, filetype: str = "xlsx") -> str:
