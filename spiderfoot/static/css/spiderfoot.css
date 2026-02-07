@@ -6174,9 +6174,8 @@ i.glyphicon-white,
   line-height: 1.4;
   vertical-align: middle;
   border-bottom: 1px solid var(--glass-border);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .findings-table tbody td:first-child {
@@ -6220,9 +6219,7 @@ i.glyphicon-white,
 }
 
 .finding-row.finding-expanded td {
-  white-space: normal;
   overflow: visible;
-  text-overflow: clip;
 }
 
 /* Type link styling */
