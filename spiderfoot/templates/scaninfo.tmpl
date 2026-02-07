@@ -1958,9 +1958,9 @@
                         html += "<td><div class='cell-clamp'>" + (data[i][2] || '') + "</div></td>";
                         // Type column as clickable link
                         if (typeVal === 'EXTERNAL_VULNERABILITIES') {
-                            html += "<td><div class='cell-clamp'><a class='finding-type-link' onclick='event.stopPropagation(); viewVulnerabilities(\"" + instanceId + "\");' title='View External Vulnerabilities (Nessus)'>" + typeVal + "</a></div></td>";
+                            html += "<td><div class='cell-clamp'><a class='finding-type-link' onclick='event.stopPropagation(); viewVulnerabilities(\"" + instanceId + "\"); window.scrollTo(0,0);' title='View External Vulnerabilities (Nessus)'>" + typeVal + "</a></div></td>";
                         } else if (typeVal === 'WEBAPP_VULNERABILITIES') {
-                            html += "<td><div class='cell-clamp'><a class='finding-type-link' onclick='event.stopPropagation(); viewVulnerabilities(\"" + instanceId + "\"); setTimeout(function(){ switchVulnTab(\"burp\", \"" + instanceId + "\"); }, 300);' title='View Web App Vulnerabilities (Burp)'>" + typeVal + "</a></div></td>";
+                            html += "<td><div class='cell-clamp'><a class='finding-type-link' onclick='event.stopPropagation(); viewVulnerabilities(\"" + instanceId + "\"); switchVulnTab(\"burp\", \"" + instanceId + "\"); window.scrollTo(0,0);' title='View Web App Vulnerabilities (Burp)'>" + typeVal + "</a></div></td>";
                         } else if (typeVal) {
                             html += "<td><div class='cell-clamp'><a class='finding-type-link' onclick='event.stopPropagation(); browseEventData(\"" + instanceId + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"full\");' title='Browse " + typeVal + " data'>" + typeVal + "</a></div></td>";
                         } else {
