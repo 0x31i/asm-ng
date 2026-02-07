@@ -74,7 +74,7 @@
         <div class="btn-group" role="group">
             <button id='btn-refresh' rel="tooltip" title="Refresh" class="btn btn-success btn-default" onClick='refresh()'><i class='glyphicon glyphicon-refresh glyphicon glyphicon-white'></i></button>
             <a id='btn-export' rel="tooltip" data-title="Export Data" class="btn btn-default dropdown-toggle download-button" data-toggle="dropdown"><i class='glyphicon glyphicon-download-alt glyphicon glyphicon-white'></i></a>
-            <ul class="dropdown-menu">
+            <ul id="export-dropdown-menu" class="dropdown-menu">
               <li class="dropdown-header">Full Data (All Results)</li>
               <li><a class='link' onClick='exportEventData("${id}", currentType, "csv", "full")'>CSV</a></li>
               <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "full")'>Excel</a></li>
@@ -190,6 +190,7 @@
         var dataloaders = [];
         var sharedSigma = "";
         var loadersrunning = false;
+        var defaultExportDropdownHtml = '';
         var refresh = function() { browseEventList("${id}"); }
         $('#searchvalue').popover({ 'trigger': 'focus', 'placement': 'bottom'});
         $('#searchvalue').keyup(function(event) {
@@ -780,6 +781,11 @@
             currentSection = target;
             updatePageTitle();
 
+            // Restore default export dropdown when navigating away from vulns
+            if (target !== 'btn-graph' && defaultExportDropdownHtml) {
+                $('#export-dropdown-menu').html(defaultExportDropdownHtml);
+            }
+
             $("#breadcrumbs").remove();
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
@@ -870,14 +876,25 @@
             $("#scanlogs-content").remove();
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
-            $("#btn-export").hide();
+            $("#btn-export").show();
             $("#btn-download-logs").hide();
             $("#btn-refresh").show();
             $("#btn-search").hide();
             $("#scanreminder").hide();
             navTo("btn-graph");
             vulnInstanceId = instanceId;
+            currentSection = 'btn-graph';
             refresh = function() { viewVulnerabilities(instanceId); }
+
+            // Save default export dropdown and replace with vuln-specific options
+            if (!defaultExportDropdownHtml) {
+                defaultExportDropdownHtml = $('#export-dropdown-menu').html();
+            }
+            var vulnExportHtml = '';
+            vulnExportHtml += "<li class='dropdown-header'>Vulnerability Export</li>";
+            vulnExportHtml += "<li><a class='link' onClick='exportEventData(\"" + instanceId + "\", \"\", \"csv\", \"full\")'>CSV (EXT-VULNS.csv + WEBAPP-VULNS.csv)</a></li>";
+            vulnExportHtml += "<li><a class='link' onClick='exportEventData(\"" + instanceId + "\", \"\", \"excel\", \"full\")'>Excel (VULNS.xlsx - two tabs)</a></li>";
+            $('#export-dropdown-menu').html(vulnExportHtml);
 
             var grid = "<div id='scansummary-content'>";
             grid += "<div class='vuln-container'>";
@@ -3278,6 +3295,14 @@
                         var urlBase = '${docroot}/scaneventresultexport?export_mode=' + exportMode + legacyParam + '&id=';
                     }
                     efr.src = urlBase + instanceId + '&type=' + eventType;
+                }
+            }
+
+            if (currentSection == "btn-graph") {
+                if (fileType == "excel") {
+                    efr.src = '${docroot}/scanvulnsexport?filetype=xlsx&id=' + instanceId;
+                } else {
+                    efr.src = '${docroot}/scanvulnsexport?filetype=csv&id=' + instanceId;
                 }
             }
 

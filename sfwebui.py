@@ -4723,6 +4723,159 @@ class SpiderFootWebUi:
                                             is_dry_run=False, existing_scan_id=id)
 
     @cherrypy.expose
+    def scanvulnsexport(self: 'SpiderFootWebUi', id: str, filetype: str = "xlsx") -> bytes:
+        """Export vulnerability scan results (Nessus and Burp).
+
+        For CSV: returns a zip archive containing EXT-VULNS.csv and WEBAPP-VULNS.csv.
+        For XLSX/Excel: returns a single VULNS.xlsx with two tabs (EXT-VULNS, WEBAPP-VULNS).
+
+        Args:
+            id (str): scan instance ID
+            filetype (str): export format (xlsx, excel, csv)
+
+        Returns:
+            bytes: exported file data
+        """
+        dbh = SpiderFootDb(self.config)
+
+        # --- Nessus data ---
+        nessus_headers = [
+            "Severity", "Severity Number", "Plugin Name", "Plugin ID",
+            "Host IP", "Host Name", "Operating System", "Description",
+            "Synopsis", "Solution", "See Also", "Service Name", "Port",
+            "Protocol", "Request", "Plugin Output", "CVSS3 Base Score", "Tracking"
+        ]
+        nessus_rows = []
+        try:
+            rows = dbh.scanNessusList(id)
+            tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
+            for row in rows:
+                nessus_rows.append([
+                    str(row[1] or ''),   # severity
+                    str(row[2] or ''),   # severity_number
+                    str(row[3] or ''),   # plugin_name
+                    str(row[4] or ''),   # plugin_id
+                    str(row[5] or ''),   # host_ip
+                    str(row[6] or ''),   # host_name
+                    str(row[7] or ''),   # operating_system
+                    str(row[8] or ''),   # description
+                    str(row[9] or ''),   # synopsis
+                    str(row[10] or ''),  # solution
+                    str(row[11] or ''),  # see_also
+                    str(row[12] or ''),  # service_name
+                    str(row[13] or ''),  # port
+                    str(row[14] or ''),  # protocol
+                    str(row[15] or ''),  # request
+                    str(row[16] or ''),  # plugin_output
+                    str(row[17] or ''),  # cvss3_base_score
+                    tracking_labels.get(int(row[18] or 0), 'OPEN'),  # tracking
+                ])
+        except Exception:
+            pass
+
+        # --- Burp data ---
+        burp_headers = [
+            "Severity", "Severity Number", "Host IP", "Host Name",
+            "Plugin Name", "Issue Type", "Path", "Location", "Confidence",
+            "Issue Background", "Issue Detail", "Solutions", "See Also",
+            "References", "Vulnerability Classifications",
+            "Request", "Response", "Tracking"
+        ]
+        burp_rows = []
+        try:
+            rows = dbh.scanBurpList(id)
+            tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
+            for row in rows:
+                burp_rows.append([
+                    str(row[1] or ''),   # severity
+                    str(row[2] or ''),   # severity_number
+                    str(row[3] or ''),   # host_ip
+                    str(row[4] or ''),   # host_name
+                    str(row[5] or ''),   # plugin_name
+                    str(row[6] or ''),   # issue_type
+                    str(row[7] or ''),   # path
+                    str(row[8] or ''),   # location
+                    str(row[9] or ''),   # confidence
+                    str(row[10] or ''),  # issue_background
+                    str(row[11] or ''),  # issue_detail
+                    str(row[12] or ''),  # solutions
+                    str(row[13] or ''),  # see_also
+                    str(row[14] or ''),  # reference_links
+                    str(row[15] or ''),  # vulnerability_classifications
+                    str(row[16] or ''),  # request
+                    str(row[17] or ''),  # response
+                    tracking_labels.get(int(row[18] or 0), 'OPEN'),  # tracking
+                ])
+        except Exception:
+            pass
+
+        if filetype.lower() in ["xlsx", "excel"]:
+            cherrypy.response.headers['Content-Disposition'] = 'attachment; filename=VULNS.xlsx'
+            cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            cherrypy.response.headers['Pragma'] = "no-cache"
+
+            import openpyxl
+            from io import BytesIO
+            wb = openpyxl.Workbook()
+
+            # EXT-VULNS sheet (Nessus)
+            ws_nessus = wb.active
+            ws_nessus.title = "EXT-VULNS"
+            for col_num, header in enumerate(nessus_headers, 1):
+                ws_nessus.cell(row=1, column=col_num, value=header)
+            for row_num, row_data in enumerate(nessus_rows, 2):
+                for col_num, cell_value in enumerate(row_data, 1):
+                    ws_nessus.cell(row=row_num, column=col_num, value=cell_value)
+
+            # WEBAPP-VULNS sheet (Burp)
+            ws_burp = wb.create_sheet("WEBAPP-VULNS")
+            for col_num, header in enumerate(burp_headers, 1):
+                ws_burp.cell(row=1, column=col_num, value=header)
+            for row_num, row_data in enumerate(burp_rows, 2):
+                for col_num, cell_value in enumerate(row_data, 1):
+                    ws_burp.cell(row=row_num, column=col_num, value=cell_value)
+
+            with BytesIO() as f:
+                wb.save(f)
+                f.seek(0)
+                return f.read()
+
+        if filetype.lower() == 'csv':
+            import csv
+            import zipfile
+            from io import StringIO, BytesIO
+
+            # Build EXT-VULNS.csv
+            nessus_buf = StringIO()
+            nessus_writer = csv.writer(nessus_buf, dialect='excel')
+            nessus_writer.writerow(nessus_headers)
+            for row in nessus_rows:
+                nessus_writer.writerow(row)
+            nessus_csv = nessus_buf.getvalue()
+
+            # Build WEBAPP-VULNS.csv
+            burp_buf = StringIO()
+            burp_writer = csv.writer(burp_buf, dialect='excel')
+            burp_writer.writerow(burp_headers)
+            for row in burp_rows:
+                burp_writer.writerow(row)
+            burp_csv = burp_buf.getvalue()
+
+            # Package into zip
+            zip_buf = BytesIO()
+            with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr('EXT-VULNS.csv', nessus_csv)
+                zf.writestr('WEBAPP-VULNS.csv', burp_csv)
+            zip_buf.seek(0)
+
+            cherrypy.response.headers['Content-Disposition'] = 'attachment; filename=VULNS-CSV.zip'
+            cherrypy.response.headers['Content-Type'] = "application/zip"
+            cherrypy.response.headers['Pragma'] = "no-cache"
+            return zip_buf.read()
+
+        return self.error("Invalid export file type.")
+
+    @cherrypy.expose
     @cherrypy.tools.json_out()
     def scannessussettracking(self: 'SpiderFootWebUi', id: str, resultId: str, tracking: str) -> dict:
         """Update tracking status for a Nessus result.
