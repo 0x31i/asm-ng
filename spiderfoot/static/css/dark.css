@@ -6246,7 +6246,7 @@ i.glyphicon-white,
 /* Correlations table column widths (matching findings 4-column layout) */
 .findings-table .col-corr-name { width: auto; }
 .findings-table .col-corr-type { width: 25%; }
-.findings-table .col-corr-elements { width: 100px; }
+.findings-table .col-corr-elements { width: 150px; }
 
 /* Correlation description panel - centered and wide */
 .corr-description-wrapper {
