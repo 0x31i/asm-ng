@@ -34,6 +34,7 @@
 <div class="tabbable tabs-left">
 <ul class="nav nav-pills nav-stacked col-md-3">
 <li id='tab_global' class="active"><a href="javascript:void(0)">Global</a></li>
+<li id='tab_gradeconfig'><a href='javascript:void(0)' onclick='switchTab("gradeconfig");'>Grade Configuration</a></li>
 % for mod in sorted(opts['__modules__'].keys()):
     <% keylist = dict((k, v) for k, v in opts['__modules__'][mod]['opts'].items() if not k.startswith('_')) %>
     % if len(keylist) > 0:
@@ -103,6 +104,185 @@
 </tbody>
 </table>
 </div>
+<div id='optsect_gradeconfig' class="tab-pane" style="display: none">
+<h4>Grade Configuration</h4>
+<p style="color: var(--text-secondary); margin-bottom: 15px;">
+Configure how the Overall Grade is calculated on scan summary pages.
+Each event type maps to a security category with scoring rules.
+Categories are weighted and combined into an overall letter grade (A-F).
+</p>
+
+<h5>Enable/Disable</h5>
+<table class='table table-bordered table-striped'>
+<tbody>
+<tr>
+  <td>Enable Overall Grade</td>
+  <td style='vertical-align: middle'>
+    <%
+        grade_enabled = opts.get('_grade_enabled', True)
+        ge_seltrue = "selected" if grade_enabled else ""
+        ge_selfalse = "" if grade_enabled else "selected"
+    %>
+    <select id='_grade_enabled' class='form-control'>
+      <option value=1 ${ge_seltrue}>True</option>
+      <option value=0 ${ge_selfalse}>False</option>
+    </select>
+  </td>
+</tr>
+</tbody>
+</table>
+
+<h5>Category Weights</h5>
+<p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">
+Adjust the weight of each category in the overall grade calculation.
+Weight 0 means the category is informational only and not counted in the overall score.
+</p>
+<table class='table table-bordered table-striped' id='grade-weights-table'>
+<thead><tr><th>Category</th><th>Weight (0.0 - 1.0)</th><th>Description</th></tr></thead>
+<tbody>
+<%
+    from spiderfoot.grade_config import DEFAULT_GRADE_CATEGORIES
+    import json as _json
+    _cat_overrides = {}
+    _cat_weights_str = opts.get('_grade_category_weights', '')
+    if _cat_weights_str and isinstance(_cat_weights_str, str) and _cat_weights_str.strip():
+        try:
+            _cat_overrides = _json.loads(_cat_weights_str)
+        except Exception:
+            pass
+%>
+% for cat_name in ['Network Security', 'Web App Security', 'Information Leakage', 'General Health', 'External Account Exposure', 'DNS Health', 'IP Reputation', 'Information / Reference']:
+<%
+    cat_info = DEFAULT_GRADE_CATEGORIES.get(cat_name, {})
+    cat_override = _cat_overrides.get(cat_name, {})
+    cat_weight = cat_override.get('weight', cat_info.get('weight', 0.0))
+    cat_desc = cat_info.get('description', '')
+    cat_input_id = 'grade_weight_' + cat_name.replace(' ', '_').replace('/', '_')
+%>
+<tr>
+  <td><span style="display:inline-block; width:4px; height:16px; border-radius:2px; background:${cat_info.get('color', '#6b7280')}; margin-right:8px; vertical-align:middle;"></span>${cat_name}</td>
+  <td style='vertical-align: middle; width: 150px;'>
+    <input id='${cat_input_id}' class='form-control grade-weight-input' type='number' step='0.1' min='0' max='1' value='${cat_weight}' data-category='${cat_name}'>
+  </td>
+  <td style='color: var(--text-muted); font-size: 12px;'>${cat_desc}</td>
+</tr>
+% endfor
+</tbody>
+</table>
+
+<h5>Grade Thresholds</h5>
+<p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">
+Define the score ranges for each letter grade. Scores are 0-100.
+</p>
+<table class='table table-bordered table-striped'>
+<thead><tr><th>Grade</th><th>Minimum Score</th></tr></thead>
+<tbody>
+<%
+    from spiderfoot.grade_config import DEFAULT_GRADE_THRESHOLDS
+    _thresh_overrides = None
+    _thresh_str = opts.get('_grade_thresholds', '')
+    if _thresh_str and isinstance(_thresh_str, str) and _thresh_str.strip():
+        try:
+            _thresh_overrides = _json.loads(_thresh_str)
+        except Exception:
+            pass
+    _thresholds = _thresh_overrides if _thresh_overrides else DEFAULT_GRADE_THRESHOLDS
+%>
+% for t in _thresholds:
+<tr>
+  <td><span style="display:inline-block; width:24px; height:20px; line-height:20px; text-align:center; border-radius:3px; color:#fff; font-weight:700; font-size:11px; background:${t.get('color', '#6b7280')};">${t['grade']}</span></td>
+  <td style='width: 150px;'>
+    <input id='grade_threshold_${t["grade"]}' class='form-control grade-threshold-input' type='number' min='0' max='100' value='${t["min"]}' data-grade='${t["grade"]}'>
+  </td>
+</tr>
+% endfor
+</tbody>
+</table>
+
+<h5>Advanced: Event Type Overrides (JSON)</h5>
+<p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">
+Override scoring rules for specific event types. Leave empty to use defaults.
+Format: <code>{"EVENT_TYPE": {"category": "...", "points": -10, "logic": "unverified_exists"}}</code>
+</p>
+<div class='form-group'>
+  <textarea id='_grade_event_overrides' class='form-control' rows='4' style='font-family: var(--font-mono); font-size: 12px;' placeholder='{"EVENT_TYPE": {"category": "Network Security", "points": -10, "logic": "unverified_exists"}}'>${opts.get('_grade_event_overrides', '')}</textarea>
+</div>
+
+<div style="margin-top: 15px;">
+  <button type="button" class="btn btn-default btn-sm" onclick="resetGradeConfig()">
+    <i class="glyphicon glyphicon-refresh"></i> Reset Grade Config to Defaults
+  </button>
+</div>
+
+<script>
+// Collect grade config into the hidden JSON fields before saving
+function collectGradeConfig() {
+    // Category weights
+    var weights = {};
+    $('.grade-weight-input').each(function() {
+        var cat = $(this).data('category');
+        var val = parseFloat($(this).val());
+        if (!isNaN(val)) {
+            weights[cat] = {"weight": val};
+        }
+    });
+    $('#_grade_category_weights').remove();
+    var cwInput = $('<input>').attr({type: 'hidden', id: '_grade_category_weights'}).val(JSON.stringify(weights));
+    $('#savesettingsform').append(cwInput);
+
+    // Thresholds
+    var thresholds = [];
+    var grades = ['A', 'B', 'C', 'D', 'F'];
+    for (var i = 0; i < grades.length; i++) {
+        var el = $('#grade_threshold_' + grades[i]);
+        if (el.length) {
+            thresholds.push({"min": parseInt(el.val()), "grade": grades[i]});
+        }
+    }
+    thresholds.sort(function(a, b) { return b.min - a.min; });
+    $('#_grade_thresholds').remove();
+    var gtInput = $('<input>').attr({type: 'hidden', id: '_grade_thresholds'}).val(JSON.stringify(thresholds));
+    $('#savesettingsform').append(gtInput);
+}
+
+function resetGradeConfig() {
+    if (!confirm('Reset all grade configuration to factory defaults?')) return;
+    // Reset weights
+    var defaults = {
+        'Network Security': 1.0, 'Web App Security': 1.0,
+        'Information Leakage': 0.8, 'General Health': 0.8,
+        'External Account Exposure': 0.7, 'DNS Health': 0.7,
+        'IP Reputation': 0.6, 'Information / Reference': 0.0
+    };
+    $('.grade-weight-input').each(function() {
+        var cat = $(this).data('category');
+        if (defaults[cat] !== undefined) $(this).val(defaults[cat]);
+    });
+    // Reset thresholds
+    $('#grade_threshold_A').val(90);
+    $('#grade_threshold_B').val(80);
+    $('#grade_threshold_C').val(70);
+    $('#grade_threshold_D').val(60);
+    $('#grade_threshold_F').val(0);
+    // Clear overrides
+    $('#_grade_event_overrides').val('');
+}
+
+// Hook into the save flow
+$(document).ready(function() {
+    // Intercept save to collect grade config
+    var origSaveHandler = null;
+    var saveBtn = document.getElementById('btn-save-changes');
+    if (saveBtn) {
+        var origClick = saveBtn.onclick;
+        saveBtn.addEventListener('click', function() {
+            collectGradeConfig();
+        }, true);
+    }
+});
+</script>
+</div>
+
 % for mod in sorted(opts['__modules__'].keys()):
     <%
         summary = opts['__modules__'][mod].get('descr') or 'No summary available.'

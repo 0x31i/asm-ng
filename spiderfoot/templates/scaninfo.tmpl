@@ -2420,6 +2420,15 @@
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-success' style='cursor: default;'>Info</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='corr-info' style='cursor: default;'>?</button></div>";
             grid += "</div></div></div></div></div>";
+
+            // Overall Grade panel
+            grid += "<div class='row'><div class='col-sm-12'>";
+            grid += "<div class='panel panel-default grade-panel'>";
+            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-certificate'></i>&nbsp;&nbsp;Overall Grade</div>";
+            grid += "<div class='panel-body' id='grade-panel-body'>";
+            grid += "<div style='text-align: center; padding: 20px; color: var(--text-muted);'>Calculating grade...</div>";
+            grid += "</div></div></div></div>";
+
             grid += "<div class='row'><div class='col-sm-12'>";
             grid += "<div class='panel panel-default'>";
             grid += "<div class='panel-heading'><i class='glyphicon glyphicon-stats'></i>&nbsp;&nbsp;Data Types</div><div class='panel-body'>";
@@ -2558,11 +2567,151 @@
                 }
             );
 
+            // Overall Grade loader
+            dataloaders.push(
+                function() {
+                    sf.fetchData('${docroot}/scangrade', {'id': instanceId}, function(data) {
+                        renderGradePanel(data, instanceId);
+                    });
+                }
+            );
+
             loadersrunning = true;
             for (var i = 0; i < dataloaders.length; i++) {
                 dataloaders[i]();
             }
             loadersrunning = false;
+        }
+
+        // Render the Overall Grade panel
+        function renderGradePanel(gradeData, instanceId) {
+            var panel = $('#grade-panel-body');
+
+            if (!gradeData || !gradeData.enabled) {
+                panel.html("<div style='text-align: center; padding: 15px; color: var(--text-muted);'>Grade calculation is disabled. Enable it in Settings.</div>");
+                return;
+            }
+
+            if (gradeData.error) {
+                panel.html("<div class='alert alert-warning' style='margin: 0;'>" + gradeData.error + "</div>");
+                return;
+            }
+
+            var grade = gradeData.overall_grade || '-';
+            var score = gradeData.overall_score || 0;
+            var categories = gradeData.categories || {};
+
+            // Category display order
+            var catOrder = [
+                'Network Security', 'Web App Security', 'Information Leakage',
+                'General Health', 'External Account Exposure', 'DNS Health',
+                'IP Reputation', 'Information / Reference'
+            ];
+
+            var html = '';
+
+            // Overview: grade badge + summary
+            html += "<div class='grade-overview'>";
+            html += "<div class='grade-badge-large grade-badge-" + grade + "'>";
+            html += "<span class='grade-letter'>" + grade + "</span>";
+            html += "<span class='grade-score'>" + score + "</span>";
+            html += "</div>";
+            html += "<div class='grade-summary-text'>";
+            html += "<h3>Overall Rating: " + score + " / 100</h3>";
+            html += "<p>Calculated from " + Object.keys(categories).length + " security categories based on scan findings.</p>";
+
+            // Show warning if scan is still running
+            if (scanStatus && scanStatus != 'FINISHED' && scanStatus != 'ABORTED' && scanStatus.indexOf('FAILED') < 0) {
+                html += "<span class='grade-scan-warning'><i class='glyphicon glyphicon-exclamation-sign'></i> Scan in progress &mdash; grade may change</span>";
+            }
+            html += "</div>";
+            html += "</div>";
+
+            // Category breakdown table
+            html += "<table class='grade-category-table'>";
+            html += "<thead><tr>";
+            html += "<th>Category</th>";
+            html += "<th>Raw Score</th>";
+            html += "<th>Adj Score</th>";
+            html += "<th>Score / 100</th>";
+            html += "<th>Grade</th>";
+            html += "</tr></thead>";
+            html += "<tbody>";
+
+            for (var ci = 0; ci < catOrder.length; ci++) {
+                var catName = catOrder[ci];
+                var cat = categories[catName];
+                if (!cat) continue;
+
+                var catId = 'grade-cat-' + ci;
+                var hasDetails = cat.details && cat.details.length > 0;
+
+                html += "<tr onclick='toggleGradeDetail(\"" + catId + "\")' title='Click to expand details'>";
+                html += "<td><div class='grade-cat-name'>";
+                html += "<div class='grade-cat-indicator' style='background:" + cat.color + "'></div>";
+                html += "<span>" + catName + "</span>";
+                if (hasDetails) {
+                    html += "<span class='grade-expand-icon' id='" + catId + "-icon'>&#9654;</span>";
+                }
+                html += "</div></td>";
+                html += "<td>" + cat.raw_score + "</td>";
+                html += "<td>" + cat.adj_score + "</td>";
+                html += "<td>" + cat.score + "</td>";
+                html += "<td><span class='grade-badge-sm grade-badge-sm-" + cat.grade + "'>" + cat.grade + "</span></td>";
+                html += "</tr>";
+
+                // Detail expansion row
+                if (hasDetails) {
+                    html += "<tr class='grade-detail-row' id='" + catId + "-detail'>";
+                    html += "<td colspan='5'>";
+                    html += "<ul class='grade-detail-list'>";
+                    for (var di = 0; di < cat.details.length; di++) {
+                        var d = cat.details[di];
+                        var ptClass = d.points < 0 ? 'detail-points-neg' : 'detail-points-zero';
+                        var ptStr = d.points < 0 ? d.points : (d.points === 0 ? '0' : '+' + d.points);
+                        html += "<li>";
+                        html += "<span class='detail-type'>" + d.type + " <span style='color:var(--text-muted)'>(" + d.count + " unique)</span></span>";
+                        html += "<span class='detail-points " + ptClass + "'>" + ptStr + " pts</span>";
+                        html += "</li>";
+                    }
+                    html += "</ul>";
+                    html += "</td></tr>";
+                }
+            }
+
+            // Overall row
+            html += "<tr class='grade-overall-row'>";
+            html += "<td>Overall Rating</td>";
+            html += "<td></td><td></td>";
+            html += "<td>" + score + "</td>";
+            html += "<td><span class='grade-badge-sm grade-badge-sm-" + grade + "'>" + grade + "</span></td>";
+            html += "</tr>";
+
+            html += "</tbody></table>";
+
+            // Unmapped types warning
+            if (gradeData.unmapped_types && gradeData.unmapped_types.length > 0) {
+                html += "<div class='grade-unmapped-warning'>";
+                html += "<i class='glyphicon glyphicon-info-sign'></i> ";
+                html += gradeData.unmapped_types.length + " event type(s) were auto-categorized. ";
+                html += "Review in <a href='${docroot}/opts'>Settings</a> for more accurate grading.";
+                html += "</div>";
+            }
+
+            panel.html(html);
+        }
+
+        // Toggle grade category detail row
+        function toggleGradeDetail(catId) {
+            var detailRow = $('#' + catId + '-detail');
+            var icon = $('#' + catId + '-icon');
+            if (detailRow.hasClass('expanded')) {
+                detailRow.removeClass('expanded').hide();
+                icon.removeClass('expanded');
+            } else {
+                detailRow.addClass('expanded').show();
+                icon.addClass('expanded');
+            }
         }
 
         // Expand the correlation list to show the events associated
