@@ -1,70 +1,59 @@
 <%include file="HEADER.tmpl"/>
 <script>document.write('<script type="text/javascript" src="${docroot}/static/js/spiderfoot.import.js?v=' + Date.now() + '"><\/script>');</script>
 <h2>Import Data</h2>
-<p class="text-muted" style="margin-bottom: 25px;">Import scan data from various sources into ASM-NG.</p>
+<p class="text-muted" style="margin-bottom: 25px;">Import scan data from CSV exports into ASM-NG.</p>
 
 <div class="row import-cards-row">
 
   <!-- Legacy Scan Import (CSV) -->
-  <div class="col-sm-6 col-md-3">
-    <div class="import-card" id="card-legacy" data-import-type="legacy">
+  <div class="col-sm-6">
+    <div class="import-card import-card-lg" id="card-legacy" data-import-type="legacy">
       <div class="import-card-icon">
         <i class="glyphicon glyphicon-file"></i>
       </div>
-      <h4 class="import-card-title">LEGACY SCAN</h4>
-      <p class="import-card-desc">IMPORT CSV EXPORTS FROM OLDER SPIDERFOOT VERSIONS.</p>
+      <h4 class="import-card-title">LEGACY SCAN IMPORT</h4>
+      <p class="import-card-desc">IMPORT CSV EXPORTS FROM OLDER SPIDERFOOT VERSIONS INTO ASM-NG.</p>
       <span class="import-card-filetype">.CSV</span>
     </div>
   </div>
 
-  <!-- ASM-NG Scan Import (backup/restore) -->
-  <div class="col-sm-6 col-md-3">
-    <div class="import-card" id="card-scan" data-import-type="scan">
+  <!-- ASM-NG Scan Backup Restore (CSV) -->
+  <div class="col-sm-6">
+    <div class="import-card import-card-lg import-card-alt" id="card-scan" data-import-type="scan">
       <div class="import-card-icon">
         <i class="glyphicon glyphicon-refresh"></i>
       </div>
-      <h4 class="import-card-title">SCAN BACKUP</h4>
-      <p class="import-card-desc">RESTORE SCANS FROM SPIDERFOOT CSV BACKUPS.</p>
+      <h4 class="import-card-title">SCAN BACKUP RESTORE</h4>
+      <p class="import-card-desc">RESTORE SCANS FROM ASM-NG / SPIDERFOOT CSV BACKUP FILES.</p>
       <span class="import-card-filetype">.CSV</span>
     </div>
   </div>
 
-  <!-- Burp Suite Import -->
-  <div class="col-sm-6 col-md-3">
-    <div class="import-card" id="card-burp" data-import-type="burp">
-      <div class="import-card-icon">
-        <i class="glyphicon glyphicon-globe"></i>
+</div>
+
+<!-- Info Panel -->
+<div class="import-info-panel">
+  <div class="import-info-header">
+    <i class="glyphicon glyphicon-info-sign"></i> CSV IMPORT FEATURES
+  </div>
+  <div class="import-info-body">
+    <div class="row">
+      <div class="col-sm-6">
+        <ul class="import-info-list">
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>FALSE POSITIVE PRESERVATION</strong> &mdash; All F/P and validated status flags from your original scans are maintained during import.</li>
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>AUTO-POPULATE ALL MODULES</strong> &mdash; Imported data automatically populates all relevant ASM-NG modules, views, and data tables.</li>
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>DISCOVERY PATH RECONSTRUCTION</strong> &mdash; Source-to-target discovery paths and entity relationships are fully rebuilt from the CSV data.</li>
+        </ul>
       </div>
-      <h4 class="import-card-title">BURP SUITE</h4>
-      <p class="import-card-desc">IMPORT FINDINGS FROM BURP SUITE XML EXPORTS.</p>
-      <span class="import-card-filetype">.XML</span>
+      <div class="col-sm-6">
+        <ul class="import-info-list">
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>AI CORRELATION PROCESSING</strong> &mdash; After import, the local AI engine runs correlation analysis to identify patterns, link related findings, and surface insights.</li>
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>DRY-RUN VALIDATION</strong> &mdash; Every import is validated first with a dry-run preview showing row counts, event types, and any warnings before committing.</li>
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>SCAN METADATA DETECTION</strong> &mdash; Target, scan name, and timestamps are auto-detected from the CSV data so you can import with zero manual configuration.</li>
+        </ul>
+      </div>
     </div>
   </div>
-
-  <!-- Burp HTML Enhance (use from scan's BURP tab) -->
-  <div class="col-sm-6 col-md-3">
-    <div class="import-card import-card-disabled" id="card-burp-html" data-import-type="burp_html">
-      <div class="import-card-icon">
-        <i class="glyphicon glyphicon-plus-sign"></i>
-      </div>
-      <h4 class="import-card-title">HTML ENHANCE</h4>
-      <p class="import-card-desc">ENHANCE EXISTING BURP XML DATA WITH HTML REPORT DETAILS. USE FROM A SCAN'S BURP TAB.</p>
-      <span class="import-card-filetype">.HTML</span>
-    </div>
-  </div>
-
-  <!-- Nessus Pro Import -->
-  <div class="col-sm-6 col-md-3">
-    <div class="import-card" id="card-nessus" data-import-type="nessus">
-      <div class="import-card-icon">
-        <i class="glyphicon glyphicon-shield"></i>
-      </div>
-      <h4 class="import-card-title">NESSUS PRO</h4>
-      <p class="import-card-desc">IMPORT VULNERABILITY DATA FROM NESSUS EXPORTS.</p>
-      <span class="import-card-filetype">.NESSUS</span>
-    </div>
-  </div>
-
 </div>
 
 <!-- Import Form (hidden by default, shown when a card is selected) -->

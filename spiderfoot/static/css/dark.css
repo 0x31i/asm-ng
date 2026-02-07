@@ -5560,7 +5560,7 @@ i.glyphicon-white,
    Import Page - Card Styles (Dark Theme)
    ============================================ */
 .import-cards-row {
-  margin-bottom: 20px;
+  margin-bottom: 30px;
 }
 
 .import-card {
@@ -5579,6 +5579,54 @@ i.glyphicon-white,
   align-items: center;
   justify-content: center;
   margin-bottom: 15px;
+}
+
+.import-card-lg {
+  min-height: 280px;
+  padding: 40px 30px;
+}
+
+.import-card-lg .import-card-icon {
+  font-size: 52px;
+  margin-bottom: 18px;
+}
+
+.import-card-lg .import-card-title {
+  font-size: 18px;
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+}
+
+.import-card-lg .import-card-desc {
+  font-size: 11px;
+  max-width: 320px;
+  margin-bottom: 16px;
+}
+
+.import-card-lg .import-card-filetype {
+  font-size: 13px;
+  padding: 4px 16px;
+}
+
+.import-card-alt {
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.import-card-alt .import-card-icon {
+  color: var(--accent-blue, #3b82f6);
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.import-card-alt:hover {
+  border-color: var(--accent-blue, #3b82f6);
+  box-shadow: var(--shadow-md), 0 0 15px rgba(59, 130, 246, 0.3);
+  transform: translateY(-2px);
+}
+
+.import-card-alt.import-card-selected {
+  border-color: var(--accent-blue, #3b82f6) !important;
+  box-shadow: var(--shadow-lg), 0 0 20px rgba(59, 130, 246, 0.35) !important;
+  background: rgba(59, 130, 246, 0.1);
 }
 
 .import-card:hover {
@@ -5664,6 +5712,70 @@ i.glyphicon-white,
   background: var(--accent-yellow);
   color: #000;
   text-shadow: none;
+}
+
+/* Import Info Panel */
+.import-info-panel {
+  background: var(--bg-elevated);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 25px;
+}
+
+.import-info-header {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  padding: 14px 20px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--glass-border);
+  color: var(--text-primary);
+}
+
+.import-info-header i {
+  color: var(--accent-green);
+  margin-right: 8px;
+  text-shadow: 0 0 8px var(--glow-green);
+}
+
+.import-info-body {
+  padding: 20px 25px;
+}
+
+.import-info-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.import-info-list li {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--glass-border);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.import-info-list li:last-child {
+  border-bottom: none;
+}
+
+.import-info-list li i {
+  color: var(--accent-green);
+  margin-right: 6px;
+  font-size: 10px;
+  text-shadow: 0 0 6px var(--glow-green);
+}
+
+.import-info-list li strong {
+  color: var(--text-primary);
 }
 
 /* Import form section */
