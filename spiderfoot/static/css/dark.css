@@ -6776,3 +6776,22 @@ i.glyphicon-white,
   font-size: 10px;
   letter-spacing: 0.5px;
 }
+
+/* ============================================================
+   OVERALL GRADE PANEL
+   ============================================================ */
+
+/* Spinning refresh icon */
+.glyphicon-spin {
+  animation: glyphicon-spin 1s linear infinite;
+}
+@keyframes glyphicon-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Grade chevron transition */
+.grade-chevron {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}

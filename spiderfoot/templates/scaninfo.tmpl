@@ -2423,10 +2423,13 @@
 
             // Overall Grade panel
             grid += "<div class='row'><div class='col-sm-12'>";
-            grid += "<div class='panel panel-default grade-panel'>";
-            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-certificate'></i>&nbsp;&nbsp;Overall Grade</div>";
-            grid += "<div class='panel-body' id='grade-panel-body'>";
-            grid += "<div style='text-align: center; padding: 20px; color: var(--text-muted);'>Calculating grade...</div>";
+            grid += "<div class='panel panel-default' style='border: 1px solid var(--glass-border); background: var(--bg-secondary);'>";
+            grid += "<div class='panel-heading' style='display:flex; justify-content:space-between; align-items:center;'>";
+            grid += "<span><i class='glyphicon glyphicon-certificate'></i>&nbsp;&nbsp;Overall Grade</span>";
+            grid += "<button class='btn btn-xs btn-default' id='grade-refresh-btn' onclick='refreshGrade(\"" + instanceId + "\")' title='Recalculate grade'><i class='glyphicon glyphicon-refresh'></i> Refresh</button>";
+            grid += "</div>";
+            grid += "<div id='grade-panel-body' style='padding: 0;'>";
+            grid += "<div style='text-align: center; padding: 30px; color: var(--text-muted);'><i class='glyphicon glyphicon-hourglass'></i> Calculating grade...</div>";
             grid += "</div></div></div></div>";
 
             grid += "<div class='row'><div class='col-sm-12'>";
@@ -2583,134 +2586,154 @@
             loadersrunning = false;
         }
 
+        // Refresh grade (called from button click)
+        function refreshGrade(iid) {
+            var btn = $('#grade-refresh-btn');
+            btn.prop('disabled', true).find('i').addClass('glyphicon-spin');
+            $('#grade-panel-body').html("<div style='text-align: center; padding: 30px; color: var(--text-muted);'><i class='glyphicon glyphicon-refresh glyphicon-spin'></i> Recalculating...</div>");
+            sf.fetchData('${docroot}/scangrade', {'id': iid}, function(data) {
+                renderGradePanel(data, iid);
+                btn.prop('disabled', false).find('i').removeClass('glyphicon-spin');
+            });
+        }
+
+        // Grade color map
+        function gradeGlowColor(g) {
+            var m = {
+                'A': {grad: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', glow: 'rgba(34, 197, 94, 0.6)', text: '#22c55e'},
+                'B': {grad: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', glow: 'rgba(59, 130, 246, 0.6)', text: '#3b82f6'},
+                'C': {grad: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', glow: 'rgba(245, 158, 11, 0.6)', text: '#f59e0b'},
+                'D': {grad: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', glow: 'rgba(249, 115, 22, 0.6)', text: '#f97316'},
+                'F': {grad: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', glow: 'rgba(239, 68, 68, 0.6)', text: '#ef4444'}
+            };
+            return m[g] || m['F'];
+        }
+
         // Render the Overall Grade panel
         function renderGradePanel(gradeData, instanceId) {
             var panel = $('#grade-panel-body');
 
             if (!gradeData || !gradeData.enabled) {
-                panel.html("<div style='text-align: center; padding: 15px; color: var(--text-muted);'>Grade calculation is disabled. Enable it in Settings.</div>");
+                panel.html("<div style='text-align:center;padding:20px;color:var(--text-muted);'>Grade calculation is disabled. Enable it in Settings.</div>");
                 return;
             }
-
             if (gradeData.error) {
-                panel.html("<div class='alert alert-warning' style='margin: 0;'>" + gradeData.error + "</div>");
+                panel.html("<div style='text-align:center;padding:20px;color:var(--accent-orange);'>" + gradeData.error + "</div>");
                 return;
             }
 
             var grade = gradeData.overall_grade || '-';
             var score = gradeData.overall_score || 0;
             var categories = gradeData.categories || {};
+            var gc = gradeGlowColor(grade);
 
-            // Category display order
             var catOrder = [
                 'Network Security', 'Web App Security', 'Information Leakage',
                 'General Health', 'External Account Exposure', 'DNS Health',
                 'IP Reputation', 'Information / Reference'
             ];
 
-            var html = '';
+            var h = '';
 
-            // Overview: grade badge + summary
-            html += "<div class='grade-overview'>";
-            html += "<div class='grade-badge-large grade-badge-" + grade + "'>";
-            html += "<span class='grade-letter'>" + grade + "</span>";
-            html += "<span class='grade-score'>" + score + "</span>";
-            html += "</div>";
-            html += "<div class='grade-summary-text'>";
-            html += "<h3>Overall Rating: " + score + " / 100</h3>";
-            html += "<p>Calculated from " + Object.keys(categories).length + " security categories based on scan findings.</p>";
-
-            // Show warning if scan is still running
+            // === TOP: Large glowing grade badge centered ===
+            h += "<div style='text-align:center;padding:28px 20px 18px 20px;'>";
+            // Big glowing circle
+            h += "<div style='display:inline-flex;flex-direction:column;align-items:center;justify-content:center;";
+            h += "width:130px;height:130px;border-radius:50%;";
+            h += "background:" + gc.grad + ";";
+            h += "box-shadow:0 0 30px " + gc.glow + ", 0 0 60px " + gc.glow + ", 0 0 90px " + gc.glow + ";";
+            h += "border:3px solid rgba(255,255,255,0.2);'>";
+            h += "<span style='font-family:var(--font-mono);font-size:56px;font-weight:900;line-height:1;color:#fff;text-shadow:0 0 20px rgba(255,255,255,0.9),0 0 40px rgba(255,255,255,0.5);'>" + grade + "</span>";
+            h += "<span style='font-family:var(--font-mono);font-size:16px;font-weight:600;color:rgba(255,255,255,0.9);text-shadow:0 0 10px rgba(255,255,255,0.7);'>" + score + "</span>";
+            h += "</div>";
+            // Subtitle
+            h += "<div style='margin-top:12px;color:var(--text-secondary);font-size:13px;'>Overall Security Rating</div>";
+            h += "<div style='color:var(--text-muted);font-size:11px;margin-top:2px;'>Only unverified &amp; open items count against the grade</div>";
             if (scanStatus && scanStatus != 'FINISHED' && scanStatus != 'ABORTED' && scanStatus.indexOf('FAILED') < 0) {
-                html += "<span class='grade-scan-warning'><i class='glyphicon glyphicon-exclamation-sign'></i> Scan in progress &mdash; grade may change</span>";
+                h += "<div style='display:inline-block;margin-top:8px;font-size:10px;color:var(--accent-yellow);background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);border-radius:4px;padding:3px 10px;'>";
+                h += "<i class='glyphicon glyphicon-exclamation-sign'></i> Scan in progress &mdash; grade may change</div>";
             }
-            html += "</div>";
-            html += "</div>";
+            h += "</div>";
 
-            // Category breakdown table
-            html += "<table class='grade-category-table'>";
-            html += "<thead><tr>";
-            html += "<th>Category</th>";
-            html += "<th>Raw Score</th>";
-            html += "<th>Adj Score</th>";
-            html += "<th>Score / 100</th>";
-            html += "<th>Grade</th>";
-            html += "</tr></thead>";
-            html += "<tbody>";
+            // === CATEGORY CARDS ===
+            h += "<div style='padding:0 16px 16px 16px;'>";
 
             for (var ci = 0; ci < catOrder.length; ci++) {
                 var catName = catOrder[ci];
                 var cat = categories[catName];
                 if (!cat) continue;
-
-                var catId = 'grade-cat-' + ci;
+                var catId = 'gcat' + ci;
+                var cc = gradeGlowColor(cat.grade);
                 var hasDetails = cat.details && cat.details.length > 0;
 
-                html += "<tr onclick='toggleGradeDetail(\"" + catId + "\")' title='Click to expand details'>";
-                html += "<td><div class='grade-cat-name'>";
-                html += "<div class='grade-cat-indicator' style='background:" + cat.color + "'></div>";
-                html += "<span>" + catName + "</span>";
-                if (hasDetails) {
-                    html += "<span class='grade-expand-icon' id='" + catId + "-icon'>&#9654;</span>";
-                }
-                html += "</div></td>";
-                html += "<td>" + cat.raw_score + "</td>";
-                html += "<td>" + cat.adj_score + "</td>";
-                html += "<td>" + cat.score + "</td>";
-                html += "<td><span class='grade-badge-sm grade-badge-sm-" + cat.grade + "'>" + cat.grade + "</span></td>";
-                html += "</tr>";
+                // Category card
+                h += "<div style='background:var(--bg-tertiary);border:1px solid var(--glass-border);border-radius:var(--radius-md);margin-bottom:8px;overflow:hidden;'>";
 
-                // Detail expansion row
+                // Card header - clickable
+                h += "<div onclick='toggleGradeDetail(\"" + catId + "\")' style='display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;transition:background 0.15s;' onmouseover='this.style.background=\"var(--bg-elevated)\"' onmouseout='this.style.background=\"transparent\"'>";
+
+                // Left: color bar + name + mini badge
+                h += "<div style='display:flex;align-items:center;gap:10px;flex:1;'>";
+                h += "<div style='width:4px;height:28px;border-radius:2px;background:" + cat.color + ";flex-shrink:0;'></div>";
+                h += "<span style='font-weight:600;font-size:13px;color:var(--text-primary);'>" + catName + "</span>";
+                // Mini grade badge with glow
+                h += "<span style='display:inline-block;width:26px;height:22px;line-height:22px;text-align:center;border-radius:4px;font-family:var(--font-mono);font-size:11px;font-weight:700;color:#fff;background:" + cc.grad + ";box-shadow:0 0 8px " + cc.glow + ";text-shadow:0 0 6px rgba(255,255,255,0.7);'>" + cat.grade + "</span>";
+                h += "</div>";
+
+                // Right: scores
+                h += "<div style='display:flex;align-items:center;gap:16px;font-family:var(--font-mono);font-size:12px;'>";
+                h += "<div style='text-align:right;'><div style='color:var(--text-muted);font-size:9px;text-transform:uppercase;letter-spacing:0.5px;'>Raw</div><div style='color:var(--text-secondary);'>" + cat.raw_score + "</div></div>";
+                h += "<div style='text-align:right;'><div style='color:var(--text-muted);font-size:9px;text-transform:uppercase;letter-spacing:0.5px;'>Adj</div><div style='color:var(--text-secondary);'>" + cat.adj_score + "</div></div>";
+                h += "<div style='text-align:right;min-width:36px;'><div style='color:var(--text-muted);font-size:9px;text-transform:uppercase;letter-spacing:0.5px;'>Score</div><div style='color:" + cc.text + ";font-weight:700;'>" + cat.score + "</div></div>";
                 if (hasDetails) {
-                    html += "<tr class='grade-detail-row' id='" + catId + "-detail'>";
-                    html += "<td colspan='5'>";
-                    html += "<ul class='grade-detail-list'>";
+                    h += "<span class='grade-chevron' id='" + catId + "-icon' style='color:var(--text-muted);font-size:10px;transition:transform 0.2s;'>&#9654;</span>";
+                }
+                h += "</div>";
+
+                h += "</div>"; // end header
+
+                // Detail panel (hidden by default)
+                if (hasDetails) {
+                    h += "<div id='" + catId + "-detail' style='display:none;border-top:1px solid var(--glass-border);background:var(--bg-secondary);padding:8px 14px 8px 28px;'>";
                     for (var di = 0; di < cat.details.length; di++) {
                         var d = cat.details[di];
-                        var ptClass = d.points < 0 ? 'detail-points-neg' : 'detail-points-zero';
-                        var ptStr = d.points < 0 ? d.points : (d.points === 0 ? '0' : '+' + d.points);
-                        html += "<li>";
-                        html += "<span class='detail-type'>" + d.type + " <span style='color:var(--text-muted)'>(" + d.count + " unique)</span></span>";
-                        html += "<span class='detail-points " + ptClass + "'>" + ptStr + " pts</span>";
-                        html += "</li>";
+                        var ptColor = d.points < 0 ? 'var(--accent-red)' : 'var(--text-muted)';
+                        var ptStr = d.points < 0 ? d.points : '0';
+                        h += "<div style='display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;'>";
+                        h += "<span style='font-family:var(--font-mono);color:var(--text-secondary);'>" + d.type + " <span style='color:var(--text-muted);'>(" + d.count + ")</span></span>";
+                        h += "<span style='font-family:var(--font-mono);font-weight:600;color:" + ptColor + ";'>" + ptStr + "</span>";
+                        h += "</div>";
                     }
-                    html += "</ul>";
-                    html += "</td></tr>";
+                    h += "</div>";
                 }
+
+                h += "</div>"; // end card
             }
-
-            // Overall row
-            html += "<tr class='grade-overall-row'>";
-            html += "<td>Overall Rating</td>";
-            html += "<td></td><td></td>";
-            html += "<td>" + score + "</td>";
-            html += "<td><span class='grade-badge-sm grade-badge-sm-" + grade + "'>" + grade + "</span></td>";
-            html += "</tr>";
-
-            html += "</tbody></table>";
 
             // Unmapped types warning
             if (gradeData.unmapped_types && gradeData.unmapped_types.length > 0) {
-                html += "<div class='grade-unmapped-warning'>";
-                html += "<i class='glyphicon glyphicon-info-sign'></i> ";
-                html += gradeData.unmapped_types.length + " event type(s) were auto-categorized. ";
-                html += "Review in <a href='${docroot}/opts'>Settings</a> for more accurate grading.";
-                html += "</div>";
+                h += "<div style='font-size:11px;color:var(--accent-yellow);background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.12);border-radius:var(--radius-sm);padding:6px 12px;margin-top:4px;'>";
+                h += "<i class='glyphicon glyphicon-info-sign'></i> ";
+                h += gradeData.unmapped_types.length + " event type(s) auto-categorized. ";
+                h += "Review in <a href='${docroot}/opts' style='color:var(--accent-yellow);text-decoration:underline;'>Settings</a>.";
+                h += "</div>";
             }
 
-            panel.html(html);
+            h += "</div>"; // end padding wrapper
+
+            panel.html(h);
         }
 
         // Toggle grade category detail row
         function toggleGradeDetail(catId) {
-            var detailRow = $('#' + catId + '-detail');
+            var detail = $('#' + catId + '-detail');
             var icon = $('#' + catId + '-icon');
-            if (detailRow.hasClass('expanded')) {
-                detailRow.removeClass('expanded').hide();
-                icon.removeClass('expanded');
+            if (detail.is(':visible')) {
+                detail.slideUp(150);
+                icon.css('transform', 'rotate(0deg)');
             } else {
-                detailRow.addClass('expanded').show();
-                icon.addClass('expanded');
+                detail.slideDown(150);
+                icon.css('transform', 'rotate(90deg)');
             }
         }
 
