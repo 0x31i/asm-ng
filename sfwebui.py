@@ -46,6 +46,10 @@ from spiderfoot import __version__
 from spiderfoot.logger import logListenerSetup, logWorkerSetup
 from spiderfoot.workspace import SpiderFootWorkspace
 from spiderfoot.event_type_mapping import translate_event_type
+from spiderfoot.grade_config import (
+    calculate_full_grade,
+    load_grade_config_overrides,
+)
 
 mp.set_start_method("spawn", force=True)
 
@@ -4171,6 +4175,110 @@ class SpiderFootWebUi:
                            row[3], row[4], statusdata[5]])
 
         return retdata
+
+    def _calculateScanGrade(self, dbh, scan_id: str) -> dict:
+        """Calculate the overall grade for a scan based on its event type results.
+
+        Queries the scan results grouped by event type, then applies the grading
+        rules from grade_config.py (merged with any user overrides from settings).
+
+        Args:
+            dbh: SpiderFootDb instance
+            scan_id: scan instance ID
+
+        Returns:
+            dict: Full grade data with categories, overall score, and grade letter.
+        """
+        # Check if grading is enabled
+        if not self.config.get('_grade_enabled', True):
+            return {'enabled': False, 'overall_grade': '-', 'overall_score': 0, 'categories': {}}
+
+        try:
+            # Get scan results grouped by event type
+            scan_data = dbh.scanResultSummary(scan_id, by="type")
+        except Exception:
+            return {'enabled': True, 'overall_grade': '-', 'overall_score': 0, 'categories': {},
+                    'error': 'Failed to retrieve scan results'}
+
+        # Build event type count dict: {type_code: {total, unique}}
+        event_type_counts = {}
+        for row in scan_data:
+            event_type = row[0]
+            if event_type == 'ROOT':
+                continue
+            total_count = row[3]
+            unique_count = row[4]
+            event_type_counts[event_type] = {
+                'total': total_count,
+                'unique': unique_count,
+            }
+
+        # For vulnerability event types, we need to provide severity breakdowns
+        # for the crit_high_med logic. Count VULNERABILITY_CVE_* types.
+        vuln_crit = event_type_counts.get('VULNERABILITY_CVE_CRITICAL', {}).get('unique', 0)
+        vuln_high = event_type_counts.get('VULNERABILITY_CVE_HIGH', {}).get('unique', 0)
+        vuln_med = event_type_counts.get('VULNERABILITY_CVE_MEDIUM', {}).get('unique', 0)
+
+        # Populate the aggregate EXTERNAL_VULNERABILITIES entry if any vuln types exist
+        if vuln_crit or vuln_high or vuln_med:
+            if 'EXTERNAL_VULNERABILITIES' not in event_type_counts:
+                event_type_counts['EXTERNAL_VULNERABILITIES'] = {
+                    'total': vuln_crit + vuln_high + vuln_med,
+                    'unique': vuln_crit + vuln_high + vuln_med,
+                }
+            event_type_counts['EXTERNAL_VULNERABILITIES']['crit'] = vuln_crit
+            event_type_counts['EXTERNAL_VULNERABILITIES']['high'] = vuln_high
+            event_type_counts['EXTERNAL_VULNERABILITIES']['med'] = vuln_med
+
+        # Also check for WEBAPP_VULNERABILITIES from imported findings
+        # (Nessus/Burp results may contribute here)
+        try:
+            webapp_vulns = dbh.scanFindingsList(scan_id)
+            if webapp_vulns:
+                wa_crit = sum(1 for f in webapp_vulns if f[1] == 'CRITICAL')
+                wa_high = sum(1 for f in webapp_vulns if f[1] == 'HIGH')
+                wa_med = sum(1 for f in webapp_vulns if f[1] == 'MEDIUM')
+                if wa_crit or wa_high or wa_med:
+                    if 'WEBAPP_VULNERABILITIES' not in event_type_counts:
+                        event_type_counts['WEBAPP_VULNERABILITIES'] = {
+                            'total': wa_crit + wa_high + wa_med,
+                            'unique': wa_crit + wa_high + wa_med,
+                        }
+                    event_type_counts['WEBAPP_VULNERABILITIES']['crit'] = wa_crit
+                    event_type_counts['WEBAPP_VULNERABILITIES']['high'] = wa_high
+                    event_type_counts['WEBAPP_VULNERABILITIES']['med'] = wa_med
+        except Exception:
+            pass  # Findings table may not exist in older databases
+
+        # Load config overrides from settings
+        config_overrides = load_grade_config_overrides(self.config)
+
+        # Calculate grade
+        result = calculate_full_grade(event_type_counts, config_overrides)
+        return result
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scangrade(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Calculate and return the overall grade for a scan.
+
+        Returns a structured grade report with per-category breakdowns,
+        individual event type scores, and an overall letter grade.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: grade data with categories, overall_score, overall_grade
+        """
+        dbh = SpiderFootDb(self.config)
+
+        # Verify scan exists
+        data = dbh.scanInstanceGet(id)
+        if not data:
+            return {'enabled': False, 'error': 'Scan not found'}
+
+        return self._calculateScanGrade(dbh, id)
 
     @cherrypy.expose
     @cherrypy.tools.json_out()

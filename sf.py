@@ -64,6 +64,11 @@ sfConfig = {
     '_socks3port': '',
     '_socks4user': '',
     '_socks5pwd': '',
+    # Grade configuration
+    '_grade_enabled': True,
+    '_grade_category_weights': '',
+    '_grade_event_overrides': '',
+    '_grade_thresholds': '',
 }
 sfOptdescs = {
     '_debug': "Enable debugging?",
@@ -80,7 +85,12 @@ sfOptdescs = {
     '_socks4user': 'SOCKS Username. Valid only for SOCKS4 and SOCKS5 servers.',
     '_socks5pwd': "SOCKS Password. Valid only for SOCKS5 servers.",
     # This is a hack to get a description for an option not actually available.
-    '_modulesenabled': "Modules enabled for the scan."
+    '_modulesenabled': "Modules enabled for the scan.",
+    # Grade configuration descriptions
+    '_grade_enabled': "Enable the Overall Grade on scan summary pages. Shows a letter grade (A-F) based on scan findings.",
+    '_grade_category_weights': "JSON to override default category weights. Example: {\"Network Security\": {\"weight\": 0.9}}. Leave empty for defaults.",
+    '_grade_event_overrides': "JSON to override scoring for specific event types. Example: {\"TCP_PORT_OPEN\": {\"category\": \"Network Security\", \"points\": -15, \"logic\": \"unverified_exists\"}}. Leave empty for defaults.",
+    '_grade_thresholds': "JSON to override grade letter thresholds. Example: [{\"min\": 90, \"grade\": \"A\"}, {\"min\": 80, \"grade\": \"B\"}, ...]. Leave empty for defaults.",
 }
 
 
