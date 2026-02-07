@@ -1200,9 +1200,7 @@
                     html += "<th>Host IP</th>";
                     html += "<th>Host Name</th>";
                     html += "<th>Plugin Name</th>";
-                    html += "<th>Severity Number</th>";
                     html += "<th>Solutions</th>";
-                    html += "<th>See Also</th>";
                     html += "</tr></thead><tbody>";
 
                     for (var i = 0; i < results.length; i++) {
@@ -1214,15 +1212,56 @@
                         else if (sevLower === 'low') badgeClass = 'alert-info';
                         else badgeClass = 'alert-success';
 
-                        html += "<tr class='finding-row finding-" + sevLower + "'>";
-                        html += "<td><span class='badge " + badgeClass + "'>" + (r.severity || 'Information') + "</span></td>";
+                        var hasDetail = r.solutions || r.see_also || r.request || r.response || r.issue_detail;
+
+                        // Main row (clickable to expand)
+                        html += "<tr class='finding-row finding-" + sevLower + "' data-burp-id='" + i + "'" + (hasDetail ? " onclick='toggleBurpDetail(" + i + ")'" : "") + ">";
+                        html += "<td><span class='badge " + badgeClass + "'>" + (r.severity || 'Information') + "</span>";
+                        if (hasDetail) html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='burp-icon-" + i + "'></i>";
+                        html += "</td>";
                         html += "<td>" + (r.host_ip || '') + "</td>";
                         html += "<td><div class='cell-clamp'>" + (r.host_name || '') + "</div></td>";
                         html += "<td><div class='cell-clamp'>" + (r.plugin_name || '') + "</div></td>";
-                        html += "<td>" + (r.severity_number || 0) + "</td>";
                         html += "<td><div class='cell-clamp'>" + (r.solutions || '') + "</div></td>";
-                        html += "<td><div class='cell-clamp'>" + (r.see_also || '') + "</div></td>";
                         html += "</tr>";
+
+                        // Expandable detail row
+                        if (hasDetail) {
+                            html += "<tr class='finding-detail-row finding-" + sevLower + "' id='burp-detail-" + i + "'>";
+                            html += "<td colspan='5'><div class='finding-detail' id='burp-detail-content-" + i + "'>";
+                            html += "<div class='finding-detail-grid burp-detail-grid'>";
+                            if (r.solutions) {
+                                html += "<div class='finding-detail-section detail-solutions'>";
+                                html += "<div class='finding-detail-label'>Solutions</div>";
+                                html += "<div class='finding-detail-text'>" + r.solutions + "</div>";
+                                html += "</div>";
+                            }
+                            if (r.see_also) {
+                                html += "<div class='finding-detail-section detail-see-also'>";
+                                html += "<div class='finding-detail-label'>See Also</div>";
+                                html += "<div class='finding-detail-text'>" + r.see_also + "</div>";
+                                html += "</div>";
+                            }
+                            if (r.issue_detail) {
+                                html += "<div class='finding-detail-section detail-issue-detail'>";
+                                html += "<div class='finding-detail-label'>Issue Detail</div>";
+                                html += "<div class='finding-detail-text'>" + r.issue_detail + "</div>";
+                                html += "</div>";
+                            }
+                            if (r.request) {
+                                html += "<div class='finding-detail-section detail-request'>";
+                                html += "<div class='finding-detail-label'>Request</div>";
+                                html += "<div class='finding-detail-text'>" + r.request.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "</div>";
+                                html += "</div>";
+                            }
+                            if (r.response) {
+                                html += "<div class='finding-detail-section detail-response'>";
+                                html += "<div class='finding-detail-label'>Response</div>";
+                                html += "<div class='finding-detail-text'>" + r.response.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "</div>";
+                                html += "</div>";
+                            }
+                            html += "</div></div></td></tr>";
+                        }
                     }
 
                     html += "</tbody></table></div>";
@@ -1241,6 +1280,7 @@
 
                     $("#burp-table").tablesorter({
                         headers: { 0: { sorter: 'burpSeverity' } },
+                        cssChildRow: 'finding-detail-row',
                         sortList: [[0, 0]]
                     });
                 },
@@ -1248,6 +1288,18 @@
                     showBurpUploadPlaceholder(instanceId);
                 }
             );
+        }
+
+        function toggleBurpDetail(idx) {
+            var row = $('tr[data-burp-id="' + idx + '"]');
+            var detail = $('#burp-detail-content-' + idx);
+            if (row.hasClass('finding-expanded')) {
+                row.removeClass('finding-expanded');
+                detail.slideUp(150);
+            } else {
+                row.addClass('finding-expanded');
+                detail.slideDown(150);
+            }
         }
 
         function reimportBurp(instanceId) {
