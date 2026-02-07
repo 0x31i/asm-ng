@@ -6232,3 +6232,50 @@ i.glyphicon-white,
   min-width: 200px;
   font-size: 12px;
 }
+
+/* Correlations table column widths (matching findings 4-column layout) */
+.findings-table .col-corr-name { width: 30%; }
+.findings-table .col-corr-type { width: 30%; }
+.findings-table .col-corr-elements { width: 100px; }
+
+/* Correlations expanded events sub-table */
+.corr-events-container {
+  margin-top: 10px;
+}
+
+.corr-events-table {
+  margin-bottom: 0;
+  border-collapse: collapse;
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+}
+
+.corr-events-table thead th {
+  background: rgba(30, 41, 82, 0.6);
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 6px 8px;
+  border: none;
+  white-space: nowrap;
+}
+
+.corr-events-table tbody td {
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.corr-events-table tbody td pre {
+  margin: 0;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

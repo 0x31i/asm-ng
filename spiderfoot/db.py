@@ -1597,11 +1597,24 @@ class SpiderFootDb:
             raise TypeError(
                 f"instanceId is {type(instanceId)}; expected str()") from None
 
-        qry = "SELECT c.id, c.title, c.rule_id, c.rule_risk, c.rule_name, \
-            c.rule_descr, c.rule_logic, count(e.event_hash) AS event_count FROM \
-            tbl_scan_correlation_results c, tbl_scan_correlation_results_events e \
-            WHERE scan_instance_id = ? AND c.id = e.correlation_id \
-            GROUP BY c.id ORDER BY c.title, c.rule_risk"
+        if self.db_type == 'postgresql':
+            qry = "SELECT c.id, c.title, c.rule_id, c.rule_risk, c.rule_name, \
+                c.rule_descr, c.rule_logic, count(DISTINCT e.event_hash) AS event_count, \
+                STRING_AGG(DISTINCT r.type, ',') AS event_types FROM \
+                tbl_scan_correlation_results c, tbl_scan_correlation_results_events e, \
+                tbl_scan_results r \
+                WHERE c.scan_instance_id = %s AND c.id = e.correlation_id \
+                AND e.event_hash = r.hash AND r.scan_instance_id = c.scan_instance_id \
+                GROUP BY c.id ORDER BY c.title, c.rule_risk"
+        else:
+            qry = "SELECT c.id, c.title, c.rule_id, c.rule_risk, c.rule_name, \
+                c.rule_descr, c.rule_logic, count(DISTINCT e.event_hash) AS event_count, \
+                GROUP_CONCAT(DISTINCT r.type) AS event_types FROM \
+                tbl_scan_correlation_results c, tbl_scan_correlation_results_events e, \
+                tbl_scan_results r \
+                WHERE c.scan_instance_id = ? AND c.id = e.correlation_id \
+                AND e.event_hash = r.hash AND r.scan_instance_id = c.scan_instance_id \
+                GROUP BY c.id ORDER BY c.title, c.rule_risk"
 
         qvars = [instanceId]
 

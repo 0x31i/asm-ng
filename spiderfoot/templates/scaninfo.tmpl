@@ -1281,43 +1281,105 @@
             // Compact AI bar at top
             var html = buildAiCorrelationBar(instanceId);
 
-            html += "<table id='correlations-panel-table' class='table table-bordered table-striped table-condensed tablesorter small'>";
-            html += "<thead><tr><th>Correlation</th><th>Risk</th><th>Data Elements</th></tr></thead><tbody>";
+            // Toolbar matching findings style
+            html += "<div class='findings-toolbar'>";
+            html += "<div class='findings-toolbar-left'>";
+            html += "<span class='findings-count'>" + data.length + " CORRELATIONS</span>";
+            html += "</div>";
+            html += "<div class='findings-toolbar-right'>";
+            html += "<a class='btn btn-outline-secondary btn-sm' href='${docroot}/scancorrelationsexport?id=" + instanceId + "&filetype=xlsx' target='_blank'>";
+            html += "<i class='glyphicon glyphicon-download-alt'></i>&nbsp;EXPORT</a>";
+            html += "</div></div>";
+
+            // Table matching findings style: Risk | Correlation | Type | Data Elements
+            html += "<div class='findings-table-wrapper'>";
+            html += "<table id='correlations-panel-table' class='table findings-table tablesorter small'>";
+            html += "<colgroup>";
+            html += "<col class='col-priority'>";
+            html += "<col class='col-corr-name'>";
+            html += "<col class='col-corr-type'>";
+            html += "<col class='col-corr-elements'>";
+            html += "</colgroup>";
+            html += "<thead><tr>";
+            html += "<th>Risk</th>";
+            html += "<th>Correlation</th>";
+            html += "<th>Type</th>";
+            html += "<th>Data Elements</th>";
+            html += "</tr></thead><tbody>";
 
             for (var i = 0; i < data.length; i++) {
-                html += "<tr>";
-                html += "<td><a style='cursor: pointer' onClick='toggleCorrelation(\"" + instanceId + "\",\"" + data[i][0] + "\")'>" + data[i][1] + "</a>&nbsp;&nbsp;";
-                html += "<i class='glyphicon glyphicon-question-sign' style='color: #ccc' rel='tooltip' data-title=\"" + data[i][5] + "\"></i>";
+                var risk = data[i][3];
+                var riskLower = risk.toLowerCase();
+                var badgeClass = '';
+                if (risk === 'CRITICAL') badgeClass = 'alert-critical';
+                else if (risk === 'HIGH') badgeClass = 'alert-danger';
+                else if (risk === 'MEDIUM') badgeClass = 'alert-warning';
+                else if (risk === 'LOW') badgeClass = 'alert-info';
+                else if (risk === 'INFO') badgeClass = 'alert-success';
+
+                var desc = data[i][5] || '';
+                var eventTypes = data[i][8] || '';
+                var corrId = data[i][0];
+
+                // Main row (clickable to expand)
+                html += "<tr class='finding-row finding-" + riskLower + " corr-row' data-corr-id='" + corrId + "' onclick='toggleCorrelation(\"" + instanceId + "\",\"" + corrId + "\")'>";
+                html += "<td><span class='badge " + badgeClass + "'>" + risk + "</span>";
+                html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='corr-icon-" + corrId + "'></i>";
                 html += "</td>";
-                var statusy = "";
-                if (data[i][3] == "CRITICAL") statusy = "alert-critical";
-                else if (data[i][3] == "HIGH") statusy = "alert-danger";
-                else if (data[i][3] == "MEDIUM") statusy = "alert-warning";
-                else if (data[i][3] == "LOW") statusy = "alert-info";
-                else if (data[i][3] == "INFO") statusy = "alert-success";
-                html += "<td><span class='badge " + statusy + "'>" + data[i][3] + "</span></td>";
+                html += "<td>" + data[i][1] + "</td>";
+
+                // Type column with clickable links to Browse
+                if (eventTypes) {
+                    var types = eventTypes.split(',');
+                    var typeLinks = [];
+                    for (var t = 0; t < types.length; t++) {
+                        var typ = types[t].trim();
+                        if (typ) {
+                            typeLinks.push("<a class='finding-type-link' onclick='event.stopPropagation(); browseEventData(\"" + instanceId + "\", \"" + typ.replace(/"/g, '&quot;') + "\", \"" + typ.replace(/"/g, '&quot;') + "\", \"full\");' title='Browse " + typ + " data'>" + typ + "</a>");
+                        }
+                    }
+                    html += "<td>" + typeLinks.join(", ") + "</td>";
+                } else {
+                    html += "<td></td>";
+                }
+
                 html += "<td>" + data[i][7] + "</td>";
-                html += "</tr><tr class='hidden tablesorter-childRow' id='corrwell_tr_" + data[i][0] + "'><td colspan=3 id='corrwell_td_" + data[i][0] + "'></td></tr>";
+                html += "</tr>";
+
+                // Expandable detail row (description + events sub-table)
+                html += "<tr class='finding-detail-row finding-" + riskLower + " corr-detail-row' id='corrwell_tr_" + corrId + "'>";
+                html += "<td colspan='4'><div class='finding-detail' id='corr-detail-content-" + corrId + "'>";
+                if (desc) {
+                    html += "<div class='finding-detail-grid'>";
+                    html += "<div class='finding-detail-section detail-description'>";
+                    html += "<div class='finding-detail-label'>Description</div>";
+                    html += "<div class='finding-detail-text'>" + desc + "</div>";
+                    html += "</div>";
+                    html += "</div>";
+                }
+                html += "<div id='corrwell_td_" + corrId + "' class='corr-events-container'></div>";
+                html += "</div></td></tr>";
             }
 
-            html += "</tbody></table>";
+            html += "</tbody></table></div>";
             panel.html(html);
 
             initAiCorrelationButtons(instanceId);
 
+            // Enable table sorting matching findings style
             $.tablesorter.addParser({
                 id: 'correlationPanelCriticality',
                 is: function(s) { return false; },
                 format: function(s) {
-                    return s.toLowerCase().replace(/critical/,4).replace(/high/,3).replace(/medium/,2).replace(/low/,1).replace(/info/,0);
+                    return s.toLowerCase().replace(/critical/,0).replace(/high/,1).replace(/medium/,2).replace(/low/,3).replace(/info/,4);
                 },
                 type: 'numeric'
             });
 
             $("#correlations-panel-table").tablesorter({
-                headers: { 1: { sorter: 'correlationPanelCriticality' } },
-                cssChildRow: 'tablesorter-childRow',
-                sortList: [[1, 1]]
+                headers: { 0: { sorter: 'correlationPanelCriticality' } },
+                cssChildRow: 'corr-detail-row',
+                sortList: [[0, 0]]
             });
             sf.updateTooltips();
         }
@@ -1520,22 +1582,43 @@
 
         // Expand the correlation list to show the events associated
         function toggleCorrelation(instanceId, correlationId) {
-            if (!$("#corrwell_tr_" + correlationId).hasClass("hidden")) {
-                $("#corrwell_td_" + correlationId).empty();
-                $("#corrwell_tr_" + correlationId).addClass("hidden");
+            var row = $('tr[data-corr-id="' + correlationId + '"]');
+            var detail = $('#corr-detail-content-' + correlationId);
+            var eventsContainer = $('#corrwell_td_' + correlationId);
+
+            if (row.hasClass('finding-expanded')) {
+                row.removeClass('finding-expanded');
+                detail.slideUp(150);
                 return;
             }
+
+            row.addClass('finding-expanded');
+            detail.slideDown(150);
+
+            // Only fetch events if not already loaded
+            if (eventsContainer.children().length > 0) return;
+
+            eventsContainer.html("<div style='padding: 10px; text-align: center;'><i class='glyphicon glyphicon-refresh spinning'></i> Loading events...</div>");
+
             sf.fetchData('${docroot}/scaneventresults', { 'id': instanceId, 'correlationId': correlationId }, function(data) {
-                var table = "<table id='corrcontent_'" + correlationId + "' class='table table-bordered table-striped small'>";
+                var table = "<table class='table corr-events-table small'>";
                 table += "<thead><tr>";
-                table += "<th>Data Element</th></th>";
+                table += "<th>Type</th>";
+                table += "<th>Data Element</th>";
                 table += "<th>Source Data Element</th>";
                 table += "<th>Source Module</th>";
                 table += "<th>Identified</th>";
                 table += "</tr></thead><tbody>";
 
                 for (var i = 0; i < data.length; i++) {
+                    var evtType = data[i][10] || '';
                     table += "<tr>";
+                    // Type column with link to Browse
+                    if (evtType) {
+                        table += "<td><a class='finding-type-link' onclick='browseEventData(\"" + instanceId + "\", \"" + evtType.replace(/"/g, '&quot;') + "\", \"" + evtType.replace(/"/g, '&quot;') + "\", \"full\");' title='Browse " + evtType + " data'>" + evtType + "</a></td>";
+                    } else {
+                        table += "<td></td>";
+                    }
                     table += "<td><pre class='table-border-bg-inherit'>";
                     table += sf.replace_sfurltag(data[i][1]);
                     table += "</pre></td><td><pre class='table-border-bg-inherit'>";
@@ -1545,9 +1628,8 @@
                     table += "</pre></td>";
                     table += "</tr>";
                 }
-                table += "</tbody></table>"
-                $("#corrwell_td_" + correlationId).prepend(table);
-                $("#corrwell_tr_" + correlationId).removeClass("hidden");
+                table += "</tbody></table>";
+                eventsContainer.html(table);
             });
         }
 

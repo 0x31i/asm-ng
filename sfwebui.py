@@ -3677,9 +3677,10 @@ class SpiderFootWebUi:
                 rule_description = row[5]
                 events = row[6] if len(row) > 6 else ""
                 created = row[7] if len(row) > 7 else ""
+                event_types = row[8] if len(row) > 8 else ""
 
                 retdata.append([correlation_id, correlation, rule_name, rule_risk,
-                               rule_id, rule_description, events, created])
+                               rule_id, rule_description, events, created, event_types])
 
         except Exception as e:
             self.log.error(
