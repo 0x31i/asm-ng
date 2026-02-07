@@ -1314,7 +1314,7 @@
             // Toolbar - left: action buttons + count
             var html = "<div class='findings-toolbar'>";
             html += "<div class='findings-toolbar-left'>";
-            html += "<button class='btn btn-sm btn-primary' onclick='reimportNessus(\"" + instanceId + "\")'>";
+            html += "<button class='btn btn-sm btn-cyan' onclick='reimportNessus(\"" + instanceId + "\")'>";
             html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT</button>&nbsp;";
             html += "<span class='findings-count' id='nessus-findings-count'><i class='glyphicon glyphicon-shield'></i>&nbsp;" + results.length + " NESSUS FINDINGS</span>";
             html += "</div>";
@@ -1605,10 +1605,10 @@
             // Toolbar - left: action buttons + count
             var html = "<div class='findings-toolbar'>";
             html += "<div class='findings-toolbar-left'>";
-            html += "<button class='btn btn-sm btn-primary' onclick='reimportBurp(\"" + instanceId + "\", \"xml\")'>";
+            html += "<button class='btn btn-sm btn-cyan' onclick='reimportBurp(\"" + instanceId + "\", \"xml\")'>";
             html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT XML</button>&nbsp;";
             if (isEnhanced) {
-                html += "<button class='btn btn-sm btn-primary' onclick='enhanceBurpHtml(\"" + instanceId + "\")'>";
+                html += "<button class='btn btn-sm btn-cyan' onclick='enhanceBurpHtml(\"" + instanceId + "\")'>";
                 html += "<i class='glyphicon glyphicon-plus-sign'></i>&nbsp;HTML ENHANCE</button>&nbsp;";
             } else {
                 html += "<button class='btn btn-sm btn-danger' onclick='enhanceBurpHtml(\"" + instanceId + "\")'>";
@@ -1915,7 +1915,7 @@
                     html += "<span class='findings-count'><i class='glyphicon glyphicon-list-alt'></i>&nbsp;" + data.length + " FINDINGS</span>";
                     html += "</div>";
                     html += "<div class='findings-toolbar-right'>";
-                    html += "<button class='btn btn-sm btn-primary' onclick='reimportFindings(\"" + instanceId + "\")'>";
+                    html += "<button class='btn btn-sm btn-cyan' onclick='reimportFindings(\"" + instanceId + "\")'>";
                     html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT</button>";
                     html += "</div></div>";
 
@@ -2108,7 +2108,7 @@
             html += "</div>";
             html += "<div class='findings-toolbar-right'>";
             html += "<span class='ai-correlation-compact-results' id='ai-correlation-results'></span>";
-            html += "<button id='btn-panel-rescan' class='btn btn-sm btn-primary' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
+            html += "<button id='btn-panel-rescan' class='btn btn-sm btn-cyan' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
             html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;AI RESCAN</button>";
             html += "</div></div>";
 
