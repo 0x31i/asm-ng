@@ -1846,9 +1846,13 @@ class SpiderFootWebUi:
         if import_type == 'nessus':
             return self._processNessusImport(content, scan_name, target, importfile, is_dry_run)
 
-        # Handle Burp import
+        # Handle Burp XML import
         if import_type == 'burp':
             return self._processBurpImport(content, scan_name, target, importfile, is_dry_run)
+
+        # Handle Burp HTML import
+        if import_type == 'burp_html':
+            return self._processBurpHtmlImport(content, scan_name, target, importfile, is_dry_run)
 
         # Parse CSV for legacy/scan imports
         try:
@@ -2398,6 +2402,270 @@ class SpiderFootWebUi:
             'fps_imported': 0,
             'validated_imported': 0,
             'event_types_count': len(set(r['severity'] for r in results)),
+            'errors': [],
+        }
+
+    def _processBurpHtmlImport(self, content: str, scan_name: str, target: str,
+                               importfile=None, is_dry_run: bool = False,
+                               existing_scan_id: str = None) -> dict:
+        """Parse and import a Burp Suite Pro HTML report.
+
+        Parses the classic Burp Pro HTML report format using BODH0/BODH1
+        class markers for issue groups and instances, summary_table for
+        severity/confidence/host/path, and h2-delimited sections for
+        issue detail, remediation, request/response.
+
+        Args:
+            content (str): HTML file content
+            scan_name (str): optional scan name
+            target (str): optional target
+            importfile: uploaded file object (for filename)
+            is_dry_run (bool): if True, validate only
+            existing_scan_id (str): if set, import into existing scan
+
+        Returns:
+            dict: import results
+        """
+        try:
+            from bs4 import BeautifulSoup
+        except ImportError:
+            return {'success': False, 'message': 'BeautifulSoup4 is required for HTML import. Install with: pip install beautifulsoup4'}
+
+        try:
+            soup = BeautifulSoup(content, 'html.parser')
+        except Exception as e:
+            return {'success': False, 'message': f'Failed to parse HTML: {e}'}
+
+        # Validate it looks like a Burp report
+        bodh0_elements = soup.find_all('span', class_='BODH0')
+        if not bodh0_elements:
+            return {'success': False, 'message': 'Invalid Burp HTML report. No issue groups (BODH0) found. Ensure this is a Burp Suite Pro HTML export.'}
+
+        results = []
+        hosts_seen = set()
+
+        # Collect all top-level nodes under the body for sequential iteration
+        body = soup.body or soup
+        all_elements = list(body.descendants) if body else []
+
+        # Build a flat list of key markers: BODH0, BODH1, h2, summary_table, rr_div
+        # Strategy: iterate BODH0 groups, within each find BODH1 instances
+        for bodh0 in bodh0_elements:
+            issue_type_name = bodh0.get_text(strip=True)
+            # Remove leading number: "1. Cross-site scripting" -> "Cross-site scripting"
+            import re as _re
+            issue_type_name = _re.sub(r'^\d+\.\s*', '', issue_type_name)
+
+            # Collect shared background/remediation for this issue group
+            issue_background = ''
+            remediation_background = ''
+            references = ''
+
+            # Walk siblings of BODH0 to find shared sections and BODH1 instances
+            sibling = bodh0.find_next_sibling()
+            current_h2 = ''
+            instances_in_group = []
+            current_instance = None
+
+            while sibling:
+                # Stop at next BODH0 (next issue type group)
+                if sibling.name == 'span' and 'BODH0' in (sibling.get('class') or []):
+                    break
+
+                # H2 headers mark section boundaries
+                if sibling.name == 'h2':
+                    current_h2 = sibling.get_text(strip=True).lower()
+
+                # BODH1 = individual issue instance
+                elif sibling.name == 'span' and 'BODH1' in (sibling.get('class') or []):
+                    # Save previous instance if any
+                    if current_instance:
+                        instances_in_group.append(current_instance)
+                    current_instance = {
+                        'plugin_name': issue_type_name,
+                        'severity': '',
+                        'severity_number': 0,
+                        'confidence': '',
+                        'host_ip': '',
+                        'host_name': '',
+                        'path': '',
+                        'location': '',
+                        'issue_type': '',
+                        'issue_background': '',
+                        'issue_detail': '',
+                        'solutions': '',
+                        'see_also': '',
+                        'request': '',
+                        'response': '',
+                    }
+                    current_h2 = ''
+
+                # Summary table contains severity, confidence, host, path
+                elif sibling.name == 'table' and 'summary_table' in (sibling.get('class') or []):
+                    if current_instance:
+                        for td in sibling.find_all('td'):
+                            text = td.get_text(strip=True)
+                            b_tag = td.find('b')
+                            val = b_tag.get_text(strip=True) if b_tag else ''
+                            if text.startswith('Severity:'):
+                                current_instance['severity'] = val
+                                sev_map = {'High': 3, 'Medium': 2, 'Low': 1, 'Information': 0, 'Info': 0}
+                                current_instance['severity_number'] = sev_map.get(val, 0)
+                            elif text.startswith('Confidence:'):
+                                current_instance['confidence'] = val
+                            elif text.startswith('Host:'):
+                                current_instance['host_name'] = val
+                                if val:
+                                    hosts_seen.add(val)
+                            elif text.startswith('Path:'):
+                                current_instance['path'] = val
+
+                        # Try to extract severity from icon class if not found in text
+                        if not current_instance['severity']:
+                            for icon_td in sibling.find_all('td', class_='icon'):
+                                div = icon_td.find('div')
+                                if div:
+                                    cls = ' '.join(div.get('class') or [])
+                                    if 'high' in cls:
+                                        current_instance['severity'] = 'High'
+                                        current_instance['severity_number'] = 3
+                                    elif 'medium' in cls:
+                                        current_instance['severity'] = 'Medium'
+                                        current_instance['severity_number'] = 2
+                                    elif 'low' in cls:
+                                        current_instance['severity'] = 'Low'
+                                        current_instance['severity_number'] = 1
+                                    elif 'info' in cls:
+                                        current_instance['severity'] = 'Information'
+                                        current_instance['severity_number'] = 0
+
+                # TEXT spans contain section body content
+                elif sibling.name == 'span' and 'TEXT' in (sibling.get('class') or []):
+                    text_content = sibling.get_text(strip=True)
+                    html_content = str(sibling)
+
+                    if current_instance:
+                        # Instance-specific sections
+                        if 'issue detail' in current_h2:
+                            current_instance['issue_detail'] = text_content
+                        elif 'remediation detail' in current_h2:
+                            current_instance['solutions'] = (current_instance['solutions'] + '\n\n' + text_content).strip() if current_instance['solutions'] else text_content
+                        elif 'issue background' in current_h2:
+                            current_instance['issue_background'] = text_content
+                        elif 'remediation background' in current_h2:
+                            current_instance['solutions'] = (current_instance['solutions'] + '\n\n' + text_content).strip() if current_instance['solutions'] else text_content
+                        elif 'vulnerability classif' in current_h2:
+                            # Extract links as references
+                            links = sibling.find_all('a')
+                            refs = [a.get_text(strip=True) for a in links if a.get_text(strip=True)]
+                            current_instance['see_also'] = '\n'.join(refs) if refs else text_content
+                    else:
+                        # Group-level shared sections (before any BODH1)
+                        if 'issue background' in current_h2:
+                            issue_background = text_content
+                        elif 'remediation background' in current_h2:
+                            remediation_background = text_content
+                        elif 'vulnerability classif' in current_h2:
+                            links = sibling.find_all('a')
+                            refs = [a.get_text(strip=True) for a in links if a.get_text(strip=True)]
+                            references = '\n'.join(refs) if refs else text_content
+
+                # Request/response divs
+                elif sibling.name == 'div' and 'rr_div' in (sibling.get('class') or []):
+                    if current_instance:
+                        rr_text = sibling.get_text()
+                        if 'request' in current_h2:
+                            current_instance['request'] = rr_text.strip()
+                        elif 'response' in current_h2:
+                            current_instance['response'] = rr_text.strip()
+
+                sibling = sibling.find_next_sibling()
+
+            # Don't forget the last instance
+            if current_instance:
+                instances_in_group.append(current_instance)
+
+            # Apply shared group-level data to instances that lack their own
+            for inst in instances_in_group:
+                if not inst['issue_background'] and issue_background:
+                    inst['issue_background'] = issue_background
+                if not inst['solutions'] and remediation_background:
+                    inst['solutions'] = remediation_background
+                if not inst['see_also'] and references:
+                    inst['see_also'] = references
+                # Combine issue_background into issue_detail if issue_detail is empty
+                if not inst['issue_detail'] and inst['issue_background']:
+                    inst['issue_detail'] = inst['issue_background']
+
+            results.extend(instances_in_group)
+
+        if not results:
+            return {'success': False, 'message': 'No individual issue instances found in the Burp HTML report.'}
+
+        # Auto-detect target
+        if not target:
+            target = list(hosts_seen)[0] if hosts_seen else 'burp_html_import'
+
+        # Default scan name
+        if not scan_name:
+            filename = getattr(importfile, 'filename', 'burp_html_import')
+            scan_name = f'Burp HTML Import: {filename.rsplit(".", 1)[0] if "." in filename else filename}'
+
+        if is_dry_run:
+            severity_counts = {}
+            for r in results:
+                sev = r['severity'] or 'Unknown'
+                severity_counts[sev] = severity_counts.get(sev, 0) + 1
+
+            return {
+                'success': True,
+                'dry_run': True,
+                'message': f'Validation passed. {len(results)} issues found across {len(hosts_seen)} host(s).',
+                'rows_read': len(results),
+                'rows_imported': len(results),
+                'rows_skipped': 0,
+                'event_types_count': len(severity_counts),
+                'errors': [],
+            }
+
+        # Actual import
+        dbh = SpiderFootDb(self.config)
+        scan_id = existing_scan_id
+
+        if not scan_id:
+            scan_id = str(uuid.uuid4())
+            try:
+                dbh.scanInstanceCreate(scan_id, scan_name, target)
+                root_qry = """INSERT INTO tbl_scan_results
+                    (scan_instance_id, hash, type, generated, confidence,
+                    visibility, risk, module, data, false_positive, source_event_hash)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                root_qvals = [scan_id, 'ROOT', 'ROOT', int(time.time() * 1000),
+                              100, 100, 0, '', target, 0, 'ROOT']
+                dbh.dbh.execute(root_qry, root_qvals)
+                dbh.conn.commit()
+            except Exception as e:
+                return {'success': False, 'message': f'Failed to create scan instance: {e}'}
+
+        try:
+            count = dbh.scanBurpStore(scan_id, results)
+        except Exception as e:
+            return {'success': False, 'message': f'Failed to store Burp HTML results: {e}'}
+
+        if not existing_scan_id:
+            dbh.scanInstanceSet(scan_id, status='FINISHED', ended=time.time() * 1000)
+
+        return {
+            'success': True,
+            'dry_run': False,
+            'message': f'Successfully imported {count} Burp issues from HTML report into scan "{scan_name}".',
+            'scan_id': scan_id,
+            'rows_read': len(results),
+            'rows_imported': count,
+            'rows_skipped': 0,
+            'fps_imported': 0,
+            'validated_imported': 0,
+            'event_types_count': len(set(r['severity'] for r in results if r['severity'])),
             'errors': [],
         }
 
@@ -4314,6 +4582,36 @@ class SpiderFootWebUi:
 
         return self._processBurpImport(content, None, None, importfile,
                                         is_dry_run=False, existing_scan_id=id)
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def importburphtml(self: 'SpiderFootWebUi', id: str = None, importfile=None) -> dict:
+        """Import Burp results from an HTML report into an existing scan.
+
+        Args:
+            id (str): scan instance ID
+            importfile: uploaded .html file
+
+        Returns:
+            dict: import results
+        """
+        if not id:
+            return {'success': False, 'message': 'No scan ID provided.'}
+
+        if importfile is None:
+            return {'success': False, 'message': 'No file was uploaded.'}
+
+        try:
+            raw = importfile.file.read()
+            content = raw.decode('utf-8', errors='replace')
+        except Exception as e:
+            return {'success': False, 'message': f'Failed to read uploaded file: {e}'}
+
+        if not content.strip():
+            return {'success': False, 'message': 'Uploaded file is empty.'}
+
+        return self._processBurpHtmlImport(content, None, None, importfile,
+                                           is_dry_run=False, existing_scan_id=id)
 
     @cherrypy.expose
     def scanfindingsexport(self: 'SpiderFootWebUi', id: str, filetype: str = "xlsx") -> str:
