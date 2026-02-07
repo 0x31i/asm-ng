@@ -781,8 +781,8 @@
             currentSection = target;
             updatePageTitle();
 
-            // Restore default export dropdown when navigating away from vulns
-            if (target !== 'btn-graph' && defaultExportDropdownHtml) {
+            // Restore default export dropdown when navigating away from vulns/findings
+            if (target !== 'btn-graph' && target !== 'btn-findings' && defaultExportDropdownHtml) {
                 $('#export-dropdown-menu').html(defaultExportDropdownHtml);
             }
 
@@ -1642,13 +1642,23 @@
             $("#scanlogs-content").remove();
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
-            $("#btn-export").hide();
+            $("#btn-export").show();
             $("#btn-download-logs").hide();
             $("#btn-refresh").show();
             $("#btn-search").hide();
             $("#scanreminder").hide();
             navTo("btn-findings");
             refresh = function() { viewFindings(instanceId); }
+
+            // Save default export dropdown and replace with findings-specific options
+            if (!defaultExportDropdownHtml) {
+                defaultExportDropdownHtml = $('#export-dropdown-menu').html();
+            }
+            var findingsExportHtml = '';
+            findingsExportHtml += "<li class='dropdown-header'>Findings & Correlations Export</li>";
+            findingsExportHtml += "<li><a class='link' onClick='exportEventData(\"" + instanceId + "\", \"\", \"csv\", \"full\")'>CSV (FINDINGS.csv + CORRELATIONS.csv)</a></li>";
+            findingsExportHtml += "<li><a class='link' onClick='exportEventData(\"" + instanceId + "\", \"\", \"excel\", \"full\")'>Excel (FINDINGS.xlsx - two tabs)</a></li>";
+            $('#export-dropdown-menu').html(findingsExportHtml);
 
             var grid = "<div id='scansummary-content'>";
             grid += "<div class='vuln-container'>";
@@ -3303,6 +3313,14 @@
                     efr.src = '${docroot}/scanvulnsexport?filetype=xlsx&id=' + instanceId;
                 } else {
                     efr.src = '${docroot}/scanvulnsexport?filetype=csv&id=' + instanceId;
+                }
+            }
+
+            if (currentSection == "btn-findings") {
+                if (fileType == "excel") {
+                    efr.src = '${docroot}/scanfindingsexport?filetype=xlsx&id=' + instanceId;
+                } else {
+                    efr.src = '${docroot}/scanfindingsexport?filetype=csv&id=' + instanceId;
                 }
             }
 

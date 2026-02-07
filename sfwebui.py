@@ -4965,7 +4965,7 @@ class SpiderFootWebUi:
             pass
 
         if filetype.lower() in ["xlsx", "excel"]:
-            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-findings.xlsx"
+            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-FINDINGS.xlsx"
             cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             cherrypy.response.headers['Pragma'] = "no-cache"
 
@@ -4998,18 +4998,34 @@ class SpiderFootWebUi:
                 return f.read()
 
         if filetype.lower() == 'csv':
-            from io import StringIO
             import csv
-            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-findings.csv"
-            cherrypy.response.headers['Content-Type'] = "application/csv"
+            import zipfile
+            from io import StringIO, BytesIO
+
+            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-FINDINGS-CSV.zip"
+            cherrypy.response.headers['Content-Type'] = "application/zip"
             cherrypy.response.headers['Pragma'] = "no-cache"
 
-            fileobj = StringIO()
-            parser = csv.writer(fileobj, dialect='excel')
-            parser.writerow(["Priority", "Category", "Tab", "Item", "Description", "Recommendation"])
-            for row in findings_rows:
-                parser.writerow(row)
-            return fileobj.getvalue().encode('utf-8')
+            zip_buffer = BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                # FINDINGS.csv
+                findings_io = StringIO()
+                findings_writer = csv.writer(findings_io, dialect='excel')
+                findings_writer.writerow(["Priority", "Category", "Tab", "Item", "Description", "Recommendation"])
+                for row in findings_rows:
+                    findings_writer.writerow(row)
+                zf.writestr("FINDINGS.csv", findings_io.getvalue())
+
+                # CORRELATIONS.csv
+                corr_io = StringIO()
+                corr_writer = csv.writer(corr_io, dialect='excel')
+                corr_writer.writerow(["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"])
+                for row in correlation_rows:
+                    corr_writer.writerow(row)
+                zf.writestr("CORRELATIONS.csv", corr_io.getvalue())
+
+            zip_buffer.seek(0)
+            return zip_buffer.read()
 
         return self.error("Invalid export file type.")
 
