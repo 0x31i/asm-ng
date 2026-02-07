@@ -4,7 +4,7 @@
 # Purpose:     SpiderFoot plug-in for using the 'gobuster' tool.
 #              Tool: https://github.com/OJ/gobuster
 #
-# Author:      <van1sh@van1shland.io>
+# Author:      <elias@sims.dev>
 #
 # Created:     2025-03-08
 # Copyright:   (c) Agostino Panico

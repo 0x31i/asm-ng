@@ -10,7 +10,7 @@ This package contains the core SpiderFoot functionality including:
 from .__version__ import __version__
 __author__ = "Steve Micallef, Agostino Panico"
 __license__ = "MIT"
-__email__ = "steve@binarypool.com, van1sh@van1shland.io"
+__email__ = "steve@binarypool.com, elias@sims.dev"
 __url__ = "https://github.com/poppopjmp/spiderfoot"
 
 # Core imports for package

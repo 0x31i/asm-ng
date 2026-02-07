@@ -4,7 +4,7 @@
 # Purpose:     Query Recorded Future's Vulnerability Database API.
 #
 #
-# Author:       Agostino Panico <van1sh@van1shland.io>
+# Author:       Agostino Panico <elias@sims.dev>
 #
 # Created:      14/03/2025
 # Copyright:    (c) poppopjmp

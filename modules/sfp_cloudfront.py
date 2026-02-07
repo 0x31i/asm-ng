@@ -3,7 +3,7 @@
 # Name:   sfp_cloudfront
 # Purpose:  Check if a domain uses Amazon CloudFront CDN.
 #
-# Author:   Agostino Panico <van1sh@van1shland.io>
+# Author:   Agostino Panico <elias@sims.dev>
 #
 # Created:  01/02/2025
 # Copyright:  (c) poppopjmp

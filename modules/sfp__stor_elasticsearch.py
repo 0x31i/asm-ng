@@ -3,7 +3,7 @@
 # Name:         sfp__stor_elasticsearch
 # Purpose:      SpiderFoot plug-in for storing events to ElasticSearch.
 #
-# Author:      <van1sh@van1shland.io>
+# Author:      <elias@sims.dev>
 #
 # Created:     2025-03-15
 # Copyright:   (c) poppopjmp 2025

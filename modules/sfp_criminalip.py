@@ -3,7 +3,7 @@
 # Name:        sfp_criminalip
 # Purpose:     Search CriminalIP for domain, phone and IP address information.
 #
-# Author:       Agostino Panico <van1sh@van1shland.io>
+# Author:       Agostino Panico <elias@sims.dev>
 #
 # Created:      14/03/2025
 # Copyright:    (c) poppopjmp

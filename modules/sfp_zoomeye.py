@@ -3,7 +3,7 @@
 # Name:   sfp_zoomeye
 # Purpose:  Search ZoomEye for domain, IP address, and other information.
 #
-# Author:   Agostino Panico <van1sh@van1shland.io>
+# Author:   Agostino Panico <elias@sims.dev>
 #
 # Created:  01/02/2025
 # Copyright:  (c) poppopjmp

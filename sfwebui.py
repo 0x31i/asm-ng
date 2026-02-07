@@ -516,7 +516,11 @@ class SpiderFootWebUi:
         dbh = SpiderFootDb(self.config)
 
         try:
-            data = dbh.scanCorrelations(id)
+            raw = dbh.scanCorrelationList(id)
+            # Transform from scanCorrelationList format to export format
+            # DB returns: [id, title, rule_id, rule_risk, rule_name, rule_descr, rule_logic, event_count, event_types]
+            # Export needs: [Rule Name, Correlation, Risk, Description]
+            data = [[row[4], row[1], row[3], row[5]] for row in raw]
         except Exception:
             return self.error("Scan ID not found")
 
