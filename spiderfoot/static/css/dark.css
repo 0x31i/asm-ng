@@ -6024,7 +6024,6 @@ i.glyphicon-white,
 .findings-table-wrapper {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  overflow: hidden;
 }
 
 .findings-table {
@@ -6045,6 +6044,11 @@ i.glyphicon-white,
   padding: 8px 10px;
   border: none;
   white-space: nowrap;
+  /* Sticky header - stays fixed at top when scrolling */
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  z-index: 102;
 }
 
 .findings-table .col-priority { width: 120px; }
