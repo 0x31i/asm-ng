@@ -1126,14 +1126,14 @@
                         html += "<td><span class='badge " + badgeClass + "'>" + priority + "</span>";
                         if (hasDetail) html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='finding-icon-" + i + "'></i>";
                         html += "</td>";
-                        html += "<td>" + (data[i][2] || '') + "</td>";
+                        html += "<td><div class='cell-clamp'>" + (data[i][2] || '') + "</div></td>";
                         // Type column as clickable link to Browse page
                         if (typeVal) {
-                            html += "<td><a class='finding-type-link' onclick='event.stopPropagation(); browseEventData(\"" + instanceId + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"full\");' title='Browse " + typeVal + " data'>" + typeVal + "</a></td>";
+                            html += "<td><div class='cell-clamp'><a class='finding-type-link' onclick='event.stopPropagation(); browseEventData(\"" + instanceId + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"full\");' title='Browse " + typeVal + " data'>" + typeVal + "</a></div></td>";
                         } else {
                             html += "<td></td>";
                         }
-                        html += "<td>" + (data[i][4] || '') + "</td>";
+                        html += "<td><div class='cell-clamp'>" + (data[i][4] || '') + "</div></td>";
                         html += "</tr>";
 
                         // Expandable detail row
@@ -1316,7 +1316,7 @@
                 html += "<td><span class='badge " + badgeClass + "'>" + risk + "</span>";
                 html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='corr-icon-" + corrId + "'></i>";
                 html += "</td>";
-                html += "<td>" + data[i][1] + "</td>";
+                html += "<td><div class='cell-clamp'>" + data[i][1] + "</div></td>";
 
                 // Type column with clickable links to Browse
                 if (eventTypes) {
@@ -1328,12 +1328,12 @@
                             typeLinks.push("<a class='finding-type-link' onclick='event.stopPropagation(); browseEventData(\"" + instanceId + "\", \"" + typ.replace(/"/g, '&quot;') + "\", \"" + typ.replace(/"/g, '&quot;') + "\", \"full\");' title='Browse " + typ + " data'>" + typ + "</a>");
                         }
                     }
-                    html += "<td>" + typeLinks.join(", ") + "</td>";
+                    html += "<td><div class='cell-clamp'>" + typeLinks.join(", ") + "</div></td>";
                 } else {
                     html += "<td></td>";
                 }
 
-                html += "<td>" + data[i][7] + "</td>";
+                html += "<td><div class='cell-clamp'>" + data[i][7] + "</div></td>";
                 html += "</tr>";
 
                 // Expandable detail row (description + events sub-table)
