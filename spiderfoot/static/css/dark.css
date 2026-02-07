@@ -5418,6 +5418,12 @@ button[data-target="#createWorkspaceModal"]:hover,
   font-weight: 500;
 }
 
+/* DATA values in green for quick identification (dark mode) */
+.discovery-path-cell .dp-data-value {
+  color: #4ade80;
+  font-weight: 600;
+}
+
 /* Expand/collapse toggle in dark mode */
 .dp-collapsed .dp-expand-toggle::after {
   border-left-color: rgba(255, 255, 255, 0.5);
