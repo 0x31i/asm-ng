@@ -1981,8 +1981,8 @@
                         var colLabel;
                         if (d === 0) colLabel = "Root";
                         else if (d === maxDepth - 1) colLabel = "Leaf";
-                        else if (maxDepth <= 3) colLabel = "Parent";
-                        else colLabel = "Parent " + d;
+                        else if (maxDepth <= 3) colLabel = "Branch";
+                        else colLabel = "Branch " + d;
                         table += "<th " + thStyle + ">" + colLabel + "</th>";
                     }
                     table += "</tr></thead><tbody>";

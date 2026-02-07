@@ -5615,15 +5615,15 @@ i.glyphicon-white,
   font-weight: 600;
 }
 
-/* Expand/collapse toggle triangle */
+/* Expand/collapse toggle — corner triangle filling bottom-right of cell */
 .dp-expand-toggle {
   position: absolute;
   bottom: 0;
   right: 0;
-  width: 18px;
-  height: 18px;
+  width: 0;
+  height: 0;
   cursor: pointer;
-  opacity: 0.5;
+  opacity: 0.7;
   transition: opacity 0.15s;
   z-index: 5;
 }
@@ -5632,28 +5632,16 @@ i.glyphicon-white,
   opacity: 1;
 }
 
-/* Collapsed: triangle pointing right (click to expand) */
-.dp-collapsed .dp-expand-toggle::after {
-  content: '';
-  display: block;
-  width: 0;
-  height: 0;
-  border-top: 5px solid transparent;
-  border-bottom: 5px solid transparent;
-  border-left: 7px solid #6b7280;
-  margin: 4px 0 0 6px;
+/* Collapsed: solid green corner triangle (bottom-right) */
+.dp-collapsed .dp-expand-toggle {
+  border-bottom: 20px solid #16a34a;
+  border-left: 20px solid transparent;
 }
 
-/* Expanded: triangle pointing down (click to collapse) */
-.dp-expanded .dp-expand-toggle::after {
-  content: '';
-  display: block;
-  width: 0;
-  height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 7px solid #6b7280;
-  margin: 6px 0 0 4px;
+/* Expanded: solid green corner triangle (bottom-right) */
+.dp-expanded .dp-expand-toggle {
+  border-bottom: 20px solid #15803d;
+  border-left: 20px solid transparent;
 }
 
 /* Responsive adjustments */
