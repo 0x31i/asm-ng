@@ -2019,10 +2019,12 @@
                         // Node columns (Root -> ... -> Leaf)
                         function buildCell(type, module, data) {
                             var html = "<td class='discovery-path-cell dp-collapsed'>";
+                            html += "<div class='dp-cell-wrap'>";
                             html += "<div class='dp-type'><strong>TYPE:</strong> <span class='dp-value'>" + type + "</span></div>";
                             html += "<div class='dp-module'><strong>SOURCE MODULE:</strong> <span class='dp-value'>" + module + "</span></div>";
-                            html += "<div class='dp-data'><strong>DATA:</strong> <span class='dp-value'>" + data + "</span></div>";
-                            html += "<div class='dp-expand-toggle' title='Click to expand'></div>";
+                            html += "<div class='dp-data'><strong>DATA:</strong> <span class='dp-value dp-data-value'>" + data + "</span></div>";
+                            html += "<div class='dp-expand-toggle'></div>";
+                            html += "</div>";
                             html += "</td>";
                             return html;
                         }
@@ -2060,16 +2062,21 @@
                             }
                         });
                         if (!hasOverflow) {
-                            cell.find('.dp-expand-toggle').hide();
+                            cell.find('.dp-expand-toggle').remove();
                             cell.removeClass('dp-collapsed');
                         }
                     });
 
                     // Click handler for expand/collapse toggle
-                    $(document).on('click', '.dp-expand-toggle', function(e) {
+                    $("#scansummary-content").on('click', '.dp-expand-toggle', function(e) {
                         e.stopPropagation();
+                        e.preventDefault();
                         var cell = $(this).closest('.discovery-path-cell');
-                        cell.toggleClass('dp-collapsed dp-expanded');
+                        if (cell.hasClass('dp-collapsed')) {
+                            cell.removeClass('dp-collapsed').addClass('dp-expanded');
+                        } else {
+                            cell.removeClass('dp-expanded').addClass('dp-collapsed');
+                        }
                     });
 
                     // Apply any active client-side filters
