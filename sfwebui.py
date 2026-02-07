@@ -848,9 +848,10 @@ class SpiderFootWebUi:
     def scandiscoverypathexport(self: 'SpiderFootWebUi', id: str, eventType: str, filetype: str = "csv", dialect: str = "excel") -> str:
         """Export discovery path data as CSV or Excel.
 
-        Flattens the hierarchical discovery path tree into table rows,
-        each showing the leaf data, its type, source module, and the
-        full root-to-leaf lineage.
+        Flattens the hierarchical discovery path tree into table rows.
+        Each node in the path gets its own set of columns (Type, Source Module, Data),
+        ordered Root (left) to Leaf (right). Rows follow the same ordering as the
+        full data view.
 
         Args:
             id (str): scan ID
@@ -862,11 +863,9 @@ class SpiderFootWebUi:
             str: CSV or Excel data as file download
         """
         dbh = SpiderFootDb(self.config)
-        pc = dict()
-        datamap = dict()
 
         try:
-            leafSet = dbh.scanResultEvent(id, eventType, filterFp=True)
+            leafSet = dbh.scanResultEvent(id, eventType)
             [datamap, pc] = dbh.scanElementSourcesAll(id, leafSet)
         except Exception:
             cherrypy.response.headers['Content-Disposition'] = 'attachment; filename=SpiderFoot-DiscoveryPath.csv'
@@ -878,28 +877,26 @@ class SpiderFootWebUi:
             del pc['ROOT']
         tree = SpiderFootHelpers.dataParentChildToTree(pc)
 
-        # Flatten the tree into rows by walking from root to each leaf
-        rows = []
+        # Build leaf hash -> path (list of node dicts) by walking the tree
+        leaf_paths = {}
 
         def walk(node, path_so_far):
             node_name = node.get('name', '')
             node_data = datamap.get(node_name)
             current_path = list(path_so_far)
-            if node_data and str(node_data[4]) != 'ROOT':
+            if node_data:
                 data_str = str(node_data[1]).replace('<SFURL>', '').replace('</SFURL>', '')
-                current_path.append(data_str)
+                current_path.append({
+                    'type': str(node_data[10]) if node_data[10] else str(node_data[4]),
+                    'module': str(node_data[3]) if node_data[3] else '',
+                    'data': data_str,
+                    'is_root': str(node_data[4]) == 'ROOT'
+                })
 
             children = node.get('children')
             if not children:
-                # Leaf node - emit a row
                 if node_data and str(node_data[4]) != 'ROOT':
-                    leaf_data = str(node_data[1]).replace('<SFURL>', '').replace('</SFURL>', '')
-                    rows.append([
-                        str(node_data[10]),  # Type (event_descr)
-                        str(node_data[3]),   # Source Module
-                        leaf_data,           # Data
-                        ' -> '.join(current_path)  # Discovery Path
-                    ])
+                    leaf_paths[str(node_data[8])] = current_path
             else:
                 for child in children:
                     walk(child, current_path)
@@ -907,15 +904,59 @@ class SpiderFootWebUi:
         if tree:
             walk(tree, [])
 
-        column_names = ["Type", "Source Module", "Data", "Discovery Path"]
+        # Find max path depth
+        max_depth = 0
+        for path in leaf_paths.values():
+            if len(path) > max_depth:
+                max_depth = len(path)
+
+        if max_depth == 0:
+            max_depth = 1
+
+        # Build column headers: Status + per-node (Type, Source Module, Data)
+        column_names = ["Status"]
+        for d in range(max_depth):
+            if d == 0:
+                prefix = "Root"
+            elif d == max_depth - 1 and max_depth > 1:
+                prefix = "Leaf"
+            else:
+                prefix = f"Node {d + 1}"
+            column_names.extend([f"{prefix} Type", f"{prefix} Source Module", f"{prefix} Data"])
+
+        # Build rows in leafSet order (same as full data view)
+        rows = []
+        for leaf_row in leafSet:
+            if str(leaf_row[4]) == 'ROOT':
+                continue
+            leaf_hash = str(leaf_row[8])
+            fp_flag = leaf_row[13]
+            status = "FALSE POSITIVE" if fp_flag == 1 else ("VALIDATED" if fp_flag == 2 else "UNVALIDATED")
+
+            path = leaf_paths.get(leaf_hash, [])
+            row = [status]
+            for d in range(max_depth):
+                if d < len(path):
+                    node = path[d]
+                    row.extend([node['type'], node['module'], node['data']])
+                else:
+                    row.extend(['', '', ''])
+            rows.append(row)
 
         if filetype.lower() in ["xlsx", "excel"]:
-            # buildExcel pops sheetNameIndex column to use as sheet name,
-            # so prepend Type as the sheet name column
+            # For buildExcel, prepend the leaf type as sheet name column
             excel_rows = []
-            for row in rows:
-                excel_rows.append([row[0]] + list(row))
-            excel_col_names = ["Type"] + column_names
+            for i, leaf_row in enumerate(leafSet):
+                if str(leaf_row[4]) == 'ROOT':
+                    continue
+                leaf_hash = str(leaf_row[8])
+                path = leaf_paths.get(leaf_hash, [])
+                # Use the leaf's event type description as the sheet name
+                sheet_name = str(leaf_row[10]) if leaf_row[10] else str(leaf_row[4])
+                idx = len(excel_rows)
+                if idx < len(rows):
+                    excel_rows.append([sheet_name] + rows[idx])
+            excel_col_names = ["_SheetName"] + column_names
 
             cherrypy.response.headers['Content-Disposition'] = 'attachment; filename=SpiderFoot-DiscoveryPath.xlsx'
             cherrypy.response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

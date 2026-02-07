@@ -5558,6 +5558,34 @@ i.glyphicon-white,
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+/* Discovery path table cell styling */
+.discovery-path-cell {
+  padding: 6px 10px !important;
+  vertical-align: top;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  min-width: 180px;
+}
+
+.discovery-path-cell .dp-type,
+.discovery-path-cell .dp-module,
+.discovery-path-cell .dp-data {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+
+.discovery-path-cell .dp-type strong,
+.discovery-path-cell .dp-module strong,
+.discovery-path-cell .dp-data strong {
+  color: #6b7280;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
 /* Responsive adjustments */
 @media (max-width: 992px) {
   .stats-bar-fullwidth {

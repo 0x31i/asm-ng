@@ -1871,41 +1871,42 @@
                 $("#btn-discoverypathview").addClass("active");
                 $("#btn-fullview").removeClass("active");
                 $("#btn-vizview").removeClass("active");
-                $("#modifyactions").hide();
+                $("#modifyactions").show();
 
-                sf.fetchData('${docroot}/scanelementtypediscovery', {
-                    'id': instanceId,
-                    'eventType': eventType,
-                    'filterFp': filterFP ? "1" : "0"
-                }, function(responseData) {
-                    var treeData = responseData['tree'];
-                    var dataMap = responseData['data'];
+                // Fetch both datasets: full view data (for ordering + FP status) and discovery tree (for paths)
+                var fullViewData = null;
+                var discoveryData = null;
+                var loaded = 0;
 
-                    // Flatten the tree: walk to each leaf node, collecting the discovery path
-                    var rows = [];
+                function onBothLoaded() {
+                    var treeData = discoveryData['tree'];
+                    var dataMap = discoveryData['data'];
+
+                    // Build a lookup from leaf hash to its path (array of node objects from root to leaf)
+                    var leafPaths = {};
 
                     function walkTree(node, pathSoFar) {
                         var nodeName = node.name;
                         var nodeInfo = dataMap[nodeName];
                         var currentPath = pathSoFar.slice();
-                        if (nodeInfo && nodeInfo[4] !== 'ROOT') {
-                            currentPath.push(sf.remove_sfurltag(String(nodeInfo[1])));
+                        if (nodeInfo) {
+                            currentPath.push({
+                                data: sf.remove_sfurltag(String(nodeInfo[1])),
+                                type: nodeInfo[10] || nodeInfo[4],
+                                module: nodeInfo[3] || '',
+                                hash: nodeInfo[8],
+                                isRoot: nodeInfo[4] === 'ROOT'
+                            });
                         }
 
                         if (!node.children || node.children.length === 0) {
-                            // Leaf node - emit a row
+                            // Leaf node - store the path keyed by hash
                             if (nodeInfo && nodeInfo[4] !== 'ROOT') {
-                                rows.push({
-                                    data: String(nodeInfo[1]),
-                                    type: nodeInfo[10],
-                                    module: nodeInfo[3],
-                                    fp: nodeInfo[13],
-                                    path: currentPath
-                                });
+                                leafPaths[nodeInfo[8]] = currentPath;
                             }
                         } else {
-                            for (var i = 0; i < node.children.length; i++) {
-                                walkTree(node.children[i], currentPath);
+                            for (var c = 0; c < node.children.length; c++) {
+                                walkTree(node.children[c], currentPath);
                             }
                         }
                     }
@@ -1914,38 +1915,184 @@
                         walkTree(treeData, []);
                     }
 
-                    // Build stats bar
-                    var statsBar = "<div id='stats-bar' class='stats-bar-fullwidth stats-bar-simple'>";
+                    // Find the maximum path depth across all leaves
+                    var maxDepth = 0;
+                    for (var h in leafPaths) {
+                        if (leafPaths[h].length > maxDepth) maxDepth = leafPaths[h].length;
+                    }
+
+                    // Count stats from fullViewData (same logic as full view)
+                    var stats = { total: 0, fp: 0, fpLegacy: 0, validated: 0, validatedLegacy: 0, unvalidated: 0, imported: 0 };
+                    for (var i = 0; i < fullViewData.length; i++) {
+                        stats.total++;
+                        if (fullViewData[i][13] != null) stats.imported++;
+                        if (fullViewData[i][8] == "1") stats.fp++;
+                        else if (fullViewData[i][11] == 1) stats.fpLegacy++;
+                        else if (fullViewData[i][8] == "2") stats.validated++;
+                        else if (fullViewData[i][12] == 1) stats.validatedLegacy++;
+                        else stats.unvalidated++;
+                    }
+                    var totalFP = stats.fp + stats.fpLegacy;
+                    var totalValidated = stats.validated + stats.validatedLegacy;
+
+                    // Build stats bar (same style as full view)
+                    var statsBar = "<div id='stats-bar' class='stats-bar-fullwidth' style='position: sticky; position: -webkit-sticky; top: 0; z-index: 101;'>";
                     statsBar += "<div class='stats-bar-left'>";
-                    statsBar += "<div class='stats-item'><span class='stats-value'>" + rows.length + "</span><span class='stats-label'>DISCOVERY PATHS</span></div>";
+                    statsBar += "<div class='stats-item'><span class='stats-value'>" + stats.total + "</span><span class='stats-label'>TOTAL</span></div>";
+                    statsBar += "<div class='stats-item stats-fp'><span class='stats-value'>" + stats.fp + "</span><span class='stats-label'>FALSE POSITIVES</span></div>";
+                    statsBar += "<div class='stats-item stats-validated'><span class='stats-value'>" + stats.validated + "</span><span class='stats-label'>VALIDATED</span></div>";
+                    statsBar += "<div class='stats-item stats-unvalidated'><span class='stats-value'>" + stats.unvalidated + "</span><span class='stats-label'>UNVALIDATED</span></div>";
+                    if (stats.imported > 0) {
+                        statsBar += "<div class='stats-item stats-imported'><span class='stats-value'>" + stats.imported + "</span><span class='stats-label'>IMPORTED</span></div>";
+                    }
+                    statsBar += "</div>";
+
+                    // Filter buttons
+                    statsBar += "<div class='stats-bar-right'>";
+                    if (totalFP > 0) {
+                        var fpBtnClass = clientFilterState.fp ? 'filter-btn filter-btn-active filter-btn-fp' : 'filter-btn filter-btn-fp';
+                        var fpBtnText = clientFilterState.fp ? 'HIDING ' + totalFP + ' FP' : 'HIDE ' + totalFP + ' FP';
+                        statsBar += "<button class='" + fpBtnClass + "' data-show-text='HIDE " + totalFP + " FP' data-hiding-text='HIDING " + totalFP + " FP' onclick=\"toggleClientFilter('fp')\">" + fpBtnText + "</button>";
+                    }
+                    if (totalValidated > 0) {
+                        var valBtnClass = clientFilterState.validated ? 'filter-btn filter-btn-active filter-btn-validated' : 'filter-btn filter-btn-validated';
+                        var valBtnText = clientFilterState.validated ? 'HIDING ' + totalValidated + ' VALIDATED' : 'HIDE ' + totalValidated + ' VALIDATED';
+                        statsBar += "<button class='" + valBtnClass + "' data-show-text='HIDE " + totalValidated + " VALIDATED' data-hiding-text='HIDING " + totalValidated + " VALIDATED' onclick=\"toggleClientFilter('validated')\">" + valBtnText + "</button>";
+                    }
+                    if (stats.imported > 0) {
+                        var impBtnClass = clientFilterState.imported ? 'filter-btn filter-btn-active filter-btn-imported' : 'filter-btn filter-btn-imported';
+                        var impBtnText = clientFilterState.imported ? 'HIDING ' + stats.imported + ' IMPORTED' : 'HIDE ' + stats.imported + ' IMPORTED';
+                        statsBar += "<button class='" + impBtnClass + "' data-show-text='HIDE " + stats.imported + " IMPORTED' data-hiding-text='HIDING " + stats.imported + " IMPORTED' onclick=\"toggleClientFilter('imported')\">" + impBtnText + "</button>";
+                    }
                     statsBar += "</div></div>";
 
-                    // Build table
+                    // Build table header with dynamic node columns
+                    var isDarkMode = localStorage.getItem("theme") === "dark-theme";
+                    var thBg = isDarkMode ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 255, 255, 0.85)";
+                    var thColor = isDarkMode ? "#ffffff" : "#1f2937";
+                    var thStyle = "style='position: sticky; position: -webkit-sticky; top: 50px; z-index: 100; background: " + thBg + "; color: " + thColor + ";'";
+
                     var table = "<table id='scansummary-content' class='table table-bordered table-striped small tablesorter'>";
                     table += "<thead><tr>";
-                    table += "<th>Data</th>";
-                    table += "<th>Type</th>";
-                    table += "<th>Source Module</th>";
-                    table += "<th>Discovery Path (Root \u2192 Leaf)</th>";
+                    table += "<th class='text-center' " + thStyle + "><input id='checkall' type='checkbox' onClick='switchSelectAll()'></th>";
+                    table += "<th class='text-center validation-status' " + thStyle + ">Status</th>";
+                    // Dynamic node columns: Root on left, Leaf on right
+                    for (var d = 0; d < maxDepth; d++) {
+                        var colLabel = (d === 0) ? "Root" : (d === maxDepth - 1 ? "Leaf" : "Node " + (d + 1));
+                        table += "<th " + thStyle + ">" + colLabel + "</th>";
+                    }
                     table += "</tr></thead><tbody>";
 
-                    for (var i = 0; i < rows.length; i++) {
-                        var r = rows[i];
-                        var fpClass = '';
-                        if (r.fp == 1) fpClass = ' class="table-danger"';
-                        else if (r.fp == 2) fpClass = ' class="table-success"';
-                        table += "<tr" + fpClass + ">";
-                        table += "<td><pre class='table-border-bg-inherit'>" + sf.replace_sfurltag(r.data) + "</pre></td>";
-                        table += "<td>" + r.type + "</td>";
-                        table += "<td>" + r.module + "</td>";
-                        table += "<td><pre class='table-border-bg-inherit'>" + r.path.join(" \u2192 ") + "</pre></td>";
+                    // Iterate fullViewData in order (same as full view) — each entry is a leaf
+                    for (var i = 0; i < fullViewData.length; i++) {
+                        var d = fullViewData[i];
+                        var leafHash = d[7]; // hash
+                        var path = leafPaths[leafHash];
+                        var isImported = d[13] != null;
+
+                        // Row classes
+                        var rowClasses = [];
+                        if (isImported) rowClasses.push("imported-row");
+                        var rowClassAttr = rowClasses.length > 0 ? " class='" + rowClasses.join(" ") + "'" : "";
+
+                        table += "<tr" + rowClassAttr + ">";
+
+                        // Checkbox
+                        table += "<td class='text-center'><input type='checkbox' id='cb_" + d[7] + "'></td>";
+
+                        // Status column (same as full view)
+                        table += "<td class='text-center validation-status'>";
+                        var importedClass = isImported ? " status-imported-glow" : "";
+                        if (d[8] == "1" || d[11] == 1) {
+                            table += "<span class='status-fp" + importedClass + "' title='False Positive'>FALSE POSITIVE</span>";
+                        } else if (d[8] == "2" || d[12] == 1) {
+                            table += "<span class='status-validated" + importedClass + "' title='Validated'>VALIDATED</span>";
+                        } else {
+                            table += "<span class='status-unvalidated" + importedClass + "' title='Not yet reviewed'>UNVALIDATED</span>";
+                        }
+                        table += "</td>";
+
+                        // Node columns (Root -> ... -> Leaf)
+                        if (path && path.length > 0) {
+                            for (var n = 0; n < maxDepth; n++) {
+                                if (n < path.length) {
+                                    var node = path[n];
+                                    table += "<td class='discovery-path-cell'>";
+                                    table += "<div class='dp-type'><strong>TYPE:</strong> " + node.type + "</div>";
+                                    table += "<div class='dp-module'><strong>SOURCE MODULE:</strong> " + node.module + "</div>";
+                                    table += "<div class='dp-data'><strong>DATA:</strong> " + node.data + "</div>";
+                                    table += "</td>";
+                                } else {
+                                    table += "<td></td>";
+                                }
+                            }
+                        } else {
+                            // No path found - fill with leaf data in last column
+                            for (var n = 0; n < maxDepth - 1; n++) {
+                                table += "<td></td>";
+                            }
+                            table += "<td class='discovery-path-cell'>";
+                            table += "<div class='dp-type'><strong>TYPE:</strong> " + d[10] + "</div>";
+                            table += "<div class='dp-module'><strong>SOURCE MODULE:</strong> " + d[3] + "</div>";
+                            table += "<div class='dp-data'><strong>DATA:</strong> " + sf.remove_sfurltag(d[1]) + "</div>";
+                            table += "</td>";
+                        }
+
                         table += "</tr>";
                     }
                     table += "</tbody></table>";
 
                     $("#loader").fadeOut(500);
                     $("#mainbody").append(statsBar + table);
-                    $("#scansummary-content").tablesorter();
+                    $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false }, 1: { sorter: false } } });
+
+                    // Apply any active client-side filters
+                    if (clientFilterState.fp || clientFilterState.validated || clientFilterState.imported) {
+                        applyClientSideFilters();
+                    }
+
+                    // Checkbox shift-click support
+                    lastChecked = null;
+                    var chkboxes = $('input[id*=cb_]');
+                    chkboxes.click(function(e) {
+                        if (!lastChecked) { lastChecked = this; return; }
+                        if (e.shiftKey) {
+                            var start = chkboxes.index(this);
+                            var end = chkboxes.index(lastChecked);
+                            chkboxes.slice(Math.min(start, end), Math.max(start, end) + 1).prop('checked', lastChecked.checked);
+                        }
+                        lastChecked = this;
+                    });
+
+                    // Click anywhere in first cell to toggle checkbox
+                    $("#scansummary-content td:first-child").click(function(e) {
+                        if (e.target.type !== 'checkbox') {
+                            var cb = $(this).find("input[type='checkbox']");
+                            cb.prop('checked', !cb.prop('checked'));
+                            updateSelectionToolbar();
+                        }
+                    });
+
+                    $("input[id*=cb_]").change(function() { updateSelectionToolbar(); });
+                    $("#checkall").change(function() { updateSelectionToolbar(); });
+                }
+
+                // Fetch full view data (for ordering and FP status)
+                sf.fetchData('${docroot}/scaneventresults', {'id': instanceId, 'eventType': eventType }, function(data) {
+                    fullViewData = data;
+                    loaded++;
+                    if (loaded === 2) onBothLoaded();
+                });
+
+                // Fetch discovery path tree
+                sf.fetchData('${docroot}/scanelementtypediscovery', {
+                    'id': instanceId,
+                    'eventType': eventType,
+                    'filterFp': '0'
+                }, function(data) {
+                    discoveryData = data;
+                    loaded++;
+                    if (loaded === 2) onBothLoaded();
                 });
             }
 

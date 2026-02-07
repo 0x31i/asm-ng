@@ -5406,6 +5406,13 @@ button[data-target="#createWorkspaceModal"]:hover,
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
+/* Discovery path table cell styling */
+.discovery-path-cell .dp-type strong,
+.discovery-path-cell .dp-module strong,
+.discovery-path-cell .dp-data strong {
+  color: rgba(255, 255, 255, 0.5);
+}
+
 /* Responsive adjustments */
 @media (max-width: 992px) {
   .stats-bar-fullwidth {
