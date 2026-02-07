@@ -1127,8 +1127,8 @@
             html += "<button class='btn btn-danger' onclick='triggerBurpUpload(\"" + instanceId + "\", \"xml\")'>";
             html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;&nbsp;UPLOAD XML";
             html += "</button>";
-            html += "<button class='btn btn-danger' onclick='triggerBurpUpload(\"" + instanceId + "\", \"html\")'>";
-            html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;&nbsp;UPLOAD HTML REPORT";
+            html += "<button class='btn btn-default' onclick='triggerBurpUpload(\"" + instanceId + "\", \"html\")' disabled title='Import Burp XML first, then use HTML ENHANCE to add details'>";
+            html += "<i class='glyphicon glyphicon-plus-sign'></i>&nbsp;&nbsp;HTML ENHANCE";
             html += "</button>";
             html += "<input type='file' id='burp-file-input' accept='.xml' style='display:none' onchange='handleBurpUpload(\"" + instanceId + "\", this, \"xml\")'>";
             html += "<input type='file' id='burp-html-file-input' accept='.html,.htm' style='display:none' onchange='handleBurpUpload(\"" + instanceId + "\", this, \"html\")'>";
@@ -1155,7 +1155,8 @@
             var endpoint = format === 'html' ? '${docroot}/importburphtml' : '${docroot}/importburp';
 
             var panel = $('#vuln-burp-content');
-            panel.html("<div class='vuln-placeholder'><i class='glyphicon glyphicon-refresh spinning' style='font-size: 32px;'></i><p>Importing Burp scan...</p></div>");
+            var loadMsg = format === 'html' ? 'Enhancing Burp data with HTML report...' : 'Importing Burp scan...';
+            panel.html("<div class='vuln-placeholder'><i class='glyphicon glyphicon-refresh spinning' style='font-size: 32px;'></i><p>" + loadMsg + "</p></div>");
 
             $.ajax({
                 url: endpoint,
@@ -1200,8 +1201,8 @@
                     html += "<div class='findings-toolbar-right'>";
                     html += "<button class='btn btn-sm btn-default' onclick='reimportBurp(\"" + instanceId + "\", \"xml\")'>";
                     html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT XML</button>&nbsp;";
-                    html += "<button class='btn btn-sm btn-default' onclick='reimportBurp(\"" + instanceId + "\", \"html\")'>";
-                    html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT HTML</button>";
+                    html += "<button class='btn btn-sm btn-default' onclick='enhanceBurpHtml(\"" + instanceId + "\")'>";
+                    html += "<i class='glyphicon glyphicon-plus-sign'></i>&nbsp;HTML ENHANCE</button>";
                     html += "</div></div>";
 
                     // Table
@@ -1350,12 +1351,12 @@
 
         function reimportBurp(instanceId, format) {
             if (confirm('BURP DATA HAS ALREADY BEEN IMPORTED - WOULD YOU LIKE TO REPLACE THE CURRENT DATA?')) {
-                if (format === 'html') {
-                    $('#burp-html-file-input').click();
-                } else {
-                    $('#burp-file-input').click();
-                }
+                $('#burp-file-input').click();
             }
+        }
+
+        function enhanceBurpHtml(instanceId) {
+            $('#burp-html-file-input').click();
         }
 
         // Legacy graphEvents - redirects to vulnerabilities
