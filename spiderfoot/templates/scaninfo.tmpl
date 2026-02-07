@@ -1848,7 +1848,7 @@
             html += "<p class='text-muted' style='font-size: 12px;'>Upload an Excel file with Priority, Category, Tab, Item, Description, Recommendation columns</p>";
             html += "<div style='margin-top: 20px;'>";
             html += "<button class='btn btn-danger' onclick='triggerFindingsUpload(\"" + instanceId + "\")'>";
-            html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;&nbsp;UPLOAD FINDINGS ANALYSIS";
+            html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;&nbsp;IMPORT";
             html += "</button>";
             html += "<input type='file' id='findings-file-input' accept='.xlsx,.xls' style='display:none' onchange='handleFindingsUpload(\"" + instanceId + "\", this)'>";
             html += "</div></div>";
@@ -1915,10 +1915,8 @@
                     html += "<span class='findings-count'><i class='glyphicon glyphicon-list-alt'></i>&nbsp;" + data.length + " FINDINGS</span>";
                     html += "</div>";
                     html += "<div class='findings-toolbar-right'>";
-                    html += "<button class='btn btn-sm btn-default' onclick='reimportFindings(\"" + instanceId + "\")'>";
-                    html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT</button>&nbsp;";
-                    html += "<a class='btn btn-sm btn-default' href='${docroot}/scanfindingsexport?id=" + instanceId + "&filetype=xlsx'>";
-                    html += "<i class='glyphicon glyphicon-download-alt'></i>&nbsp;EXPORT</a>";
+                    html += "<button class='btn btn-sm btn-info' onclick='reimportFindings(\"" + instanceId + "\")'>";
+                    html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT</button>";
                     html += "</div></div>";
 
                     // Compact 4-column table with expandable detail rows
@@ -1958,8 +1956,12 @@
                         if (hasDetail) html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='finding-icon-" + i + "'></i>";
                         html += "</td>";
                         html += "<td><div class='cell-clamp'>" + (data[i][2] || '') + "</div></td>";
-                        // Type column as clickable link to Browse page
-                        if (typeVal) {
+                        // Type column as clickable link
+                        if (typeVal === 'EXTERNAL_VULNERABILITIES') {
+                            html += "<td><div class='cell-clamp'><a class='finding-type-link' onclick='event.stopPropagation(); viewVulnerabilities(\"" + instanceId + "\");' title='View External Vulnerabilities (Nessus)'>" + typeVal + "</a></div></td>";
+                        } else if (typeVal === 'WEBAPP_VULNERABILITIES') {
+                            html += "<td><div class='cell-clamp'><a class='finding-type-link' onclick='event.stopPropagation(); viewVulnerabilities(\"" + instanceId + "\"); setTimeout(function(){ switchVulnTab(\"burp\", \"" + instanceId + "\"); }, 300);' title='View Web App Vulnerabilities (Burp)'>" + typeVal + "</a></div></td>";
+                        } else if (typeVal) {
                             html += "<td><div class='cell-clamp'><a class='finding-type-link' onclick='event.stopPropagation(); browseEventData(\"" + instanceId + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"full\");' title='Browse " + typeVal + " data'>" + typeVal + "</a></div></td>";
                         } else {
                             html += "<td></td>";
@@ -2106,10 +2108,8 @@
             html += "</div>";
             html += "<div class='findings-toolbar-right'>";
             html += "<span class='ai-correlation-compact-results' id='ai-correlation-results'></span>";
-            html += "<button id='btn-panel-rescan' class='btn btn-sm btn-default' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
+            html += "<button id='btn-panel-rescan' class='btn btn-sm btn-info' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
             html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;AI RESCAN</button>";
-            html += "<a class='btn btn-sm btn-default' href='${docroot}/scancorrelationsexport?id=" + instanceId + "&filetype=xlsx' target='_blank'>";
-            html += "<i class='glyphicon glyphicon-download-alt'></i>&nbsp;EXPORT</a>";
             html += "</div></div>";
 
             // Table matching findings style: Risk | Correlation | Type | Data Elements
@@ -2213,8 +2213,8 @@
             html += "</div>";
             html += "<div class='findings-toolbar-right'>";
             html += "<span class='ai-correlation-compact-results' id='ai-correlation-results'></span>";
-            html += "<button id='btn-panel-rescan' class='btn btn-sm btn-default' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
-            html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;AI RESCAN</button>";
+            html += "<button id='btn-panel-rescan' class='btn btn-sm btn-danger' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
+            html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;AI SCAN</button>";
             html += "</div></div>";
             html += "<div class='alert alert-warning' style='margin: 0;'><h4>No correlations found.</h4>If the scan is still running please reload once it has completed. If the scan is complete, it may not have triggered any correlation rules.</div>";
             panel.html(html);
