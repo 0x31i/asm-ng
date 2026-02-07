@@ -123,6 +123,50 @@ class SpiderFootDb:
             created             INT NOT NULL \
         )",
         "CREATE INDEX idx_scan_findings ON tbl_scan_findings (scan_instance_id)",
+        "CREATE TABLE tbl_scan_nessus_results ( \
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT, \
+            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
+            severity            VARCHAR, \
+            severity_number     INT DEFAULT 0, \
+            plugin_name         VARCHAR, \
+            plugin_id           VARCHAR, \
+            host_ip             VARCHAR, \
+            host_name           VARCHAR, \
+            operating_system    VARCHAR, \
+            description         VARCHAR, \
+            synopsis            VARCHAR, \
+            solution            VARCHAR, \
+            see_also            VARCHAR, \
+            service_name        VARCHAR, \
+            port                INT, \
+            protocol            VARCHAR, \
+            request             VARCHAR, \
+            plugin_output       VARCHAR, \
+            cvss3_base_score    VARCHAR, \
+            created             INT NOT NULL \
+        )",
+        "CREATE INDEX idx_scan_nessus_results ON tbl_scan_nessus_results (scan_instance_id)",
+        "CREATE TABLE tbl_scan_burp_results ( \
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT, \
+            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
+            severity            VARCHAR, \
+            severity_number     INT DEFAULT 0, \
+            host_ip             VARCHAR, \
+            host_name           VARCHAR, \
+            plugin_name         VARCHAR, \
+            issue_type          VARCHAR, \
+            path                VARCHAR, \
+            location            VARCHAR, \
+            confidence          VARCHAR, \
+            issue_background    VARCHAR, \
+            issue_detail        VARCHAR, \
+            solutions           VARCHAR, \
+            see_also            VARCHAR, \
+            request             VARCHAR, \
+            response            VARCHAR, \
+            created             INT NOT NULL \
+        )",
+        "CREATE INDEX idx_scan_burp_results ON tbl_scan_burp_results (scan_instance_id)",
         "CREATE TABLE tbl_target_false_positives ( \
             id              INTEGER PRIMARY KEY AUTOINCREMENT, \
             target          VARCHAR NOT NULL, \
@@ -254,6 +298,50 @@ class SpiderFootDb:
             created             BIGINT NOT NULL \
         )",
         "CREATE INDEX IF NOT EXISTS idx_scan_findings ON tbl_scan_findings (scan_instance_id)",
+        "CREATE TABLE IF NOT EXISTS tbl_scan_nessus_results ( \
+            id                  SERIAL PRIMARY KEY, \
+            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
+            severity            VARCHAR, \
+            severity_number     INT DEFAULT 0, \
+            plugin_name         VARCHAR, \
+            plugin_id           VARCHAR, \
+            host_ip             VARCHAR, \
+            host_name           VARCHAR, \
+            operating_system    VARCHAR, \
+            description         TEXT, \
+            synopsis            TEXT, \
+            solution            TEXT, \
+            see_also            TEXT, \
+            service_name        VARCHAR, \
+            port                INT, \
+            protocol            VARCHAR, \
+            request             TEXT, \
+            plugin_output       TEXT, \
+            cvss3_base_score    VARCHAR, \
+            created             BIGINT NOT NULL \
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_scan_nessus_results ON tbl_scan_nessus_results (scan_instance_id)",
+        "CREATE TABLE IF NOT EXISTS tbl_scan_burp_results ( \
+            id                  SERIAL PRIMARY KEY, \
+            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
+            severity            VARCHAR, \
+            severity_number     INT DEFAULT 0, \
+            host_ip             VARCHAR, \
+            host_name           VARCHAR, \
+            plugin_name         VARCHAR, \
+            issue_type          VARCHAR, \
+            path                VARCHAR, \
+            location            VARCHAR, \
+            confidence          VARCHAR, \
+            issue_background    TEXT, \
+            issue_detail        TEXT, \
+            solutions           TEXT, \
+            see_also            TEXT, \
+            request             TEXT, \
+            response            TEXT, \
+            created             BIGINT NOT NULL \
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_scan_burp_results ON tbl_scan_burp_results (scan_instance_id)",
         "CREATE TABLE IF NOT EXISTS tbl_target_false_positives ( \
             id              SERIAL PRIMARY KEY, \
             target          VARCHAR NOT NULL, \
@@ -727,6 +815,30 @@ class SpiderFootDb:
                     except sqlite3.Error:
                         pass
 
+                # Migration: Add tbl_scan_nessus_results table if it doesn't exist
+                try:
+                    self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_nessus_results")
+                except sqlite3.Error:
+                    try:
+                        for query in self.createSchemaQueries:
+                            if "tbl_scan_nessus_results" in query or "idx_scan_nessus_results" in query:
+                                self.dbh.execute(query)
+                        self.conn.commit()
+                    except sqlite3.Error:
+                        pass
+
+                # Migration: Add tbl_scan_burp_results table if it doesn't exist
+                try:
+                    self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_burp_results")
+                except sqlite3.Error:
+                    try:
+                        for query in self.createSchemaQueries:
+                            if "tbl_scan_burp_results" in query or "idx_scan_burp_results" in query:
+                                self.dbh.execute(query)
+                        self.conn.commit()
+                    except sqlite3.Error:
+                        pass
+
                 if init:
                     for row in self.eventDetails:
                         event = row[0]
@@ -868,6 +980,32 @@ class SpiderFootDb:
                     try:
                         for query in self.createPostgreSQLSchemaQueries:
                             if "tbl_scan_findings" in query or "idx_scan_findings" in query:
+                                self.dbh.execute(query)
+                        self.conn.commit()
+                    except psycopg2.Error:
+                        self.conn.rollback()
+
+                # Migration: Add tbl_scan_nessus_results table if it doesn't exist
+                try:
+                    self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_nessus_results")
+                except psycopg2.Error:
+                    self.conn.rollback()
+                    try:
+                        for query in self.createPostgreSQLSchemaQueries:
+                            if "tbl_scan_nessus_results" in query or "idx_scan_nessus_results" in query:
+                                self.dbh.execute(query)
+                        self.conn.commit()
+                    except psycopg2.Error:
+                        self.conn.rollback()
+
+                # Migration: Add tbl_scan_burp_results table if it doesn't exist
+                try:
+                    self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_burp_results")
+                except psycopg2.Error:
+                    self.conn.rollback()
+                    try:
+                        for query in self.createPostgreSQLSchemaQueries:
+                            if "tbl_scan_burp_results" in query or "idx_scan_burp_results" in query:
                                 self.dbh.execute(query)
                         self.conn.commit()
                     except psycopg2.Error:
@@ -4169,6 +4307,282 @@ class SpiderFootDb:
             qry = "SELECT COUNT(*) FROM tbl_scan_findings WHERE scan_instance_id = ?"
         else:
             qry = "SELECT COUNT(*) FROM tbl_scan_findings WHERE scan_instance_id = %s"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [instanceId])
+                return self.dbh.fetchone()[0]
+            except (sqlite3.Error, psycopg2.Error):
+                return 0
+
+    def scanNessusStore(self, instanceId: str, results: list) -> int:
+        """Store imported Nessus results for a scan (replaces existing).
+
+        Args:
+            instanceId (str): scan instance ID
+            results (list): list of dicts with Nessus result fields
+
+        Returns:
+            int: number of results stored
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(
+                f"instanceId is {type(instanceId)}; expected str()") from None
+
+        import time
+        now = int(time.time())
+
+        with self.dbhLock:
+            try:
+                if self.db_type == 'sqlite':
+                    self.dbh.execute("DELETE FROM tbl_scan_nessus_results WHERE scan_instance_id = ?", [instanceId])
+                else:
+                    self.dbh.execute("DELETE FROM tbl_scan_nessus_results WHERE scan_instance_id = %s", [instanceId])
+                self.conn.commit()
+
+                count = 0
+                for r in results:
+                    if self.db_type == 'sqlite':
+                        qry = "INSERT INTO tbl_scan_nessus_results \
+                            (scan_instance_id, severity, severity_number, plugin_name, plugin_id, \
+                            host_ip, host_name, operating_system, description, synopsis, solution, \
+                            see_also, service_name, port, protocol, request, plugin_output, \
+                            cvss3_base_score, created) \
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                    else:
+                        qry = "INSERT INTO tbl_scan_nessus_results \
+                            (scan_instance_id, severity, severity_number, plugin_name, plugin_id, \
+                            host_ip, host_name, operating_system, description, synopsis, solution, \
+                            see_also, service_name, port, protocol, request, plugin_output, \
+                            cvss3_base_score, created) \
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                    self.dbh.execute(qry, [
+                        instanceId,
+                        str(r.get('severity', '')),
+                        int(r.get('severity_number', 0)),
+                        str(r.get('plugin_name', '')),
+                        str(r.get('plugin_id', '')),
+                        str(r.get('host_ip', '')),
+                        str(r.get('host_name', '')),
+                        str(r.get('operating_system', '')),
+                        str(r.get('description', '')),
+                        str(r.get('synopsis', '')),
+                        str(r.get('solution', '')),
+                        str(r.get('see_also', '')),
+                        str(r.get('service_name', '')),
+                        int(r.get('port', 0)),
+                        str(r.get('protocol', '')),
+                        str(r.get('request', '')),
+                        str(r.get('plugin_output', '')),
+                        str(r.get('cvss3_base_score', '')),
+                        now
+                    ])
+                    count += 1
+
+                self.conn.commit()
+                return count
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError(
+                    "SQL error encountered when storing Nessus results") from e
+
+    def scanNessusList(self, instanceId: str) -> list:
+        """Obtain a list of Nessus results imported for a scan.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            list: Nessus results as list of tuples
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(
+                f"instanceId is {type(instanceId)}; expected str()") from None
+
+        if self.db_type == 'sqlite':
+            qry = "SELECT id, severity, severity_number, plugin_name, plugin_id, \
+                host_ip, host_name, operating_system, description, synopsis, solution, \
+                see_also, service_name, port, protocol, request, plugin_output, \
+                cvss3_base_score, created \
+                FROM tbl_scan_nessus_results WHERE scan_instance_id = ? ORDER BY \
+                CASE severity WHEN 'Critical' THEN 0 WHEN 'High' THEN 1 \
+                WHEN 'Medium' THEN 2 WHEN 'Low' THEN 3 WHEN 'None' THEN 4 ELSE 5 END, plugin_name"
+        else:
+            qry = "SELECT id, severity, severity_number, plugin_name, plugin_id, \
+                host_ip, host_name, operating_system, description, synopsis, solution, \
+                see_also, service_name, port, protocol, request, plugin_output, \
+                cvss3_base_score, created \
+                FROM tbl_scan_nessus_results WHERE scan_instance_id = %s ORDER BY \
+                CASE severity WHEN 'Critical' THEN 0 WHEN 'High' THEN 1 \
+                WHEN 'Medium' THEN 2 WHEN 'Low' THEN 3 WHEN 'None' THEN 4 ELSE 5 END, plugin_name"
+
+        qvars = [instanceId]
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, qvars)
+                return self.dbh.fetchall()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError(
+                    "SQL error encountered when fetching Nessus results list") from e
+
+    def scanNessusCount(self, instanceId: str) -> int:
+        """Get count of Nessus results for a scan.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            int: count of Nessus results
+        """
+        if self.db_type == 'sqlite':
+            qry = "SELECT COUNT(*) FROM tbl_scan_nessus_results WHERE scan_instance_id = ?"
+        else:
+            qry = "SELECT COUNT(*) FROM tbl_scan_nessus_results WHERE scan_instance_id = %s"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [instanceId])
+                return self.dbh.fetchone()[0]
+            except (sqlite3.Error, psycopg2.Error):
+                return 0
+
+    def scanBurpStore(self, instanceId: str, results: list) -> int:
+        """Store imported Burp results for a scan (replaces existing).
+
+        Args:
+            instanceId (str): scan instance ID
+            results (list): list of dicts with Burp result fields
+
+        Returns:
+            int: number of results stored
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(
+                f"instanceId is {type(instanceId)}; expected str()") from None
+
+        import time
+        now = int(time.time())
+
+        with self.dbhLock:
+            try:
+                if self.db_type == 'sqlite':
+                    self.dbh.execute("DELETE FROM tbl_scan_burp_results WHERE scan_instance_id = ?", [instanceId])
+                else:
+                    self.dbh.execute("DELETE FROM tbl_scan_burp_results WHERE scan_instance_id = %s", [instanceId])
+                self.conn.commit()
+
+                count = 0
+                for r in results:
+                    if self.db_type == 'sqlite':
+                        qry = "INSERT INTO tbl_scan_burp_results \
+                            (scan_instance_id, severity, severity_number, host_ip, host_name, \
+                            plugin_name, issue_type, path, location, confidence, \
+                            issue_background, issue_detail, solutions, see_also, \
+                            request, response, created) \
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                    else:
+                        qry = "INSERT INTO tbl_scan_burp_results \
+                            (scan_instance_id, severity, severity_number, host_ip, host_name, \
+                            plugin_name, issue_type, path, location, confidence, \
+                            issue_background, issue_detail, solutions, see_also, \
+                            request, response, created) \
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                    self.dbh.execute(qry, [
+                        instanceId,
+                        str(r.get('severity', '')),
+                        int(r.get('severity_number', 0)),
+                        str(r.get('host_ip', '')),
+                        str(r.get('host_name', '')),
+                        str(r.get('plugin_name', '')),
+                        str(r.get('issue_type', '')),
+                        str(r.get('path', '')),
+                        str(r.get('location', '')),
+                        str(r.get('confidence', '')),
+                        str(r.get('issue_background', '')),
+                        str(r.get('issue_detail', '')),
+                        str(r.get('solutions', '')),
+                        str(r.get('see_also', '')),
+                        str(r.get('request', '')),
+                        str(r.get('response', '')),
+                        now
+                    ])
+                    count += 1
+
+                self.conn.commit()
+                return count
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError(
+                    "SQL error encountered when storing Burp results") from e
+
+    def scanBurpList(self, instanceId: str) -> list:
+        """Obtain a list of Burp results imported for a scan.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            list: Burp results as list of tuples
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(
+                f"instanceId is {type(instanceId)}; expected str()") from None
+
+        if self.db_type == 'sqlite':
+            qry = "SELECT id, severity, severity_number, host_ip, host_name, \
+                plugin_name, issue_type, path, location, confidence, \
+                issue_background, issue_detail, solutions, see_also, \
+                request, response, created \
+                FROM tbl_scan_burp_results WHERE scan_instance_id = ? ORDER BY \
+                CASE severity WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 \
+                WHEN 'Low' THEN 2 WHEN 'Information' THEN 3 ELSE 4 END, plugin_name"
+        else:
+            qry = "SELECT id, severity, severity_number, host_ip, host_name, \
+                plugin_name, issue_type, path, location, confidence, \
+                issue_background, issue_detail, solutions, see_also, \
+                request, response, created \
+                FROM tbl_scan_burp_results WHERE scan_instance_id = %s ORDER BY \
+                CASE severity WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 \
+                WHEN 'Low' THEN 2 WHEN 'Information' THEN 3 ELSE 4 END, plugin_name"
+
+        qvars = [instanceId]
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, qvars)
+                return self.dbh.fetchall()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError(
+                    "SQL error encountered when fetching Burp results list") from e
+
+    def scanBurpCount(self, instanceId: str) -> int:
+        """Get count of Burp results for a scan.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            int: count of Burp results
+        """
+        if self.db_type == 'sqlite':
+            qry = "SELECT COUNT(*) FROM tbl_scan_burp_results WHERE scan_instance_id = ?"
+        else:
+            qry = "SELECT COUNT(*) FROM tbl_scan_burp_results WHERE scan_instance_id = %s"
 
         with self.dbhLock:
             try:

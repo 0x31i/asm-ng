@@ -858,7 +858,10 @@
             });
         }
 
-        // Vulnerabilities page - placeholder for NESSUS and BURP imports
+        // Vulnerabilities page - NESSUS and BURP imports with data tables
+        var vulnActiveTab = 'nessus';
+        var vulnInstanceId = null;
+
         function viewVulnerabilities(instanceId) {
             $("#scansummary-content").remove();
             $("#ai-correlation-section").remove();
@@ -873,49 +876,384 @@
             $("#btn-search").hide();
             $("#scanreminder").hide();
             navTo("btn-graph");
+            vulnInstanceId = instanceId;
             refresh = function() { viewVulnerabilities(instanceId); }
-
-            var activeTab = 'nessus';
 
             var grid = "<div id='scansummary-content'>";
             grid += "<div class='vuln-container'>";
             grid += "<div class='vuln-tab-bar'>";
-            grid += "<button id='vuln-btn-nessus' class='vuln-tab-btn active' onclick='switchVulnTab(\"nessus\")'>";
+            grid += "<button id='vuln-btn-nessus' class='vuln-tab-btn active' onclick='switchVulnTab(\"nessus\", \"" + instanceId + "\")'>";
             grid += "<span class='vuln-btn-icon'><i class='glyphicon glyphicon-shield'></i></span>";
             grid += "<span class='vuln-btn-label'>NESSUS</span>";
             grid += "<span class='vuln-btn-sub'>Tenable Pro Scanner</span>";
             grid += "</button>";
-            grid += "<button id='vuln-btn-burp' class='vuln-tab-btn' onclick='switchVulnTab(\"burp\")'>";
+            grid += "<button id='vuln-btn-burp' class='vuln-tab-btn' onclick='switchVulnTab(\"burp\", \"" + instanceId + "\")'>";
             grid += "<span class='vuln-btn-icon'><i class='glyphicon glyphicon-globe'></i></span>";
             grid += "<span class='vuln-btn-label'>BURP</span>";
             grid += "<span class='vuln-btn-sub'>PortSwigger Pro Scanner</span>";
             grid += "</button>";
             grid += "</div>";
             grid += "<div class='vuln-content'>";
-            grid += "<div id='vuln-nessus-content' class='vuln-panel'>";
-            grid += "<div class='vuln-placeholder'>";
-            grid += "<i class='glyphicon glyphicon-import' style='font-size: 32px; opacity: 0.4;'></i>";
-            grid += "<p>Import Nessus Pro scan results (.nessus)</p>";
-            grid += "<p class='text-muted' style='font-size: 12px;'>No vulnerability scans imported yet</p>";
-            grid += "</div></div>";
-            grid += "<div id='vuln-burp-content' class='vuln-panel' style='display:none'>";
-            grid += "<div class='vuln-placeholder'>";
-            grid += "<i class='glyphicon glyphicon-import' style='font-size: 32px; opacity: 0.4;'></i>";
-            grid += "<p>Import Burp Pro scan results (.xml)</p>";
-            grid += "<p class='text-muted' style='font-size: 12px;'>No vulnerability scans imported yet</p>";
-            grid += "</div></div>";
+            grid += "<div id='vuln-nessus-content' class='vuln-panel'></div>";
+            grid += "<div id='vuln-burp-content' class='vuln-panel' style='display:none'></div>";
             grid += "</div></div></div>";
 
             $("#mainbody").append(grid);
             $("#loader").hide();
+
+            // Load Nessus data for default tab
+            loadNessusData(instanceId);
         }
 
         // Switch between NESSUS and BURP vulnerability tabs
-        function switchVulnTab(tab) {
+        function switchVulnTab(tab, instanceId) {
             $('.vuln-tab-btn').removeClass('active');
             $('#vuln-btn-' + tab).addClass('active');
             $('.vuln-panel').hide();
             $('#vuln-' + tab + '-content').show();
+            vulnActiveTab = tab;
+
+            // Load data on first switch
+            if (tab === 'nessus' && $('#vuln-nessus-content').html() === '') {
+                loadNessusData(instanceId);
+            }
+            if (tab === 'burp' && $('#vuln-burp-content').html() === '') {
+                loadBurpData(instanceId);
+            }
+        }
+
+        // ---- NESSUS DATA ----
+        function loadNessusData(instanceId) {
+            var panel = $('#vuln-nessus-content');
+            panel.html("<div class='vuln-placeholder'><i class='glyphicon glyphicon-refresh spinning' style='font-size: 24px;'></i><p>Loading...</p></div>");
+
+            sf.fetchData('${docroot}/scannessuscount', {'id': instanceId},
+                function(data) {
+                    if (data.success && data.count > 0) {
+                        loadNessusTable(instanceId);
+                    } else {
+                        showNessusUploadPlaceholder(instanceId);
+                    }
+                },
+                function() {
+                    showNessusUploadPlaceholder(instanceId);
+                }
+            );
+        }
+
+        function showNessusUploadPlaceholder(instanceId) {
+            var panel = $('#vuln-nessus-content');
+            var html = "<div class='vuln-placeholder'>";
+            html += "<i class='glyphicon glyphicon-import' style='font-size: 32px; opacity: 0.4;'></i>";
+            html += "<p>Import Nessus Pro scan results (.nessus)</p>";
+            html += "<p class='text-muted' style='font-size: 12px;'>No vulnerability scans imported yet</p>";
+            html += "<div style='margin-top: 20px;'>";
+            html += "<button class='btn btn-danger' onclick='triggerNessusUpload(\"" + instanceId + "\")'>";
+            html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;&nbsp;UPLOAD NESSUS SCAN";
+            html += "</button>";
+            html += "<input type='file' id='nessus-file-input' accept='.nessus,.xml' style='display:none' onchange='handleNessusUpload(\"" + instanceId + "\", this)'>";
+            html += "</div></div>";
+            panel.html(html);
+        }
+
+        function triggerNessusUpload(instanceId) {
+            $('#nessus-file-input').click();
+        }
+
+        function handleNessusUpload(instanceId, input) {
+            if (!input.files || !input.files[0]) return;
+
+            var file = input.files[0];
+            var formData = new FormData();
+            formData.append('importfile', file);
+            formData.append('id', instanceId);
+
+            var panel = $('#vuln-nessus-content');
+            panel.html("<div class='vuln-placeholder'><i class='glyphicon glyphicon-refresh spinning' style='font-size: 32px;'></i><p>Importing Nessus scan...</p></div>");
+
+            $.ajax({
+                url: '${docroot}/importnessus',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                dataType: 'json',
+                success: function(data) {
+                    if (data.success) {
+                        loadNessusTable(instanceId);
+                    } else {
+                        panel.html("<div class='alert alert-danger' style='margin: 20px;'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;" + data.message + "</div>");
+                        setTimeout(function() { showNessusUploadPlaceholder(instanceId); }, 3000);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    panel.html("<div class='alert alert-danger' style='margin: 20px;'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Upload failed: " + status + "</div>");
+                    setTimeout(function() { showNessusUploadPlaceholder(instanceId); }, 3000);
+                }
+            });
+        }
+
+        function loadNessusTable(instanceId) {
+            var panel = $('#vuln-nessus-content');
+            panel.html("<div class='vuln-placeholder'><i class='glyphicon glyphicon-refresh spinning' style='font-size: 24px;'></i><p>Loading Nessus results...</p></div>");
+
+            sf.fetchData('${docroot}/scannessuslist', {'id': instanceId},
+                function(data) {
+                    if (!data.success || !data.results || data.results.length === 0) {
+                        showNessusUploadPlaceholder(instanceId);
+                        return;
+                    }
+
+                    var results = data.results;
+
+                    // Toolbar
+                    var html = "<div class='findings-toolbar'>";
+                    html += "<div class='findings-toolbar-left'>";
+                    html += "<span class='findings-count'><i class='glyphicon glyphicon-shield'></i>&nbsp;" + results.length + " NESSUS FINDINGS</span>";
+                    html += "</div>";
+                    html += "<div class='findings-toolbar-right'>";
+                    html += "<button class='btn btn-sm btn-default' onclick='reimportNessus(\"" + instanceId + "\")'>";
+                    html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT</button>";
+                    html += "</div></div>";
+
+                    // Table
+                    html += "<div class='findings-table-wrapper'>";
+                    html += "<table id='nessus-table' class='table findings-table tablesorter small'>";
+                    html += "<thead><tr>";
+                    html += "<th>Severity</th>";
+                    html += "<th>Plugin Name</th>";
+                    html += "<th>Host IP</th>";
+                    html += "<th>Operating System</th>";
+                    html += "<th>Host Name</th>";
+                    html += "<th>Severity Number</th>";
+                    html += "<th>Description</th>";
+                    html += "<th>Synopsis</th>";
+                    html += "<th>Solution</th>";
+                    html += "<th>See Also</th>";
+                    html += "<th>Service Name Port</th>";
+                    html += "<th>Request</th>";
+                    html += "<th>Plugin Output</th>";
+                    html += "<th>CVSS3 Base Score</th>";
+                    html += "</tr></thead><tbody>";
+
+                    for (var i = 0; i < results.length; i++) {
+                        var r = results[i];
+                        var sevLower = (r.severity || '').toLowerCase();
+                        var badgeClass = '';
+                        if (sevLower === 'critical') badgeClass = 'alert-critical';
+                        else if (sevLower === 'high') badgeClass = 'alert-danger';
+                        else if (sevLower === 'medium') badgeClass = 'alert-warning';
+                        else if (sevLower === 'low') badgeClass = 'alert-info';
+                        else badgeClass = 'alert-success';
+
+                        var svcPort = r.service_name || '';
+                        if (r.port && r.port > 0) svcPort += (svcPort ? ' ' : '') + r.port;
+
+                        html += "<tr class='finding-row finding-" + sevLower + "'>";
+                        html += "<td><span class='badge " + badgeClass + "'>" + (r.severity || 'None') + "</span></td>";
+                        html += "<td><div class='cell-clamp'>" + (r.plugin_name || '') + "</div></td>";
+                        html += "<td>" + (r.host_ip || '') + "</td>";
+                        html += "<td><div class='cell-clamp'>" + (r.operating_system || '') + "</div></td>";
+                        html += "<td><div class='cell-clamp'>" + (r.host_name || '') + "</div></td>";
+                        html += "<td>" + (r.severity_number || 0) + "</td>";
+                        html += "<td><div class='cell-clamp'>" + (r.description || '') + "</div></td>";
+                        html += "<td><div class='cell-clamp'>" + (r.synopsis || '') + "</div></td>";
+                        html += "<td><div class='cell-clamp'>" + (r.solution || '') + "</div></td>";
+                        html += "<td><div class='cell-clamp'>" + (r.see_also || '') + "</div></td>";
+                        html += "<td>" + svcPort + "</td>";
+                        html += "<td><div class='cell-clamp'>" + (r.request || '') + "</div></td>";
+                        html += "<td><div class='cell-clamp'>" + (r.plugin_output || '') + "</div></td>";
+                        html += "<td>" + (r.cvss3_base_score || '') + "</td>";
+                        html += "</tr>";
+                    }
+
+                    html += "</tbody></table></div>";
+                    html += "<input type='file' id='nessus-file-input' accept='.nessus,.xml' style='display:none' onchange='handleNessusUpload(\"" + instanceId + "\", this)'>";
+
+                    panel.html(html);
+
+                    $.tablesorter.addParser({
+                        id: 'nessusSeverity',
+                        is: function(s) { return false; },
+                        format: function(s) {
+                            return s.toLowerCase().replace(/critical/,0).replace(/high/,1).replace(/medium/,2).replace(/low/,3).replace(/none/,4);
+                        },
+                        type: 'numeric'
+                    });
+
+                    $("#nessus-table").tablesorter({
+                        headers: { 0: { sorter: 'nessusSeverity' } },
+                        sortList: [[0, 0]]
+                    });
+                },
+                function() {
+                    showNessusUploadPlaceholder(instanceId);
+                }
+            );
+        }
+
+        function reimportNessus(instanceId) {
+            if (confirm('NESSUS DATA HAS ALREADY BEEN IMPORTED - WOULD YOU LIKE TO REPLACE THE CURRENT DATA?')) {
+                $('#nessus-file-input').click();
+            }
+        }
+
+        // ---- BURP DATA ----
+        function loadBurpData(instanceId) {
+            var panel = $('#vuln-burp-content');
+            panel.html("<div class='vuln-placeholder'><i class='glyphicon glyphicon-refresh spinning' style='font-size: 24px;'></i><p>Loading...</p></div>");
+
+            sf.fetchData('${docroot}/scanburpcount', {'id': instanceId},
+                function(data) {
+                    if (data.success && data.count > 0) {
+                        loadBurpTable(instanceId);
+                    } else {
+                        showBurpUploadPlaceholder(instanceId);
+                    }
+                },
+                function() {
+                    showBurpUploadPlaceholder(instanceId);
+                }
+            );
+        }
+
+        function showBurpUploadPlaceholder(instanceId) {
+            var panel = $('#vuln-burp-content');
+            var html = "<div class='vuln-placeholder'>";
+            html += "<i class='glyphicon glyphicon-import' style='font-size: 32px; opacity: 0.4;'></i>";
+            html += "<p>Import Burp Pro scan results (.xml)</p>";
+            html += "<p class='text-muted' style='font-size: 12px;'>No vulnerability scans imported yet</p>";
+            html += "<div style='margin-top: 20px;'>";
+            html += "<button class='btn btn-danger' onclick='triggerBurpUpload(\"" + instanceId + "\")'>";
+            html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;&nbsp;UPLOAD BURP SCAN";
+            html += "</button>";
+            html += "<input type='file' id='burp-file-input' accept='.xml' style='display:none' onchange='handleBurpUpload(\"" + instanceId + "\", this)'>";
+            html += "</div></div>";
+            panel.html(html);
+        }
+
+        function triggerBurpUpload(instanceId) {
+            $('#burp-file-input').click();
+        }
+
+        function handleBurpUpload(instanceId, input) {
+            if (!input.files || !input.files[0]) return;
+
+            var file = input.files[0];
+            var formData = new FormData();
+            formData.append('importfile', file);
+            formData.append('id', instanceId);
+
+            var panel = $('#vuln-burp-content');
+            panel.html("<div class='vuln-placeholder'><i class='glyphicon glyphicon-refresh spinning' style='font-size: 32px;'></i><p>Importing Burp scan...</p></div>");
+
+            $.ajax({
+                url: '${docroot}/importburp',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                dataType: 'json',
+                success: function(data) {
+                    if (data.success) {
+                        loadBurpTable(instanceId);
+                    } else {
+                        panel.html("<div class='alert alert-danger' style='margin: 20px;'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;" + data.message + "</div>");
+                        setTimeout(function() { showBurpUploadPlaceholder(instanceId); }, 3000);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    panel.html("<div class='alert alert-danger' style='margin: 20px;'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Upload failed: " + status + "</div>");
+                    setTimeout(function() { showBurpUploadPlaceholder(instanceId); }, 3000);
+                }
+            });
+        }
+
+        function loadBurpTable(instanceId) {
+            var panel = $('#vuln-burp-content');
+            panel.html("<div class='vuln-placeholder'><i class='glyphicon glyphicon-refresh spinning' style='font-size: 24px;'></i><p>Loading Burp results...</p></div>");
+
+            sf.fetchData('${docroot}/scanburplist', {'id': instanceId},
+                function(data) {
+                    if (!data.success || !data.results || data.results.length === 0) {
+                        showBurpUploadPlaceholder(instanceId);
+                        return;
+                    }
+
+                    var results = data.results;
+
+                    // Toolbar
+                    var html = "<div class='findings-toolbar'>";
+                    html += "<div class='findings-toolbar-left'>";
+                    html += "<span class='findings-count'><i class='glyphicon glyphicon-globe'></i>&nbsp;" + results.length + " BURP ISSUES</span>";
+                    html += "</div>";
+                    html += "<div class='findings-toolbar-right'>";
+                    html += "<button class='btn btn-sm btn-default' onclick='reimportBurp(\"" + instanceId + "\")'>";
+                    html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT</button>";
+                    html += "</div></div>";
+
+                    // Table
+                    html += "<div class='findings-table-wrapper'>";
+                    html += "<table id='burp-table' class='table findings-table tablesorter small'>";
+                    html += "<thead><tr>";
+                    html += "<th>Severity</th>";
+                    html += "<th>Host IP</th>";
+                    html += "<th>Host Name</th>";
+                    html += "<th>Plugin Name</th>";
+                    html += "<th>Severity Number</th>";
+                    html += "<th>Solutions</th>";
+                    html += "<th>See Also</th>";
+                    html += "</tr></thead><tbody>";
+
+                    for (var i = 0; i < results.length; i++) {
+                        var r = results[i];
+                        var sevLower = (r.severity || '').toLowerCase();
+                        var badgeClass = '';
+                        if (sevLower === 'high') badgeClass = 'alert-danger';
+                        else if (sevLower === 'medium') badgeClass = 'alert-warning';
+                        else if (sevLower === 'low') badgeClass = 'alert-info';
+                        else badgeClass = 'alert-success';
+
+                        html += "<tr class='finding-row finding-" + sevLower + "'>";
+                        html += "<td><span class='badge " + badgeClass + "'>" + (r.severity || 'Information') + "</span></td>";
+                        html += "<td>" + (r.host_ip || '') + "</td>";
+                        html += "<td><div class='cell-clamp'>" + (r.host_name || '') + "</div></td>";
+                        html += "<td><div class='cell-clamp'>" + (r.plugin_name || '') + "</div></td>";
+                        html += "<td>" + (r.severity_number || 0) + "</td>";
+                        html += "<td><div class='cell-clamp'>" + (r.solutions || '') + "</div></td>";
+                        html += "<td><div class='cell-clamp'>" + (r.see_also || '') + "</div></td>";
+                        html += "</tr>";
+                    }
+
+                    html += "</tbody></table></div>";
+                    html += "<input type='file' id='burp-file-input' accept='.xml' style='display:none' onchange='handleBurpUpload(\"" + instanceId + "\", this)'>";
+
+                    panel.html(html);
+
+                    $.tablesorter.addParser({
+                        id: 'burpSeverity',
+                        is: function(s) { return false; },
+                        format: function(s) {
+                            return s.toLowerCase().replace(/high/,0).replace(/medium/,1).replace(/low/,2).replace(/information/,3).replace(/info/,3);
+                        },
+                        type: 'numeric'
+                    });
+
+                    $("#burp-table").tablesorter({
+                        headers: { 0: { sorter: 'burpSeverity' } },
+                        sortList: [[0, 0]]
+                    });
+                },
+                function() {
+                    showBurpUploadPlaceholder(instanceId);
+                }
+            );
+        }
+
+        function reimportBurp(instanceId) {
+            if (confirm('BURP DATA HAS ALREADY BEEN IMPORTED - WOULD YOU LIKE TO REPLACE THE CURRENT DATA?')) {
+                $('#burp-file-input').click();
+            }
         }
 
         // Legacy graphEvents - redirects to vulnerabilities

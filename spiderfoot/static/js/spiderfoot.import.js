@@ -20,6 +20,14 @@ $(document).ready(function() {
         }
     });
 
+    // File type configuration per import type
+    var fileTypeConfig = {
+        'legacy': { accept: '.csv', hint: 'ACCEPTED FORMAT: CSV' },
+        'scan':   { accept: '.csv', hint: 'ACCEPTED FORMAT: CSV' },
+        'burp':   { accept: '.xml', hint: 'ACCEPTED FORMAT: XML (BURP SUITE EXPORT)' },
+        'nessus': { accept: '.nessus,.xml', hint: 'ACCEPTED FORMAT: NESSUS (.nessus)' }
+    };
+
     // Card click handlers
     $('.import-card').on('click', function() {
         var importType = $(this).data('import-type');
@@ -40,6 +48,11 @@ $(document).ready(function() {
         // Update form title
         var title = $(this).find('.import-card-title').text();
         $('#import-form-title').text('IMPORT: ' + title);
+
+        // Update file accept type and hint
+        var config = fileTypeConfig[importType] || fileTypeConfig['legacy'];
+        $('#import-file').attr('accept', config.accept);
+        $('#import-file-hint').text(config.hint);
 
         // Show the form, hide preview/results
         $('#import-form-section').slideDown(200);

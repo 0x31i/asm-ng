@@ -10,6 +10,7 @@
 # License:      MIT
 # -----------------------------------------------------------------
 
+import base64
 import csv
 import hashlib
 import html
@@ -23,6 +24,7 @@ import string
 import time
 import os
 import uuid
+import xml.etree.ElementTree as ET
 from datetime import datetime as dt_datetime
 from copy import deepcopy
 from io import BytesIO, StringIO
@@ -1825,12 +1827,6 @@ class SpiderFootWebUi:
         Returns:
             dict: import results
         """
-        if import_type in ('burp', 'nessus'):
-            return {
-                'success': False,
-                'message': f'{import_type.title()} import is not yet supported.'
-            }
-
         if importfile is None:
             return {'success': False, 'message': 'No file was uploaded.'}
 
@@ -1846,7 +1842,15 @@ class SpiderFootWebUi:
         if not content.strip():
             return {'success': False, 'message': 'Uploaded file is empty.'}
 
-        # Parse CSV
+        # Handle Nessus import
+        if import_type == 'nessus':
+            return self._processNessusImport(content, scan_name, target, importfile, is_dry_run)
+
+        # Handle Burp import
+        if import_type == 'burp':
+            return self._processBurpImport(content, scan_name, target, importfile, is_dry_run)
+
+        # Parse CSV for legacy/scan imports
         try:
             reader = csv.reader(StringIO(content))
             headers = next(reader)
@@ -2082,6 +2086,319 @@ class SpiderFootWebUi:
             'validated_imported': stats['validated_imported'],
             'event_types_count': len(stats['event_types']),
             'errors': stats['errors'],
+        }
+
+    def _processNessusImport(self, content: str, scan_name: str, target: str,
+                              importfile=None, is_dry_run: bool = False,
+                              existing_scan_id: str = None) -> dict:
+        """Parse and import a Nessus .nessus XML file.
+
+        Args:
+            content (str): XML file content
+            scan_name (str): optional scan name
+            target (str): optional target
+            importfile: uploaded file object (for filename)
+            is_dry_run (bool): if True, validate only
+            existing_scan_id (str): if set, import into existing scan
+
+        Returns:
+            dict: import results
+        """
+        try:
+            root = ET.fromstring(content)
+        except ET.ParseError as e:
+            return {'success': False, 'message': f'Failed to parse Nessus XML: {e}'}
+
+        # Validate root element
+        if root.tag != 'NessusClientData_v2':
+            return {'success': False, 'message': f'Invalid Nessus file. Expected NessusClientData_v2 root element, got: {root.tag}'}
+
+        results = []
+        hosts_seen = set()
+
+        for report in root.findall('.//Report'):
+            for report_host in report.findall('ReportHost'):
+                host_name = report_host.get('name', '')
+                hosts_seen.add(host_name)
+
+                # Extract host properties
+                host_props = {}
+                host_properties_el = report_host.find('HostProperties')
+                if host_properties_el is not None:
+                    for tag in host_properties_el.findall('tag'):
+                        tag_name = tag.get('name', '')
+                        tag_val = tag.text or ''
+                        host_props[tag_name] = tag_val
+
+                host_ip = host_props.get('host-ip', host_name)
+                host_fqdn = host_props.get('host-fqdn', host_name)
+                operating_system = host_props.get('operating-system', '')
+
+                for item in report_host.findall('ReportItem'):
+                    severity_num = int(item.get('severity', '0'))
+                    severity_map = {0: 'None', 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Critical'}
+                    severity = severity_map.get(severity_num, 'None')
+
+                    result = {
+                        'severity': severity,
+                        'severity_number': severity_num,
+                        'plugin_name': item.get('pluginName', ''),
+                        'plugin_id': item.get('pluginID', ''),
+                        'host_ip': host_ip,
+                        'host_name': host_fqdn,
+                        'operating_system': operating_system,
+                        'description': (item.findtext('description') or '').strip(),
+                        'synopsis': (item.findtext('synopsis') or '').strip(),
+                        'solution': (item.findtext('solution') or '').strip(),
+                        'see_also': (item.findtext('see_also') or '').strip(),
+                        'service_name': item.get('svc_name', ''),
+                        'port': int(item.get('port', '0')),
+                        'protocol': item.get('protocol', ''),
+                        'request': '',
+                        'plugin_output': (item.findtext('plugin_output') or '').strip(),
+                        'cvss3_base_score': item.findtext('cvss3_base_score') or '',
+                    }
+                    results.append(result)
+
+        if not results:
+            return {'success': False, 'message': 'No vulnerability items found in Nessus file.'}
+
+        # Auto-detect target
+        if not target:
+            target = list(hosts_seen)[0] if hosts_seen else 'nessus_import'
+
+        # Default scan name
+        if not scan_name:
+            filename = getattr(importfile, 'filename', 'nessus_import')
+            scan_name = f'Nessus Import: {filename.rsplit(".", 1)[0] if "." in filename else filename}'
+
+        if is_dry_run:
+            severity_counts = {}
+            for r in results:
+                sev = r['severity']
+                severity_counts[sev] = severity_counts.get(sev, 0) + 1
+
+            return {
+                'success': True,
+                'dry_run': True,
+                'message': f'Validation passed. {len(results)} vulnerability items found across {len(hosts_seen)} host(s).',
+                'rows_read': len(results),
+                'rows_imported': len(results),
+                'rows_skipped': 0,
+                'event_types_count': len(severity_counts),
+                'errors': [],
+            }
+
+        # Actual import
+        dbh = SpiderFootDb(self.config)
+        scan_id = existing_scan_id
+
+        if not scan_id:
+            scan_id = str(uuid.uuid4())
+            try:
+                dbh.scanInstanceCreate(scan_id, scan_name, target)
+                # Create ROOT event
+                root_qry = """INSERT INTO tbl_scan_results
+                    (scan_instance_id, hash, type, generated, confidence,
+                    visibility, risk, module, data, false_positive, source_event_hash)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                root_qvals = [scan_id, 'ROOT', 'ROOT', int(time.time() * 1000),
+                              100, 100, 0, '', target, 0, 'ROOT']
+                dbh.dbh.execute(root_qry, root_qvals)
+                dbh.conn.commit()
+            except Exception as e:
+                return {'success': False, 'message': f'Failed to create scan instance: {e}'}
+
+        try:
+            count = dbh.scanNessusStore(scan_id, results)
+        except Exception as e:
+            return {'success': False, 'message': f'Failed to store Nessus results: {e}'}
+
+        if not existing_scan_id:
+            dbh.scanInstanceSet(scan_id, status='FINISHED', ended=time.time() * 1000)
+
+        return {
+            'success': True,
+            'dry_run': False,
+            'message': f'Successfully imported {count} Nessus findings into scan "{scan_name}".',
+            'scan_id': scan_id,
+            'rows_read': len(results),
+            'rows_imported': count,
+            'rows_skipped': 0,
+            'fps_imported': 0,
+            'validated_imported': 0,
+            'event_types_count': len(set(r['severity'] for r in results)),
+            'errors': [],
+        }
+
+    def _processBurpImport(self, content: str, scan_name: str, target: str,
+                            importfile=None, is_dry_run: bool = False,
+                            existing_scan_id: str = None) -> dict:
+        """Parse and import a Burp Suite XML file.
+
+        Args:
+            content (str): XML file content
+            scan_name (str): optional scan name
+            target (str): optional target
+            importfile: uploaded file object (for filename)
+            is_dry_run (bool): if True, validate only
+            existing_scan_id (str): if set, import into existing scan
+
+        Returns:
+            dict: import results
+        """
+        try:
+            root = ET.fromstring(content)
+        except ET.ParseError as e:
+            return {'success': False, 'message': f'Failed to parse Burp XML: {e}'}
+
+        # Validate root element
+        if root.tag != 'issues':
+            return {'success': False, 'message': f'Invalid Burp file. Expected "issues" root element, got: {root.tag}'}
+
+        results = []
+        hosts_seen = set()
+
+        for issue in root.findall('issue'):
+            host_el = issue.find('host')
+            host_ip = ''
+            host_name = ''
+            if host_el is not None:
+                host_ip = host_el.get('ip', '')
+                host_name = (host_el.text or '').strip()
+
+            if host_name:
+                hosts_seen.add(host_name)
+            elif host_ip:
+                hosts_seen.add(host_ip)
+
+            severity_text = (issue.findtext('severity') or '').strip()
+            severity_map = {'High': 3, 'Medium': 2, 'Low': 1, 'Information': 0, 'Info': 0}
+            severity_number = severity_map.get(severity_text, 0)
+
+            # Extract request/response, handling base64 encoding
+            request_text = ''
+            response_text = ''
+            rr = issue.find('requestresponse')
+            if rr is not None:
+                req_el = rr.find('request')
+                if req_el is not None:
+                    if req_el.get('base64') == 'true' and req_el.text:
+                        try:
+                            request_text = base64.b64decode(req_el.text).decode('utf-8', errors='replace')
+                        except Exception:
+                            request_text = req_el.text or ''
+                    else:
+                        request_text = (req_el.text or '').strip()
+
+                resp_el = rr.find('response')
+                if resp_el is not None:
+                    if resp_el.get('base64') == 'true' and resp_el.text:
+                        try:
+                            response_text = base64.b64decode(resp_el.text).decode('utf-8', errors='replace')
+                        except Exception:
+                            response_text = resp_el.text or ''
+                    else:
+                        response_text = (resp_el.text or '').strip()
+
+            # Combine remediation fields for solutions
+            remediation_bg = (issue.findtext('remediationBackground') or '').strip()
+            remediation_detail = (issue.findtext('remediationDetail') or '').strip()
+            solutions = remediation_bg
+            if remediation_detail:
+                solutions = (solutions + '\n\n' + remediation_detail).strip() if solutions else remediation_detail
+
+            # Extract references as see_also
+            references = (issue.findtext('references') or '').strip()
+
+            result = {
+                'severity': severity_text,
+                'severity_number': severity_number,
+                'host_ip': host_ip,
+                'host_name': host_name,
+                'plugin_name': (issue.findtext('name') or '').strip(),
+                'issue_type': (issue.findtext('type') or '').strip(),
+                'path': (issue.findtext('path') or '').strip(),
+                'location': (issue.findtext('location') or '').strip(),
+                'confidence': (issue.findtext('confidence') or '').strip(),
+                'issue_background': (issue.findtext('issueBackground') or '').strip(),
+                'issue_detail': (issue.findtext('issueDetail') or '').strip(),
+                'solutions': solutions,
+                'see_also': references,
+                'request': request_text,
+                'response': response_text,
+            }
+            results.append(result)
+
+        if not results:
+            return {'success': False, 'message': 'No issues found in Burp XML file.'}
+
+        # Auto-detect target
+        if not target:
+            target = list(hosts_seen)[0] if hosts_seen else 'burp_import'
+
+        # Default scan name
+        if not scan_name:
+            filename = getattr(importfile, 'filename', 'burp_import')
+            scan_name = f'Burp Import: {filename.rsplit(".", 1)[0] if "." in filename else filename}'
+
+        if is_dry_run:
+            severity_counts = {}
+            for r in results:
+                sev = r['severity']
+                severity_counts[sev] = severity_counts.get(sev, 0) + 1
+
+            return {
+                'success': True,
+                'dry_run': True,
+                'message': f'Validation passed. {len(results)} issues found across {len(hosts_seen)} host(s).',
+                'rows_read': len(results),
+                'rows_imported': len(results),
+                'rows_skipped': 0,
+                'event_types_count': len(severity_counts),
+                'errors': [],
+            }
+
+        # Actual import
+        dbh = SpiderFootDb(self.config)
+        scan_id = existing_scan_id
+
+        if not scan_id:
+            scan_id = str(uuid.uuid4())
+            try:
+                dbh.scanInstanceCreate(scan_id, scan_name, target)
+                # Create ROOT event
+                root_qry = """INSERT INTO tbl_scan_results
+                    (scan_instance_id, hash, type, generated, confidence,
+                    visibility, risk, module, data, false_positive, source_event_hash)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                root_qvals = [scan_id, 'ROOT', 'ROOT', int(time.time() * 1000),
+                              100, 100, 0, '', target, 0, 'ROOT']
+                dbh.dbh.execute(root_qry, root_qvals)
+                dbh.conn.commit()
+            except Exception as e:
+                return {'success': False, 'message': f'Failed to create scan instance: {e}'}
+
+        try:
+            count = dbh.scanBurpStore(scan_id, results)
+        except Exception as e:
+            return {'success': False, 'message': f'Failed to store Burp results: {e}'}
+
+        if not existing_scan_id:
+            dbh.scanInstanceSet(scan_id, status='FINISHED', ended=time.time() * 1000)
+
+        return {
+            'success': True,
+            'dry_run': False,
+            'message': f'Successfully imported {count} Burp issues into scan "{scan_name}".',
+            'scan_id': scan_id,
+            'rows_read': len(results),
+            'rows_imported': count,
+            'rows_skipped': 0,
+            'fps_imported': 0,
+            'validated_imported': 0,
+            'event_types_count': len(set(r['severity'] for r in results)),
+            'errors': [],
         }
 
     @cherrypy.expose
@@ -3815,6 +4132,188 @@ class SpiderFootWebUi:
         except Exception as e:
             self.log.error(f"Error importing findings: {e}", exc_info=True)
             return {'success': False, 'message': f'Error processing Excel file: {e}'}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scannessuscount(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Get count of Nessus results for a scan.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: count of Nessus results
+        """
+        dbh = SpiderFootDb(self.config)
+
+        try:
+            count = dbh.scanNessusCount(id)
+            return {'success': True, 'count': count}
+        except Exception as e:
+            self.log.error(f"Error counting Nessus results for scan {id}: {e}", exc_info=True)
+            return {'success': False, 'count': 0}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scannessuslist(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Get list of Nessus results for a scan.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: Nessus results
+        """
+        dbh = SpiderFootDb(self.config)
+
+        try:
+            rows = dbh.scanNessusList(id)
+            results = []
+            for row in rows:
+                results.append({
+                    'id': row[0],
+                    'severity': row[1],
+                    'severity_number': row[2],
+                    'plugin_name': row[3],
+                    'plugin_id': row[4],
+                    'host_ip': row[5],
+                    'host_name': row[6],
+                    'operating_system': row[7],
+                    'description': row[8],
+                    'synopsis': row[9],
+                    'solution': row[10],
+                    'see_also': row[11],
+                    'service_name': row[12],
+                    'port': row[13],
+                    'protocol': row[14],
+                    'request': row[15],
+                    'plugin_output': row[16],
+                    'cvss3_base_score': row[17],
+                })
+            return {'success': True, 'results': results}
+        except Exception as e:
+            self.log.error(f"Error listing Nessus results for scan {id}: {e}", exc_info=True)
+            return {'success': False, 'results': []}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def importnessus(self: 'SpiderFootWebUi', id: str = None, importfile=None) -> dict:
+        """Import Nessus results from a .nessus file into an existing scan.
+
+        Args:
+            id (str): scan instance ID
+            importfile: uploaded .nessus file
+
+        Returns:
+            dict: import results
+        """
+        if not id:
+            return {'success': False, 'message': 'No scan ID provided.'}
+
+        if importfile is None:
+            return {'success': False, 'message': 'No file was uploaded.'}
+
+        try:
+            raw = importfile.file.read()
+            content = raw.decode('utf-8', errors='replace')
+        except Exception as e:
+            return {'success': False, 'message': f'Failed to read uploaded file: {e}'}
+
+        if not content.strip():
+            return {'success': False, 'message': 'Uploaded file is empty.'}
+
+        return self._processNessusImport(content, None, None, importfile,
+                                          is_dry_run=False, existing_scan_id=id)
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scanburpcount(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Get count of Burp results for a scan.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: count of Burp results
+        """
+        dbh = SpiderFootDb(self.config)
+
+        try:
+            count = dbh.scanBurpCount(id)
+            return {'success': True, 'count': count}
+        except Exception as e:
+            self.log.error(f"Error counting Burp results for scan {id}: {e}", exc_info=True)
+            return {'success': False, 'count': 0}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scanburplist(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Get list of Burp results for a scan.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: Burp results
+        """
+        dbh = SpiderFootDb(self.config)
+
+        try:
+            rows = dbh.scanBurpList(id)
+            results = []
+            for row in rows:
+                results.append({
+                    'id': row[0],
+                    'severity': row[1],
+                    'severity_number': row[2],
+                    'host_ip': row[3],
+                    'host_name': row[4],
+                    'plugin_name': row[5],
+                    'issue_type': row[6],
+                    'path': row[7],
+                    'location': row[8],
+                    'confidence': row[9],
+                    'issue_background': row[10],
+                    'issue_detail': row[11],
+                    'solutions': row[12],
+                    'see_also': row[13],
+                    'request': row[14],
+                    'response': row[15],
+                })
+            return {'success': True, 'results': results}
+        except Exception as e:
+            self.log.error(f"Error listing Burp results for scan {id}: {e}", exc_info=True)
+            return {'success': False, 'results': []}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def importburp(self: 'SpiderFootWebUi', id: str = None, importfile=None) -> dict:
+        """Import Burp results from an XML file into an existing scan.
+
+        Args:
+            id (str): scan instance ID
+            importfile: uploaded .xml file
+
+        Returns:
+            dict: import results
+        """
+        if not id:
+            return {'success': False, 'message': 'No scan ID provided.'}
+
+        if importfile is None:
+            return {'success': False, 'message': 'No file was uploaded.'}
+
+        try:
+            raw = importfile.file.read()
+            content = raw.decode('utf-8', errors='replace')
+        except Exception as e:
+            return {'success': False, 'message': f'Failed to read uploaded file: {e}'}
+
+        if not content.strip():
+            return {'success': False, 'message': 'Uploaded file is empty.'}
+
+        return self._processBurpImport(content, None, None, importfile,
+                                        is_dry_run=False, existing_scan_id=id)
 
     @cherrypy.expose
     def scanfindingsexport(self: 'SpiderFootWebUi', id: str, filetype: str = "xlsx") -> str:
