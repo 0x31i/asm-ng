@@ -3993,6 +3993,14 @@ class SpiderFootWebUi:
         except Exception as e:
             self.log.warning(f"Pre-correlation dedup failed (continuing anyway): {e}")
 
+        # Delete previous AI correlations for this scan to avoid duplicates on rescan
+        ruleId = 'ai_single_scan_correlation' if mode == 'single' else 'ai_cross_scan_correlation'
+        try:
+            dbh.deleteCorrelationsByRule(id, ruleId)
+            self.log.info(f"Cleared previous {ruleId} correlations for scan {id}")
+        except Exception as e:
+            self.log.warning(f"Failed to clear old AI correlations (continuing anyway): {e}")
+
         try:
             if mode == 'single':
                 return self._runSingleScanCorrelation(dbh, id, target)

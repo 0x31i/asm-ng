@@ -3055,6 +3055,54 @@ class SpiderFootDb:
         
         return str(correlationId)
 
+    def deleteCorrelationsByRule(self, instanceId: str, ruleId: str) -> int:
+        """Delete all correlation results for a scan that match a given rule ID.
+
+        Args:
+            instanceId (str): scan instance ID
+            ruleId (str): rule ID to match (e.g. 'ai_single_scan_correlation')
+
+        Returns:
+            int: number of correlation results deleted
+
+        Raises:
+            IOError: database I/O failed
+        """
+        with self.dbhLock:
+            try:
+                # Get IDs of correlations to delete
+                if self.db_type == 'postgresql':
+                    qry = "SELECT id FROM tbl_scan_correlation_results WHERE scan_instance_id = %s AND rule_id = %s"
+                else:
+                    qry = "SELECT id FROM tbl_scan_correlation_results WHERE scan_instance_id = ? AND rule_id = ?"
+                self.dbh.execute(qry, [instanceId, ruleId])
+                rows = self.dbh.fetchall()
+
+                if not rows:
+                    return 0
+
+                corr_ids = [row[0] for row in rows]
+
+                # Delete events for these correlations
+                for cid in corr_ids:
+                    if self.db_type == 'postgresql':
+                        self.dbh.execute("DELETE FROM tbl_scan_correlation_results_events WHERE correlation_id = %s", [cid])
+                    else:
+                        self.dbh.execute("DELETE FROM tbl_scan_correlation_results_events WHERE correlation_id = ?", [cid])
+
+                # Delete the correlation results themselves
+                if self.db_type == 'postgresql':
+                    self.dbh.execute("DELETE FROM tbl_scan_correlation_results WHERE scan_instance_id = %s AND rule_id = %s", [instanceId, ruleId])
+                else:
+                    self.dbh.execute("DELETE FROM tbl_scan_correlation_results WHERE scan_instance_id = ? AND rule_id = ?", [instanceId, ruleId])
+
+                self.conn.commit()
+                return len(corr_ids)
+
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError(
+                    "SQL error encountered when deleting correlations by rule") from e
+
     def get_sources(self, scan_id: str, event_hash: str) -> list:
         """Return the list of source events for a given event in a scan.
 
