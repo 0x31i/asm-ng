@@ -5566,24 +5566,82 @@ i.glyphicon-white,
   font-size: 11px;
   line-height: 1.6;
   min-width: 180px;
+  position: relative;
 }
 
-.discovery-path-cell .dp-type,
-.discovery-path-cell .dp-module,
-.discovery-path-cell .dp-data {
+/* Collapsed state: truncate long values */
+.discovery-path-cell.dp-collapsed .dp-type,
+.discovery-path-cell.dp-collapsed .dp-module,
+.discovery-path-cell.dp-collapsed .dp-data {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 300px;
 }
 
+/* Expanded state: show full content */
+.discovery-path-cell.dp-expanded .dp-type,
+.discovery-path-cell.dp-expanded .dp-module,
+.discovery-path-cell.dp-expanded .dp-data {
+  white-space: normal;
+  word-break: break-all;
+  max-width: none;
+}
+
+/* Labels (TYPE:, SOURCE MODULE:, DATA:) */
 .discovery-path-cell .dp-type strong,
 .discovery-path-cell .dp-module strong,
 .discovery-path-cell .dp-data strong {
-  color: #6b7280;
+  color: #9ca3af;
   font-weight: 600;
   text-transform: uppercase;
   font-size: 10px;
+}
+
+/* Values - stand out from labels */
+.discovery-path-cell .dp-value {
+  color: #111827;
+  font-weight: 500;
+}
+
+/* Expand/collapse toggle triangle */
+.dp-expand-toggle {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+
+.dp-expand-toggle:hover {
+  opacity: 0.8;
+}
+
+/* Collapsed: triangle pointing right (click to expand) */
+.dp-collapsed .dp-expand-toggle::after {
+  content: '';
+  display: block;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 6px solid #6b7280;
+  margin: 2px 0 0 4px;
+}
+
+/* Expanded: triangle pointing down (click to collapse) */
+.dp-expanded .dp-expand-toggle::after {
+  content: '';
+  display: block;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #6b7280;
+  margin: 4px 0 0 2px;
 }
 
 /* Responsive adjustments */
