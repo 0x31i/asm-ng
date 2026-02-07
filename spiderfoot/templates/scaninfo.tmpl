@@ -1610,10 +1610,10 @@
             html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT XML</button>&nbsp;";
             if (isEnhanced) {
                 html += "<button class='btn btn-sm btn-cyan' onclick='enhanceBurpHtml(\"" + instanceId + "\")'>";
-                html += "<i class='glyphicon glyphicon-plus-sign'></i>&nbsp;HTML ENHANCE</button>&nbsp;";
+                html += "<i class='glyphicon glyphicon-ok'></i>&nbsp;ENHANCED</button>&nbsp;";
             } else {
                 html += "<button class='btn btn-sm btn-danger' onclick='enhanceBurpHtml(\"" + instanceId + "\")'>";
-                html += "<i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;NOT ENHANCED</button>&nbsp;";
+                html += "<i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;ENHANCE</button>&nbsp;";
             }
             html += "<span class='findings-count' id='burp-findings-count'><i class='glyphicon glyphicon-globe'></i>&nbsp;" + results.length + " BURP ISSUES</span>";
             html += "</div>";
@@ -1929,8 +1929,6 @@
                     html += "<div class='findings-toolbar-left'>";
                     html += "<button class='btn btn-sm btn-cyan' onclick='reimportFindings(\"" + instanceId + "\")'>";
                     html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT</button>&nbsp;";
-                    html += "<button class='btn btn-sm btn-cyan' onclick='findingsAiScan(\"" + instanceId + "\")'>";
-                    html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;AI SCAN</button>&nbsp;";
                     html += "<span class='findings-count' id='findings-findings-count'><i class='glyphicon glyphicon-list-alt'></i>&nbsp;" + data.length + " FINDINGS</span>";
                     html += "</div>";
                     // Toolbar - right: severity hide filters
@@ -2056,12 +2054,6 @@
             if (confirm('FINDINGS ANALYSIS HAS ALREADY BEEN PERFORMED - WOULD YOU LIKE TO REPLACE THE CURRENT FINDINGS?')) {
                 $('#findings-file-input').click();
             }
-        }
-
-        function findingsAiScan(instanceId) {
-            switchFindingsTab('correlations', instanceId);
-            // Small delay to let the correlations panel render, then trigger AI scan
-            setTimeout(function() { runAiCorrelation(instanceId, 'single'); }, 500);
         }
 
         function toggleFindingsFilter(severity) {

@@ -280,17 +280,34 @@ a:hover {
 }
 
 /* Cyan action button - bright cyan with glow, immune to context overrides */
-.btn-cyan {
-  background: linear-gradient(135deg, var(--accent-cyan) 0%, #06b6d4 100%) !important;
+.btn-cyan,
+.btn.btn-cyan,
+.btn.btn-sm.btn-cyan,
+button.btn-cyan {
+  --bs-btn-bg: #22d3ee;
+  --bs-btn-color: #fff;
+  --bs-btn-border-color: transparent;
+  --bs-btn-hover-bg: #06b6d4;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-border-color: transparent;
+  --bs-btn-active-bg: #0891b2;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-border-color: transparent;
+  background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%) !important;
+  background-color: #22d3ee !important;
   color: #ffffff !important;
   border: none !important;
-  box-shadow: 0 0 15px var(--glow-cyan);
+  border-color: transparent !important;
+  box-shadow: 0 0 15px rgba(34, 211, 238, 0.5);
 }
 
 .btn-cyan:hover,
-.btn-cyan:focus {
-  background: linear-gradient(135deg, var(--accent-cyan) 0%, #0891b2 100%) !important;
-  box-shadow: 0 0 25px var(--glow-cyan), 0 4px 15px rgba(0, 0, 0, 0.3);
+.btn-cyan:focus,
+.btn.btn-cyan:hover,
+.btn.btn-cyan:focus {
+  background: linear-gradient(135deg, #22d3ee 0%, #0891b2 100%) !important;
+  background-color: #06b6d4 !important;
+  box-shadow: 0 0 25px rgba(34, 211, 238, 0.5), 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
 .btn-cyan .glyphicon,
