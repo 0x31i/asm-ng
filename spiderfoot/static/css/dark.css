@@ -279,6 +279,33 @@ a:hover {
   text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
 }
 
+/* Cyan action button - bright cyan with glow, immune to context overrides */
+.btn-cyan {
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, #06b6d4 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 0 15px var(--glow-cyan);
+}
+
+.btn-cyan:hover,
+.btn-cyan:focus {
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, #0891b2 100%) !important;
+  box-shadow: 0 0 25px var(--glow-cyan), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.btn-cyan .glyphicon,
+.btn-cyan i {
+  color: #ffffff !important;
+}
+
+.btn-cyan:hover .glyphicon,
+.btn-cyan:focus .glyphicon,
+.btn-cyan:hover i,
+.btn-cyan:focus i {
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
+}
+
 /* Default button - Subtle gradient */
 .btn-default {
   background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%) !important;
