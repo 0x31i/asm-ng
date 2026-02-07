@@ -673,9 +673,26 @@ class SpiderFootWebUi:
             except Exception:
                 pass  # Table may not exist in older databases
 
-        # Build correlations prepend sheet if requested
+        # Build prepend sheets for analysis_correlations mode (Findings + Correlations)
         prepend_sheets = None
         if export_mode == "analysis_correlations":
+            # Findings sheet
+            findings_rows = []
+            try:
+                findings_data = dbh.scanFindingsList(id)
+                for f_row in findings_data:
+                    findings_rows.append([
+                        str(f_row[1]),   # Priority
+                        str(f_row[2]),   # Category
+                        str(f_row[3]),   # Tab
+                        str(f_row[4]),   # Item
+                        str(f_row[5]),   # Description
+                        str(f_row[6]),   # Recommendation
+                    ])
+            except Exception:
+                pass
+
+            # Correlations sheet
             correlation_rows = []
             try:
                 corr_data = dbh.scanCorrelationList(id)
@@ -690,11 +707,18 @@ class SpiderFootWebUi:
                     ])
             except Exception:
                 pass
-            prepend_sheets = [{
-                "name": "Correlations",
-                "headers": ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"],
-                "rows": correlation_rows
-            }]
+            prepend_sheets = [
+                {
+                    "name": "Findings",
+                    "headers": ["Priority", "Category", "Tab", "Item", "Description", "Recommendation"],
+                    "rows": findings_rows
+                },
+                {
+                    "name": "Correlations",
+                    "headers": ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"],
+                    "rows": correlation_rows
+                }
+            ]
 
         if filetype.lower() in ["xlsx", "excel"]:
             rows = []
@@ -1023,9 +1047,31 @@ class SpiderFootWebUi:
         if not data:
             return None
 
-        # Build correlations prepend sheet if requested
+        # Build prepend sheets for analysis_correlations mode (Findings + Correlations)
         prepend_sheets = None
         if export_mode == "analysis_correlations":
+            # Findings sheet (multi-scan)
+            findings_rows = []
+            for scan_id in ids.split(','):
+                if scan_id not in scaninfo or scaninfo[scan_id] is None:
+                    continue
+                try:
+                    findings_data = dbh.scanFindingsList(scan_id)
+                    scan_name_display = scaninfo[scan_id][0] if scaninfo[scan_id] else "Unknown"
+                    for f_row in findings_data:
+                        findings_rows.append([
+                            scan_name_display,
+                            str(f_row[1]),   # Priority
+                            str(f_row[2]),   # Category
+                            str(f_row[3]),   # Tab
+                            str(f_row[4]),   # Item
+                            str(f_row[5]),   # Description
+                            str(f_row[6]),   # Recommendation
+                        ])
+                except Exception:
+                    pass
+
+            # Correlations sheet (multi-scan)
             correlation_rows = []
             for scan_id in ids.split(','):
                 if scan_id not in scaninfo or scaninfo[scan_id] is None:
@@ -1045,11 +1091,18 @@ class SpiderFootWebUi:
                         ])
                 except Exception:
                     pass
-            prepend_sheets = [{
-                "name": "Correlations",
-                "headers": ["Scan Name", "Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"],
-                "rows": correlation_rows
-            }]
+            prepend_sheets = [
+                {
+                    "name": "Findings",
+                    "headers": ["Scan Name", "Priority", "Category", "Tab", "Item", "Description", "Recommendation"],
+                    "rows": findings_rows
+                },
+                {
+                    "name": "Correlations",
+                    "headers": ["Scan Name", "Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"],
+                    "rows": correlation_rows
+                }
+            ]
 
         if filetype.lower() in ["xlsx", "excel"]:
             rows = []
@@ -1267,9 +1320,26 @@ class SpiderFootWebUi:
             except Exception:
                 pass  # Table may not exist in older databases
 
-        # Build correlations prepend sheet if requested
+        # Build prepend sheets for analysis_correlations mode (Findings + Correlations)
         prepend_sheets = None
         if export_mode == "analysis_correlations":
+            # Findings sheet
+            findings_rows = []
+            try:
+                findings_data = dbh.scanFindingsList(id)
+                for f_row in findings_data:
+                    findings_rows.append([
+                        str(f_row[1]),   # Priority
+                        str(f_row[2]),   # Category
+                        str(f_row[3]),   # Tab
+                        str(f_row[4]),   # Item
+                        str(f_row[5]),   # Description
+                        str(f_row[6]),   # Recommendation
+                    ])
+            except Exception:
+                pass
+
+            # Correlations sheet
             correlation_rows = []
             try:
                 corr_data = dbh.scanCorrelationList(id)
@@ -1284,11 +1354,18 @@ class SpiderFootWebUi:
                     ])
             except Exception:
                 pass
-            prepend_sheets = [{
-                "name": "Correlations",
-                "headers": ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"],
-                "rows": correlation_rows
-            }]
+            prepend_sheets = [
+                {
+                    "name": "Findings",
+                    "headers": ["Priority", "Category", "Tab", "Item", "Description", "Recommendation"],
+                    "rows": findings_rows
+                },
+                {
+                    "name": "Correlations",
+                    "headers": ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"],
+                    "rows": correlation_rows
+                }
+            ]
 
         if filetype.lower() in ["xlsx", "excel"]:
             rows = []
@@ -3610,6 +3687,223 @@ class SpiderFootWebUi:
             # Return empty list on error
 
         return retdata
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scanfindings(self: 'SpiderFootWebUi', id: str) -> list:
+        """Get findings for a scan.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            list: findings data
+        """
+        dbh = SpiderFootDb(self.config)
+
+        try:
+            data = dbh.scanFindingsList(id)
+            return [list(row) for row in data]
+        except Exception as e:
+            self.log.error(f"Error fetching findings for scan {id}: {e}", exc_info=True)
+            return []
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scanfindingscount(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Get count of findings for a scan.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: count of findings
+        """
+        dbh = SpiderFootDb(self.config)
+
+        try:
+            count = dbh.scanFindingsCount(id)
+            return {'success': True, 'count': count}
+        except Exception as e:
+            self.log.error(f"Error counting findings for scan {id}: {e}", exc_info=True)
+            return {'success': False, 'count': 0}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def importfindings(self: 'SpiderFootWebUi', id: str = None, importfile=None) -> dict:
+        """Import findings from an Excel file (.xlsx).
+
+        Args:
+            id (str): scan instance ID
+            importfile: uploaded .xlsx file
+
+        Returns:
+            dict: import results
+        """
+        if not id:
+            return {'success': False, 'message': 'No scan ID provided.'}
+
+        if importfile is None:
+            return {'success': False, 'message': 'No file was uploaded.'}
+
+        try:
+            raw = importfile.file.read()
+        except Exception as e:
+            return {'success': False, 'message': f'Failed to read uploaded file: {e}'}
+
+        if not raw:
+            return {'success': False, 'message': 'Uploaded file is empty.'}
+
+        try:
+            import openpyxl
+            from io import BytesIO
+            wb = openpyxl.load_workbook(BytesIO(raw), read_only=True, data_only=True)
+            ws = wb.active
+
+            # Read headers from first row
+            headers = []
+            for cell in ws[1]:
+                headers.append(str(cell.value or '').strip().lower())
+
+            # Map expected columns
+            expected = ['priority', 'category', 'tab', 'item', 'description', 'recommendation']
+            col_map = {}
+            for col_name in expected:
+                if col_name in headers:
+                    col_map[col_name] = headers.index(col_name)
+
+            if 'priority' not in col_map:
+                return {'success': False, 'message': f'Required "Priority" column not found. Found columns: {", ".join(headers)}'}
+
+            findings = []
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                if row is None:
+                    continue
+                # Skip completely empty rows
+                if all(cell is None or str(cell).strip() == '' for cell in row):
+                    continue
+
+                finding = {}
+                for col_name, col_idx in col_map.items():
+                    if col_idx < len(row):
+                        finding[col_name] = str(row[col_idx] or '').strip()
+                    else:
+                        finding[col_name] = ''
+
+                if finding.get('priority'):
+                    findings.append(finding)
+
+            wb.close()
+
+            if not findings:
+                return {'success': False, 'message': 'No valid findings found in the Excel file.'}
+
+            dbh = SpiderFootDb(self.config)
+            count = dbh.scanFindingsStore(id, findings)
+
+            return {
+                'success': True,
+                'count': count,
+                'message': f'Successfully imported {count} findings.'
+            }
+
+        except Exception as e:
+            self.log.error(f"Error importing findings: {e}", exc_info=True)
+            return {'success': False, 'message': f'Error processing Excel file: {e}'}
+
+    @cherrypy.expose
+    def scanfindingsexport(self: 'SpiderFootWebUi', id: str, filetype: str = "xlsx") -> str:
+        """Export findings and correlations from a scan.
+
+        Args:
+            id (str): scan ID
+            filetype (str): export format (xlsx, csv)
+
+        Returns:
+            str: exported data
+        """
+        dbh = SpiderFootDb(self.config)
+
+        # Get findings
+        findings_rows = []
+        try:
+            findings_data = dbh.scanFindingsList(id)
+            for row in findings_data:
+                findings_rows.append([
+                    str(row[1]),  # Priority
+                    str(row[2]),  # Category
+                    str(row[3]),  # Tab
+                    str(row[4]),  # Item
+                    str(row[5]),  # Description
+                    str(row[6]),  # Recommendation
+                ])
+        except Exception:
+            pass
+
+        # Get correlations
+        correlation_rows = []
+        try:
+            corr_data = dbh.scanCorrelationList(id)
+            for corr_row in corr_data:
+                correlation_rows.append([
+                    str(corr_row[1]),   # Title
+                    str(corr_row[4]),   # Rule Name
+                    str(corr_row[3]),   # Risk
+                    str(corr_row[5]),   # Description
+                    str(corr_row[6]),   # Rule Logic
+                    str(corr_row[7]),   # Event Count
+                ])
+        except Exception:
+            pass
+
+        if filetype.lower() in ["xlsx", "excel"]:
+            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-findings.xlsx"
+            cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            cherrypy.response.headers['Pragma'] = "no-cache"
+
+            import openpyxl
+            from io import BytesIO
+            wb = openpyxl.Workbook()
+
+            # Findings sheet
+            ws_findings = wb.active
+            ws_findings.title = "Findings"
+            findings_headers = ["Priority", "Category", "Tab", "Item", "Description", "Recommendation"]
+            for col_num, header in enumerate(findings_headers, 1):
+                ws_findings.cell(row=1, column=col_num, value=header)
+            for row_num, row_data in enumerate(findings_rows, 2):
+                for col_num, cell_value in enumerate(row_data, 1):
+                    ws_findings.cell(row=row_num, column=col_num, value=cell_value)
+
+            # Correlations sheet
+            ws_corr = wb.create_sheet("Correlations")
+            corr_headers = ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"]
+            for col_num, header in enumerate(corr_headers, 1):
+                ws_corr.cell(row=1, column=col_num, value=header)
+            for row_num, row_data in enumerate(correlation_rows, 2):
+                for col_num, cell_value in enumerate(row_data, 1):
+                    ws_corr.cell(row=row_num, column=col_num, value=cell_value)
+
+            with BytesIO() as f:
+                wb.save(f)
+                f.seek(0)
+                return f.read()
+
+        if filetype.lower() == 'csv':
+            from io import StringIO
+            import csv
+            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-findings.csv"
+            cherrypy.response.headers['Content-Type'] = "application/csv"
+            cherrypy.response.headers['Pragma'] = "no-cache"
+
+            fileobj = StringIO()
+            parser = csv.writer(fileobj, dialect='excel')
+            parser.writerow(["Priority", "Category", "Tab", "Item", "Description", "Recommendation"])
+            for row in findings_rows:
+                parser.writerow(row)
+            return fileobj.getvalue().encode('utf-8')
+
+        return self.error("Invalid export file type.")
 
     @cherrypy.expose
     @cherrypy.tools.json_out()

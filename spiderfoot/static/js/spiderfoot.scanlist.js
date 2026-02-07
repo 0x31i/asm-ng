@@ -378,14 +378,14 @@ function showlisttable(types, filter, data) {
         buttons += "<li class='dropdown-header'>Analysis (No False Positives)</li>";
         buttons += "<li><a href='javascript:exportSelected(\"csv_analysis\")'>CSV</a></li>";
         buttons += "<li><a href='javascript:exportSelected(\"excel_analysis\")'>Excel</a></li>";
-        buttons += "<li><a href='javascript:exportSelected(\"excel_analysis_correlations\")'>Excel + Correlations</a></li>";
+        buttons += "<li><a href='javascript:exportSelected(\"excel_analysis_correlations\")'>Excel + Findings & Correlations</a></li>";
         buttons += "<li class='divider'></li>";
         buttons += "<li class='dropdown-header'>Legacy Export (v4.0 Types)</li>";
         buttons += "<li><a href='javascript:exportSelected(\"csv_legacy\")'>CSV</a></li>";
         buttons += "<li><a href='javascript:exportSelected(\"excel_legacy\")'>Excel</a></li>";
         buttons += "<li><a href='javascript:exportSelected(\"csv_analysis_legacy\")'>CSV Analysis</a></li>";
         buttons += "<li><a href='javascript:exportSelected(\"excel_analysis_legacy\")'>Excel Analysis</a></li>";
-        buttons += "<li><a href='javascript:exportSelected(\"excel_analysis_correlations_legacy\")'>Excel Analysis + Correlations</a></li>";
+        buttons += "<li><a href='javascript:exportSelected(\"excel_analysis_correlations_legacy\")'>Excel Analysis + Findings & Correlations</a></li>";
         buttons += "<li class='divider'></li>";
         buttons += "<li class='dropdown-header'>Other Formats</li>";
         buttons += "<li><a href='javascript:exportSelected(\"gexf\")'>GEXF</a></li>";

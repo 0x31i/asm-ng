@@ -111,6 +111,18 @@ class SpiderFootDb:
         "CREATE INDEX idx_scan_logs ON tbl_scan_log (scan_instance_id)",
         "CREATE INDEX idx_scan_correlation ON tbl_scan_correlation_results (scan_instance_id, id)",
         "CREATE INDEX idx_scan_correlation_events ON tbl_scan_correlation_results_events (correlation_id)",
+        "CREATE TABLE tbl_scan_findings ( \
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT, \
+            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
+            priority            VARCHAR NOT NULL, \
+            category            VARCHAR, \
+            tab                 VARCHAR, \
+            item                VARCHAR, \
+            description         VARCHAR, \
+            recommendation      VARCHAR, \
+            created             INT NOT NULL \
+        )",
+        "CREATE INDEX idx_scan_findings ON tbl_scan_findings (scan_instance_id)",
         "CREATE TABLE tbl_target_false_positives ( \
             id              INTEGER PRIMARY KEY AUTOINCREMENT, \
             target          VARCHAR NOT NULL, \
@@ -230,6 +242,18 @@ class SpiderFootDb:
         "CREATE INDEX IF NOT EXISTS idx_scan_logs ON tbl_scan_log (scan_instance_id)",
         "CREATE INDEX IF NOT EXISTS idx_scan_correlation ON tbl_scan_correlation_results (scan_instance_id, id)",
         "CREATE INDEX IF NOT EXISTS idx_scan_correlation_events ON tbl_scan_correlation_results_events (correlation_id)",
+        "CREATE TABLE IF NOT EXISTS tbl_scan_findings ( \
+            id                  SERIAL PRIMARY KEY, \
+            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
+            priority            VARCHAR NOT NULL, \
+            category            VARCHAR, \
+            tab                 VARCHAR, \
+            item                VARCHAR, \
+            description         TEXT, \
+            recommendation      TEXT, \
+            created             BIGINT NOT NULL \
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_scan_findings ON tbl_scan_findings (scan_instance_id)",
         "CREATE TABLE IF NOT EXISTS tbl_target_false_positives ( \
             id              SERIAL PRIMARY KEY, \
             target          VARCHAR NOT NULL, \
@@ -691,6 +715,18 @@ class SpiderFootDb:
                     except sqlite3.Error:
                         pass
 
+                # Migration: Add tbl_scan_findings table if it doesn't exist
+                try:
+                    self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_findings")
+                except sqlite3.Error:
+                    try:
+                        for query in self.createSchemaQueries:
+                            if "tbl_scan_findings" in query or "idx_scan_findings" in query:
+                                self.dbh.execute(query)
+                        self.conn.commit()
+                    except sqlite3.Error:
+                        pass
+
                 if init:
                     for row in self.eventDetails:
                         event = row[0]
@@ -819,6 +855,19 @@ class SpiderFootDb:
                     try:
                         for query in self.createPostgreSQLSchemaQueries:
                             if "audit_log" in query:
+                                self.dbh.execute(query)
+                        self.conn.commit()
+                    except psycopg2.Error:
+                        self.conn.rollback()
+
+                # Migration: Add tbl_scan_findings table if it doesn't exist
+                try:
+                    self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_findings")
+                except psycopg2.Error:
+                    self.conn.rollback()
+                    try:
+                        for query in self.createPostgreSQLSchemaQueries:
+                            if "tbl_scan_findings" in query or "idx_scan_findings" in query:
                                 self.dbh.execute(query)
                         self.conn.commit()
                     except psycopg2.Error:
@@ -3948,3 +3997,121 @@ class SpiderFootDb:
                 ]
             except (sqlite3.Error, psycopg2.Error):
                 return []
+
+    def scanFindingsList(self, instanceId: str) -> list:
+        """Obtain a list of findings imported for a scan.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            list: scan findings list
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(
+                f"instanceId is {type(instanceId)}; expected str()") from None
+
+        if self.db_type == 'sqlite':
+            qry = "SELECT id, priority, category, tab, item, description, recommendation, created \
+                FROM tbl_scan_findings WHERE scan_instance_id = ? ORDER BY \
+                CASE priority WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 \
+                WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 WHEN 'INFO' THEN 4 ELSE 5 END, category"
+        else:
+            qry = "SELECT id, priority, category, tab, item, description, recommendation, created \
+                FROM tbl_scan_findings WHERE scan_instance_id = %s ORDER BY \
+                CASE priority WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 \
+                WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 WHEN 'INFO' THEN 4 ELSE 5 END, category"
+
+        qvars = [instanceId]
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, qvars)
+                return self.dbh.fetchall()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError(
+                    "SQL error encountered when fetching findings list") from e
+
+    def scanFindingsStore(self, instanceId: str, findings: list) -> int:
+        """Store imported findings for a scan (replaces existing).
+
+        Args:
+            instanceId (str): scan instance ID
+            findings (list): list of dicts with keys: priority, category, tab, item, description, recommendation
+
+        Returns:
+            int: number of findings stored
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(
+                f"instanceId is {type(instanceId)}; expected str()") from None
+
+        import time
+        now = int(time.time())
+
+        with self.dbhLock:
+            try:
+                # Delete existing findings for this scan
+                if self.db_type == 'sqlite':
+                    self.dbh.execute("DELETE FROM tbl_scan_findings WHERE scan_instance_id = ?", [instanceId])
+                else:
+                    self.dbh.execute("DELETE FROM tbl_scan_findings WHERE scan_instance_id = %s", [instanceId])
+                self.conn.commit()
+
+                # Insert new findings
+                count = 0
+                for f in findings:
+                    if self.db_type == 'sqlite':
+                        qry = "INSERT INTO tbl_scan_findings \
+                            (scan_instance_id, priority, category, tab, item, description, recommendation, created) \
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                    else:
+                        qry = "INSERT INTO tbl_scan_findings \
+                            (scan_instance_id, priority, category, tab, item, description, recommendation, created) \
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+                    self.dbh.execute(qry, [
+                        instanceId,
+                        str(f.get('priority', '')).upper(),
+                        str(f.get('category', '')),
+                        str(f.get('tab', '')),
+                        str(f.get('item', '')),
+                        str(f.get('description', '')),
+                        str(f.get('recommendation', '')),
+                        now
+                    ])
+                    count += 1
+
+                self.conn.commit()
+                return count
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError(
+                    "SQL error encountered when storing findings") from e
+
+    def scanFindingsCount(self, instanceId: str) -> int:
+        """Get count of findings for a scan.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            int: count of findings
+        """
+        if self.db_type == 'sqlite':
+            qry = "SELECT COUNT(*) FROM tbl_scan_findings WHERE scan_instance_id = ?"
+        else:
+            qry = "SELECT COUNT(*) FROM tbl_scan_findings WHERE scan_instance_id = %s"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [instanceId])
+                return self.dbh.fetchone()[0]
+            except (sqlite3.Error, psycopg2.Error):
+                return 0
