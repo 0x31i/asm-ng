@@ -1242,27 +1242,17 @@
         }
 
         function buildAiCorrelationBar(instanceId) {
-            var bar = "<div class='ai-correlation-compact'>";
-            bar += "<span class='ai-correlation-compact-label'><i class='glyphicon glyphicon-flash'></i>&nbsp;AI ANALYSIS</span>";
-            bar += "<button id='btn-panel-single-correlation' class='btn btn-primary btn-sm' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
-            bar += "<i class='glyphicon glyphicon-search'></i>&nbsp;Single Scan</button>";
-            bar += "<button id='btn-panel-cross-correlation' class='btn btn-info btn-sm' onclick='runAiCorrelation(\"" + instanceId + "\", \"cross\")'>";
-            bar += "<i class='glyphicon glyphicon-transfer'></i>&nbsp;Cross-Scan</button>";
-            bar += "<span class='ai-correlation-compact-results' id='ai-correlation-results'></span>";
-            bar += "</div>";
-            return bar;
+            // No longer rendered as a separate bar - AI rescan is now in the toolbar
+            return "";
         }
 
         function initAiCorrelationButtons(instanceId) {
             sf.fetchData('${docroot}/checkAiCorrelationModes', {'id': instanceId},
                 function(data) {
                     if (data.success) {
-                        if (!data.cross_scan_available) {
-                            $("#btn-panel-cross-correlation").prop('disabled', true).addClass('disabled')
-                                .attr('title', 'No imported historical data detected.');
-                        }
                         if (!data.single_scan_available) {
-                            $("#btn-panel-single-correlation").prop('disabled', true).addClass('disabled');
+                            $("#btn-panel-rescan").prop('disabled', true).addClass('disabled')
+                                .attr('title', 'No scan data available for AI analysis.');
                         }
                     }
                 },
@@ -1278,16 +1268,16 @@
                 return;
             }
 
-            // Compact AI bar at top
-            var html = buildAiCorrelationBar(instanceId);
-
             // Toolbar matching findings style
-            html += "<div class='findings-toolbar'>";
+            var html = "<div class='findings-toolbar'>";
             html += "<div class='findings-toolbar-left'>";
             html += "<span class='findings-count'>" + data.length + " CORRELATIONS</span>";
             html += "</div>";
             html += "<div class='findings-toolbar-right'>";
-            html += "<a class='btn btn-outline-secondary btn-sm' href='${docroot}/scancorrelationsexport?id=" + instanceId + "&filetype=xlsx' target='_blank'>";
+            html += "<span class='ai-correlation-compact-results' id='ai-correlation-results'></span>";
+            html += "<button id='btn-panel-rescan' class='btn btn-sm btn-default' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
+            html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;AI RESCAN</button>";
+            html += "<a class='btn btn-sm btn-default' href='${docroot}/scancorrelationsexport?id=" + instanceId + "&filetype=xlsx' target='_blank'>";
             html += "<i class='glyphicon glyphicon-download-alt'></i>&nbsp;EXPORT</a>";
             html += "</div></div>";
 
@@ -1350,8 +1340,8 @@
                 html += "<tr class='finding-detail-row finding-" + riskLower + " corr-detail-row' id='corrwell_tr_" + corrId + "'>";
                 html += "<td colspan='4'><div class='finding-detail' id='corr-detail-content-" + corrId + "'>";
                 if (desc) {
-                    html += "<div class='finding-detail-grid'>";
-                    html += "<div class='finding-detail-section detail-description'>";
+                    html += "<div class='corr-description-wrapper'>";
+                    html += "<div class='finding-detail-section detail-description corr-description-wide'>";
                     html += "<div class='finding-detail-label'>Description</div>";
                     html += "<div class='finding-detail-text'>" + desc + "</div>";
                     html += "</div>";
@@ -1386,7 +1376,15 @@
 
         function renderCorrelationsPanelEmpty(instanceId) {
             var panel = $('#findings-correlations-content');
-            var html = buildAiCorrelationBar(instanceId);
+            var html = "<div class='findings-toolbar'>";
+            html += "<div class='findings-toolbar-left'>";
+            html += "<span class='findings-count'>0 CORRELATIONS</span>";
+            html += "</div>";
+            html += "<div class='findings-toolbar-right'>";
+            html += "<span class='ai-correlation-compact-results' id='ai-correlation-results'></span>";
+            html += "<button id='btn-panel-rescan' class='btn btn-sm btn-default' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
+            html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;AI RESCAN</button>";
+            html += "</div></div>";
             html += "<div class='alert alert-warning' style='margin: 0;'><h4>No correlations found.</h4>If the scan is still running please reload once it has completed. If the scan is complete, it may not have triggered any correlation rules.</div>";
             panel.html(html);
             initAiCorrelationButtons(instanceId);
@@ -1872,43 +1870,32 @@
 
         }
 
-        // Run AI correlation analysis with specified mode
+        // Run AI correlation analysis on current scan data
         function runAiCorrelation(instanceId, mode) {
-            var btnId = mode === 'cross' ? '#btn-run-cross-correlation' : '#btn-run-single-correlation';
-            var label = mode === 'cross' ? 'Cross-Scan Analysis' : 'Single Scan Analysis';
-            var icon = mode === 'cross' ? 'glyphicon-transfer' : 'glyphicon-search';
+            var btnId = '#btn-panel-rescan';
 
             $(btnId).prop('disabled', true).html("<i class='glyphicon glyphicon-refresh spinning'></i>&nbsp;Analyzing...");
-            $("#ai-correlation-results").html("<div class='alert alert-info'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;Running " + label.toLowerCase() + ". This may take a moment...</div>");
+            $("#ai-correlation-results").html("<span class='text-info'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;Running analysis...</span>");
 
             sf.fetchData('${docroot}/runAiCorrelation', {'id': instanceId, 'mode': mode},
                 function(data) {
-                    $(btnId).prop('disabled', false).html("<i class='glyphicon " + icon + "'></i>&nbsp;" + label);
+                    $(btnId).prop('disabled', false).html("<i class='glyphicon glyphicon-flash'></i>&nbsp;AI RESCAN");
 
                     if (data.success) {
                         if (data.correlations_found > 0) {
+                            $("#ai-correlation-results").html("<span class='text-success'><i class='glyphicon glyphicon-ok'></i>&nbsp;" + data.correlations_found + " new correlation(s) found.</span>");
                             // Refresh the correlations panel to show AI results
-                            loadCorrelationsIntoPanel(instanceId);
+                            setTimeout(function() { loadCorrelationsIntoPanel(instanceId); }, 1500);
                         } else {
-                            var resultHtml = "<div class='alert alert-info'>";
-                            resultHtml += "<h5><i class='glyphicon glyphicon-info-sign'></i>&nbsp;Analysis Complete</h5>";
-                            if (mode === 'single') {
-                                resultHtml += "<p>No IOCs were found with cross-module corroboration in this scan.</p>";
-                            } else if ((data.imported_iocs || 0) == 0) {
-                                resultHtml += "<p>No imported historical data found. Import data from other scans first.</p>";
-                            } else {
-                                resultHtml += "<p>No matching IOCs found between native and imported data.</p>";
-                            }
-                            resultHtml += "</div>";
-                            $("#ai-correlation-results").html(resultHtml);
+                            $("#ai-correlation-results").html("<span class='text-muted'><i class='glyphicon glyphicon-info-sign'></i>&nbsp;No new correlations found.</span>");
                         }
                     } else {
-                        $("#ai-correlation-results").html("<div class='alert alert-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Error: " + (data.error || 'Unknown error') + "</div>");
+                        $("#ai-correlation-results").html("<span class='text-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;" + (data.error || 'Error') + "</span>");
                     }
                 },
                 function(xhr, textStatus, errorThrown) {
-                    $(btnId).prop('disabled', false).html("<i class='glyphicon " + icon + "'></i>&nbsp;" + label);
-                    $("#ai-correlation-results").html("<div class='alert alert-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Failed to run analysis: " + textStatus + "</div>");
+                    $(btnId).prop('disabled', false).html("<i class='glyphicon glyphicon-flash'></i>&nbsp;AI RESCAN");
+                    $("#ai-correlation-results").html("<span class='text-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Failed: " + textStatus + "</span>");
                 }
             );
         }

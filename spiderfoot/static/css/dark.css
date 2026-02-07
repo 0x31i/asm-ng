@@ -6238,6 +6238,18 @@ i.glyphicon-white,
 .findings-table .col-corr-type { width: 30%; }
 .findings-table .col-corr-elements { width: 100px; }
 
+/* Correlation description panel - centered and wide */
+.corr-description-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.corr-description-wide {
+  width: 100%;
+  max-width: 100%;
+}
+
 /* Correlations expanded events sub-table */
 .corr-events-container {
   margin-top: 10px;
