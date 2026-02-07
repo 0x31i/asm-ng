@@ -3,7 +3,7 @@
 # Name:         test_sfp_cisco_umbrella
 # Purpose:      Test Cisco Umbrella Investigate API module.
 #
-# Author:       Agostino Panico <van1sh@van1shland.io>
+# Author:       Agostino Panico <elias@sims.dev>
 #
 # Created:      01/02/2025
 # Copyright:    (c) poppopjmp

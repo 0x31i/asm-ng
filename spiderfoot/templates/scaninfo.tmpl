@@ -1871,20 +1871,27 @@
         }
 
         // Run AI correlation analysis on current scan data
+        // Uses $.ajax directly (not sf.fetchData) for proper error/timeout handling
         function runAiCorrelation(instanceId, mode) {
             var btnId = '#btn-panel-rescan';
+            var resetBtn = function() {
+                $(btnId).prop('disabled', false).html("<i class='glyphicon glyphicon-flash'></i>&nbsp;AI RESCAN");
+            };
 
             $(btnId).prop('disabled', true).html("<i class='glyphicon glyphicon-refresh spinning'></i>&nbsp;Analyzing...");
             $("#ai-correlation-results").html("<span class='text-info'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;Running analysis...</span>");
 
-            sf.fetchData('${docroot}/runAiCorrelation', {'id': instanceId, 'mode': mode},
-                function(data) {
-                    $(btnId).prop('disabled', false).html("<i class='glyphicon glyphicon-flash'></i>&nbsp;AI RESCAN");
-
+            $.ajax({
+                type: "POST",
+                url: '${docroot}/runAiCorrelation',
+                data: {'id': instanceId, 'mode': mode},
+                dataType: "json",
+                timeout: 300000,
+                success: function(data) {
+                    resetBtn();
                     if (data.success) {
                         if (data.correlations_found > 0) {
                             $("#ai-correlation-results").html("<span class='text-success'><i class='glyphicon glyphicon-ok'></i>&nbsp;" + data.correlations_found + " new correlation(s) found.</span>");
-                            // Refresh the correlations panel to show AI results
                             setTimeout(function() { loadCorrelationsIntoPanel(instanceId); }, 1500);
                         } else {
                             $("#ai-correlation-results").html("<span class='text-muted'><i class='glyphicon glyphicon-info-sign'></i>&nbsp;No new correlations found.</span>");
@@ -1893,11 +1900,12 @@
                         $("#ai-correlation-results").html("<span class='text-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;" + (data.error || 'Error') + "</span>");
                     }
                 },
-                function(xhr, textStatus, errorThrown) {
-                    $(btnId).prop('disabled', false).html("<i class='glyphicon glyphicon-flash'></i>&nbsp;AI RESCAN");
-                    $("#ai-correlation-results").html("<span class='text-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Failed: " + textStatus + "</span>");
+                error: function(xhr, textStatus, errorThrown) {
+                    resetBtn();
+                    var msg = textStatus === 'timeout' ? 'Request timed out' : textStatus;
+                    $("#ai-correlation-results").html("<span class='text-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Failed: " + msg + "</span>");
                 }
-            );
+            });
         }
 
         // Run duplication check on scan results

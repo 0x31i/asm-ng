@@ -3,7 +3,7 @@
 # Name:         sfp_cisco_umbrella
 # Purpose:      Query Cisco Umbrella Investigate API for domain information.
 #
-# Author:       Agostino Panico <van1sh@van1shland.io>
+# Author:       Agostino Panico <elias@sims.dev>
 #
 # Created:      01/02/2025
 # Copyright:    (c) poppopjmp

@@ -3,7 +3,7 @@
 # Name:   sfp_bambanek
 # Purpose:  Check if a host/domain or IP appears in Bambenek Consulting feeds.
 #
-# Author:   Agostino Panico <van1sh@van1shland.io>
+# Author:   Agostino Panico <elias@sims.dev>
 #
 # Created:  01/02/2025
 # Copyright:  (c) poppopjmp

@@ -345,7 +345,7 @@ For more detailed instructions and examples, refer to the [API documentation](do
 
 ASM-NG is actively maintained with regular updates and contributions. Issues and pull requests are actively managed. The community is engaged through discussions and contributions.
 
-Maintainer: 0x31i <van1sh@van1shland.io>
+Maintainer: 0x31i <elias@sims.dev>
 
 ---
 

@@ -429,4 +429,4 @@ headline: "Exposed service detected using ZoomEye: {data}"
 ## Maintainers
 
 Steve Micallef <steve@binarypool.com>
-Poppopjmp <van1sh@van1shland.io>
+Poppopjmp <elias@sims.dev>

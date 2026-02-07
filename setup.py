@@ -26,7 +26,7 @@ setup(
     name="asm-ng",
     version=version,
     author="0x31i",
-    author_email="van1sh@van1shland.io",
+    author_email="elias@sims.dev",
     description="ASM-NG - Attack Surface Management, Next Generation OSINT Platform",
     long_description=long_description,
     long_description_content_type="text/markdown",
