@@ -1013,6 +1013,7 @@
         // -- Shared vulnerability table state --
         var nessusFilterState = { closed: false, ticketed: false };
         var burpFilterState = { closed: false, ticketed: false };
+        var findingsFilterState = { critical: false, high: false, medium: false, low: false, info: false };
         var nessusMerged = true;
         var burpMerged = true;
         window.nessusRawResults = [];
@@ -1909,14 +1910,36 @@
                         return;
                     }
 
-                    // Toolbar
+                    // Store raw data for filtering
+                    window.findingsRawData = data;
+
+                    // Count severities
+                    var sevCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+                    for (var s = 0; s < data.length; s++) {
+                        var p = (data[s][1] || '').toUpperCase();
+                        if (p === 'CRITICAL') sevCounts.critical++;
+                        else if (p === 'HIGH') sevCounts.high++;
+                        else if (p === 'MEDIUM') sevCounts.medium++;
+                        else if (p === 'LOW') sevCounts.low++;
+                        else if (p === 'INFO') sevCounts.info++;
+                    }
+
+                    // Toolbar - left: action buttons + count (mirroring VULNERABILITIES layout)
                     var html = "<div class='findings-toolbar'>";
                     html += "<div class='findings-toolbar-left'>";
-                    html += "<span class='findings-count'><i class='glyphicon glyphicon-list-alt'></i>&nbsp;" + data.length + " FINDINGS</span>";
-                    html += "</div>";
-                    html += "<div class='findings-toolbar-right'>";
                     html += "<button class='btn btn-sm btn-cyan' onclick='reimportFindings(\"" + instanceId + "\")'>";
-                    html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT</button>";
+                    html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT</button>&nbsp;";
+                    html += "<button class='btn btn-sm btn-cyan' onclick='findingsAiScan(\"" + instanceId + "\")'>";
+                    html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;AI SCAN</button>&nbsp;";
+                    html += "<span class='findings-count' id='findings-findings-count'><i class='glyphicon glyphicon-list-alt'></i>&nbsp;" + data.length + " FINDINGS</span>";
+                    html += "</div>";
+                    // Toolbar - right: severity hide filters
+                    html += "<div class='findings-toolbar-right'>";
+                    if (sevCounts.critical > 0) html += "<button class='filter-btn" + (findingsFilterState.critical ? " filter-btn-active" : "") + "' id='findings-hide-critical' onclick='toggleFindingsFilter(\"critical\")'>" + (findingsFilterState.critical ? "HIDING " : "HIDE ") + sevCounts.critical + " CRITICALS</button>&nbsp;";
+                    if (sevCounts.high > 0) html += "<button class='filter-btn" + (findingsFilterState.high ? " filter-btn-active" : "") + "' id='findings-hide-high' onclick='toggleFindingsFilter(\"high\")'>" + (findingsFilterState.high ? "HIDING " : "HIDE ") + sevCounts.high + " HIGHS</button>&nbsp;";
+                    if (sevCounts.medium > 0) html += "<button class='filter-btn" + (findingsFilterState.medium ? " filter-btn-active" : "") + "' id='findings-hide-medium' onclick='toggleFindingsFilter(\"medium\")'>" + (findingsFilterState.medium ? "HIDING " : "HIDE ") + sevCounts.medium + " MEDIUMS</button>&nbsp;";
+                    if (sevCounts.low > 0) html += "<button class='filter-btn" + (findingsFilterState.low ? " filter-btn-active" : "") + "' id='findings-hide-low' onclick='toggleFindingsFilter(\"low\")'>" + (findingsFilterState.low ? "HIDING " : "HIDE ") + sevCounts.low + " LOWS</button>&nbsp;";
+                    if (sevCounts.info > 0) html += "<button class='filter-btn" + (findingsFilterState.info ? " filter-btn-active" : "") + "' id='findings-hide-info' onclick='toggleFindingsFilter(\"info\")'>" + (findingsFilterState.info ? "HIDING " : "HIDE ") + sevCounts.info + " INFOS</button>";
                     html += "</div></div>";
 
                     // Compact 4-column table with expandable detail rows
@@ -2035,6 +2058,70 @@
             }
         }
 
+        function findingsAiScan(instanceId) {
+            switchFindingsTab('correlations', instanceId);
+            // Small delay to let the correlations panel render, then trigger AI scan
+            setTimeout(function() { runAiCorrelation(instanceId, 'single'); }, 500);
+        }
+
+        function toggleFindingsFilter(severity) {
+            findingsFilterState[severity] = !findingsFilterState[severity];
+            applyFindingsFilters();
+        }
+
+        function applyFindingsFilters() {
+            $('#findings-table tbody tr.finding-row').each(function() {
+                var row = $(this);
+                var badge = row.find('.badge').text().toLowerCase();
+                var shouldHide = false;
+                if (findingsFilterState.critical && badge === 'critical') shouldHide = true;
+                if (findingsFilterState.high && badge === 'high') shouldHide = true;
+                if (findingsFilterState.medium && badge === 'medium') shouldHide = true;
+                if (findingsFilterState.low && badge === 'low') shouldHide = true;
+                if (findingsFilterState.info && badge === 'info') shouldHide = true;
+                if (shouldHide) {
+                    row.hide();
+                    row.next('.finding-detail-row').hide();
+                } else {
+                    row.show();
+                }
+            });
+            updateFindingsFilterCounts();
+        }
+
+        function updateFindingsFilterCounts() {
+            var data = window.findingsRawData || [];
+            var sevCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+            for (var i = 0; i < data.length; i++) {
+                var p = (data[i][1] || '').toUpperCase();
+                if (p === 'CRITICAL') sevCounts.critical++;
+                else if (p === 'HIGH') sevCounts.high++;
+                else if (p === 'MEDIUM') sevCounts.medium++;
+                else if (p === 'LOW') sevCounts.low++;
+                else if (p === 'INFO') sevCounts.info++;
+            }
+            var severities = ['critical', 'high', 'medium', 'low', 'info'];
+            var labels = { critical: 'CRITICALS', high: 'HIGHS', medium: 'MEDIUMS', low: 'LOWS', info: 'INFOS' };
+            for (var s = 0; s < severities.length; s++) {
+                var sev = severities[s];
+                var btn = $('#findings-hide-' + sev);
+                if (sevCounts[sev] > 0) {
+                    btn.show();
+                    btn.text(findingsFilterState[sev] ? 'HIDING ' + sevCounts[sev] + ' ' + labels[sev] : 'HIDE ' + sevCounts[sev] + ' ' + labels[sev]);
+                    if (findingsFilterState[sev]) btn.addClass('filter-btn-active'); else btn.removeClass('filter-btn-active');
+                } else {
+                    btn.hide();
+                }
+            }
+            // Update visible count
+            var hiddenCount = 0;
+            for (var s = 0; s < severities.length; s++) {
+                if (findingsFilterState[severities[s]]) hiddenCount += sevCounts[severities[s]];
+            }
+            var visibleCount = data.length - hiddenCount;
+            $('#findings-findings-count').html("<i class='glyphicon glyphicon-list-alt'></i>&nbsp;" + visibleCount + " FINDINGS");
+        }
+
         // Load correlations data into the correlations tab panel
         function loadCorrelationsIntoPanel(instanceId) {
             var panel = $('#findings-correlations-content');
@@ -2101,15 +2188,15 @@
                 return;
             }
 
-            // Toolbar matching findings style
+            // Toolbar matching findings style - action buttons on left
             var html = "<div class='findings-toolbar'>";
             html += "<div class='findings-toolbar-left'>";
+            html += "<button id='btn-panel-rescan' class='btn btn-sm btn-cyan' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
+            html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;AI RESCAN</button>&nbsp;";
             html += "<span class='findings-count'>" + data.length + " CORRELATIONS</span>";
             html += "</div>";
             html += "<div class='findings-toolbar-right'>";
             html += "<span class='ai-correlation-compact-results' id='ai-correlation-results'></span>";
-            html += "<button id='btn-panel-rescan' class='btn btn-sm btn-cyan' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
-            html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;AI RESCAN</button>";
             html += "</div></div>";
 
             // Table matching findings style: Risk | Correlation | Type | Data Elements
@@ -2209,12 +2296,12 @@
             var panel = $('#findings-correlations-content');
             var html = "<div class='findings-toolbar'>";
             html += "<div class='findings-toolbar-left'>";
+            html += "<button id='btn-panel-rescan' class='btn btn-sm btn-cyan' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
+            html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;AI SCAN</button>&nbsp;";
             html += "<span class='findings-count'>0 CORRELATIONS</span>";
             html += "</div>";
             html += "<div class='findings-toolbar-right'>";
             html += "<span class='ai-correlation-compact-results' id='ai-correlation-results'></span>";
-            html += "<button id='btn-panel-rescan' class='btn btn-sm btn-danger' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
-            html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;AI SCAN</button>";
             html += "</div></div>";
             html += "<div class='alert alert-warning' style='margin: 0;'><h4>No correlations found.</h4>If the scan is still running please reload once it has completed. If the scan is complete, it may not have triggered any correlation rules.</div>";
             panel.html(html);
