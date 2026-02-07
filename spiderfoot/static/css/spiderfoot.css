@@ -6163,7 +6163,7 @@ i.glyphicon-white,
 }
 
 /* Column widths for 4-column layout */
-.findings-table .col-priority { width: 110px; }
+.findings-table .col-priority { width: 85px; }
 .findings-table .col-category { width: 20%; }
 .findings-table .col-type { width: 20%; }
 .findings-table .col-item { width: auto; }
@@ -6172,15 +6172,30 @@ i.glyphicon-white,
   padding: 6px 10px;
   font-size: 12px;
   line-height: 1.4;
-  vertical-align: middle;
+  vertical-align: top;
   border-bottom: 1px solid var(--glass-border);
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
 
+/* Clamp non-priority cells to 4 lines max */
+.findings-table tbody td:not(:first-child) {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .findings-table tbody td:first-child {
   overflow: visible;
   white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* Uncap when row is expanded */
+.finding-row.finding-expanded td:not(:first-child) {
+  -webkit-line-clamp: unset;
+  overflow: visible;
 }
 
 .finding-row {
@@ -6218,7 +6233,7 @@ i.glyphicon-white,
   border-bottom: none;
 }
 
-.finding-row.finding-expanded td {
+.finding-row.finding-expanded td:first-child {
   overflow: visible;
 }
 
@@ -6350,8 +6365,8 @@ i.glyphicon-white,
 }
 
 /* Correlations table column widths (matching findings 4-column layout) */
-.findings-table .col-corr-name { width: 30%; }
-.findings-table .col-corr-type { width: 30%; }
+.findings-table .col-corr-name { width: auto; }
+.findings-table .col-corr-type { width: 25%; }
 .findings-table .col-corr-elements { width: 100px; }
 
 /* Correlation description panel - centered and wide */
