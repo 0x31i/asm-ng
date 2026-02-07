@@ -1014,6 +1014,7 @@
         var nessusFilterState = { closed: false, ticketed: false };
         var burpFilterState = { closed: false, ticketed: false };
         var findingsFilterState = { critical: false, high: false, medium: false, low: false, info: false };
+        var correlationsFilterState = { critical: false, high: false, medium: false, low: false, info: false };
         var nessusMerged = true;
         var burpMerged = true;
         window.nessusRawResults = [];
@@ -2114,6 +2115,63 @@
             $('#findings-findings-count').html("<i class='glyphicon glyphicon-list-alt'></i>&nbsp;" + visibleCount + " FINDINGS");
         }
 
+        function toggleCorrelationsFilter(severity) {
+            correlationsFilterState[severity] = !correlationsFilterState[severity];
+            applyCorrelationsFilters();
+        }
+
+        function applyCorrelationsFilters() {
+            $('#correlations-panel-table tbody tr.corr-row').each(function() {
+                var row = $(this);
+                var badge = row.find('.badge').text().toLowerCase();
+                var shouldHide = false;
+                if (correlationsFilterState.critical && badge === 'critical') shouldHide = true;
+                if (correlationsFilterState.high && badge === 'high') shouldHide = true;
+                if (correlationsFilterState.medium && badge === 'medium') shouldHide = true;
+                if (correlationsFilterState.low && badge === 'low') shouldHide = true;
+                if (correlationsFilterState.info && badge === 'info') shouldHide = true;
+                if (shouldHide) {
+                    row.hide();
+                    row.next('.corr-detail-row').hide();
+                } else {
+                    row.show();
+                }
+            });
+            updateCorrelationsFilterCounts();
+        }
+
+        function updateCorrelationsFilterCounts() {
+            var data = window.correlationsRawData || [];
+            var sevCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+            for (var i = 0; i < data.length; i++) {
+                var r = (data[i][3] || '').toUpperCase();
+                if (r === 'CRITICAL') sevCounts.critical++;
+                else if (r === 'HIGH') sevCounts.high++;
+                else if (r === 'MEDIUM') sevCounts.medium++;
+                else if (r === 'LOW') sevCounts.low++;
+                else if (r === 'INFO') sevCounts.info++;
+            }
+            var severities = ['critical', 'high', 'medium', 'low', 'info'];
+            var labels = { critical: 'CRITICALS', high: 'HIGHS', medium: 'MEDIUMS', low: 'LOWS', info: 'INFOS' };
+            for (var s = 0; s < severities.length; s++) {
+                var sev = severities[s];
+                var btn = $('#corr-hide-' + sev);
+                if (sevCounts[sev] > 0) {
+                    btn.show();
+                    btn.text(correlationsFilterState[sev] ? 'HIDING ' + sevCounts[sev] + ' ' + labels[sev] : 'HIDE ' + sevCounts[sev] + ' ' + labels[sev]);
+                    if (correlationsFilterState[sev]) btn.addClass('filter-btn-active'); else btn.removeClass('filter-btn-active');
+                } else {
+                    btn.hide();
+                }
+            }
+            var hiddenCount = 0;
+            for (var s = 0; s < severities.length; s++) {
+                if (correlationsFilterState[severities[s]]) hiddenCount += sevCounts[severities[s]];
+            }
+            var visibleCount = data.length - hiddenCount;
+            $('#correlations-count').text(visibleCount + " CORRELATIONS");
+        }
+
         // Load correlations data into the correlations tab panel
         function loadCorrelationsIntoPanel(instanceId) {
             var panel = $('#findings-correlations-content');
@@ -2180,15 +2238,34 @@
                 return;
             }
 
+            // Store raw data for filtering
+            window.correlationsRawData = data;
+
+            // Count risk levels
+            var corrSevCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+            for (var s = 0; s < data.length; s++) {
+                var r = (data[s][3] || '').toUpperCase();
+                if (r === 'CRITICAL') corrSevCounts.critical++;
+                else if (r === 'HIGH') corrSevCounts.high++;
+                else if (r === 'MEDIUM') corrSevCounts.medium++;
+                else if (r === 'LOW') corrSevCounts.low++;
+                else if (r === 'INFO') corrSevCounts.info++;
+            }
+
             // Toolbar matching findings style - action buttons on left
             var html = "<div class='findings-toolbar'>";
             html += "<div class='findings-toolbar-left'>";
             html += "<button id='btn-panel-rescan' class='btn btn-sm btn-cyan' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
             html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;AI RESCAN</button>&nbsp;";
-            html += "<span class='findings-count'>" + data.length + " CORRELATIONS</span>";
+            html += "<span class='findings-count' id='correlations-count'>" + data.length + " CORRELATIONS</span>";
             html += "</div>";
             html += "<div class='findings-toolbar-right'>";
             html += "<span class='ai-correlation-compact-results' id='ai-correlation-results'></span>";
+            if (corrSevCounts.critical > 0) html += "<button class='filter-btn" + (correlationsFilterState.critical ? " filter-btn-active" : "") + "' id='corr-hide-critical' onclick='toggleCorrelationsFilter(\"critical\")'>" + (correlationsFilterState.critical ? "HIDING " : "HIDE ") + corrSevCounts.critical + " CRITICALS</button>&nbsp;";
+            if (corrSevCounts.high > 0) html += "<button class='filter-btn" + (correlationsFilterState.high ? " filter-btn-active" : "") + "' id='corr-hide-high' onclick='toggleCorrelationsFilter(\"high\")'>" + (correlationsFilterState.high ? "HIDING " : "HIDE ") + corrSevCounts.high + " HIGHS</button>&nbsp;";
+            if (corrSevCounts.medium > 0) html += "<button class='filter-btn" + (correlationsFilterState.medium ? " filter-btn-active" : "") + "' id='corr-hide-medium' onclick='toggleCorrelationsFilter(\"medium\")'>" + (correlationsFilterState.medium ? "HIDING " : "HIDE ") + corrSevCounts.medium + " MEDIUMS</button>&nbsp;";
+            if (corrSevCounts.low > 0) html += "<button class='filter-btn" + (correlationsFilterState.low ? " filter-btn-active" : "") + "' id='corr-hide-low' onclick='toggleCorrelationsFilter(\"low\")'>" + (correlationsFilterState.low ? "HIDING " : "HIDE ") + corrSevCounts.low + " LOWS</button>&nbsp;";
+            if (corrSevCounts.info > 0) html += "<button class='filter-btn" + (correlationsFilterState.info ? " filter-btn-active" : "") + "' id='corr-hide-info' onclick='toggleCorrelationsFilter(\"info\")'>" + (correlationsFilterState.info ? "HIDING " : "HIDE ") + corrSevCounts.info + " INFOS</button>";
             html += "</div></div>";
 
             // Table matching findings style: Risk | Correlation | Type | Data Elements
