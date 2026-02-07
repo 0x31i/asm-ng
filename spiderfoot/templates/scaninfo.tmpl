@@ -966,7 +966,7 @@
             html += "<p class='text-muted' style='font-size: 12px;'>No vulnerability scans imported yet</p>";
             html += "<div style='margin-top: 20px;'>";
             html += "<button class='btn btn-danger' onclick='triggerNessusUpload(\"" + instanceId + "\")'>";
-            html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;&nbsp;UPLOAD NESSUS SCAN";
+            html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;&nbsp;IMPORT";
             html += "</button>";
             html += "<input type='file' id='nessus-file-input' accept='.nessus,.xml' style='display:none' onchange='handleNessusUpload(\"" + instanceId + "\", this)'>";
             html += "</div></div>";
@@ -1314,7 +1314,7 @@
             // Toolbar - left: action buttons + count
             var html = "<div class='findings-toolbar'>";
             html += "<div class='findings-toolbar-left'>";
-            html += "<button class='btn btn-sm btn-default' onclick='reimportNessus(\"" + instanceId + "\")'>";
+            html += "<button class='btn btn-sm btn-info' onclick='reimportNessus(\"" + instanceId + "\")'>";
             html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT</button>&nbsp;";
             html += "<span class='findings-count' id='nessus-findings-count'><i class='glyphicon glyphicon-shield'></i>&nbsp;" + results.length + " NESSUS FINDINGS</span>";
             html += "</div>";
@@ -1464,10 +1464,7 @@
             html += "<p class='text-muted' style='font-size: 12px;'>No vulnerability scans imported yet</p>";
             html += "<div style='margin-top: 20px; display: flex; gap: 10px; justify-content: center;'>";
             html += "<button class='btn btn-danger' onclick='triggerBurpUpload(\"" + instanceId + "\", \"xml\")'>";
-            html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;&nbsp;UPLOAD XML";
-            html += "</button>";
-            html += "<button class='btn btn-default' onclick='triggerBurpUpload(\"" + instanceId + "\", \"html\")' disabled title='Import Burp XML first, then use HTML ENHANCE to add details'>";
-            html += "<i class='glyphicon glyphicon-plus-sign'></i>&nbsp;&nbsp;HTML ENHANCE";
+            html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;&nbsp;IMPORT XML";
             html += "</button>";
             html += "<input type='file' id='burp-file-input' accept='.xml' style='display:none' onchange='handleBurpUpload(\"" + instanceId + "\", this, \"xml\")'>";
             html += "<input type='file' id='burp-html-file-input' accept='.html,.htm' style='display:none' onchange='handleBurpUpload(\"" + instanceId + "\", this, \"html\")'>";
@@ -1583,7 +1580,17 @@
 
                     window.burpRawResults = results;
                     window.burpInstanceId = instanceId;
-                    renderBurpTable(instanceId, results, burpMerged);
+
+                    // Check if HTML enhancement has been applied
+                    sf.fetchData('${docroot}/scanburpenhanced', {'id': instanceId},
+                        function(enhData) {
+                            var isEnhanced = enhData.success && enhData.enhanced;
+                            renderBurpTable(instanceId, results, burpMerged, isEnhanced);
+                        },
+                        function() {
+                            renderBurpTable(instanceId, results, burpMerged, false);
+                        }
+                    );
                 },
                 function() {
                     showBurpUploadPlaceholder(instanceId);
@@ -1591,16 +1598,22 @@
             );
         }
 
-        function renderBurpTable(instanceId, results, merged) {
+        function renderBurpTable(instanceId, results, merged, isEnhanced) {
+            window.burpIsEnhanced = !!isEnhanced;
             var panel = $('#vuln-burp-content');
 
             // Toolbar - left: action buttons + count
             var html = "<div class='findings-toolbar'>";
             html += "<div class='findings-toolbar-left'>";
-            html += "<button class='btn btn-sm btn-default' onclick='reimportBurp(\"" + instanceId + "\", \"xml\")'>";
+            html += "<button class='btn btn-sm btn-info' onclick='reimportBurp(\"" + instanceId + "\", \"xml\")'>";
             html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT XML</button>&nbsp;";
-            html += "<button class='btn btn-sm btn-default' onclick='enhanceBurpHtml(\"" + instanceId + "\")'>";
-            html += "<i class='glyphicon glyphicon-plus-sign'></i>&nbsp;HTML ENHANCE</button>&nbsp;";
+            if (isEnhanced) {
+                html += "<button class='btn btn-sm btn-info' onclick='enhanceBurpHtml(\"" + instanceId + "\")'>";
+                html += "<i class='glyphicon glyphicon-plus-sign'></i>&nbsp;HTML ENHANCE</button>&nbsp;";
+            } else {
+                html += "<button class='btn btn-sm btn-danger' onclick='enhanceBurpHtml(\"" + instanceId + "\")'>";
+                html += "<i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;NOT ENHANCED</button>&nbsp;";
+            }
             html += "<span class='findings-count' id='burp-findings-count'><i class='glyphicon glyphicon-globe'></i>&nbsp;" + results.length + " BURP ISSUES</span>";
             html += "</div>";
             // Toolbar - right: merge toggle + hide filters
@@ -1701,7 +1714,7 @@
 
         function toggleBurpMerge(instanceId) {
             burpMerged = !burpMerged;
-            renderBurpTable(instanceId, window.burpRawResults, burpMerged);
+            renderBurpTable(instanceId, window.burpRawResults, burpMerged, window.burpIsEnhanced);
         }
 
         function toggleBurpDetail(idx) {

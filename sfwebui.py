@@ -4617,6 +4617,26 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
+    def scanburpenhanced(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Check if Burp results have been enhanced with HTML report data.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: whether HTML enhancement has been applied
+        """
+        dbh = SpiderFootDb(self.config)
+
+        try:
+            enhanced = dbh.scanBurpEnhanced(id)
+            return {'success': True, 'enhanced': enhanced}
+        except Exception as e:
+            self.log.error(f"Error checking Burp enhanced state for scan {id}: {e}", exc_info=True)
+            return {'success': False, 'enhanced': False}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
     def scanburplist(self: 'SpiderFootWebUi', id: str) -> dict:
         """Get list of Burp results for a scan.
 
