@@ -1073,10 +1073,34 @@
             return html;
         }
 
-        function getTrackingBadge(tracking, resultId, table) {
+        function getTrackingBadge(tracking, resultId, table, mergedIds) {
             var labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'};
             var classes = {0: 'tracking-open', 1: 'tracking-closed', 2: 'tracking-ticketed'};
             var val = parseInt(tracking) || 0;
+
+            if (mergedIds && mergedIds.length > 1) {
+                // Merged row - check if all tracking values match
+                var rawResults = table === 'nessus' ? window.nessusRawResults : window.burpRawResults;
+                var trackingVals = {};
+                for (var mi = 0; mi < mergedIds.length; mi++) {
+                    for (var ri = 0; ri < rawResults.length; ri++) {
+                        if (rawResults[ri].id === mergedIds[mi]) {
+                            trackingVals[rawResults[ri].tracking || 0] = true;
+                            break;
+                        }
+                    }
+                }
+                var uniqueVals = Object.keys(trackingVals);
+                var idsJson = JSON.stringify(mergedIds);
+                if (uniqueVals.length > 1) {
+                    // MIXED state
+                    return "<span class='tracking-badge tracking-mixed' data-merged-ids='" + idsJson + "' data-tracking='mixed' onclick='cycleMergedTracking(event, \"" + table + "\", " + idsJson + ", \"mixed\")'>MIXED</span>";
+                } else {
+                    var mergedVal = parseInt(uniqueVals[0]) || 0;
+                    return "<span class='tracking-badge " + classes[mergedVal] + "' data-merged-ids='" + idsJson + "' data-tracking='" + mergedVal + "' onclick='cycleMergedTracking(event, \"" + table + "\", " + idsJson + ", " + mergedVal + ")'>" + labels[mergedVal] + "</span>";
+                }
+            }
+
             return "<span class='tracking-badge " + classes[val] + "' data-result-id='" + resultId + "' data-tracking='" + val + "' onclick='cycleTracking(event, \"" + table + "\", " + resultId + ", " + val + ")'>" + labels[val] + "</span>";
         }
 
@@ -1117,7 +1141,7 @@
                         var labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'};
                         var classes = {0: 'tracking-open', 1: 'tracking-closed', 2: 'tracking-ticketed'};
                         var badge = $(evt.target);
-                        badge.removeClass('tracking-open tracking-closed tracking-ticketed');
+                        badge.removeClass('tracking-open tracking-closed tracking-ticketed tracking-mixed');
                         badge.addClass(classes[next]);
                         badge.text(labels[next]);
                         badge.attr('data-tracking', next);
@@ -1127,6 +1151,80 @@
                     }
                 }
             );
+        }
+
+        // Bulk tracking update for merged rows
+        function cycleMergedTracking(evt, table, mergedIds, currentVal) {
+            evt.stopPropagation();
+            var badge = $(evt.target);
+
+            // If MIXED, show override warning flow
+            if (currentVal === 'mixed') {
+                var step = badge.attr('data-override-step') || '0';
+                if (step === '0') {
+                    // First click on MIXED: show orange OVERRIDE ALL?
+                    badge.attr('data-override-step', '1');
+                    badge.removeClass('tracking-mixed');
+                    badge.addClass('tracking-override-warn');
+                    badge.text('OVERRIDE ALL?');
+                    return;
+                } else if (step === '1') {
+                    // Second click: show red CONFIRM OVERRIDE
+                    badge.attr('data-override-step', '2');
+                    badge.removeClass('tracking-override-warn');
+                    badge.addClass('tracking-override-confirm');
+                    badge.text('CONFIRM OVERRIDE');
+                    return;
+                } else {
+                    // Third click: proceed with bulk override to OPEN(0)
+                    badge.removeAttr('data-override-step');
+                    bulkSetMergedTracking(evt, table, mergedIds, 0);
+                    return;
+                }
+            }
+
+            // Normal cycle: OPEN(0) -> TICKETED(2) -> CLOSED(1) -> OPEN(0)
+            var next = currentVal === 0 ? 2 : (currentVal === 2 ? 1 : 0);
+            bulkSetMergedTracking(evt, table, mergedIds, next);
+        }
+
+        function bulkSetMergedTracking(evt, table, mergedIds, nextVal) {
+            var endpoint = table === 'nessus' ? '${docroot}/scannessussettracking' : '${docroot}/scanburpsettracking';
+            var instanceId = table === 'nessus' ? window.nessusInstanceId : window.burpInstanceId;
+            var rawResults = table === 'nessus' ? window.nessusRawResults : window.burpRawResults;
+            var completed = 0;
+            var total = mergedIds.length;
+
+            for (var mi = 0; mi < mergedIds.length; mi++) {
+                (function(rid) {
+                    sf.fetchData(endpoint, {'id': instanceId, 'resultId': rid, 'tracking': nextVal},
+                        function(data) {
+                            if (data.success) {
+                                for (var i = 0; i < rawResults.length; i++) {
+                                    if (rawResults[i].id === rid) {
+                                        rawResults[i].tracking = nextVal;
+                                        break;
+                                    }
+                                }
+                            }
+                            completed++;
+                            if (completed >= total) {
+                                // All done - update badge in place
+                                var labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'};
+                                var classes = {0: 'tracking-open', 1: 'tracking-closed', 2: 'tracking-ticketed'};
+                                var badge = $(evt.target);
+                                badge.removeClass('tracking-open tracking-closed tracking-ticketed tracking-mixed tracking-override-warn tracking-override-confirm');
+                                badge.addClass(classes[nextVal]);
+                                badge.text(labels[nextVal]);
+                                badge.attr('data-tracking', nextVal);
+                                var idsJson = JSON.stringify(mergedIds);
+                                badge.attr('onclick', "cycleMergedTracking(event, '" + table + "', " + idsJson + ", " + nextVal + ")");
+                                updateVulnFilterCounts(table);
+                            }
+                        }
+                    );
+                })(mergedIds[mi]);
+            }
         }
 
         function toggleVulnFilter(table, type) {
@@ -1248,12 +1346,14 @@
                     var group = mg.groups[key];
                     var r = group[0];
                     var count = group.length;
-                    html += renderNessusRow(r, idx, count > 1 ? count : 0);
+                    var groupIds = [];
+                    for (var gi = 0; gi < group.length; gi++) { groupIds.push(group[gi].id); }
+                    html += renderNessusRow(r, idx, count > 1 ? count : 0, count > 1 ? groupIds : null);
                     idx++;
                 }
             } else {
                 for (var i = 0; i < results.length; i++) {
-                    html += renderNessusRow(results[i], i, 0);
+                    html += renderNessusRow(results[i], i, 0, null);
                 }
             }
 
@@ -1281,7 +1381,7 @@
             applyVulnFilters('nessus');
         }
 
-        function renderNessusRow(r, idx, mergeCount) {
+        function renderNessusRow(r, idx, mergeCount, mergedIds) {
             var sevLower = (r.severity || '').toLowerCase();
             var badgeClass = '';
             if (sevLower === 'critical') badgeClass = 'alert-critical';
@@ -1301,7 +1401,7 @@
             html += "</div></td>";
             html += "<td>" + (r.host_ip || '') + "</td>";
             html += "<td><div class='cell-clamp'>" + (r.host_name || '') + "</div></td>";
-            html += "<td>" + getTrackingBadge(r.tracking, r.id, 'nessus') + "</td>";
+            html += "<td>" + getTrackingBadge(r.tracking, r.id, 'nessus', mergedIds) + "</td>";
             html += "</tr>";
 
             if (hasDetail) {
@@ -1531,12 +1631,14 @@
                     var group = mg.groups[key];
                     var r = group[0];
                     var count = group.length;
-                    html += renderBurpRow(r, idx, count > 1 ? count : 0);
+                    var groupIds = [];
+                    for (var gi = 0; gi < group.length; gi++) { groupIds.push(group[gi].id); }
+                    html += renderBurpRow(r, idx, count > 1 ? count : 0, count > 1 ? groupIds : null);
                     idx++;
                 }
             } else {
                 for (var i = 0; i < results.length; i++) {
-                    html += renderBurpRow(results[i], i, 0);
+                    html += renderBurpRow(results[i], i, 0, null);
                 }
             }
 
@@ -1565,7 +1667,7 @@
             applyVulnFilters('burp');
         }
 
-        function renderBurpRow(r, idx, mergeCount) {
+        function renderBurpRow(r, idx, mergeCount, mergedIds) {
             var sevLower = (r.severity || '').toLowerCase();
             var badgeClass = '';
             if (sevLower === 'high') badgeClass = 'alert-danger';
@@ -1584,7 +1686,7 @@
             html += "</div></td>";
             html += "<td>" + (r.host_ip || '') + "</td>";
             html += "<td><div class='cell-clamp'>" + (r.host_name || '') + "</div></td>";
-            html += "<td>" + getTrackingBadge(r.tracking, r.id, 'burp') + "</td>";
+            html += "<td>" + getTrackingBadge(r.tracking, r.id, 'burp', mergedIds) + "</td>";
             html += "</tr>";
 
             if (hasDetail) {
