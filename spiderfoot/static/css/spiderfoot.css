@@ -6163,8 +6163,8 @@ i.glyphicon-white,
 }
 
 /* Column widths for 4-column layout */
-.findings-table .col-priority { width: 90px; }
-.findings-table .col-category { width: 22%; }
+.findings-table .col-priority { width: 110px; }
+.findings-table .col-category { width: 20%; }
 .findings-table .col-type { width: 20%; }
 .findings-table .col-item { width: auto; }
 
@@ -6176,6 +6176,11 @@ i.glyphicon-white,
   border-bottom: 1px solid var(--glass-border);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.findings-table tbody td:first-child {
+  overflow: visible;
   white-space: nowrap;
 }
 
@@ -6212,6 +6217,12 @@ i.glyphicon-white,
 .finding-row.finding-expanded {
   background: rgba(0, 0, 0, 0.02);
   border-bottom: none;
+}
+
+.finding-row.finding-expanded td {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 /* Type link styling */
@@ -6259,6 +6270,15 @@ i.glyphicon-white,
   background: var(--bg-primary);
   border: 1px solid var(--glass-border);
   border-radius: 6px;
+  border-left: 3px solid var(--glass-border);
+}
+
+.finding-detail-section.detail-description {
+  border-left-color: #3b82f6;
+}
+
+.finding-detail-section.detail-recommendation {
+  border-left-color: #16a34a;
 }
 
 .finding-detail-label {
@@ -6269,6 +6289,14 @@ i.glyphicon-white,
   text-transform: uppercase;
   color: var(--text-muted);
   margin-bottom: 6px;
+}
+
+.finding-detail-section.detail-description .finding-detail-label {
+  color: #3b82f6;
+}
+
+.finding-detail-section.detail-recommendation .finding-detail-label {
+  color: #16a34a;
 }
 
 .finding-detail-text {
