@@ -6303,8 +6303,7 @@ i.glyphicon-white,
 }
 
 /* Vulnerability (Nessus/Burp) table styles */
-#nessus-table.findings-table,
-#burp-table.findings-table {
+#nessus-table.findings-table {
   table-layout: auto;
 }
 
@@ -6315,12 +6314,17 @@ i.glyphicon-white,
   white-space: nowrap;
 }
 
+#burp-table.findings-table {
+  table-layout: fixed;
+}
+
 #burp-table.findings-table .cell-clamp {
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  max-width: 300px;
+  white-space: normal;
+  word-break: break-word;
 }
 
 #nessus-table.findings-table thead th,
@@ -6339,9 +6343,21 @@ i.glyphicon-white,
 .finding-detail-row.finding-none td { border-left-color: #6c757d; }
 .finding-detail-row.finding-information td { border-left-color: #28a745; }
 
-/* Burp detail grid */
+/* Burp detail grid - single column stacked layout */
 .burp-detail-grid {
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.burp-detail-grid .finding-detail-section {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.burp-detail-grid .finding-detail-text {
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Burp detail section colors */
@@ -6391,4 +6407,5 @@ i.glyphicon-white,
   font-size: 11px;
   max-height: 200px;
   overflow-y: auto;
+  overflow-x: auto;
 }
