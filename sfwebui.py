@@ -2312,8 +2312,9 @@ class SpiderFootWebUi:
             if remediation_detail:
                 solutions = (solutions + '\n\n' + remediation_detail).strip() if solutions else remediation_detail
 
-            # Extract references as see_also
+            # Extract references and vulnerability classifications
             references = (issue.findtext('references') or '').strip()
+            vuln_classifications = (issue.findtext('vulnerabilityClassifications') or '').strip()
 
             result = {
                 'severity': severity_text,
@@ -2328,7 +2329,9 @@ class SpiderFootWebUi:
                 'issue_background': (issue.findtext('issueBackground') or '').strip(),
                 'issue_detail': (issue.findtext('issueDetail') or '').strip(),
                 'solutions': solutions,
-                'see_also': references,
+                'see_also': '',
+                'references': references,
+                'vulnerability_classifications': vuln_classifications,
                 'request': request_text,
                 'response': response_text,
             }
@@ -2410,10 +2413,15 @@ class SpiderFootWebUi:
                                existing_scan_id: str = None) -> dict:
         """Parse and import a Burp Suite Pro HTML report.
 
-        Parses the classic Burp Pro HTML report format using BODH0/BODH1
-        class markers for issue groups and instances, summary_table for
-        severity/confidence/host/path, and h2-delimited sections for
-        issue detail, remediation, request/response.
+        Parses the classic Burp Pro HTML report format. Uses sequential
+        iteration over all elements to handle nested structures reliably.
+
+        Structure:
+          BODH0 = issue type group (e.g. "1. TLS cookie without secure flag set")
+            Group-level: Issue background, Issue remediation, Vulnerability
+                         classifications, References
+          BODH1 = individual instance (e.g. "1.1. https://host.com/")
+            Instance-level: Summary table, Issue detail, Request, Response
 
         Args:
             content (str): HTML file content
@@ -2427,9 +2435,12 @@ class SpiderFootWebUi:
             dict: import results
         """
         try:
-            from bs4 import BeautifulSoup
+            from bs4 import BeautifulSoup, Tag
         except ImportError:
             return {'success': False, 'message': 'BeautifulSoup4 is required for HTML import. Install with: pip install beautifulsoup4'}
+
+        import re as _re
+        from urllib.parse import urlparse
 
         try:
             soup = BeautifulSoup(content, 'html.parser')
@@ -2444,160 +2455,242 @@ class SpiderFootWebUi:
         results = []
         hosts_seen = set()
 
-        # Collect all top-level nodes under the body for sequential iteration
+        def _extract_host_parts(host_val):
+            """Extract hostname and derive IP-like field from a Host value.
+
+            Burp HTML uses full URLs like 'https://admin.example.com' for Host.
+            Returns (host_name, host_ip) where host_name is the full URL and
+            host_ip is the extracted domain/hostname.
+            """
+            host_val = (host_val or '').strip()
+            if not host_val:
+                return '', ''
+            # Parse as URL to extract hostname
+            if '://' in host_val:
+                parsed = urlparse(host_val)
+                hostname = parsed.hostname or ''
+                return host_val, hostname
+            return host_val, host_val
+
+        def _get_element_classes(el):
+            """Safely get class list from an element."""
+            if not isinstance(el, Tag):
+                return []
+            return el.get('class') or []
+
+        # Build a flat ordered list of significant elements for sequential traversal.
+        # This is more robust than find_next_sibling() which breaks with nested structures.
         body = soup.body or soup
-        all_elements = list(body.descendants) if body else []
+        significant_elements = []
+        for el in body.descendants:
+            if not isinstance(el, Tag):
+                continue
+            classes = el.get('class') or []
+            if el.name == 'span' and ('BODH0' in classes or 'BODH1' in classes or 'TEXT' in classes):
+                significant_elements.append(el)
+            elif el.name == 'h2':
+                significant_elements.append(el)
+            elif el.name == 'table' and 'summary_table' in classes:
+                significant_elements.append(el)
+            elif el.name == 'div' and 'rr_div' in classes:
+                significant_elements.append(el)
 
-        # Build a flat list of key markers: BODH0, BODH1, h2, summary_table, rr_div
-        # Strategy: iterate BODH0 groups, within each find BODH1 instances
-        for bodh0 in bodh0_elements:
-            issue_type_name = bodh0.get_text(strip=True)
-            # Remove leading number: "1. Cross-site scripting" -> "Cross-site scripting"
-            import re as _re
-            issue_type_name = _re.sub(r'^\d+\.\s*', '', issue_type_name)
+        # State machine: iterate through significant elements in document order
+        current_group_name = ''
+        group_issue_background = ''
+        group_remediation = ''
+        group_references = ''
+        group_classifications = ''
+        current_h2 = ''
+        in_instance = False
+        current_instance = None
+        instances_in_group = []
 
-            # Collect shared background/remediation for this issue group
-            issue_background = ''
-            remediation_background = ''
-            references = ''
+        def _new_instance(group_name):
+            return {
+                'plugin_name': group_name,
+                'severity': '',
+                'severity_number': 0,
+                'confidence': '',
+                'host_ip': '',
+                'host_name': '',
+                'path': '',
+                'location': '',
+                'issue_type': '',
+                'issue_background': '',
+                'issue_detail': '',
+                'solutions': '',
+                'see_also': '',
+                'references': '',
+                'vulnerability_classifications': '',
+                'request': '',
+                'response': '',
+            }
 
-            # Walk siblings of BODH0 to find shared sections and BODH1 instances
-            sibling = bodh0.find_next_sibling()
-            current_h2 = ''
-            instances_in_group = []
-            current_instance = None
-
-            while sibling:
-                # Stop at next BODH0 (next issue type group)
-                if sibling.name == 'span' and 'BODH0' in (sibling.get('class') or []):
-                    break
-
-                # H2 headers mark section boundaries
-                if sibling.name == 'h2':
-                    current_h2 = sibling.get_text(strip=True).lower()
-
-                # BODH1 = individual issue instance
-                elif sibling.name == 'span' and 'BODH1' in (sibling.get('class') or []):
-                    # Save previous instance if any
-                    if current_instance:
-                        instances_in_group.append(current_instance)
-                    current_instance = {
-                        'plugin_name': issue_type_name,
-                        'severity': '',
-                        'severity_number': 0,
-                        'confidence': '',
-                        'host_ip': '',
-                        'host_name': '',
-                        'path': '',
-                        'location': '',
-                        'issue_type': '',
-                        'issue_background': '',
-                        'issue_detail': '',
-                        'solutions': '',
-                        'see_also': '',
-                        'request': '',
-                        'response': '',
-                    }
-                    current_h2 = ''
-
-                # Summary table contains severity, confidence, host, path
-                elif sibling.name == 'table' and 'summary_table' in (sibling.get('class') or []):
-                    if current_instance:
-                        for td in sibling.find_all('td'):
-                            text = td.get_text(strip=True)
-                            b_tag = td.find('b')
-                            val = b_tag.get_text(strip=True) if b_tag else ''
-                            if text.startswith('Severity:'):
-                                current_instance['severity'] = val
-                                sev_map = {'High': 3, 'Medium': 2, 'Low': 1, 'Information': 0, 'Info': 0}
-                                current_instance['severity_number'] = sev_map.get(val, 0)
-                            elif text.startswith('Confidence:'):
-                                current_instance['confidence'] = val
-                            elif text.startswith('Host:'):
-                                current_instance['host_name'] = val
-                                if val:
-                                    hosts_seen.add(val)
-                            elif text.startswith('Path:'):
-                                current_instance['path'] = val
-
-                        # Try to extract severity from icon class if not found in text
-                        if not current_instance['severity']:
-                            for icon_td in sibling.find_all('td', class_='icon'):
-                                div = icon_td.find('div')
-                                if div:
-                                    cls = ' '.join(div.get('class') or [])
-                                    if 'high' in cls:
-                                        current_instance['severity'] = 'High'
-                                        current_instance['severity_number'] = 3
-                                    elif 'medium' in cls:
-                                        current_instance['severity'] = 'Medium'
-                                        current_instance['severity_number'] = 2
-                                    elif 'low' in cls:
-                                        current_instance['severity'] = 'Low'
-                                        current_instance['severity_number'] = 1
-                                    elif 'info' in cls:
-                                        current_instance['severity'] = 'Information'
-                                        current_instance['severity_number'] = 0
-
-                # TEXT spans contain section body content
-                elif sibling.name == 'span' and 'TEXT' in (sibling.get('class') or []):
-                    text_content = sibling.get_text(strip=True)
-                    html_content = str(sibling)
-
-                    if current_instance:
-                        # Instance-specific sections
-                        if 'issue detail' in current_h2:
-                            current_instance['issue_detail'] = text_content
-                        elif 'remediation detail' in current_h2:
-                            current_instance['solutions'] = (current_instance['solutions'] + '\n\n' + text_content).strip() if current_instance['solutions'] else text_content
-                        elif 'issue background' in current_h2:
-                            current_instance['issue_background'] = text_content
-                        elif 'remediation background' in current_h2:
-                            current_instance['solutions'] = (current_instance['solutions'] + '\n\n' + text_content).strip() if current_instance['solutions'] else text_content
-                        elif 'vulnerability classif' in current_h2:
-                            # Extract links as references
-                            links = sibling.find_all('a')
-                            refs = [a.get_text(strip=True) for a in links if a.get_text(strip=True)]
-                            current_instance['see_also'] = '\n'.join(refs) if refs else text_content
-                    else:
-                        # Group-level shared sections (before any BODH1)
-                        if 'issue background' in current_h2:
-                            issue_background = text_content
-                        elif 'remediation background' in current_h2:
-                            remediation_background = text_content
-                        elif 'vulnerability classif' in current_h2:
-                            links = sibling.find_all('a')
-                            refs = [a.get_text(strip=True) for a in links if a.get_text(strip=True)]
-                            references = '\n'.join(refs) if refs else text_content
-
-                # Request/response divs
-                elif sibling.name == 'div' and 'rr_div' in (sibling.get('class') or []):
-                    if current_instance:
-                        rr_text = sibling.get_text()
-                        if 'request' in current_h2:
-                            current_instance['request'] = rr_text.strip()
-                        elif 'response' in current_h2:
-                            current_instance['response'] = rr_text.strip()
-
-                sibling = sibling.find_next_sibling()
-
-            # Don't forget the last instance
-            if current_instance:
-                instances_in_group.append(current_instance)
-
-            # Apply shared group-level data to instances that lack their own
+        def _finalize_group():
+            """Apply group-level shared data to instances and add to results."""
+            nonlocal instances_in_group
             for inst in instances_in_group:
-                if not inst['issue_background'] and issue_background:
-                    inst['issue_background'] = issue_background
-                if not inst['solutions'] and remediation_background:
-                    inst['solutions'] = remediation_background
-                if not inst['see_also'] and references:
-                    inst['see_also'] = references
-                # Combine issue_background into issue_detail if issue_detail is empty
+                # Apply group-level data to instances that don't have their own
+                if not inst['issue_background'] and group_issue_background:
+                    inst['issue_background'] = group_issue_background
+                if not inst['solutions'] and group_remediation:
+                    inst['solutions'] = group_remediation
+                if not inst['references'] and group_references:
+                    inst['references'] = group_references
+                if not inst['vulnerability_classifications'] and group_classifications:
+                    inst['vulnerability_classifications'] = group_classifications
+                # If issue_detail is empty, use issue_background as fallback
                 if not inst['issue_detail'] and inst['issue_background']:
                     inst['issue_detail'] = inst['issue_background']
-
             results.extend(instances_in_group)
+            instances_in_group = []
+
+        for el in significant_elements:
+            classes = _get_element_classes(el)
+
+            # --- BODH0: New issue type group ---
+            if el.name == 'span' and 'BODH0' in classes:
+                # Finalize previous instance and group
+                if current_instance:
+                    instances_in_group.append(current_instance)
+                    current_instance = None
+                _finalize_group()
+
+                # Start new group
+                raw_name = el.get_text(strip=True)
+                current_group_name = _re.sub(r'^\d+\.\s*', '', raw_name)
+                group_issue_background = ''
+                group_remediation = ''
+                group_references = ''
+                group_classifications = ''
+                current_h2 = ''
+                in_instance = False
+
+            # --- BODH1: New individual instance ---
+            elif el.name == 'span' and 'BODH1' in classes:
+                # Save previous instance
+                if current_instance:
+                    instances_in_group.append(current_instance)
+                current_instance = _new_instance(current_group_name)
+                current_h2 = ''
+                in_instance = True
+
+            # --- H2: Section header ---
+            elif el.name == 'h2':
+                current_h2 = el.get_text(strip=True).lower()
+
+            # --- Summary table: severity, confidence, host, path ---
+            elif el.name == 'table' and 'summary_table' in classes:
+                if current_instance:
+                    rows = el.find_all('tr')
+                    for row in rows:
+                        tds = row.find_all('td')
+                        for td in tds:
+                            # Skip icon cells
+                            if 'icon' in (td.get('class') or []):
+                                continue
+                            text = td.get_text(strip=True)
+                            # Get the value - could be in <b>, <a>, or just text
+                            b_tag = td.find('b')
+                            a_tag = td.find('a')
+                            if b_tag:
+                                val = b_tag.get_text(strip=True)
+                            elif a_tag:
+                                val = a_tag.get_text(strip=True)
+                            else:
+                                # Try to extract value after the label
+                                val = text
+
+                            if text.startswith('Severity:'):
+                                sev_val = val.replace('Severity:', '').strip() if val == text else val
+                                current_instance['severity'] = sev_val
+                                sev_map = {'High': 3, 'Medium': 2, 'Low': 1, 'Information': 0, 'Info': 0}
+                                current_instance['severity_number'] = sev_map.get(sev_val, 0)
+                            elif text.startswith('Confidence:'):
+                                conf_val = val.replace('Confidence:', '').strip() if val == text else val
+                                current_instance['confidence'] = conf_val
+                            elif text.startswith('Host:'):
+                                host_val = val.replace('Host:', '').strip() if val == text else val
+                                # Also check for <a> href which may have the full URL
+                                if a_tag and a_tag.get('href'):
+                                    host_val = a_tag.get('href').strip() or host_val
+                                host_name, host_ip = _extract_host_parts(host_val)
+                                current_instance['host_name'] = host_name
+                                current_instance['host_ip'] = host_ip
+                                if host_ip:
+                                    hosts_seen.add(host_ip)
+                            elif text.startswith('Path:'):
+                                path_val = val.replace('Path:', '').strip() if val == text else val
+                                current_instance['path'] = path_val
+
+                    # Try to extract severity from icon class if not found in text
+                    if not current_instance['severity']:
+                        for icon_td in el.find_all('td', class_='icon'):
+                            div = icon_td.find('div')
+                            if div:
+                                cls = ' '.join(div.get('class') or [])
+                                if 'high' in cls:
+                                    current_instance['severity'] = 'High'
+                                    current_instance['severity_number'] = 3
+                                elif 'medium' in cls:
+                                    current_instance['severity'] = 'Medium'
+                                    current_instance['severity_number'] = 2
+                                elif 'low' in cls:
+                                    current_instance['severity'] = 'Low'
+                                    current_instance['severity_number'] = 1
+                                elif 'info' in cls:
+                                    current_instance['severity'] = 'Information'
+                                    current_instance['severity_number'] = 0
+
+            # --- TEXT spans: section body content ---
+            elif el.name == 'span' and 'TEXT' in classes:
+                text_content = el.get_text(separator='\n', strip=True)
+
+                # Extract links for reference-type sections
+                links = el.find_all('a')
+                link_texts = [a.get_text(strip=True) for a in links if a.get_text(strip=True)]
+
+                if in_instance and current_instance:
+                    # Instance-level sections
+                    if 'issue detail' in current_h2:
+                        current_instance['issue_detail'] = (current_instance['issue_detail'] + '\n\n' + text_content).strip() if current_instance['issue_detail'] else text_content
+                    elif 'issue background' in current_h2:
+                        current_instance['issue_background'] = (current_instance['issue_background'] + '\n\n' + text_content).strip() if current_instance['issue_background'] else text_content
+                    elif 'remediation' in current_h2:
+                        current_instance['solutions'] = (current_instance['solutions'] + '\n\n' + text_content).strip() if current_instance['solutions'] else text_content
+                    elif 'vulnerability classif' in current_h2:
+                        val = '\n'.join(link_texts) if link_texts else text_content
+                        current_instance['vulnerability_classifications'] = (current_instance['vulnerability_classifications'] + '\n' + val).strip() if current_instance['vulnerability_classifications'] else val
+                    elif 'reference' in current_h2:
+                        val = '\n'.join(link_texts) if link_texts else text_content
+                        current_instance['references'] = (current_instance['references'] + '\n' + val).strip() if current_instance['references'] else val
+                else:
+                    # Group-level shared sections (before any BODH1)
+                    if 'issue background' in current_h2:
+                        group_issue_background = (group_issue_background + '\n\n' + text_content).strip() if group_issue_background else text_content
+                    elif 'remediation' in current_h2:
+                        group_remediation = (group_remediation + '\n\n' + text_content).strip() if group_remediation else text_content
+                    elif 'vulnerability classif' in current_h2:
+                        val = '\n'.join(link_texts) if link_texts else text_content
+                        group_classifications = (group_classifications + '\n' + val).strip() if group_classifications else val
+                    elif 'reference' in current_h2:
+                        val = '\n'.join(link_texts) if link_texts else text_content
+                        group_references = (group_references + '\n' + val).strip() if group_references else val
+
+            # --- Request/Response divs ---
+            elif el.name == 'div' and 'rr_div' in classes:
+                if current_instance:
+                    rr_text = el.get_text()
+                    if 'request' in current_h2:
+                        current_instance['request'] = (current_instance['request'] + '\n\n' + rr_text.strip()).strip() if current_instance['request'] else rr_text.strip()
+                    elif 'response' in current_h2:
+                        current_instance['response'] = (current_instance['response'] + '\n\n' + rr_text.strip()).strip() if current_instance['response'] else rr_text.strip()
+
+        # Finalize last instance and group
+        if current_instance:
+            instances_in_group.append(current_instance)
+        _finalize_group()
 
         if not results:
             return {'success': False, 'message': 'No individual issue instances found in the Burp HTML report.'}
@@ -4545,8 +4638,10 @@ class SpiderFootWebUi:
                     'issue_detail': row[11],
                     'solutions': row[12],
                     'see_also': row[13],
-                    'request': row[14],
-                    'response': row[15],
+                    'references': row[14],
+                    'vulnerability_classifications': row[15],
+                    'request': row[16],
+                    'response': row[17],
                 })
             return {'success': True, 'results': results}
         except Exception as e:

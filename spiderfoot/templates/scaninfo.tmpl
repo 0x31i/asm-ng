@@ -1212,7 +1212,6 @@
                     html += "<th>Host IP</th>";
                     html += "<th>Host Name</th>";
                     html += "<th>Plugin Name</th>";
-                    html += "<th>Solutions</th>";
                     html += "</tr></thead><tbody>";
 
                     for (var i = 0; i < results.length; i++) {
@@ -1224,7 +1223,7 @@
                         else if (sevLower === 'low') badgeClass = 'alert-info';
                         else badgeClass = 'alert-success';
 
-                        var hasDetail = r.solutions || r.see_also || r.request || r.response || r.issue_detail;
+                        var hasDetail = r.solutions || r.see_also || r.request || r.response || r.issue_detail || r.issue_background || r.references || r.vulnerability_classifications;
 
                         // Main row (clickable to expand)
                         html += "<tr class='finding-row finding-" + sevLower + "' data-burp-id='" + i + "'" + (hasDetail ? " onclick='toggleBurpDetail(" + i + ")'" : "") + ">";
@@ -1234,44 +1233,78 @@
                         html += "<td>" + (r.host_ip || '') + "</td>";
                         html += "<td><div class='cell-clamp'>" + (r.host_name || '') + "</div></td>";
                         html += "<td><div class='cell-clamp'>" + (r.plugin_name || '') + "</div></td>";
-                        html += "<td><div class='cell-clamp'>" + (r.solutions || '') + "</div></td>";
                         html += "</tr>";
 
                         // Expandable detail row
                         if (hasDetail) {
                             html += "<tr class='finding-detail-row finding-" + sevLower + "' id='burp-detail-" + i + "'>";
-                            html += "<td colspan='5'><div class='finding-detail' id='burp-detail-content-" + i + "'>";
+                            html += "<td colspan='4'><div class='finding-detail' id='burp-detail-content-" + i + "'>";
                             html += "<div class='burp-detail-grid'>";
-                            if (r.solutions) {
-                                html += "<div class='finding-detail-section detail-solutions'>";
-                                html += "<div class='finding-detail-label'>Solutions</div>";
-                                html += "<div class='finding-detail-text'>" + r.solutions + "</div>";
-                                html += "</div>";
-                            }
-                            if (r.see_also) {
-                                html += "<div class='finding-detail-section detail-see-also'>";
-                                html += "<div class='finding-detail-label'>See Also</div>";
-                                html += "<div class='finding-detail-text'>" + r.see_also + "</div>";
-                                html += "</div>";
-                            }
+
+                            // Issue Detail - ALWAYS FIRST
                             if (r.issue_detail) {
                                 html += "<div class='finding-detail-section detail-issue-detail'>";
                                 html += "<div class='finding-detail-label'>Issue Detail</div>";
                                 html += "<div class='finding-detail-text'>" + r.issue_detail + "</div>";
                                 html += "</div>";
                             }
+
+                            // Remediation - ALWAYS SECOND
+                            if (r.solutions) {
+                                html += "<div class='finding-detail-section detail-remediation'>";
+                                html += "<div class='finding-detail-label'>Remediation</div>";
+                                html += "<div class='finding-detail-text'>" + r.solutions + "</div>";
+                                html += "</div>";
+                            }
+
+                            // Issue Background
+                            if (r.issue_background) {
+                                html += "<div class='finding-detail-section detail-background'>";
+                                html += "<div class='finding-detail-label'>Issue Background</div>";
+                                html += "<div class='finding-detail-text'>" + r.issue_background + "</div>";
+                                html += "</div>";
+                            }
+
+                            // References
+                            if (r.references) {
+                                html += "<div class='finding-detail-section detail-references'>";
+                                html += "<div class='finding-detail-label'>References</div>";
+                                html += "<div class='finding-detail-text'>" + r.references.replace(/\n/g, '<br>') + "</div>";
+                                html += "</div>";
+                            }
+
+                            // Vulnerability Classifications
+                            if (r.vulnerability_classifications) {
+                                html += "<div class='finding-detail-section detail-classifications'>";
+                                html += "<div class='finding-detail-label'>Vulnerability Classifications</div>";
+                                html += "<div class='finding-detail-text'>" + r.vulnerability_classifications.replace(/\n/g, '<br>') + "</div>";
+                                html += "</div>";
+                            }
+
+                            // See Also
+                            if (r.see_also) {
+                                html += "<div class='finding-detail-section detail-see-also'>";
+                                html += "<div class='finding-detail-label'>See Also</div>";
+                                html += "<div class='finding-detail-text'>" + r.see_also.replace(/\n/g, '<br>') + "</div>";
+                                html += "</div>";
+                            }
+
+                            // Request
                             if (r.request) {
                                 html += "<div class='finding-detail-section detail-request'>";
                                 html += "<div class='finding-detail-label'>Request</div>";
                                 html += "<div class='finding-detail-text'>" + r.request.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "</div>";
                                 html += "</div>";
                             }
+
+                            // Response
                             if (r.response) {
                                 html += "<div class='finding-detail-section detail-response'>";
                                 html += "<div class='finding-detail-label'>Response</div>";
                                 html += "<div class='finding-detail-text'>" + r.response.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "</div>";
                                 html += "</div>";
                             }
+
                             html += "</div></div></td></tr>";
                         }
                     }
