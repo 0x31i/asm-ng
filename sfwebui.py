@@ -2213,8 +2213,16 @@ class SpiderFootWebUi:
             except Exception as e:
                 return {'success': False, 'message': f'Failed to create scan instance: {e}'}
 
+        # Preserve tracking status for existing TICKETED/CLOSED findings on reimport
+        trackedFindings = None
+        if existing_scan_id:
+            try:
+                trackedFindings = dbh.scanNessusTrackedFindings(scan_id)
+            except Exception:
+                pass
+
         try:
-            count = dbh.scanNessusStore(scan_id, results)
+            count = dbh.scanNessusStore(scan_id, results, trackedFindings=trackedFindings)
         except Exception as e:
             return {'success': False, 'message': f'Failed to store Nessus results: {e}'}
 
@@ -2386,8 +2394,16 @@ class SpiderFootWebUi:
             except Exception as e:
                 return {'success': False, 'message': f'Failed to create scan instance: {e}'}
 
+        # Preserve tracking status for existing TICKETED/CLOSED findings on reimport
+        trackedFindings = None
+        if existing_scan_id:
+            try:
+                trackedFindings = dbh.scanBurpTrackedFindings(scan_id)
+            except Exception:
+                pass
+
         try:
-            count = dbh.scanBurpStore(scan_id, results)
+            count = dbh.scanBurpStore(scan_id, results, trackedFindings=trackedFindings)
         except Exception as e:
             return {'success': False, 'message': f'Failed to store Burp results: {e}'}
 
@@ -4542,6 +4558,7 @@ class SpiderFootWebUi:
                     'request': row[15],
                     'plugin_output': row[16],
                     'cvss3_base_score': row[17],
+                    'tracking': row[18],
                 })
             return {'success': True, 'results': results}
         except Exception as e:
@@ -4634,6 +4651,7 @@ class SpiderFootWebUi:
                     'vulnerability_classifications': row[15],
                     'request': row[16],
                     'response': row[17],
+                    'tracking': row[18],
                 })
             return {'success': True, 'results': results}
         except Exception as e:
@@ -4703,6 +4721,50 @@ class SpiderFootWebUi:
 
         return self._processBurpHtmlEnhance(content, None, None, importfile,
                                             is_dry_run=False, existing_scan_id=id)
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scannessussettracking(self: 'SpiderFootWebUi', id: str, resultId: str, tracking: str) -> dict:
+        """Update tracking status for a Nessus result.
+
+        Args:
+            id (str): scan instance ID
+            resultId (str): result row ID
+            tracking (str): 0=OPEN, 1=CLOSED, 2=TICKETED
+
+        Returns:
+            dict: success status
+        """
+        dbh = SpiderFootDb(self.config)
+
+        try:
+            dbh.scanNessusUpdateTracking(id, int(resultId), int(tracking))
+            return {'success': True}
+        except Exception as e:
+            self.log.error(f"Error updating Nessus tracking for scan {id}, result {resultId}: {e}", exc_info=True)
+            return {'success': False, 'message': str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scanburpsettracking(self: 'SpiderFootWebUi', id: str, resultId: str, tracking: str) -> dict:
+        """Update tracking status for a Burp result.
+
+        Args:
+            id (str): scan instance ID
+            resultId (str): result row ID
+            tracking (str): 0=OPEN, 1=CLOSED, 2=TICKETED
+
+        Returns:
+            dict: success status
+        """
+        dbh = SpiderFootDb(self.config)
+
+        try:
+            dbh.scanBurpUpdateTracking(id, int(resultId), int(tracking))
+            return {'success': True}
+        except Exception as e:
+            self.log.error(f"Error updating Burp tracking for scan {id}, result {resultId}: {e}", exc_info=True)
+            return {'success': False, 'message': str(e)}
 
     @cherrypy.expose
     def scanfindingsexport(self: 'SpiderFootWebUi', id: str, filetype: str = "xlsx") -> str:

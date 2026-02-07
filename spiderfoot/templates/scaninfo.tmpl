@@ -993,6 +993,180 @@
             });
         }
 
+        // -- Shared vulnerability table state --
+        var nessusFilterState = { closed: false, ticketed: false };
+        var burpFilterState = { closed: false, ticketed: false };
+        var nessusMerged = true;
+        var burpMerged = true;
+        window.nessusRawResults = [];
+        window.burpRawResults = [];
+        window.nessusInstanceId = '';
+        window.burpInstanceId = '';
+
+        function buildNessusDetailHtml(r) {
+            var html = '';
+            var svcPort = r.service_name || '';
+            if (r.port && r.port > 0) svcPort += (svcPort ? ' ' : '') + r.port;
+
+            if (r.synopsis) {
+                html += "<div class='finding-detail-section detail-synopsis'>";
+                html += "<div class='finding-detail-label'>Synopsis</div>";
+                html += "<div class='finding-detail-text'>" + r.synopsis + "</div></div>";
+            }
+            if (r.description) {
+                html += "<div class='finding-detail-section detail-description'>";
+                html += "<div class='finding-detail-label'>Description</div>";
+                html += "<div class='finding-detail-text'>" + r.description + "</div></div>";
+            }
+            if (r.solution) {
+                html += "<div class='finding-detail-section detail-remediation'>";
+                html += "<div class='finding-detail-label'>Solution</div>";
+                html += "<div class='finding-detail-text'>" + r.solution + "</div></div>";
+            }
+            if (r.operating_system) {
+                html += "<div class='finding-detail-section detail-os'>";
+                html += "<div class='finding-detail-label'>Operating System</div>";
+                html += "<div class='finding-detail-text'>" + r.operating_system + "</div></div>";
+            }
+            if (svcPort) {
+                html += "<div class='finding-detail-section detail-service'>";
+                html += "<div class='finding-detail-label'>Service / Port</div>";
+                html += "<div class='finding-detail-text'>" + svcPort + (r.protocol ? ' (' + r.protocol + ')' : '') + "</div></div>";
+            }
+            if (r.cvss3_base_score) {
+                html += "<div class='finding-detail-section detail-cvss'>";
+                html += "<div class='finding-detail-label'>CVSS3 Base Score</div>";
+                html += "<div class='finding-detail-text'>" + r.cvss3_base_score + "</div></div>";
+            }
+            if (r.see_also) {
+                html += "<div class='finding-detail-section detail-see-also'>";
+                html += "<div class='finding-detail-label'>See Also</div>";
+                html += "<div class='finding-detail-text'>" + r.see_also.replace(/\n/g, '<br>') + "</div></div>";
+            }
+            if (r.plugin_output) {
+                html += "<div class='finding-detail-section detail-plugin-output'>";
+                html += "<div class='finding-detail-label'>Plugin Output</div>";
+                html += "<div class='finding-detail-text'>" + r.plugin_output.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "</div></div>";
+            }
+            if (r.request) {
+                html += "<div class='finding-detail-section detail-request'>";
+                html += "<div class='finding-detail-label'>Request</div>";
+                html += "<div class='finding-detail-text'>" + r.request.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "</div></div>";
+            }
+            return html;
+        }
+
+        function getTrackingBadge(tracking, resultId, table) {
+            var labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'};
+            var classes = {0: 'tracking-open', 1: 'tracking-closed', 2: 'tracking-ticketed'};
+            var val = parseInt(tracking) || 0;
+            return "<span class='tracking-badge " + classes[val] + "' data-result-id='" + resultId + "' data-tracking='" + val + "' onclick='cycleTracking(event, \"" + table + "\", " + resultId + ", " + val + ")'>" + labels[val] + "</span>";
+        }
+
+        function mergeResults(results) {
+            var groups = {};
+            var order = [];
+            for (var i = 0; i < results.length; i++) {
+                var r = results[i];
+                var key = (r.plugin_name || '').toLowerCase() + '|' + (r.host_ip || '').toLowerCase() + '|' + (r.host_name || '').toLowerCase();
+                if (!groups[key]) {
+                    groups[key] = [];
+                    order.push(key);
+                }
+                groups[key].push(r);
+            }
+            return {groups: groups, order: order};
+        }
+
+        function cycleTracking(evt, table, resultId, currentVal) {
+            evt.stopPropagation();
+            // Cycle: OPEN(0) -> TICKETED(2) -> CLOSED(1) -> OPEN(0)
+            var next = currentVal === 0 ? 2 : (currentVal === 2 ? 1 : 0);
+            var endpoint = table === 'nessus' ? '${docroot}/scannessussettracking' : '${docroot}/scanburpsettracking';
+            var instanceId = table === 'nessus' ? window.nessusInstanceId : window.burpInstanceId;
+
+            sf.fetchData(endpoint, {'id': instanceId, 'resultId': resultId, 'tracking': next},
+                function(data) {
+                    if (data.success) {
+                        // Update raw data
+                        var rawResults = table === 'nessus' ? window.nessusRawResults : window.burpRawResults;
+                        for (var i = 0; i < rawResults.length; i++) {
+                            if (rawResults[i].id === resultId) {
+                                rawResults[i].tracking = next;
+                                break;
+                            }
+                        }
+                        // Update badge in place
+                        var labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'};
+                        var classes = {0: 'tracking-open', 1: 'tracking-closed', 2: 'tracking-ticketed'};
+                        var badge = $(evt.target);
+                        badge.removeClass('tracking-open tracking-closed tracking-ticketed');
+                        badge.addClass(classes[next]);
+                        badge.text(labels[next]);
+                        badge.attr('data-tracking', next);
+                        badge.attr('onclick', "cycleTracking(event, '" + table + "', " + resultId + ", " + next + ")");
+                        // Update filter counts
+                        updateVulnFilterCounts(table);
+                    }
+                }
+            );
+        }
+
+        function toggleVulnFilter(table, type) {
+            var state = table === 'nessus' ? nessusFilterState : burpFilterState;
+            state[type] = !state[type];
+            applyVulnFilters(table);
+        }
+
+        function applyVulnFilters(table) {
+            var state = table === 'nessus' ? nessusFilterState : burpFilterState;
+            var tableEl = table === 'nessus' ? '#nessus-table' : '#burp-table';
+            $(tableEl + ' tbody tr.finding-row').each(function() {
+                var row = $(this);
+                var trackingBadge = row.find('.tracking-badge');
+                if (!trackingBadge.length) { row.show(); return; }
+                var trackVal = parseInt(trackingBadge.attr('data-tracking')) || 0;
+                var shouldHide = false;
+                if (state.closed && trackVal === 1) shouldHide = true;
+                if (state.ticketed && trackVal === 2) shouldHide = true;
+                if (shouldHide) {
+                    row.hide();
+                    row.next('.finding-detail-row').hide();
+                } else {
+                    row.show();
+                }
+            });
+            updateVulnFilterCounts(table);
+        }
+
+        function updateVulnFilterCounts(table) {
+            var rawResults = table === 'nessus' ? window.nessusRawResults : window.burpRawResults;
+            var state = table === 'nessus' ? nessusFilterState : burpFilterState;
+            var closedCount = 0, ticketedCount = 0, openCount = 0;
+            for (var i = 0; i < rawResults.length; i++) {
+                var t = parseInt(rawResults[i].tracking) || 0;
+                if (t === 1) closedCount++;
+                else if (t === 2) ticketedCount++;
+                else openCount++;
+            }
+            var prefix = table === 'nessus' ? 'nessus' : 'burp';
+            if (closedCount > 0) {
+                $('#' + prefix + '-hide-closed').show();
+                $('#' + prefix + '-hide-closed').text(state.closed ? 'HIDING ' + closedCount + ' CLOSED' : 'HIDE ' + closedCount + ' CLOSED');
+                if (state.closed) $('#' + prefix + '-hide-closed').addClass('filter-btn-active'); else $('#' + prefix + '-hide-closed').removeClass('filter-btn-active');
+            } else { $('#' + prefix + '-hide-closed').hide(); }
+            if (ticketedCount > 0) {
+                $('#' + prefix + '-hide-ticketed').show();
+                $('#' + prefix + '-hide-ticketed').text(state.ticketed ? 'HIDING ' + ticketedCount + ' TICKETED' : 'HIDE ' + ticketedCount + ' TICKETED');
+                if (state.ticketed) $('#' + prefix + '-hide-ticketed').addClass('filter-btn-active'); else $('#' + prefix + '-hide-ticketed').removeClass('filter-btn-active');
+            } else { $('#' + prefix + '-hide-ticketed').hide(); }
+            // Update main count
+            var visibleCount = rawResults.length - (state.closed ? closedCount : 0) - (state.ticketed ? ticketedCount : 0);
+            var label = table === 'nessus' ? 'NESSUS FINDINGS' : 'BURP ISSUES';
+            var icon = table === 'nessus' ? 'glyphicon-shield' : 'glyphicon-globe';
+            $('#' + prefix + '-findings-count').html("<i class='glyphicon " + icon + "'></i>&nbsp;" + visibleCount + " " + label);
+        }
+
         function loadNessusTable(instanceId) {
             var panel = $('#vuln-nessus-content');
             panel.html("<div class='vuln-placeholder'><i class='glyphicon glyphicon-refresh spinning' style='font-size: 24px;'></i><p>Loading Nessus results...</p></div>");
@@ -1009,157 +1183,123 @@
                         return (r.severity || '').toLowerCase() !== 'none';
                     });
 
-                    // Toolbar
-                    var html = "<div class='findings-toolbar'>";
-                    html += "<div class='findings-toolbar-left'>";
-                    html += "<span class='findings-count'><i class='glyphicon glyphicon-shield'></i>&nbsp;" + results.length + " NESSUS FINDINGS</span>";
-                    html += "</div>";
-                    html += "<div class='findings-toolbar-right'>";
-                    html += "<button class='btn btn-sm btn-default' onclick='reimportNessus(\"" + instanceId + "\")'>";
-                    html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT</button>";
-                    html += "</div></div>";
-
-                    // Table
-                    html += "<div class='findings-table-wrapper'>";
-                    html += "<table id='nessus-table' class='table findings-table tablesorter small'>";
-                    html += "<thead><tr>";
-                    html += "<th>Severity</th>";
-                    html += "<th>Plugin Name</th>";
-                    html += "<th>Host IP</th>";
-                    html += "<th>Host Name</th>";
-                    html += "</tr></thead><tbody>";
-
-                    for (var i = 0; i < results.length; i++) {
-                        var r = results[i];
-                        var sevLower = (r.severity || '').toLowerCase();
-                        var badgeClass = '';
-                        if (sevLower === 'critical') badgeClass = 'alert-critical';
-                        else if (sevLower === 'high') badgeClass = 'alert-danger';
-                        else if (sevLower === 'medium') badgeClass = 'alert-warning';
-                        else if (sevLower === 'low') badgeClass = 'alert-info';
-                        else badgeClass = 'alert-success';
-
-                        var hasDetail = r.description || r.synopsis || r.solution || r.see_also || r.request || r.plugin_output || r.operating_system || r.cvss3_base_score;
-
-                        var svcPort = r.service_name || '';
-                        if (r.port && r.port > 0) svcPort += (svcPort ? ' ' : '') + r.port;
-
-                        // Main row (clickable to expand)
-                        html += "<tr class='finding-row finding-" + sevLower + "' data-nessus-id='" + i + "'" + (hasDetail ? " onclick='toggleNessusDetail(" + i + ")'" : "") + ">";
-                        html += "<td><span class='badge " + badgeClass + "'>" + (r.severity || 'None') + "</span>";
-                        if (hasDetail) html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='nessus-icon-" + i + "'></i>";
-                        html += "</td>";
-                        html += "<td><div class='cell-clamp'>" + (r.plugin_name || '') + "</div></td>";
-                        html += "<td>" + (r.host_ip || '') + "</td>";
-                        html += "<td><div class='cell-clamp'>" + (r.host_name || '') + "</div></td>";
-                        html += "</tr>";
-
-                        // Expandable detail row
-                        if (hasDetail) {
-                            html += "<tr class='finding-detail-row finding-" + sevLower + "' id='nessus-detail-" + i + "'>";
-                            html += "<td colspan='4'><div class='finding-detail' id='nessus-detail-content-" + i + "'>";
-                            html += "<div class='nessus-detail-grid'>";
-
-                            // Synopsis - FIRST
-                            if (r.synopsis) {
-                                html += "<div class='finding-detail-section detail-synopsis'>";
-                                html += "<div class='finding-detail-label'>Synopsis</div>";
-                                html += "<div class='finding-detail-text'>" + r.synopsis + "</div>";
-                                html += "</div>";
-                            }
-
-                            // Description
-                            if (r.description) {
-                                html += "<div class='finding-detail-section detail-description'>";
-                                html += "<div class='finding-detail-label'>Description</div>";
-                                html += "<div class='finding-detail-text'>" + r.description + "</div>";
-                                html += "</div>";
-                            }
-
-                            // Solution
-                            if (r.solution) {
-                                html += "<div class='finding-detail-section detail-remediation'>";
-                                html += "<div class='finding-detail-label'>Solution</div>";
-                                html += "<div class='finding-detail-text'>" + r.solution + "</div>";
-                                html += "</div>";
-                            }
-
-                            // Operating System
-                            if (r.operating_system) {
-                                html += "<div class='finding-detail-section detail-os'>";
-                                html += "<div class='finding-detail-label'>Operating System</div>";
-                                html += "<div class='finding-detail-text'>" + r.operating_system + "</div>";
-                                html += "</div>";
-                            }
-
-                            // Service / Port
-                            if (svcPort) {
-                                html += "<div class='finding-detail-section detail-service'>";
-                                html += "<div class='finding-detail-label'>Service / Port</div>";
-                                html += "<div class='finding-detail-text'>" + svcPort + (r.protocol ? ' (' + r.protocol + ')' : '') + "</div>";
-                                html += "</div>";
-                            }
-
-                            // CVSS3 Base Score
-                            if (r.cvss3_base_score) {
-                                html += "<div class='finding-detail-section detail-cvss'>";
-                                html += "<div class='finding-detail-label'>CVSS3 Base Score</div>";
-                                html += "<div class='finding-detail-text'>" + r.cvss3_base_score + "</div>";
-                                html += "</div>";
-                            }
-
-                            // See Also
-                            if (r.see_also) {
-                                html += "<div class='finding-detail-section detail-see-also'>";
-                                html += "<div class='finding-detail-label'>See Also</div>";
-                                html += "<div class='finding-detail-text'>" + r.see_also.replace(/\n/g, '<br>') + "</div>";
-                                html += "</div>";
-                            }
-
-                            // Plugin Output
-                            if (r.plugin_output) {
-                                html += "<div class='finding-detail-section detail-plugin-output'>";
-                                html += "<div class='finding-detail-label'>Plugin Output</div>";
-                                html += "<div class='finding-detail-text'>" + r.plugin_output.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "</div>";
-                                html += "</div>";
-                            }
-
-                            // Request
-                            if (r.request) {
-                                html += "<div class='finding-detail-section detail-request'>";
-                                html += "<div class='finding-detail-label'>Request</div>";
-                                html += "<div class='finding-detail-text'>" + r.request.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "</div>";
-                                html += "</div>";
-                            }
-
-                            html += "</div></div></td></tr>";
-                        }
-                    }
-
-                    html += "</tbody></table></div>";
-                    html += "<input type='file' id='nessus-file-input' accept='.nessus,.xml' style='display:none' onchange='handleNessusUpload(\"" + instanceId + "\", this)'>";
-
-                    panel.html(html);
-
-                    $.tablesorter.addParser({
-                        id: 'nessusSeverity',
-                        is: function(s) { return false; },
-                        format: function(s) {
-                            return s.toLowerCase().replace(/critical/,0).replace(/high/,1).replace(/medium/,2).replace(/low/,3).replace(/none/,4);
-                        },
-                        type: 'numeric'
-                    });
-
-                    $("#nessus-table").tablesorter({
-                        headers: { 0: { sorter: 'nessusSeverity' } },
-                        cssChildRow: 'finding-detail-row',
-                        sortList: [[0, 0]]
-                    });
+                    window.nessusRawResults = results;
+                    window.nessusInstanceId = instanceId;
+                    renderNessusTable(instanceId, results, nessusMerged);
                 },
                 function() {
                     showNessusUploadPlaceholder(instanceId);
                 }
             );
+        }
+
+        function renderNessusTable(instanceId, results, merged) {
+            var panel = $('#vuln-nessus-content');
+
+            // Toolbar - left: action buttons + count
+            var html = "<div class='findings-toolbar'>";
+            html += "<div class='findings-toolbar-left'>";
+            html += "<button class='btn btn-sm btn-default' onclick='reimportNessus(\"" + instanceId + "\")'>";
+            html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT</button>&nbsp;";
+            html += "<span class='findings-count' id='nessus-findings-count'><i class='glyphicon glyphicon-shield'></i>&nbsp;" + results.length + " NESSUS FINDINGS</span>";
+            html += "</div>";
+            // Toolbar - right: merge toggle + hide filters
+            html += "<div class='findings-toolbar-right'>";
+            html += "<button class='btn btn-sm btn-default vuln-merge-btn' id='nessus-merge-btn' onclick='toggleNessusMerge(\"" + instanceId + "\")'>";
+            html += merged ? "<i class='glyphicon glyphicon-compressed'></i>&nbsp;SHOW ALL" : "<i class='glyphicon glyphicon-compressed'></i>&nbsp;MERGE SIMILAR";
+            html += "</button>&nbsp;";
+            html += "<button class='filter-btn filter-btn-closed' id='nessus-hide-closed' style='display:none' onclick='toggleVulnFilter(\"nessus\",\"closed\")'></button>&nbsp;";
+            html += "<button class='filter-btn filter-btn-ticketed' id='nessus-hide-ticketed' style='display:none' onclick='toggleVulnFilter(\"nessus\",\"ticketed\")'></button>";
+            html += "</div></div>";
+
+            // Table
+            html += "<div class='findings-table-wrapper'>";
+            html += "<table id='nessus-table' class='table findings-table tablesorter small'>";
+            html += "<thead><tr>";
+            html += "<th>Severity</th>";
+            html += "<th>Plugin Name</th>";
+            html += "<th>Host IP</th>";
+            html += "<th>Host Name</th>";
+            html += "<th>Tracking</th>";
+            html += "</tr></thead><tbody>";
+
+            if (merged) {
+                var mg = mergeResults(results);
+                var idx = 0;
+                for (var oi = 0; oi < mg.order.length; oi++) {
+                    var key = mg.order[oi];
+                    var group = mg.groups[key];
+                    var r = group[0];
+                    var count = group.length;
+                    html += renderNessusRow(r, idx, count > 1 ? count : 0);
+                    idx++;
+                }
+            } else {
+                for (var i = 0; i < results.length; i++) {
+                    html += renderNessusRow(results[i], i, 0);
+                }
+            }
+
+            html += "</tbody></table></div>";
+            html += "<input type='file' id='nessus-file-input' accept='.nessus,.xml' style='display:none' onchange='handleNessusUpload(\"" + instanceId + "\", this)'>";
+
+            panel.html(html);
+
+            $.tablesorter.addParser({
+                id: 'nessusSeverity',
+                is: function(s) { return false; },
+                format: function(s) {
+                    return s.toLowerCase().replace(/critical/,0).replace(/high/,1).replace(/medium/,2).replace(/low/,3).replace(/none/,4);
+                },
+                type: 'numeric'
+            });
+
+            $("#nessus-table").tablesorter({
+                headers: { 0: { sorter: 'nessusSeverity' }, 4: { sorter: false } },
+                cssChildRow: 'finding-detail-row',
+                sortList: [[0, 0]]
+            });
+
+            updateVulnFilterCounts('nessus');
+            applyVulnFilters('nessus');
+        }
+
+        function renderNessusRow(r, idx, mergeCount) {
+            var sevLower = (r.severity || '').toLowerCase();
+            var badgeClass = '';
+            if (sevLower === 'critical') badgeClass = 'alert-critical';
+            else if (sevLower === 'high') badgeClass = 'alert-danger';
+            else if (sevLower === 'medium') badgeClass = 'alert-warning';
+            else if (sevLower === 'low') badgeClass = 'alert-info';
+            else badgeClass = 'alert-success';
+
+            var hasDetail = r.description || r.synopsis || r.solution || r.see_also || r.request || r.plugin_output || r.operating_system || r.cvss3_base_score;
+
+            var html = "<tr class='finding-row finding-" + sevLower + "' data-nessus-id='" + idx + "'" + (hasDetail ? " onclick='toggleNessusDetail(" + idx + ")'" : "") + ">";
+            html += "<td><span class='badge " + badgeClass + "'>" + (r.severity || 'None') + "</span>";
+            if (hasDetail) html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='nessus-icon-" + idx + "'></i>";
+            html += "</td>";
+            html += "<td><div class='cell-clamp'>" + (r.plugin_name || '');
+            if (mergeCount > 0) html += " <span class='merge-count-badge'>&times;" + mergeCount + "</span>";
+            html += "</div></td>";
+            html += "<td>" + (r.host_ip || '') + "</td>";
+            html += "<td><div class='cell-clamp'>" + (r.host_name || '') + "</div></td>";
+            html += "<td>" + getTrackingBadge(r.tracking, r.id, 'nessus') + "</td>";
+            html += "</tr>";
+
+            if (hasDetail) {
+                html += "<tr class='finding-detail-row finding-" + sevLower + "' id='nessus-detail-" + idx + "'>";
+                html += "<td colspan='5'><div class='finding-detail' id='nessus-detail-content-" + idx + "'>";
+                html += "<div class='nessus-detail-grid'>";
+                html += buildNessusDetailHtml(r);
+                html += "</div></div></td></tr>";
+            }
+            return html;
+        }
+
+        function toggleNessusMerge(instanceId) {
+            nessusMerged = !nessusMerged;
+            renderNessusTable(instanceId, window.nessusRawResults, nessusMerged);
         }
 
         function reimportNessus(instanceId) {
@@ -1262,6 +1402,51 @@
             });
         }
 
+        function buildBurpDetailHtml(r) {
+            var html = '';
+            if (r.issue_detail) {
+                html += "<div class='finding-detail-section detail-issue-detail'>";
+                html += "<div class='finding-detail-label'>Issue Detail</div>";
+                html += "<div class='finding-detail-text'>" + r.issue_detail + "</div></div>";
+            }
+            if (r.solutions) {
+                html += "<div class='finding-detail-section detail-remediation'>";
+                html += "<div class='finding-detail-label'>Remediation</div>";
+                html += "<div class='finding-detail-text'>" + r.solutions + "</div></div>";
+            }
+            if (r.issue_background) {
+                html += "<div class='finding-detail-section detail-background'>";
+                html += "<div class='finding-detail-label'>Issue Background</div>";
+                html += "<div class='finding-detail-text'>" + r.issue_background + "</div></div>";
+            }
+            if (r.references) {
+                html += "<div class='finding-detail-section detail-references'>";
+                html += "<div class='finding-detail-label'>References</div>";
+                html += "<div class='finding-detail-text'>" + r.references.replace(/\n/g, '<br>') + "</div></div>";
+            }
+            if (r.vulnerability_classifications) {
+                html += "<div class='finding-detail-section detail-classifications'>";
+                html += "<div class='finding-detail-label'>Vulnerability Classifications</div>";
+                html += "<div class='finding-detail-text'>" + r.vulnerability_classifications.replace(/\n/g, '<br>') + "</div></div>";
+            }
+            if (r.see_also) {
+                html += "<div class='finding-detail-section detail-see-also'>";
+                html += "<div class='finding-detail-label'>See Also</div>";
+                html += "<div class='finding-detail-text'>" + r.see_also.replace(/\n/g, '<br>') + "</div></div>";
+            }
+            if (r.request) {
+                html += "<div class='finding-detail-section detail-request'>";
+                html += "<div class='finding-detail-label'>Request</div>";
+                html += "<div class='finding-detail-text'>" + r.request.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "</div></div>";
+            }
+            if (r.response) {
+                html += "<div class='finding-detail-section detail-response'>";
+                html += "<div class='finding-detail-label'>Response</div>";
+                html += "<div class='finding-detail-text'>" + r.response.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "</div></div>";
+            }
+            return html;
+        }
+
         function loadBurpTable(instanceId) {
             var panel = $('#vuln-burp-content');
             panel.html("<div class='vuln-placeholder'><i class='glyphicon glyphicon-refresh spinning' style='font-size: 24px;'></i><p>Loading Burp results...</p></div>");
@@ -1279,148 +1464,125 @@
                         return sev !== 'information' && sev !== 'info';
                     });
 
-                    // Toolbar
-                    var html = "<div class='findings-toolbar'>";
-                    html += "<div class='findings-toolbar-left'>";
-                    html += "<span class='findings-count'><i class='glyphicon glyphicon-globe'></i>&nbsp;" + results.length + " BURP ISSUES</span>";
-                    html += "</div>";
-                    html += "<div class='findings-toolbar-right'>";
-                    html += "<button class='btn btn-sm btn-default' onclick='reimportBurp(\"" + instanceId + "\", \"xml\")'>";
-                    html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT XML</button>&nbsp;";
-                    html += "<button class='btn btn-sm btn-default' onclick='enhanceBurpHtml(\"" + instanceId + "\")'>";
-                    html += "<i class='glyphicon glyphicon-plus-sign'></i>&nbsp;HTML ENHANCE</button>";
-                    html += "</div></div>";
-
-                    // Table
-                    html += "<div class='findings-table-wrapper'>";
-                    html += "<table id='burp-table' class='table findings-table tablesorter small'>";
-                    html += "<thead><tr>";
-                    html += "<th>Severity</th>";
-                    html += "<th>Plugin Name</th>";
-                    html += "<th>Host IP</th>";
-                    html += "<th>Host Name</th>";
-                    html += "</tr></thead><tbody>";
-
-                    for (var i = 0; i < results.length; i++) {
-                        var r = results[i];
-                        var sevLower = (r.severity || '').toLowerCase();
-                        var badgeClass = '';
-                        if (sevLower === 'high') badgeClass = 'alert-danger';
-                        else if (sevLower === 'medium') badgeClass = 'alert-warning';
-                        else if (sevLower === 'low') badgeClass = 'alert-info';
-                        else badgeClass = 'alert-success';
-
-                        var hasDetail = r.solutions || r.see_also || r.request || r.response || r.issue_detail || r.issue_background || r.references || r.vulnerability_classifications;
-
-                        // Main row (clickable to expand)
-                        html += "<tr class='finding-row finding-" + sevLower + "' data-burp-id='" + i + "'" + (hasDetail ? " onclick='toggleBurpDetail(" + i + ")'" : "") + ">";
-                        html += "<td><span class='badge " + badgeClass + "'>" + (r.severity || 'Information') + "</span>";
-                        if (hasDetail) html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='burp-icon-" + i + "'></i>";
-                        html += "</td>";
-                        html += "<td><div class='cell-clamp'>" + (r.plugin_name || '') + "</div></td>";
-                        html += "<td>" + (r.host_ip || '') + "</td>";
-                        html += "<td><div class='cell-clamp'>" + (r.host_name || '') + "</div></td>";
-                        html += "</tr>";
-
-                        // Expandable detail row
-                        if (hasDetail) {
-                            html += "<tr class='finding-detail-row finding-" + sevLower + "' id='burp-detail-" + i + "'>";
-                            html += "<td colspan='4'><div class='finding-detail' id='burp-detail-content-" + i + "'>";
-                            html += "<div class='burp-detail-grid'>";
-
-                            // Issue Detail - ALWAYS FIRST
-                            if (r.issue_detail) {
-                                html += "<div class='finding-detail-section detail-issue-detail'>";
-                                html += "<div class='finding-detail-label'>Issue Detail</div>";
-                                html += "<div class='finding-detail-text'>" + r.issue_detail + "</div>";
-                                html += "</div>";
-                            }
-
-                            // Remediation - ALWAYS SECOND
-                            if (r.solutions) {
-                                html += "<div class='finding-detail-section detail-remediation'>";
-                                html += "<div class='finding-detail-label'>Remediation</div>";
-                                html += "<div class='finding-detail-text'>" + r.solutions + "</div>";
-                                html += "</div>";
-                            }
-
-                            // Issue Background
-                            if (r.issue_background) {
-                                html += "<div class='finding-detail-section detail-background'>";
-                                html += "<div class='finding-detail-label'>Issue Background</div>";
-                                html += "<div class='finding-detail-text'>" + r.issue_background + "</div>";
-                                html += "</div>";
-                            }
-
-                            // References
-                            if (r.references) {
-                                html += "<div class='finding-detail-section detail-references'>";
-                                html += "<div class='finding-detail-label'>References</div>";
-                                html += "<div class='finding-detail-text'>" + r.references.replace(/\n/g, '<br>') + "</div>";
-                                html += "</div>";
-                            }
-
-                            // Vulnerability Classifications
-                            if (r.vulnerability_classifications) {
-                                html += "<div class='finding-detail-section detail-classifications'>";
-                                html += "<div class='finding-detail-label'>Vulnerability Classifications</div>";
-                                html += "<div class='finding-detail-text'>" + r.vulnerability_classifications.replace(/\n/g, '<br>') + "</div>";
-                                html += "</div>";
-                            }
-
-                            // See Also
-                            if (r.see_also) {
-                                html += "<div class='finding-detail-section detail-see-also'>";
-                                html += "<div class='finding-detail-label'>See Also</div>";
-                                html += "<div class='finding-detail-text'>" + r.see_also.replace(/\n/g, '<br>') + "</div>";
-                                html += "</div>";
-                            }
-
-                            // Request
-                            if (r.request) {
-                                html += "<div class='finding-detail-section detail-request'>";
-                                html += "<div class='finding-detail-label'>Request</div>";
-                                html += "<div class='finding-detail-text'>" + r.request.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "</div>";
-                                html += "</div>";
-                            }
-
-                            // Response
-                            if (r.response) {
-                                html += "<div class='finding-detail-section detail-response'>";
-                                html += "<div class='finding-detail-label'>Response</div>";
-                                html += "<div class='finding-detail-text'>" + r.response.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "</div>";
-                                html += "</div>";
-                            }
-
-                            html += "</div></div></td></tr>";
-                        }
-                    }
-
-                    html += "</tbody></table></div>";
-                    html += "<input type='file' id='burp-file-input' accept='.xml' style='display:none' onchange='handleBurpUpload(\"" + instanceId + "\", this, \"xml\")'>";
-                    html += "<input type='file' id='burp-html-file-input' accept='.html,.htm' style='display:none' onchange='handleBurpUpload(\"" + instanceId + "\", this, \"html\")'>";
-
-                    panel.html(html);
-
-                    $.tablesorter.addParser({
-                        id: 'burpSeverity',
-                        is: function(s) { return false; },
-                        format: function(s) {
-                            return s.toLowerCase().replace(/high/,0).replace(/medium/,1).replace(/low/,2).replace(/information/,3).replace(/info/,3);
-                        },
-                        type: 'numeric'
-                    });
-
-                    $("#burp-table").tablesorter({
-                        headers: { 0: { sorter: 'burpSeverity' } },
-                        cssChildRow: 'finding-detail-row',
-                        sortList: [[0, 0]]
-                    });
+                    window.burpRawResults = results;
+                    window.burpInstanceId = instanceId;
+                    renderBurpTable(instanceId, results, burpMerged);
                 },
                 function() {
                     showBurpUploadPlaceholder(instanceId);
                 }
             );
+        }
+
+        function renderBurpTable(instanceId, results, merged) {
+            var panel = $('#vuln-burp-content');
+
+            // Toolbar - left: action buttons + count
+            var html = "<div class='findings-toolbar'>";
+            html += "<div class='findings-toolbar-left'>";
+            html += "<button class='btn btn-sm btn-default' onclick='reimportBurp(\"" + instanceId + "\", \"xml\")'>";
+            html += "<i class='glyphicon glyphicon-upload'></i>&nbsp;REIMPORT XML</button>&nbsp;";
+            html += "<button class='btn btn-sm btn-default' onclick='enhanceBurpHtml(\"" + instanceId + "\")'>";
+            html += "<i class='glyphicon glyphicon-plus-sign'></i>&nbsp;HTML ENHANCE</button>&nbsp;";
+            html += "<span class='findings-count' id='burp-findings-count'><i class='glyphicon glyphicon-globe'></i>&nbsp;" + results.length + " BURP ISSUES</span>";
+            html += "</div>";
+            // Toolbar - right: merge toggle + hide filters
+            html += "<div class='findings-toolbar-right'>";
+            html += "<button class='btn btn-sm btn-default vuln-merge-btn' id='burp-merge-btn' onclick='toggleBurpMerge(\"" + instanceId + "\")'>";
+            html += merged ? "<i class='glyphicon glyphicon-compressed'></i>&nbsp;SHOW ALL" : "<i class='glyphicon glyphicon-compressed'></i>&nbsp;MERGE SIMILAR";
+            html += "</button>&nbsp;";
+            html += "<button class='filter-btn filter-btn-closed' id='burp-hide-closed' style='display:none' onclick='toggleVulnFilter(\"burp\",\"closed\")'></button>&nbsp;";
+            html += "<button class='filter-btn filter-btn-ticketed' id='burp-hide-ticketed' style='display:none' onclick='toggleVulnFilter(\"burp\",\"ticketed\")'></button>";
+            html += "</div></div>";
+
+            // Table
+            html += "<div class='findings-table-wrapper'>";
+            html += "<table id='burp-table' class='table findings-table tablesorter small'>";
+            html += "<thead><tr>";
+            html += "<th>Severity</th>";
+            html += "<th>Plugin Name</th>";
+            html += "<th>Host IP</th>";
+            html += "<th>Host Name</th>";
+            html += "<th>Tracking</th>";
+            html += "</tr></thead><tbody>";
+
+            if (merged) {
+                var mg = mergeResults(results);
+                var idx = 0;
+                for (var oi = 0; oi < mg.order.length; oi++) {
+                    var key = mg.order[oi];
+                    var group = mg.groups[key];
+                    var r = group[0];
+                    var count = group.length;
+                    html += renderBurpRow(r, idx, count > 1 ? count : 0);
+                    idx++;
+                }
+            } else {
+                for (var i = 0; i < results.length; i++) {
+                    html += renderBurpRow(results[i], i, 0);
+                }
+            }
+
+            html += "</tbody></table></div>";
+            html += "<input type='file' id='burp-file-input' accept='.xml' style='display:none' onchange='handleBurpUpload(\"" + instanceId + "\", this, \"xml\")'>";
+            html += "<input type='file' id='burp-html-file-input' accept='.html,.htm' style='display:none' onchange='handleBurpUpload(\"" + instanceId + "\", this, \"html\")'>";
+
+            panel.html(html);
+
+            $.tablesorter.addParser({
+                id: 'burpSeverity',
+                is: function(s) { return false; },
+                format: function(s) {
+                    return s.toLowerCase().replace(/high/,0).replace(/medium/,1).replace(/low/,2).replace(/information/,3).replace(/info/,3);
+                },
+                type: 'numeric'
+            });
+
+            $("#burp-table").tablesorter({
+                headers: { 0: { sorter: 'burpSeverity' }, 4: { sorter: false } },
+                cssChildRow: 'finding-detail-row',
+                sortList: [[0, 0]]
+            });
+
+            updateVulnFilterCounts('burp');
+            applyVulnFilters('burp');
+        }
+
+        function renderBurpRow(r, idx, mergeCount) {
+            var sevLower = (r.severity || '').toLowerCase();
+            var badgeClass = '';
+            if (sevLower === 'high') badgeClass = 'alert-danger';
+            else if (sevLower === 'medium') badgeClass = 'alert-warning';
+            else if (sevLower === 'low') badgeClass = 'alert-info';
+            else badgeClass = 'alert-success';
+
+            var hasDetail = r.solutions || r.see_also || r.request || r.response || r.issue_detail || r.issue_background || r.references || r.vulnerability_classifications;
+
+            var html = "<tr class='finding-row finding-" + sevLower + "' data-burp-id='" + idx + "'" + (hasDetail ? " onclick='toggleBurpDetail(" + idx + ")'" : "") + ">";
+            html += "<td><span class='badge " + badgeClass + "'>" + (r.severity || 'Information') + "</span>";
+            if (hasDetail) html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='burp-icon-" + idx + "'></i>";
+            html += "</td>";
+            html += "<td><div class='cell-clamp'>" + (r.plugin_name || '');
+            if (mergeCount > 0) html += " <span class='merge-count-badge'>&times;" + mergeCount + "</span>";
+            html += "</div></td>";
+            html += "<td>" + (r.host_ip || '') + "</td>";
+            html += "<td><div class='cell-clamp'>" + (r.host_name || '') + "</div></td>";
+            html += "<td>" + getTrackingBadge(r.tracking, r.id, 'burp') + "</td>";
+            html += "</tr>";
+
+            if (hasDetail) {
+                html += "<tr class='finding-detail-row finding-" + sevLower + "' id='burp-detail-" + idx + "'>";
+                html += "<td colspan='5'><div class='finding-detail' id='burp-detail-content-" + idx + "'>";
+                html += "<div class='burp-detail-grid'>";
+                html += buildBurpDetailHtml(r);
+                html += "</div></div></td></tr>";
+            }
+            return html;
+        }
+
+        function toggleBurpMerge(instanceId) {
+            burpMerged = !burpMerged;
+            renderBurpTable(instanceId, window.burpRawResults, burpMerged);
         }
 
         function toggleBurpDetail(idx) {

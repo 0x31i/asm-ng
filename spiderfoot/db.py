@@ -143,6 +143,7 @@ class SpiderFootDb:
             request             VARCHAR, \
             plugin_output       VARCHAR, \
             cvss3_base_score    VARCHAR, \
+            tracking            INT NOT NULL DEFAULT 0, \
             created             INT NOT NULL \
         )",
         "CREATE INDEX idx_scan_nessus_results ON tbl_scan_nessus_results (scan_instance_id)",
@@ -166,6 +167,7 @@ class SpiderFootDb:
             vulnerability_classifications VARCHAR, \
             request             VARCHAR, \
             response            VARCHAR, \
+            tracking            INT NOT NULL DEFAULT 0, \
             created             INT NOT NULL \
         )",
         "CREATE INDEX idx_scan_burp_results ON tbl_scan_burp_results (scan_instance_id)",
@@ -320,6 +322,7 @@ class SpiderFootDb:
             request             TEXT, \
             plugin_output       TEXT, \
             cvss3_base_score    VARCHAR, \
+            tracking            INT NOT NULL DEFAULT 0, \
             created             BIGINT NOT NULL \
         )",
         "CREATE INDEX IF NOT EXISTS idx_scan_nessus_results ON tbl_scan_nessus_results (scan_instance_id)",
@@ -343,6 +346,7 @@ class SpiderFootDb:
             vulnerability_classifications TEXT, \
             request             TEXT, \
             response            TEXT, \
+            tracking            INT NOT NULL DEFAULT 0, \
             created             BIGINT NOT NULL \
         )",
         "CREATE INDEX IF NOT EXISTS idx_scan_burp_results ON tbl_scan_burp_results (scan_instance_id)",
@@ -854,6 +858,25 @@ class SpiderFootDb:
                     except sqlite3.Error:
                         pass
 
+                # Migration: Add tracking column to nessus and burp results
+                try:
+                    self.dbh.execute("SELECT tracking FROM tbl_scan_nessus_results LIMIT 1")
+                except sqlite3.Error:
+                    try:
+                        self.dbh.execute("ALTER TABLE tbl_scan_nessus_results ADD COLUMN tracking INT NOT NULL DEFAULT 0")
+                        self.conn.commit()
+                    except sqlite3.Error:
+                        pass
+
+                try:
+                    self.dbh.execute("SELECT tracking FROM tbl_scan_burp_results LIMIT 1")
+                except sqlite3.Error:
+                    try:
+                        self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN tracking INT NOT NULL DEFAULT 0")
+                        self.conn.commit()
+                    except sqlite3.Error:
+                        pass
+
                 if init:
                     for row in self.eventDetails:
                         event = row[0]
@@ -1034,6 +1057,27 @@ class SpiderFootDb:
                     try:
                         self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN reference_links TEXT")
                         self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN vulnerability_classifications TEXT")
+                        self.conn.commit()
+                    except psycopg2.Error:
+                        self.conn.rollback()
+
+                # Migration: Add tracking column to nessus and burp results
+                try:
+                    self.dbh.execute("SELECT tracking FROM tbl_scan_nessus_results LIMIT 1")
+                except psycopg2.Error:
+                    self.conn.rollback()
+                    try:
+                        self.dbh.execute("ALTER TABLE tbl_scan_nessus_results ADD COLUMN tracking INT NOT NULL DEFAULT 0")
+                        self.conn.commit()
+                    except psycopg2.Error:
+                        self.conn.rollback()
+
+                try:
+                    self.dbh.execute("SELECT tracking FROM tbl_scan_burp_results LIMIT 1")
+                except psycopg2.Error:
+                    self.conn.rollback()
+                    try:
+                        self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN tracking INT NOT NULL DEFAULT 0")
                         self.conn.commit()
                     except psycopg2.Error:
                         self.conn.rollback()
@@ -4342,12 +4386,16 @@ class SpiderFootDb:
             except (sqlite3.Error, psycopg2.Error):
                 return 0
 
-    def scanNessusStore(self, instanceId: str, results: list) -> int:
+    def scanNessusStore(self, instanceId: str, results: list, trackedFindings: set = None) -> int:
         """Store imported Nessus results for a scan (replaces existing).
+
+        Findings matching previously tracked (TICKETED/CLOSED) entries are
+        imported with their tracking status preserved.
 
         Args:
             instanceId (str): scan instance ID
             results (list): list of dicts with Nessus result fields
+            trackedFindings (set): set of (plugin_name, host_ip, host_name, tracking) tuples to preserve
 
         Returns:
             int: number of results stored
@@ -4363,6 +4411,13 @@ class SpiderFootDb:
         import time
         now = int(time.time())
 
+        # Build lookup for tracked findings (key -> tracking value)
+        tracked_lookup = {}
+        if trackedFindings:
+            for tf in trackedFindings:
+                key = (str(tf[0]).lower().strip(), str(tf[1]).lower().strip(), str(tf[2]).lower().strip())
+                tracked_lookup[key] = tf[3]
+
         with self.dbhLock:
             try:
                 if self.db_type == 'sqlite':
@@ -4373,20 +4428,26 @@ class SpiderFootDb:
 
                 count = 0
                 for r in results:
+                    # Preserve tracking status for matching findings
+                    track_key = (str(r.get('plugin_name', '')).lower().strip(),
+                                 str(r.get('host_ip', '')).lower().strip(),
+                                 str(r.get('host_name', '')).lower().strip())
+                    tracking_val = tracked_lookup.get(track_key, 0)
+
                     if self.db_type == 'sqlite':
                         qry = "INSERT INTO tbl_scan_nessus_results \
                             (scan_instance_id, severity, severity_number, plugin_name, plugin_id, \
                             host_ip, host_name, operating_system, description, synopsis, solution, \
                             see_also, service_name, port, protocol, request, plugin_output, \
-                            cvss3_base_score, created) \
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                            cvss3_base_score, tracking, created) \
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                     else:
                         qry = "INSERT INTO tbl_scan_nessus_results \
                             (scan_instance_id, severity, severity_number, plugin_name, plugin_id, \
                             host_ip, host_name, operating_system, description, synopsis, solution, \
                             see_also, service_name, port, protocol, request, plugin_output, \
-                            cvss3_base_score, created) \
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                            cvss3_base_score, tracking, created) \
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                     self.dbh.execute(qry, [
                         instanceId,
                         str(r.get('severity', '')),
@@ -4406,6 +4467,7 @@ class SpiderFootDb:
                         str(r.get('request', '')),
                         str(r.get('plugin_output', '')),
                         str(r.get('cvss3_base_score', '')),
+                        tracking_val,
                         now
                     ])
                     count += 1
@@ -4437,7 +4499,7 @@ class SpiderFootDb:
             qry = "SELECT id, severity, severity_number, plugin_name, plugin_id, \
                 host_ip, host_name, operating_system, description, synopsis, solution, \
                 see_also, service_name, port, protocol, request, plugin_output, \
-                cvss3_base_score, created \
+                cvss3_base_score, tracking, created \
                 FROM tbl_scan_nessus_results WHERE scan_instance_id = ? ORDER BY \
                 CASE severity WHEN 'Critical' THEN 0 WHEN 'High' THEN 1 \
                 WHEN 'Medium' THEN 2 WHEN 'Low' THEN 3 WHEN 'None' THEN 4 ELSE 5 END, plugin_name"
@@ -4445,7 +4507,7 @@ class SpiderFootDb:
             qry = "SELECT id, severity, severity_number, plugin_name, plugin_id, \
                 host_ip, host_name, operating_system, description, synopsis, solution, \
                 see_also, service_name, port, protocol, request, plugin_output, \
-                cvss3_base_score, created \
+                cvss3_base_score, tracking, created \
                 FROM tbl_scan_nessus_results WHERE scan_instance_id = %s ORDER BY \
                 CASE severity WHEN 'Critical' THEN 0 WHEN 'High' THEN 1 \
                 WHEN 'Medium' THEN 2 WHEN 'Low' THEN 3 WHEN 'None' THEN 4 ELSE 5 END, plugin_name"
@@ -4481,12 +4543,16 @@ class SpiderFootDb:
             except (sqlite3.Error, psycopg2.Error):
                 return 0
 
-    def scanBurpStore(self, instanceId: str, results: list) -> int:
+    def scanBurpStore(self, instanceId: str, results: list, trackedFindings: set = None) -> int:
         """Store imported Burp results for a scan (replaces existing).
+
+        Findings matching previously tracked (TICKETED/CLOSED) entries are
+        imported with their tracking status preserved.
 
         Args:
             instanceId (str): scan instance ID
             results (list): list of dicts with Burp result fields
+            trackedFindings (set): set of (plugin_name, host_ip, host_name, tracking) tuples to preserve
 
         Returns:
             int: number of results stored
@@ -4502,6 +4568,13 @@ class SpiderFootDb:
         import time
         now = int(time.time())
 
+        # Build lookup for tracked findings (key -> tracking value)
+        tracked_lookup = {}
+        if trackedFindings:
+            for tf in trackedFindings:
+                key = (str(tf[0]).lower().strip(), str(tf[1]).lower().strip(), str(tf[2]).lower().strip())
+                tracked_lookup[key] = tf[3]
+
         with self.dbhLock:
             try:
                 if self.db_type == 'sqlite':
@@ -4512,22 +4585,28 @@ class SpiderFootDb:
 
                 count = 0
                 for r in results:
+                    # Preserve tracking status for matching findings
+                    track_key = (str(r.get('plugin_name', '')).lower().strip(),
+                                 str(r.get('host_ip', '')).lower().strip(),
+                                 str(r.get('host_name', '')).lower().strip())
+                    tracking_val = tracked_lookup.get(track_key, 0)
+
                     if self.db_type == 'sqlite':
                         qry = "INSERT INTO tbl_scan_burp_results \
                             (scan_instance_id, severity, severity_number, host_ip, host_name, \
                             plugin_name, issue_type, path, location, confidence, \
                             issue_background, issue_detail, solutions, see_also, \
                             reference_links, vulnerability_classifications, \
-                            request, response, created) \
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                            request, response, tracking, created) \
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                     else:
                         qry = "INSERT INTO tbl_scan_burp_results \
                             (scan_instance_id, severity, severity_number, host_ip, host_name, \
                             plugin_name, issue_type, path, location, confidence, \
                             issue_background, issue_detail, solutions, see_also, \
                             reference_links, vulnerability_classifications, \
-                            request, response, created) \
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                            request, response, tracking, created) \
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                     self.dbh.execute(qry, [
                         instanceId,
                         str(r.get('severity', '')),
@@ -4547,6 +4626,7 @@ class SpiderFootDb:
                         str(r.get('vulnerability_classifications', '')),
                         str(r.get('request', '')),
                         str(r.get('response', '')),
+                        tracking_val,
                         now
                     ])
                     count += 1
@@ -4696,7 +4776,7 @@ class SpiderFootDb:
                 plugin_name, issue_type, path, location, confidence, \
                 issue_background, issue_detail, solutions, see_also, \
                 reference_links, vulnerability_classifications, \
-                request, response, created \
+                request, response, tracking, created \
                 FROM tbl_scan_burp_results WHERE scan_instance_id = ? ORDER BY \
                 CASE severity WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 \
                 WHEN 'Low' THEN 2 WHEN 'Information' THEN 3 ELSE 4 END, plugin_name"
@@ -4705,7 +4785,7 @@ class SpiderFootDb:
                 plugin_name, issue_type, path, location, confidence, \
                 issue_background, issue_detail, solutions, see_also, \
                 reference_links, vulnerability_classifications, \
-                request, response, created \
+                request, response, tracking, created \
                 FROM tbl_scan_burp_results WHERE scan_instance_id = %s ORDER BY \
                 CASE severity WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 \
                 WHEN 'Low' THEN 2 WHEN 'Information' THEN 3 ELSE 4 END, plugin_name"
@@ -4740,3 +4820,93 @@ class SpiderFootDb:
                 return self.dbh.fetchone()[0]
             except (sqlite3.Error, psycopg2.Error):
                 return 0
+
+    def scanNessusUpdateTracking(self, instanceId: str, resultId: int, tracking: int) -> bool:
+        """Update the tracking status for a Nessus result.
+
+        Args:
+            instanceId (str): scan instance ID
+            resultId (int): result row ID
+            tracking (int): 0=OPEN, 1=CLOSED, 2=TICKETED
+
+        Returns:
+            bool: success
+        """
+        ph = '?' if self.db_type == 'sqlite' else '%s'
+        qry = f"UPDATE tbl_scan_nessus_results SET tracking = {ph} WHERE id = {ph} AND scan_instance_id = {ph}"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [tracking, resultId, instanceId])
+                self.conn.commit()
+                return True
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error updating Nessus tracking status") from e
+
+    def scanBurpUpdateTracking(self, instanceId: str, resultId: int, tracking: int) -> bool:
+        """Update the tracking status for a Burp result.
+
+        Args:
+            instanceId (str): scan instance ID
+            resultId (int): result row ID
+            tracking (int): 0=OPEN, 1=CLOSED, 2=TICKETED
+
+        Returns:
+            bool: success
+        """
+        ph = '?' if self.db_type == 'sqlite' else '%s'
+        qry = f"UPDATE tbl_scan_burp_results SET tracking = {ph} WHERE id = {ph} AND scan_instance_id = {ph}"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [tracking, resultId, instanceId])
+                self.conn.commit()
+                return True
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error updating Burp tracking status") from e
+
+    def scanNessusTrackedFindings(self, instanceId: str) -> set:
+        """Get set of (plugin_name, host_ip, host_name) tuples for Nessus findings
+        with tracking status TICKETED(2) or CLOSED(1).
+
+        Used during reimport to preserve tracked findings.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            set: set of (plugin_name, host_ip, host_name, tracking) tuples
+        """
+        ph = '?' if self.db_type == 'sqlite' else '%s'
+        qry = f"SELECT plugin_name, host_ip, host_name, tracking FROM tbl_scan_nessus_results \
+            WHERE scan_instance_id = {ph} AND tracking IN (1, 2)"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [instanceId])
+                return {(row[0], row[1], row[2], row[3]) for row in self.dbh.fetchall()}
+            except (sqlite3.Error, psycopg2.Error):
+                return set()
+
+    def scanBurpTrackedFindings(self, instanceId: str) -> set:
+        """Get set of (plugin_name, host_ip, host_name) tuples for Burp findings
+        with tracking status TICKETED(2) or CLOSED(1).
+
+        Used during reimport to preserve tracked findings.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            set: set of (plugin_name, host_ip, host_name, tracking) tuples
+        """
+        ph = '?' if self.db_type == 'sqlite' else '%s'
+        qry = f"SELECT plugin_name, host_ip, host_name, tracking FROM tbl_scan_burp_results \
+            WHERE scan_instance_id = {ph} AND tracking IN (1, 2)"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [instanceId])
+                return {(row[0], row[1], row[2], row[3]) for row in self.dbh.fetchall()}
+            except (sqlite3.Error, psycopg2.Error):
+                return set()
