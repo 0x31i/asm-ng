@@ -6163,7 +6163,7 @@ i.glyphicon-white,
 }
 
 /* Column widths for 4-column layout */
-.findings-table .col-priority { width: 85px; }
+.findings-table .col-priority { width: 120px; }
 .findings-table .col-category { width: 20%; }
 .findings-table .col-type { width: 20%; }
 .findings-table .col-item { width: auto; }
