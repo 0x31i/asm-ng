@@ -1004,7 +1004,10 @@
                         return;
                     }
 
-                    var results = data.results;
+                    // Filter out NONE severity findings
+                    var results = data.results.filter(function(r) {
+                        return (r.severity || '').toLowerCase() !== 'none';
+                    });
 
                     // Toolbar
                     var html = "<div class='findings-toolbar'>";
@@ -1023,17 +1026,7 @@
                     html += "<th>Severity</th>";
                     html += "<th>Plugin Name</th>";
                     html += "<th>Host IP</th>";
-                    html += "<th>Operating System</th>";
                     html += "<th>Host Name</th>";
-                    html += "<th>Severity Number</th>";
-                    html += "<th>Description</th>";
-                    html += "<th>Synopsis</th>";
-                    html += "<th>Solution</th>";
-                    html += "<th>See Also</th>";
-                    html += "<th>Service Name Port</th>";
-                    html += "<th>Request</th>";
-                    html += "<th>Plugin Output</th>";
-                    html += "<th>CVSS3 Base Score</th>";
                     html += "</tr></thead><tbody>";
 
                     for (var i = 0; i < results.length; i++) {
@@ -1046,25 +1039,101 @@
                         else if (sevLower === 'low') badgeClass = 'alert-info';
                         else badgeClass = 'alert-success';
 
+                        var hasDetail = r.description || r.synopsis || r.solution || r.see_also || r.request || r.plugin_output || r.operating_system || r.cvss3_base_score;
+
                         var svcPort = r.service_name || '';
                         if (r.port && r.port > 0) svcPort += (svcPort ? ' ' : '') + r.port;
 
-                        html += "<tr class='finding-row finding-" + sevLower + "'>";
-                        html += "<td><span class='badge " + badgeClass + "'>" + (r.severity || 'None') + "</span></td>";
+                        // Main row (clickable to expand)
+                        html += "<tr class='finding-row finding-" + sevLower + "' data-nessus-id='" + i + "'" + (hasDetail ? " onclick='toggleNessusDetail(" + i + ")'" : "") + ">";
+                        html += "<td><span class='badge " + badgeClass + "'>" + (r.severity || 'None') + "</span>";
+                        if (hasDetail) html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='nessus-icon-" + i + "'></i>";
+                        html += "</td>";
                         html += "<td><div class='cell-clamp'>" + (r.plugin_name || '') + "</div></td>";
                         html += "<td>" + (r.host_ip || '') + "</td>";
-                        html += "<td><div class='cell-clamp'>" + (r.operating_system || '') + "</div></td>";
                         html += "<td><div class='cell-clamp'>" + (r.host_name || '') + "</div></td>";
-                        html += "<td>" + (r.severity_number || 0) + "</td>";
-                        html += "<td><div class='cell-clamp'>" + (r.description || '') + "</div></td>";
-                        html += "<td><div class='cell-clamp'>" + (r.synopsis || '') + "</div></td>";
-                        html += "<td><div class='cell-clamp'>" + (r.solution || '') + "</div></td>";
-                        html += "<td><div class='cell-clamp'>" + (r.see_also || '') + "</div></td>";
-                        html += "<td>" + svcPort + "</td>";
-                        html += "<td><div class='cell-clamp'>" + (r.request || '') + "</div></td>";
-                        html += "<td><div class='cell-clamp'>" + (r.plugin_output || '') + "</div></td>";
-                        html += "<td>" + (r.cvss3_base_score || '') + "</td>";
                         html += "</tr>";
+
+                        // Expandable detail row
+                        if (hasDetail) {
+                            html += "<tr class='finding-detail-row finding-" + sevLower + "' id='nessus-detail-" + i + "'>";
+                            html += "<td colspan='4'><div class='finding-detail' id='nessus-detail-content-" + i + "'>";
+                            html += "<div class='nessus-detail-grid'>";
+
+                            // Synopsis - FIRST
+                            if (r.synopsis) {
+                                html += "<div class='finding-detail-section detail-synopsis'>";
+                                html += "<div class='finding-detail-label'>Synopsis</div>";
+                                html += "<div class='finding-detail-text'>" + r.synopsis + "</div>";
+                                html += "</div>";
+                            }
+
+                            // Description
+                            if (r.description) {
+                                html += "<div class='finding-detail-section detail-description'>";
+                                html += "<div class='finding-detail-label'>Description</div>";
+                                html += "<div class='finding-detail-text'>" + r.description + "</div>";
+                                html += "</div>";
+                            }
+
+                            // Solution
+                            if (r.solution) {
+                                html += "<div class='finding-detail-section detail-remediation'>";
+                                html += "<div class='finding-detail-label'>Solution</div>";
+                                html += "<div class='finding-detail-text'>" + r.solution + "</div>";
+                                html += "</div>";
+                            }
+
+                            // Operating System
+                            if (r.operating_system) {
+                                html += "<div class='finding-detail-section detail-os'>";
+                                html += "<div class='finding-detail-label'>Operating System</div>";
+                                html += "<div class='finding-detail-text'>" + r.operating_system + "</div>";
+                                html += "</div>";
+                            }
+
+                            // Service / Port
+                            if (svcPort) {
+                                html += "<div class='finding-detail-section detail-service'>";
+                                html += "<div class='finding-detail-label'>Service / Port</div>";
+                                html += "<div class='finding-detail-text'>" + svcPort + (r.protocol ? ' (' + r.protocol + ')' : '') + "</div>";
+                                html += "</div>";
+                            }
+
+                            // CVSS3 Base Score
+                            if (r.cvss3_base_score) {
+                                html += "<div class='finding-detail-section detail-cvss'>";
+                                html += "<div class='finding-detail-label'>CVSS3 Base Score</div>";
+                                html += "<div class='finding-detail-text'>" + r.cvss3_base_score + "</div>";
+                                html += "</div>";
+                            }
+
+                            // See Also
+                            if (r.see_also) {
+                                html += "<div class='finding-detail-section detail-see-also'>";
+                                html += "<div class='finding-detail-label'>See Also</div>";
+                                html += "<div class='finding-detail-text'>" + r.see_also.replace(/\n/g, '<br>') + "</div>";
+                                html += "</div>";
+                            }
+
+                            // Plugin Output
+                            if (r.plugin_output) {
+                                html += "<div class='finding-detail-section detail-plugin-output'>";
+                                html += "<div class='finding-detail-label'>Plugin Output</div>";
+                                html += "<div class='finding-detail-text'>" + r.plugin_output.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "</div>";
+                                html += "</div>";
+                            }
+
+                            // Request
+                            if (r.request) {
+                                html += "<div class='finding-detail-section detail-request'>";
+                                html += "<div class='finding-detail-label'>Request</div>";
+                                html += "<div class='finding-detail-text'>" + r.request.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "</div>";
+                                html += "</div>";
+                            }
+
+                            html += "</div></div></td></tr>";
+                        }
                     }
 
                     html += "</tbody></table></div>";
@@ -1083,6 +1152,7 @@
 
                     $("#nessus-table").tablesorter({
                         headers: { 0: { sorter: 'nessusSeverity' } },
+                        cssChildRow: 'finding-detail-row',
                         sortList: [[0, 0]]
                     });
                 },
@@ -1095,6 +1165,18 @@
         function reimportNessus(instanceId) {
             if (confirm('NESSUS DATA HAS ALREADY BEEN IMPORTED - WOULD YOU LIKE TO REPLACE THE CURRENT DATA?')) {
                 $('#nessus-file-input').click();
+            }
+        }
+
+        function toggleNessusDetail(idx) {
+            var row = $('tr[data-nessus-id="' + idx + '"]');
+            var detail = $('#nessus-detail-content-' + idx);
+            if (row.hasClass('finding-expanded')) {
+                row.removeClass('finding-expanded');
+                detail.slideUp(150);
+            } else {
+                row.addClass('finding-expanded');
+                detail.slideDown(150);
             }
         }
 
@@ -1191,7 +1273,11 @@
                         return;
                     }
 
-                    var results = data.results;
+                    // Filter out INFO/Information severity findings
+                    var results = data.results.filter(function(r) {
+                        var sev = (r.severity || '').toLowerCase();
+                        return sev !== 'information' && sev !== 'info';
+                    });
 
                     // Toolbar
                     var html = "<div class='findings-toolbar'>";
@@ -1210,9 +1296,9 @@
                     html += "<table id='burp-table' class='table findings-table tablesorter small'>";
                     html += "<thead><tr>";
                     html += "<th>Severity</th>";
+                    html += "<th>Plugin Name</th>";
                     html += "<th>Host IP</th>";
                     html += "<th>Host Name</th>";
-                    html += "<th>Plugin Name</th>";
                     html += "</tr></thead><tbody>";
 
                     for (var i = 0; i < results.length; i++) {
@@ -1231,9 +1317,9 @@
                         html += "<td><span class='badge " + badgeClass + "'>" + (r.severity || 'Information') + "</span>";
                         if (hasDetail) html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='burp-icon-" + i + "'></i>";
                         html += "</td>";
+                        html += "<td><div class='cell-clamp'>" + (r.plugin_name || '') + "</div></td>";
                         html += "<td>" + (r.host_ip || '') + "</td>";
                         html += "<td><div class='cell-clamp'>" + (r.host_name || '') + "</div></td>";
-                        html += "<td><div class='cell-clamp'>" + (r.plugin_name || '') + "</div></td>";
                         html += "</tr>";
 
                         // Expandable detail row

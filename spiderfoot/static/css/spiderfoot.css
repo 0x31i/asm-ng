@@ -6432,14 +6432,16 @@ i.glyphicon-white,
    ============================================================ */
 
 #nessus-table.findings-table {
-  table-layout: auto;
+  table-layout: fixed;
 }
 
 #nessus-table.findings-table .cell-clamp {
-  max-width: 200px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 
 #burp-table.findings-table {
@@ -6553,5 +6555,68 @@ i.glyphicon-white,
   max-height: 200px;
   overflow-y: auto;
   overflow-x: auto;
+}
+
+/* Nessus detail grid - single column stacked layout (mirrors Burp) */
+.nessus-detail-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nessus-detail-grid .finding-detail-section {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.nessus-detail-grid .finding-detail-text {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Nessus detail section colors */
+.finding-detail-section.detail-synopsis {
+  border-left-color: #0ea5e9;
+}
+.finding-detail-section.detail-synopsis .finding-detail-label {
+  color: #0ea5e9;
+}
+
+.finding-detail-section.detail-os {
+  border-left-color: #64748b;
+}
+.finding-detail-section.detail-os .finding-detail-label {
+  color: #64748b;
+}
+
+.finding-detail-section.detail-service {
+  border-left-color: #14b8a6;
+}
+.finding-detail-section.detail-service .finding-detail-label {
+  color: #14b8a6;
+}
+
+.finding-detail-section.detail-cvss {
+  border-left-color: #e11d48;
+}
+.finding-detail-section.detail-cvss .finding-detail-label {
+  color: #e11d48;
+}
+
+.finding-detail-section.detail-plugin-output {
+  border-left-color: #f59e0b;
+}
+.finding-detail-section.detail-plugin-output .finding-detail-label {
+  color: #f59e0b;
+}
+
+.finding-detail-section.detail-plugin-output .finding-detail-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  max-height: 200px;
+  overflow-y: auto;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
