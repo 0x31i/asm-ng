@@ -162,6 +162,8 @@ class SpiderFootDb:
             issue_detail        VARCHAR, \
             solutions           VARCHAR, \
             see_also            VARCHAR, \
+            reference_links     VARCHAR, \
+            vulnerability_classifications VARCHAR, \
             request             VARCHAR, \
             response            VARCHAR, \
             created             INT NOT NULL \
@@ -337,6 +339,8 @@ class SpiderFootDb:
             issue_detail        TEXT, \
             solutions           TEXT, \
             see_also            TEXT, \
+            reference_links     TEXT, \
+            vulnerability_classifications TEXT, \
             request             TEXT, \
             response            TEXT, \
             created             BIGINT NOT NULL \
@@ -839,6 +843,17 @@ class SpiderFootDb:
                     except sqlite3.Error:
                         pass
 
+                # Migration: Add reference_links and vulnerability_classifications columns to burp results
+                try:
+                    self.dbh.execute("SELECT reference_links FROM tbl_scan_burp_results LIMIT 1")
+                except sqlite3.Error:
+                    try:
+                        self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN reference_links VARCHAR")
+                        self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN vulnerability_classifications VARCHAR")
+                        self.conn.commit()
+                    except sqlite3.Error:
+                        pass
+
                 if init:
                     for row in self.eventDetails:
                         event = row[0]
@@ -1007,6 +1022,18 @@ class SpiderFootDb:
                         for query in self.createPostgreSQLSchemaQueries:
                             if "tbl_scan_burp_results" in query or "idx_scan_burp_results" in query:
                                 self.dbh.execute(query)
+                        self.conn.commit()
+                    except psycopg2.Error:
+                        self.conn.rollback()
+
+                # Migration: Add reference_links and vulnerability_classifications columns to burp results
+                try:
+                    self.dbh.execute("SELECT reference_links FROM tbl_scan_burp_results LIMIT 1")
+                except psycopg2.Error:
+                    self.conn.rollback()
+                    try:
+                        self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN reference_links TEXT")
+                        self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN vulnerability_classifications TEXT")
                         self.conn.commit()
                     except psycopg2.Error:
                         self.conn.rollback()
@@ -4490,15 +4517,17 @@ class SpiderFootDb:
                             (scan_instance_id, severity, severity_number, host_ip, host_name, \
                             plugin_name, issue_type, path, location, confidence, \
                             issue_background, issue_detail, solutions, see_also, \
+                            reference_links, vulnerability_classifications, \
                             request, response, created) \
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                     else:
                         qry = "INSERT INTO tbl_scan_burp_results \
                             (scan_instance_id, severity, severity_number, host_ip, host_name, \
                             plugin_name, issue_type, path, location, confidence, \
                             issue_background, issue_detail, solutions, see_also, \
+                            reference_links, vulnerability_classifications, \
                             request, response, created) \
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                     self.dbh.execute(qry, [
                         instanceId,
                         str(r.get('severity', '')),
@@ -4514,6 +4543,8 @@ class SpiderFootDb:
                         str(r.get('issue_detail', '')),
                         str(r.get('solutions', '')),
                         str(r.get('see_also', '')),
+                        str(r.get('references', '')),
+                        str(r.get('vulnerability_classifications', '')),
                         str(r.get('request', '')),
                         str(r.get('response', '')),
                         now
@@ -4547,6 +4578,7 @@ class SpiderFootDb:
             qry = "SELECT id, severity, severity_number, host_ip, host_name, \
                 plugin_name, issue_type, path, location, confidence, \
                 issue_background, issue_detail, solutions, see_also, \
+                reference_links, vulnerability_classifications, \
                 request, response, created \
                 FROM tbl_scan_burp_results WHERE scan_instance_id = ? ORDER BY \
                 CASE severity WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 \
@@ -4555,6 +4587,7 @@ class SpiderFootDb:
             qry = "SELECT id, severity, severity_number, host_ip, host_name, \
                 plugin_name, issue_type, path, location, confidence, \
                 issue_background, issue_detail, solutions, see_also, \
+                reference_links, vulnerability_classifications, \
                 request, response, created \
                 FROM tbl_scan_burp_results WHERE scan_instance_id = %s ORDER BY \
                 CASE severity WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 \
