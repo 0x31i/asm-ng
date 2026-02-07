@@ -1078,7 +1078,7 @@
                         return;
                     }
 
-                    // Toolbar with reimport + export
+                    // Toolbar
                     var html = "<div class='findings-toolbar'>";
                     html += "<div class='findings-toolbar-left'>";
                     html += "<span class='findings-count'><i class='glyphicon glyphicon-list-alt'></i>&nbsp;" + data.length + " FINDINGS</span>";
@@ -1090,37 +1090,71 @@
                     html += "<i class='glyphicon glyphicon-download-alt'></i>&nbsp;EXPORT</a>";
                     html += "</div></div>";
 
-                    // Build findings table
+                    // Compact 4-column table with expandable detail rows
                     html += "<div class='findings-table-wrapper'>";
                     html += "<table id='findings-table' class='table findings-table tablesorter small'>";
+                    html += "<colgroup>";
+                    html += "<col class='col-priority'>";
+                    html += "<col class='col-category'>";
+                    html += "<col class='col-type'>";
+                    html += "<col class='col-item'>";
+                    html += "</colgroup>";
                     html += "<thead><tr>";
                     html += "<th>Priority</th>";
                     html += "<th>Category</th>";
-                    html += "<th>Tab</th>";
+                    html += "<th>Type</th>";
                     html += "<th>Item</th>";
-                    html += "<th>Description</th>";
-                    html += "<th>Recommendation</th>";
                     html += "</tr></thead><tbody>";
 
                     for (var i = 0; i < data.length; i++) {
                         var priority = data[i][1];
-                        var rowClass = 'finding-row finding-' + priority.toLowerCase();
+                        var prioLower = priority.toLowerCase();
                         var badgeClass = '';
-
                         if (priority === 'CRITICAL') badgeClass = 'alert-critical';
                         else if (priority === 'HIGH') badgeClass = 'alert-danger';
                         else if (priority === 'MEDIUM') badgeClass = 'alert-warning';
                         else if (priority === 'LOW') badgeClass = 'alert-info';
                         else if (priority === 'INFO') badgeClass = 'alert-success';
 
-                        html += "<tr class='" + rowClass + "'>";
-                        html += "<td><span class='badge " + badgeClass + "'>" + priority + "</span></td>";
+                        var typeVal = data[i][3] || '';
+                        var desc = data[i][5] || '';
+                        var rec = data[i][6] || '';
+                        var hasDetail = desc || rec;
+
+                        // Main row (clickable to expand)
+                        html += "<tr class='finding-row finding-" + prioLower + "' data-finding-id='" + i + "'" + (hasDetail ? " onclick='toggleFinding(" + i + ")'" : "") + ">";
+                        html += "<td><span class='badge " + badgeClass + "'>" + priority + "</span>";
+                        if (hasDetail) html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='finding-icon-" + i + "'></i>";
+                        html += "</td>";
                         html += "<td>" + (data[i][2] || '') + "</td>";
-                        html += "<td>" + (data[i][3] || '') + "</td>";
+                        // Type column as clickable link to Browse page
+                        if (typeVal) {
+                            html += "<td><a class='finding-type-link' onclick='event.stopPropagation(); browseEventData(\"" + instanceId + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"full\");' title='Browse " + typeVal + " data'>" + typeVal + "</a></td>";
+                        } else {
+                            html += "<td></td>";
+                        }
                         html += "<td>" + (data[i][4] || '') + "</td>";
-                        html += "<td class='findings-desc-cell'>" + (data[i][5] || '') + "</td>";
-                        html += "<td class='findings-rec-cell'>" + (data[i][6] || '') + "</td>";
                         html += "</tr>";
+
+                        // Expandable detail row
+                        if (hasDetail) {
+                            html += "<tr class='finding-detail-row finding-" + prioLower + "' id='finding-detail-" + i + "'>";
+                            html += "<td colspan='4'><div class='finding-detail' id='finding-detail-content-" + i + "'>";
+                            html += "<div class='finding-detail-grid'>";
+                            if (desc) {
+                                html += "<div class='finding-detail-section'>";
+                                html += "<div class='finding-detail-label'>Description</div>";
+                                html += "<div class='finding-detail-text'>" + desc + "</div>";
+                                html += "</div>";
+                            }
+                            if (rec) {
+                                html += "<div class='finding-detail-section'>";
+                                html += "<div class='finding-detail-label'>Recommendation</div>";
+                                html += "<div class='finding-detail-text'>" + rec + "</div>";
+                                html += "</div>";
+                            }
+                            html += "</div></div></td></tr>";
+                        }
                     }
 
                     html += "</tbody></table></div>";
@@ -1128,7 +1162,7 @@
 
                     panel.html(html);
 
-                    // Enable table sorting
+                    // Enable table sorting (skip detail rows)
                     $.tablesorter.addParser({
                         id: 'findingsPriority',
                         is: function(s) { return false; },
@@ -1140,6 +1174,7 @@
 
                     $("#findings-table").tablesorter({
                         headers: { 0: { sorter: 'findingsPriority' } },
+                        cssChildRow: 'finding-detail-row',
                         sortList: [[0, 0]]
                     });
                 },
@@ -1147,6 +1182,18 @@
                     showFindingsUploadPlaceholder(instanceId);
                 }
             );
+        }
+
+        function toggleFinding(idx) {
+            var row = $('tr[data-finding-id="' + idx + '"]');
+            var detail = $('#finding-detail-content-' + idx);
+            if (row.hasClass('finding-expanded')) {
+                row.removeClass('finding-expanded');
+                detail.slideUp(150);
+            } else {
+                row.addClass('finding-expanded');
+                detail.slideDown(150);
+            }
         }
 
         function reimportFindings(instanceId) {
@@ -1194,6 +1241,35 @@
             );
         }
 
+        function buildAiCorrelationBar(instanceId) {
+            var bar = "<div class='ai-correlation-compact'>";
+            bar += "<span class='ai-correlation-compact-label'><i class='glyphicon glyphicon-flash'></i>&nbsp;AI ANALYSIS</span>";
+            bar += "<button id='btn-panel-single-correlation' class='btn btn-primary btn-sm' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
+            bar += "<i class='glyphicon glyphicon-search'></i>&nbsp;Single Scan</button>";
+            bar += "<button id='btn-panel-cross-correlation' class='btn btn-info btn-sm' onclick='runAiCorrelation(\"" + instanceId + "\", \"cross\")'>";
+            bar += "<i class='glyphicon glyphicon-transfer'></i>&nbsp;Cross-Scan</button>";
+            bar += "<span class='ai-correlation-compact-results' id='ai-correlation-results'></span>";
+            bar += "</div>";
+            return bar;
+        }
+
+        function initAiCorrelationButtons(instanceId) {
+            sf.fetchData('${docroot}/checkAiCorrelationModes', {'id': instanceId},
+                function(data) {
+                    if (data.success) {
+                        if (!data.cross_scan_available) {
+                            $("#btn-panel-cross-correlation").prop('disabled', true).addClass('disabled')
+                                .attr('title', 'No imported historical data detected.');
+                        }
+                        if (!data.single_scan_available) {
+                            $("#btn-panel-single-correlation").prop('disabled', true).addClass('disabled');
+                        }
+                    }
+                },
+                function() { }
+            );
+        }
+
         function renderCorrelationsPanel(instanceId, data, counts) {
             var panel = $('#findings-correlations-content');
 
@@ -1202,7 +1278,10 @@
                 return;
             }
 
-            var html = "<table id='correlations-panel-table' class='table table-bordered table-striped table-condensed tablesorter small'>";
+            // Compact AI bar at top
+            var html = buildAiCorrelationBar(instanceId);
+
+            html += "<table id='correlations-panel-table' class='table table-bordered table-striped table-condensed tablesorter small'>";
             html += "<thead><tr><th>Correlation</th><th>Risk</th><th>Data Elements</th></tr></thead><tbody>";
 
             for (var i = 0; i < data.length; i++) {
@@ -1224,8 +1303,7 @@
             html += "</tbody></table>";
             panel.html(html);
 
-            // AI Correlation section
-            addAiCorrelationSectionToPanel(instanceId);
+            initAiCorrelationButtons(instanceId);
 
             $.tablesorter.addParser({
                 id: 'correlationPanelCriticality',
@@ -1246,41 +1324,10 @@
 
         function renderCorrelationsPanelEmpty(instanceId) {
             var panel = $('#findings-correlations-content');
-            var html = "<div class='alert alert-warning' style='margin: 20px;'><h4>No correlations found.</h4>If the scan is still running please reload once it has completed. If the scan is complete, it may not have triggered any correlation rules.</div>";
+            var html = buildAiCorrelationBar(instanceId);
+            html += "<div class='alert alert-warning' style='margin: 0;'><h4>No correlations found.</h4>If the scan is still running please reload once it has completed. If the scan is complete, it may not have triggered any correlation rules.</div>";
             panel.html(html);
-            addAiCorrelationSectionToPanel(instanceId);
-        }
-
-        function addAiCorrelationSectionToPanel(instanceId) {
-            var panel = $('#findings-correlations-content');
-            var aiSection = "<div id='ai-correlation-section-panel' class='panel panel-default' style='margin-top: 20px;'>";
-            aiSection += "<div class='panel-heading'><i class='glyphicon glyphicon-flash'></i>&nbsp;&nbsp;AI Correlation Analysis</div>";
-            aiSection += "<div class='panel-body'>";
-            aiSection += "<p>Run AI-powered analysis to identify significant and recurring indicators in scan data.</p>";
-            aiSection += "<div style='margin-bottom: 15px;'>";
-            aiSection += "<button id='btn-panel-single-correlation' class='btn btn-primary' style='margin-right: 10px;' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
-            aiSection += "<i class='glyphicon glyphicon-search'></i>&nbsp;Single Scan Analysis</button>";
-            aiSection += "<button id='btn-panel-cross-correlation' class='btn btn-info' style='margin-right: 10px;' onclick='runAiCorrelation(\"" + instanceId + "\", \"cross\")'>";
-            aiSection += "<i class='glyphicon glyphicon-transfer'></i>&nbsp;Cross-Scan Analysis</button>";
-            aiSection += "</div>";
-            aiSection += "<div id='ai-correlation-results'></div>";
-            aiSection += "</div></div>";
-            panel.append(aiSection);
-
-            sf.fetchData('${docroot}/checkAiCorrelationModes', {'id': instanceId},
-                function(data) {
-                    if (data.success) {
-                        if (!data.cross_scan_available) {
-                            $("#btn-panel-cross-correlation").prop('disabled', true).addClass('disabled')
-                                .attr('title', 'No imported historical data detected.');
-                        }
-                        if (!data.single_scan_available) {
-                            $("#btn-panel-single-correlation").prop('disabled', true).addClass('disabled');
-                        }
-                    }
-                },
-                function() { }
-            );
+            initAiCorrelationButtons(instanceId);
         }
 
         // Scan status
