@@ -3074,11 +3074,13 @@
                 for (var i = 0; i < vals.length; i++) {
                     vals[i].style.setProperty('font-size', valFs + 'px', 'important');
                 }
-                // Text values (like STATUS) scale proportionally but cap slightly lower
+                // Text values (like STATUS) use the same line-height as number values
+                // but font-size adjusts to fit the word within the stat-item width
                 var textVals = rightCol.querySelectorAll('.stat-value-text');
-                var textFs = Math.max(10, Math.min(16, Math.round(valFs * 0.7)));
+                var textFs = Math.max(10, Math.min(14, Math.round(valFs * 0.65)));
                 for (var i = 0; i < textVals.length; i++) {
                     textVals[i].style.setProperty('font-size', textFs + 'px', 'important');
+                    textVals[i].style.setProperty('line-height', valFs + 'px', 'important');
                 }
 
                 var labels = rightCol.querySelectorAll('.sev-label, .stat-label');
