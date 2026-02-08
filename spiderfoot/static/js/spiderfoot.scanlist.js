@@ -427,10 +427,12 @@ function showlisttable(types, filter, data) {
 
             table += "<tr><td class='text-center'><input type='checkbox' id='cb_" + data[i][0] + "'></td>"
             table += "<td><code style='font-size: 11px; background: #f5f5f5; padding: 2px 4px; cursor: pointer; border: 1px solid #ddd; border-radius: 3px;' onclick='copyToClipboard(\"" + data[i][0] + "\")' title='Click to copy scan ID'>" + data[i][0] + " <i class='glyphicon glyphicon-copy' style='font-size: 10px; margin-left: 2px;'></i></code></td>";
-            table += "<td><a href=" + docroot + "/scaninfo?id=" + data[i][0] + ">" + data[i][1] + "</a>" + latestBadge + "</td>";
-            table += "<td>" + data[i][2] + "</td>";
-            table += "<td>" + data[i][3] + "</td>";
-            table += "<td>" + data[i][5] + "</td>";
+            var scanLink = docroot + "/scaninfo?id=" + data[i][0];
+            var clickableStyle = "cursor: pointer;";
+            table += "<td style='" + clickableStyle + "' onclick='window.location.href=\"" + scanLink + "\"'><a href=" + scanLink + ">" + data[i][1] + "</a>" + latestBadge + "</td>";
+            table += "<td style='" + clickableStyle + "' onclick='window.location.href=\"" + scanLink + "\"'>" + data[i][2] + "</td>";
+            table += "<td style='" + clickableStyle + "' onclick='window.location.href=\"" + scanLink + "\"'>" + data[i][3] + "</td>";
+            table += "<td style='" + clickableStyle + "' onclick='window.location.href=\"" + scanLink + "\"'>" + data[i][5] + "</td>";
 
             var statusy = "";
 
@@ -445,7 +447,7 @@ function showlisttable(types, filter, data) {
             } else {
                 statusy = "alert-info";
             }
-            table += "<td class='text-center'><span class='badge " + statusy + "'>" + data[i][6] + "</span>";
+            table += "<td class='text-center' style='" + clickableStyle + "' onclick='window.location.href=\"" + scanLink + "\"'><span class='badge " + statusy + "'>" + data[i][6] + "</span>";
             if (data[i][6] == "RUNNING" || data[i][6] == "STARTING" || data[i][6] == "STARTED" || data[i][6] == "INITIALIZING") {
                 table += "<div class='scanlist-progress' data-scanid='" + data[i][0] + "' style='margin-top: 4px;'>";
                 table += "<div class='progress' style='height: 10px; margin-bottom: 0; min-width: 80px;'>";
@@ -455,7 +457,7 @@ function showlisttable(types, filter, data) {
                 table += "</div>";
             }
             table += "</td>";
-            table += "<td class='text-center'>" + data[i][7] + "</td>";
+            table += "<td class='text-center' style='" + clickableStyle + "' onclick='window.location.href=\"" + scanLink + "\"'>" + data[i][7] + "</td>";
             table += "<td class='text-center'>";
             if (data[i][8]['CRITICAL'] > 0) {
                 table += "<span class='badge alert-critical'>" + data[i][8]['CRITICAL'] + "</span>";

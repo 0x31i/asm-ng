@@ -2844,7 +2844,7 @@ class SpiderFootWebUi:
         templ = Template(filename='spiderfoot/templates/scaninfo.tmpl',
                          lookup=self.lookup, input_encoding='utf-8')
         return templ.render(id=id, name=html.escape(res[0]), status=res[5], docroot=self.docroot, version=__version__,
-                            pageid="SCANLIST")
+                            pageid="SCANLIST", current_user=self.currentUser())
 
     @cherrypy.expose
     def opts(self: 'SpiderFootWebUi', updated: str = None) -> str:

@@ -36,9 +36,12 @@
    <div class="btn-group">
       <a id='btn-status' class="btn btn-default" onClick='scanSummaryView("${id}")'><i class='glyphicon glyphicon-eye-open'></i>&nbsp;Summary</a>
       <a id='btn-findings' class="btn btn-default" onClick='viewFindings("${id}")'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Findings</a>
-      <a id='btn-browse' class="btn btn-default" onClick='browseEventList("${id}")'><i class='glyphicon glyphicon-th-list'></i>&nbsp;Browse</a>
       <a id='btn-graph' class="btn btn-default" onClick='viewVulnerabilities("${id}")'><i class='glyphicon glyphicon-asterisk'></i>&nbsp;Vulnerabilities</a>
+      <a id='btn-assets' class="btn btn-default" onClick='viewAssets("${id}")'><i class='glyphicon glyphicon-hdd'></i>&nbsp;Assets</a>
+      <a id='btn-browse' class="btn btn-default" onClick='browseEventList("${id}")'><i class='glyphicon glyphicon-th-list'></i>&nbsp;Browse</a>
+% if current_user == 'admin':
       <a id='btn-info' class="btn btn-default" onClick='viewScanConfig("${id}")'><i class='glyphicon glyphicon-cog'></i>&nbsp;Manage</a>
+% endif
     </div>
         <div id='modifyactions' role="group" class="btn-group">
             <a id='btn-setfp' rel="tooltip" data-title="Set validation status" class="btn-warning btn btn-default dropdown-toggle" data-toggle="dropdown"><i class='glyphicon glyphicon-ok-circle glyphicon glyphicon-white'></i></a>
@@ -105,7 +108,7 @@
   </div>
 
   <!-- Page Title -->
-  <div id="page-title" class="page-title">BROWSE</div>
+  <div id="page-title" class="page-title">SUMMARY</div>
 
   <!-- Floating Selection Toolbar - Modern horizontal design -->
   <div id="selection-toolbar" class="toolbar-bottom toolbar-hidden">
@@ -748,8 +751,9 @@
         var pageTitles = {
             "btn-status": "SUMMARY",
             "btn-findings": "FINDINGS",
-            "btn-browse": "BROWSE",
             "btn-graph": "VULNERABILITIES",
+            "btn-assets": "ASSETS",
+            "btn-browse": "BROWSE",
             "btn-info": "MANAGE",
             "btn-search": "SEARCH RESULTS"
         };
@@ -769,7 +773,7 @@
         function navTo(target) {
             var targets = [ "btn-browse", "btn-info",
                 "btn-export", "btn-download-logs", "btn-viz",
-                "btn-status", "btn-graph", "btn-findings" ]
+                "btn-status", "btn-graph", "btn-findings", "btn-assets" ]
             for (var i = 0; i < targets.length; i++) {
                 if (targets[i] == target) {
                     $("#" + targets[i]).addClass("active");
@@ -920,6 +924,34 @@
 
             // Load Nessus data for default tab
             loadNessusData(instanceId);
+        }
+
+        function viewAssets(instanceId) {
+            $("#scansummary-content").remove();
+            $("#ai-correlation-section").remove();
+            $("#ai-correlation-table-single").remove();
+            $("#ai-correlation-table-cross").remove();
+            $("#scanlogs-content").remove();
+            $("#stats-bar").remove();
+            $("#dedup-bar").remove();
+            $("#btn-export").hide();
+            $("#btn-download-logs").hide();
+            $("#btn-refresh").show();
+            $("#btn-search").hide();
+            $("#scanreminder").hide();
+            navTo("btn-assets");
+            currentSection = 'btn-assets';
+            refresh = function() { viewAssets(instanceId); }
+
+            var grid = "<div id='scansummary-content'>";
+            grid += "<div style='padding: 40px; text-align: center;'>";
+            grid += "<i class='glyphicon glyphicon-hdd' style='font-size: 48px; color: #4ade80; margin-bottom: 16px;'></i>";
+            grid += "<h3 style='color: #e2e8f0; margin-bottom: 8px;'>ASSETS</h3>";
+            grid += "<p style='color: #94a3b8; font-size: 14px;'>Asset discovery and inventory features coming soon.</p>";
+            grid += "</div></div>";
+
+            $("#mainbody").append(grid);
+            $("#loader").hide();
         }
 
         // Switch between NESSUS and BURP vulnerability tabs
@@ -3349,11 +3381,9 @@
                 return { x: cx + x2 * radius, y: cy - y2 * radius, z: z3, visible: z3 > 0 };
             }
 
-            // Threat color based on intensity
+            // Threat color based on intensity - white/green only
             function threatColor(intensity) {
-                if (intensity > 0.7) return {r:239,g:68,b:68};   // red - critical
-                if (intensity > 0.4) return {r:245,g:158,b:11};  // amber - medium
-                return {r:34,g:197,b:94};                          // green - low
+                return {r:255,g:255,b:255};                        // white for all
             }
 
             function drawFrame() {
@@ -5216,11 +5246,8 @@
             }
         }
 
-        if ("${status}" == "CREATED" || "${status}" == "RUNNING" || "${status}" == "STARTING" || "${status}" == "STARTED" || "${status}" == "UNKNOWN" || "${status}" == "INITIALIZING") {
-            scanSummaryView("${id}");
-        } else {
-            browseEventList("${id}");
-        }
+        // Always default to Summary view
+        scanSummaryView("${id}");
 
         var refreshSummaryInterval;
 
