@@ -215,21 +215,13 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     def logout(self: 'SpiderFootWebUi') -> str:
-        """Logout the current user.
-
-        Supports GET (browser redirect) and POST (beacon from tab close).
-        """
+        """Logout the current user."""
         username = self.currentUser()
         if username:
             dbh = SpiderFootDb(self.config)
             dbh.auditLog(username, 'LOGOUT', ip_address=self.clientIP())
             self.log.info(f"User '{username}' logged out")
         cherrypy.session.clear()
-
-        # POST requests come from the beforeunload beacon — return a short response
-        if cherrypy.request.method == 'POST':
-            cherrypy.response.headers['Content-Type'] = 'text/plain'
-            return 'ok'
 
         raise cherrypy.HTTPRedirect(f"{self.docroot}/login")
 

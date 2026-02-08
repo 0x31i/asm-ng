@@ -1023,8 +1023,8 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
             'tools.sessions.on': True,
             'tools.sessions.storage_class': cherrypy.lib.sessions.FileSession,
             'tools.sessions.storage_path': session_dir,
-            'tools.sessions.timeout': 480,
-            'tools.sessions.persistent': False,
+            'tools.sessions.timeout': 720,
+            'tools.sessions.persistent': True,
             'tools.sessions.httponly': True,
             'tools.sessions.secure': False,
         })
