@@ -4225,39 +4225,45 @@ class SpiderFootWebUi:
                 'unique': unique_count,
             }
 
-        # For vulnerability event types, provide severity breakdowns
-        vuln_crit = event_type_counts.get('VULNERABILITY_CVE_CRITICAL', {}).get('unique', 0)
-        vuln_high = event_type_counts.get('VULNERABILITY_CVE_HIGH', {}).get('unique', 0)
-        vuln_med = event_type_counts.get('VULNERABILITY_CVE_MEDIUM', {}).get('unique', 0)
-
-        if vuln_crit or vuln_high or vuln_med:
-            if 'EXTERNAL_VULNERABILITIES' not in event_type_counts:
-                event_type_counts['EXTERNAL_VULNERABILITIES'] = {
-                    'total': vuln_crit + vuln_high + vuln_med,
-                    'unique': vuln_crit + vuln_high + vuln_med,
-                }
-            event_type_counts['EXTERNAL_VULNERABILITIES']['crit'] = vuln_crit
-            event_type_counts['EXTERNAL_VULNERABILITIES']['high'] = vuln_high
-            event_type_counts['EXTERNAL_VULNERABILITIES']['med'] = vuln_med
-
-        # Check for WEBAPP_VULNERABILITIES from imported findings
+        # EXTERNAL_VULNERABILITIES: Read from tbl_scan_nessus_results (Nessus imports)
+        # Only count OPEN items (tracking = 0). Nessus severities are title case.
+        # Row format: [0]=id, [1]=severity, ..., [18]=tracking
         try:
-            webapp_vulns = dbh.scanFindingsList(scan_id)
-            if webapp_vulns:
-                wa_crit = sum(1 for f in webapp_vulns if f[1] == 'CRITICAL')
-                wa_high = sum(1 for f in webapp_vulns if f[1] == 'HIGH')
-                wa_med = sum(1 for f in webapp_vulns if f[1] == 'MEDIUM')
-                if wa_crit or wa_high or wa_med:
-                    if 'WEBAPP_VULNERABILITIES' not in event_type_counts:
-                        event_type_counts['WEBAPP_VULNERABILITIES'] = {
-                            'total': wa_crit + wa_high + wa_med,
-                            'unique': wa_crit + wa_high + wa_med,
-                        }
-                    event_type_counts['WEBAPP_VULNERABILITIES']['crit'] = wa_crit
-                    event_type_counts['WEBAPP_VULNERABILITIES']['high'] = wa_high
-                    event_type_counts['WEBAPP_VULNERABILITIES']['med'] = wa_med
-        except Exception:
-            pass
+            nessus_results = dbh.scanNessusList(scan_id)
+            if nessus_results:
+                ne_crit = sum(1 for r in nessus_results if r[1] == 'Critical' and (not r[18] or r[18] == 0))
+                ne_high = sum(1 for r in nessus_results if r[1] == 'High' and (not r[18] or r[18] == 0))
+                ne_med = sum(1 for r in nessus_results if r[1] == 'Medium' and (not r[18] or r[18] == 0))
+                if ne_crit or ne_high or ne_med:
+                    event_type_counts['EXTERNAL_VULNERABILITIES'] = {
+                        'total': ne_crit + ne_high + ne_med,
+                        'unique': ne_crit + ne_high + ne_med,
+                        'crit': ne_crit,
+                        'high': ne_high,
+                        'med': ne_med,
+                    }
+        except Exception as e:
+            self.log.warning(f"Grade: failed to read Nessus results: {e}")
+
+        # WEBAPP_VULNERABILITIES: Read from tbl_scan_burp_results (Burp imports)
+        # Only count OPEN items (tracking = 0). Burp severities are title case.
+        # Row format: [0]=id, [1]=severity, ..., [18]=tracking
+        try:
+            burp_results = dbh.scanBurpList(scan_id)
+            if burp_results:
+                wa_high = sum(1 for r in burp_results if r[1] == 'High' and (not r[18] or r[18] == 0))
+                wa_med = sum(1 for r in burp_results if r[1] == 'Medium' and (not r[18] or r[18] == 0))
+                wa_low = sum(1 for r in burp_results if r[1] == 'Low' and (not r[18] or r[18] == 0))
+                if wa_high or wa_med or wa_low:
+                    event_type_counts['WEBAPP_VULNERABILITIES'] = {
+                        'total': wa_high + wa_med + wa_low,
+                        'unique': wa_high + wa_med + wa_low,
+                        'crit': 0,
+                        'high': wa_high,
+                        'med': wa_med,
+                    }
+        except Exception as e:
+            self.log.warning(f"Grade: failed to read Burp results: {e}")
 
         # Load config overrides from settings
         config_overrides = load_grade_config_overrides(self.config)
