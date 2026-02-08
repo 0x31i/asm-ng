@@ -3039,11 +3039,29 @@ tr.active td {
   line-height: 1.2;
   transition: font-size 0.15s ease;
 }
-/* Text values (STATUS field) - smaller to fit words like FINISHED */
+/* Text values (STATUS field) - slightly smaller to fit words like FINISHED */
 .stat-value-text {
-  font-size: 11px !important;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   letter-spacing: 0.5px;
+}
+
+/* SYNC button - cyan accent */
+.btn-sync {
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, #06b6d4 100%) !important;
+  color: #fff !important;
+  border: none !important;
+  box-shadow: 0 0 12px var(--glow-cyan);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.btn-sync:hover,
+.btn-sync:focus {
+  background: linear-gradient(135deg, var(--accent-cyan-light) 0%, var(--accent-cyan) 100%) !important;
+  box-shadow: 0 0 20px var(--glow-cyan), 0 4px 15px rgba(0, 0, 0, 0.3);
+  color: #fff !important;
 }
 .stat-label {
   font-family: var(--font-mono);
