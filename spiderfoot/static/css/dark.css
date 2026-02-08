@@ -2957,6 +2957,28 @@ tr.active td {
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   background: rgba(255, 255, 255, 0.02);
 }
+/* Clickable header variant */
+.srp-header-link {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.srp-header-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.srp-header-link:hover .srp-title {
+  color: var(--text-primary);
+}
+.srp-arrow {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+.srp-header-link:hover .srp-arrow {
+  opacity: 1;
+  transform: translateX(2px);
+}
 .srp-icon {
   font-size: 12px;
   color: var(--text-muted);
@@ -3016,6 +3038,12 @@ tr.active td {
   color: var(--text-primary);
   line-height: 1.2;
   transition: font-size 0.15s ease;
+}
+/* Text values (STATUS field) - smaller to fit words like FINISHED */
+.stat-value-text {
+  font-size: 11px !important;
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 .stat-label {
   font-family: var(--font-mono);

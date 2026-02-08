@@ -2451,7 +2451,7 @@
             grid += "<div class='stat-grid'>";
             grid += "<div class='stat-item'><span class='stat-value' id='tcounter'>?</span><span class='stat-label'>TOTAL</span></div>";
             grid += "<div class='stat-item'><span class='stat-value' id='ucounter'>?</span><span class='stat-label'>UNIQUE</span></div>";
-            grid += "<div class='stat-item'><span class='stat-value' id='status'>?</span><span class='stat-label'>STATUS</span></div>";
+            grid += "<div class='stat-item stat-item-text'><span class='stat-value stat-value-text' id='status'>?</span><span class='stat-label'>STATUS</span></div>";
             grid += "<div class='stat-item'><span class='stat-value' id='errors'>?</span><span class='stat-label'>ERRORS</span></div>";
             grid += "</div>";
             // Progress bar (shown only for active scans)
@@ -2468,22 +2468,22 @@
 
             // Findings panel
             grid += "<div class='summary-right-panel srp-findings'>";
-            grid += "<div class='srp-header'><i class='glyphicon glyphicon-list-alt srp-icon'></i><span class='srp-title'>FINDINGS</span></div>";
+            grid += "<div class='srp-header srp-header-link' onclick='viewFindings(\"${id}\"); window.scrollTo(0,0);'><i class='glyphicon glyphicon-list-alt srp-icon'></i><span class='srp-title'>FINDINGS</span><i class='glyphicon glyphicon-chevron-right srp-arrow'></i></div>";
             grid += "<div class='srp-body'>" + _sevRow('findings') + "</div></div>";
 
             // Correlations panel
             grid += "<div class='summary-right-panel srp-correlations'>";
-            grid += "<div class='srp-header'><i class='glyphicon glyphicon-exclamation-sign srp-icon'></i><span class='srp-title'>CORRELATIONS</span></div>";
+            grid += "<div class='srp-header srp-header-link' onclick='viewFindings(\"${id}\"); setTimeout(function(){ switchFindingsTab(\"correlations\", \"${id}\"); }, 100); window.scrollTo(0,0);'><i class='glyphicon glyphicon-exclamation-sign srp-icon'></i><span class='srp-title'>CORRELATIONS</span><i class='glyphicon glyphicon-chevron-right srp-arrow'></i></div>";
             grid += "<div class='srp-body'>" + _sevRow('corr') + "</div></div>";
 
             // External Vulnerabilities panel
             grid += "<div class='summary-right-panel srp-extvuln'>";
-            grid += "<div class='srp-header'><i class='glyphicon glyphicon-search srp-icon'></i><span class='srp-title'>EXT. VULNERABILITIES</span></div>";
+            grid += "<div class='srp-header srp-header-link' onclick='viewVulnerabilities(\"${id}\"); window.scrollTo(0,0);'><i class='glyphicon glyphicon-search srp-icon'></i><span class='srp-title'>EXT. VULNERABILITIES</span><i class='glyphicon glyphicon-chevron-right srp-arrow'></i></div>";
             grid += "<div class='srp-body'>" + _sevRow('nessus', '-') + "</div></div>";
 
             // Web App Vulnerabilities panel
             grid += "<div class='summary-right-panel srp-webvuln'>";
-            grid += "<div class='srp-header'><i class='glyphicon glyphicon-fire srp-icon'></i><span class='srp-title'>WEB APP VULNS</span></div>";
+            grid += "<div class='srp-header srp-header-link' onclick='viewVulnerabilities(\"${id}\"); setTimeout(function(){ switchVulnTab(\"burp\", \"${id}\"); }, 100); window.scrollTo(0,0);'><i class='glyphicon glyphicon-fire srp-icon'></i><span class='srp-title'>WEB APP VULNS</span><i class='glyphicon glyphicon-chevron-right srp-arrow'></i></div>";
             grid += "<div class='srp-body'>" + _sevRow('burp', '-') + "</div></div>";
 
             grid += "</div>"; // end right column
@@ -3070,9 +3070,15 @@
                 var gapPx = Math.max(3, Math.min(8, Math.round(bodyH / 10)));
                 var padPx = Math.max(3, Math.min(8, Math.round(bodyH / 8)));
 
-                var vals = rightCol.querySelectorAll('.sev-val, .stat-value');
+                var vals = rightCol.querySelectorAll('.sev-val, .stat-value:not(.stat-value-text)');
                 for (var i = 0; i < vals.length; i++) {
                     vals[i].style.setProperty('font-size', valFs + 'px', 'important');
+                }
+                // Text values (like STATUS) get a capped smaller size
+                var textVals = rightCol.querySelectorAll('.stat-value-text');
+                var textFs = Math.max(9, Math.min(12, Math.round(bodyH / 5)));
+                for (var i = 0; i < textVals.length; i++) {
+                    textVals[i].style.setProperty('font-size', textFs + 'px', 'important');
                 }
 
                 var labels = rightCol.querySelectorAll('.sev-label, .stat-label');
