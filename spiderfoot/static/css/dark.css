@@ -3051,23 +3051,28 @@ tr.active td {
 }
 
 /* SYNC button - bright cyan glow */
-.btn-sync {
-  background: var(--accent-cyan) !important;
+.btn-sync,
+#grade-refresh-btn {
+  background: #22d3ee !important;
+  background-color: #22d3ee !important;
   color: #fff !important;
   border: none !important;
-  box-shadow: 0 0 14px var(--glow-cyan), 0 0 30px rgba(34, 211, 238, 0.3);
-  font-family: var(--font-mono);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 0 16px rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 14px rgba(34, 211, 238, 0.5), 0 0 30px rgba(34, 211, 238, 0.3) !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 0 16px rgba(255, 255, 255, 0.4) !important;
 }
 .btn-sync:hover,
-.btn-sync:focus {
-  background: var(--accent-cyan-light) !important;
-  box-shadow: 0 0 20px var(--glow-cyan), 0 0 40px rgba(34, 211, 238, 0.5), 0 4px 15px rgba(0, 0, 0, 0.3);
+.btn-sync:focus,
+#grade-refresh-btn:hover,
+#grade-refresh-btn:focus {
+  background: #67e8f9 !important;
+  background-color: #67e8f9 !important;
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.6), 0 0 40px rgba(34, 211, 238, 0.4), 0 4px 15px rgba(0, 0, 0, 0.3) !important;
   color: #fff !important;
-  text-shadow: 0 0 12px rgba(255, 255, 255, 1), 0 0 24px rgba(255, 255, 255, 0.6);
+  text-shadow: 0 0 12px rgba(255, 255, 255, 1), 0 0 24px rgba(255, 255, 255, 0.6) !important;
 }
 .stat-label {
   font-family: var(--font-mono);
