@@ -2850,22 +2850,27 @@ tr.active td {
   font-family: var(--font-mono) !important;
 }
 
-/* Right column flex layout */
-#scansummary-content .col-sm-5 {
-  display: flex;
-  flex-direction: column;
-}
-
-/* Ensure panels in flex column don't have extra margin */
-#scansummary-content .col-sm-5 > .panel {
-  margin-bottom: 0 !important;
-  border-radius: 0 !important;
-}
-
 /* Attack surface + exposure panels */
 #attack-surface-body,
 #exposure-indicators-body {
   font-family: var(--font-mono) !important;
+}
+
+/* Row 2 intel panels - equal heights across 4 columns */
+#scansummary-content .intel-row {
+  display: flex;
+  flex-wrap: wrap;
+}
+#scansummary-content .intel-row > [class*="col-"] {
+  display: flex;
+}
+#scansummary-content .intel-row > [class*="col-"] > .panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+#scansummary-content .intel-row > [class*="col-"] > .panel > .panel-body {
+  flex: 1;
 }
 
 /* Asset Overview rows - ensure proper text contrast */
