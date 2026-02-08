@@ -37,8 +37,8 @@
       <a id='btn-status' class="btn btn-default" onClick='scanSummaryView("${id}")'><i class='glyphicon glyphicon-eye-open'></i>&nbsp;Summary</a>
       <a id='btn-findings' class="btn btn-default" onClick='viewFindings("${id}")'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Findings</a>
       <a id='btn-graph' class="btn btn-default" onClick='viewVulnerabilities("${id}")'><i class='glyphicon glyphicon-asterisk'></i>&nbsp;Vulnerabilities</a>
+      <a id='btn-data' class="btn btn-default" onClick='dataEventList("${id}")'><i class='glyphicon glyphicon-th-list'></i>&nbsp;Data</a>
       <a id='btn-assets' class="btn btn-default" onClick='viewAssets("${id}")'><i class='glyphicon glyphicon-hdd'></i>&nbsp;Assets</a>
-      <a id='btn-browse' class="btn btn-default" onClick='browseEventList("${id}")'><i class='glyphicon glyphicon-th-list'></i>&nbsp;Browse</a>
 % if current_user == 'admin':
       <a id='btn-info' class="btn btn-default" onClick='viewScanConfig("${id}")'><i class='glyphicon glyphicon-cog'></i>&nbsp;Manage</a>
 % endif
@@ -60,13 +60,13 @@
             </ul>
         </div>
         <div id='customtabview' role="group" class="btn-group">
-         <a id='btn-fullview' rel="tooltip" data-title="Full Data View" class="btn btn-default active" onClick='browseUpdate("full")'><i class='glyphicon glyphicon-th glyphicon glyphicon-white'></i></a>
-         <a id='btn-discoverypathview' rel="tooltip" data-title="Discovery Path View" class="btn btn-default" onClick='browseUpdate("discovery-path")'><i class='glyphicon glyphicon-random glyphicon glyphicon-white'></i></a>
+         <a id='btn-fullview' rel="tooltip" data-title="Full Data View" class="btn btn-default active" onClick='dataUpdate("full")'><i class='glyphicon glyphicon-th glyphicon glyphicon-white'></i></a>
+         <a id='btn-discoverypathview' rel="tooltip" data-title="Discovery Path View" class="btn btn-default" onClick='dataUpdate("discovery-path")'><i class='glyphicon glyphicon-random glyphicon glyphicon-white'></i></a>
          <a id='btn-vizview' rel="tooltip" data-title="Visualize" class="btn btn-default dropdown-toggle" data-toggle="dropdown"><i class='glyphicon glyphicon-picture glyphicon glyphicon-white'></i></a>
          <ul class="dropdown-menu">
-            <li><a class='link' onClick='browseUpdate("viz-bubble-data")'>Bubble (Data Element)</a></li>
-            <li><a class='link' onClick='browseUpdate("viz-bubble-source")'>Bubble (Source Data Element)</a></li>
-            <li><a class='link' onClick='browseUpdate("viz-dendro")'>Discovery Path (Visual)</a></li>
+            <li><a class='link' onClick='dataUpdate("viz-bubble-data")'>Bubble (Data Element)</a></li>
+            <li><a class='link' onClick='dataUpdate("viz-bubble-source")'>Bubble (Source Data Element)</a></li>
+            <li><a class='link' onClick='dataUpdate("viz-dendro")'>Discovery Path (Visual)</a></li>
          </ul>
         </div>
         <div id='customvizview' class="btn-group">
@@ -186,15 +186,15 @@
     <script type='text/javascript'>
         var currentType = "ALL";
         var currentTypeName = "All";
-        var currentSection = "btn-browse";
-        var currentBrowseFormat = "full";
+        var currentSection = "btn-data";
+        var currentDataFormat = "full";
         var lastSearchType = "ALL";
         var lastSearchQuery = "";
         var dataloaders = [];
         var sharedSigma = "";
         var loadersrunning = false;
         var defaultExportDropdownHtml = '';
-        var refresh = function() { browseEventList("${id}"); }
+        var refresh = function() { dataEventList("${id}"); }
         $('#searchvalue').popover({ 'trigger': 'focus', 'placement': 'bottom'});
         $('#searchvalue').keyup(function(event) {
             if (event.keyCode == 13) {
@@ -753,7 +753,7 @@
             "btn-findings": "FINDINGS",
             "btn-graph": "VULNERABILITIES",
             "btn-assets": "ASSETS",
-            "btn-browse": "BROWSE",
+            "btn-data": "DATA",
             "btn-info": "MANAGE",
             "btn-search": "SEARCH RESULTS"
         };
@@ -771,7 +771,7 @@
         }
 
         function navTo(target) {
-            var targets = [ "btn-browse", "btn-info",
+            var targets = [ "btn-data", "btn-info",
                 "btn-export", "btn-download-logs", "btn-viz",
                 "btn-status", "btn-graph", "btn-findings", "btn-assets" ]
             for (var i = 0; i < targets.length; i++) {
@@ -2016,7 +2016,7 @@
                         } else if (typeVal === 'WEBAPP_VULNERABILITIES') {
                             html += "<td><div class='cell-clamp'><a class='finding-type-link' onclick='event.stopPropagation(); viewVulnerabilities(\"" + instanceId + "\"); switchVulnTab(\"burp\", \"" + instanceId + "\"); window.scrollTo(0,0);' title='View Web App Vulnerabilities (Burp)'>" + typeVal + "</a></div></td>";
                         } else if (typeVal) {
-                            html += "<td><div class='cell-clamp'><a class='finding-type-link' onclick='event.stopPropagation(); browseEventData(\"" + instanceId + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"full\");' title='Browse " + typeVal + " data'>" + typeVal + "</a></div></td>";
+                            html += "<td><div class='cell-clamp'><a class='finding-type-link' onclick='event.stopPropagation(); dataEventData(\"" + instanceId + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"full\");' title='View " + typeVal + " data'>" + typeVal + "</a></div></td>";
                         } else {
                             html += "<td></td>";
                         }
@@ -2337,14 +2337,14 @@
                 html += "</td>";
                 html += "<td><div class='cell-clamp'>" + data[i][1] + "</div></td>";
 
-                // Type column with clickable links to Browse
+                // Type column with clickable links to Data
                 if (eventTypes) {
                     var types = eventTypes.split(',');
                     var typeLinks = [];
                     for (var t = 0; t < types.length; t++) {
                         var typ = types[t].trim();
                         if (typ) {
-                            typeLinks.push("<a class='finding-type-link' onclick='event.stopPropagation(); browseEventData(\"" + instanceId + "\", \"" + typ.replace(/"/g, '&quot;') + "\", \"" + typ.replace(/"/g, '&quot;') + "\", \"full\");' title='Browse " + typ + " data'>" + typ + "</a>");
+                            typeLinks.push("<a class='finding-type-link' onclick='event.stopPropagation(); dataEventData(\"" + instanceId + "\", \"" + typ.replace(/"/g, '&quot;') + "\", \"" + typ.replace(/"/g, '&quot;') + "\", \"full\");' title='View " + typ + " data'>" + typ + "</a>");
                         }
                     }
                     html += "<td><div class='cell-clamp'>" + typeLinks.join(", ") + "</div></td>";
@@ -2427,112 +2427,64 @@
             grid += "<div style='text-align: center; padding: 30px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 1px;'><i class='glyphicon glyphicon-hourglass'></i> CALCULATING GRADE...</div>";
             grid += "</div></div></div>";
 
-            // Inline style vars for header badge colors
-            // NOTE: Using &quot; for quotes in font-family to avoid breaking the style attribute
-            var _hdrBase = 'font-family:JetBrains Mono,monospace;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#fff;border-bottom:none;padding:8px 14px;';
-            var _hdrScanStatus = _hdrBase + 'background:linear-gradient(135deg,#f59e0b,#d97706);box-shadow:0 0 12px rgba(245,158,11,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(245,158,11,0.5);';
-            var _hdrFindings   = _hdrBase + 'background:linear-gradient(135deg,#22c55e,#16a34a);box-shadow:0 0 12px rgba(34,197,94,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(34,197,94,0.5);';
-            var _hdrCorr       = _hdrBase + 'background:linear-gradient(135deg,#3b82f6,#2563eb);box-shadow:0 0 12px rgba(59,130,246,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(59,130,246,0.5);';
-            var _hdrExtVuln    = _hdrBase + 'background:linear-gradient(135deg,#8b5cf6,#7c3aed);box-shadow:0 0 12px rgba(139,92,246,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(139,92,246,0.5);';
-            var _hdrWebVuln    = _hdrBase + 'background:linear-gradient(135deg,#22d3ee,#06b6d4);box-shadow:0 0 12px rgba(34,211,238,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(34,211,238,0.5);';
-            var _hdrIcon = 'color:#fff;text-shadow:0 0 8px rgba(255,255,255,0.7);';
+            // Helper to build a severity row with colored pills
+            function _sevRow(prefix, defaultVal) {
+                var d = defaultVal || '?';
+                var r = '';
+                r += "<div class='sev-row'>";
+                r += "<span class='sev-pill sev-critical'><span class='sev-val' id='" + prefix + "-critical'>" + d + "</span><span class='sev-label'>CRIT</span></span>";
+                r += "<span class='sev-pill sev-high'><span class='sev-val' id='" + prefix + "-high'>" + d + "</span><span class='sev-label'>HIGH</span></span>";
+                r += "<span class='sev-pill sev-medium'><span class='sev-val' id='" + prefix + "-medium'>" + d + "</span><span class='sev-label'>MED</span></span>";
+                r += "<span class='sev-pill sev-low'><span class='sev-val' id='" + prefix + "-low'>" + d + "</span><span class='sev-label'>LOW</span></span>";
+                r += "<span class='sev-pill sev-info'><span class='sev-val' id='" + prefix + "-info'>" + d + "</span><span class='sev-label'>INFO</span></span>";
+                r += "</div>";
+                return r;
+            }
 
             // RIGHT COLUMN: 5 separate panels stacked
-            grid += "<div class='col-sm-5' id='right-panels-col' style='display:flex;flex-direction:column;gap:4px;'>";
+            grid += "<div class='col-sm-5' id='right-panels-col' style='display:flex;flex-direction:column;gap:6px;'>";
 
-            // Scan Status panel (AMBER)
-            grid += "<div class='panel panel-default summary-right-panel' style='margin-bottom:0;flex:1;display:flex;flex-direction:column;min-height:0;'>";
-            grid += "<div class='panel-heading' style='" + _hdrScanStatus + "'><i class='glyphicon glyphicon-eye-open' style='" + _hdrIcon + "'></i>&nbsp;&nbsp;SCAN STATUS</div>";
-            grid += "<div class='panel-body summary-counts-body' style='flex:1;display:flex;align-items:center;justify-content:center;padding:2px;min-height:0;overflow:hidden;'>";
-            grid += "<div class='btn-toolbar text-center' style='display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px;'>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-secondary' style='cursor:default'>TOTAL</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='tcounter' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-secondary' style='cursor:default'>UNIQUE</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='ucounter' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-secondary' style='cursor:default'>STATUS</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='status' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-secondary' style='cursor:default'>ERRORS</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='errors' style='cursor:default'>?</button></div>";
+            // Scan Status panel
+            grid += "<div class='summary-right-panel srp-status'>";
+            grid += "<div class='srp-header'><i class='glyphicon glyphicon-eye-open srp-icon'></i><span class='srp-title'>SCAN STATUS</span></div>";
+            grid += "<div class='srp-body'>";
+            grid += "<div class='stat-grid'>";
+            grid += "<div class='stat-item'><span class='stat-value' id='tcounter'>?</span><span class='stat-label'>TOTAL</span></div>";
+            grid += "<div class='stat-item'><span class='stat-value' id='ucounter'>?</span><span class='stat-label'>UNIQUE</span></div>";
+            grid += "<div class='stat-item'><span class='stat-value' id='status'>?</span><span class='stat-label'>STATUS</span></div>";
+            grid += "<div class='stat-item'><span class='stat-value' id='errors'>?</span><span class='stat-label'>ERRORS</span></div>";
             grid += "</div>";
             // Progress bar (shown only for active scans)
-            grid += "<div id='summary-progress-container' style='display:none;padding:4px 10px 2px 10px;'>";
+            grid += "<div id='summary-progress-container' style='display:none;padding:6px 0 0 0;'>";
             grid += "<div style='display:flex;align-items:center;gap:8px;'>";
-            grid += "<div class='progress' style='flex:1;height:14px;margin-bottom:0;'>";
-            grid += "<div id='summary-progress-bar' class='progress-bar progress-bar-striped active' role='progressbar' style='width:0%;min-width:2em;text-align:center;line-height:14px;font-size:10px;'>0%</div>";
+            grid += "<div class='progress' style='flex:1;height:6px;margin-bottom:0;border-radius:3px;background:var(--bg-primary);'>";
+            grid += "<div id='summary-progress-bar' class='progress-bar progress-bar-striped active' role='progressbar' style='width:0%;min-width:2em;text-align:center;line-height:6px;font-size:0;border-radius:3px;'>0%</div>";
             grid += "</div>";
-            grid += "<small id='summary-progress-pct' style='white-space:nowrap;font-weight:bold;min-width:30px;'></small>";
+            grid += "<small id='summary-progress-pct' style='white-space:nowrap;font-weight:600;min-width:30px;font-size:11px;color:var(--text-secondary);'></small>";
             grid += "</div>";
-            grid += "<div id='summary-progress-details' style='margin-top:2px;font-size:10px;color:#888;display:flex;gap:12px;flex-wrap:wrap;'></div>";
+            grid += "<div id='summary-progress-details' style='margin-top:4px;font-size:10px;color:var(--text-muted);display:flex;gap:12px;flex-wrap:wrap;'></div>";
             grid += "</div>";
             grid += "</div></div>";
 
-            // Findings panel (GREEN)
-            grid += "<div class='panel panel-default summary-right-panel' style='margin-bottom:0;flex:1;display:flex;flex-direction:column;min-height:0;'>";
-            grid += "<div class='panel-heading' style='" + _hdrFindings + "'><i class='glyphicon glyphicon-list-alt' style='" + _hdrIcon + "'></i>&nbsp;&nbsp;FINDINGS</div>";
-            grid += "<div class='panel-body summary-counts-body' style='flex:1;display:flex;align-items:center;justify-content:center;padding:2px;min-height:0;overflow:hidden;'>";
-            grid += "<div class='btn-toolbar text-center' style='display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px;'>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-critical' style='cursor:default'>CRITICAL</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='findings-critical' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-danger' style='cursor:default'>HIGH</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='findings-high' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-warning' style='cursor:default'>MEDIUM</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='findings-medium' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-info' style='cursor:default'>LOW</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='findings-low' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-success' style='cursor:default'>INFO</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='findings-info' style='cursor:default'>?</button></div>";
-            grid += "</div></div></div>";
+            // Findings panel
+            grid += "<div class='summary-right-panel srp-findings'>";
+            grid += "<div class='srp-header'><i class='glyphicon glyphicon-list-alt srp-icon'></i><span class='srp-title'>FINDINGS</span></div>";
+            grid += "<div class='srp-body'>" + _sevRow('findings') + "</div></div>";
 
-            // Correlations panel (BLUE)
-            grid += "<div class='panel panel-default summary-right-panel' style='margin-bottom:0;flex:1;display:flex;flex-direction:column;min-height:0;'>";
-            grid += "<div class='panel-heading' style='" + _hdrCorr + "'><i class='glyphicon glyphicon-exclamation-sign' style='" + _hdrIcon + "'></i>&nbsp;&nbsp;CORRELATIONS</div>";
-            grid += "<div class='panel-body summary-counts-body' style='flex:1;display:flex;align-items:center;justify-content:center;padding:2px;min-height:0;overflow:hidden;'>";
-            grid += "<div class='btn-toolbar text-center' style='display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px;'>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-critical' style='cursor:default'>CRITICAL</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='corr-critical' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-danger' style='cursor:default'>HIGH</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='corr-high' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-warning' style='cursor:default'>MEDIUM</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='corr-medium' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-info' style='cursor:default'>LOW</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='corr-low' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-success' style='cursor:default'>INFO</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='corr-info' style='cursor:default'>?</button></div>";
-            grid += "</div></div></div>";
+            // Correlations panel
+            grid += "<div class='summary-right-panel srp-correlations'>";
+            grid += "<div class='srp-header'><i class='glyphicon glyphicon-exclamation-sign srp-icon'></i><span class='srp-title'>CORRELATIONS</span></div>";
+            grid += "<div class='srp-body'>" + _sevRow('corr') + "</div></div>";
 
-            // External Vulnerabilities panel (PURPLE)
-            grid += "<div class='panel panel-default summary-right-panel' style='margin-bottom:0;flex:1;display:flex;flex-direction:column;min-height:0;'>";
-            grid += "<div class='panel-heading' style='" + _hdrExtVuln + "'><i class='glyphicon glyphicon-search' style='" + _hdrIcon + "'></i>&nbsp;&nbsp;EXTERNAL VULNERABILITIES</div>";
-            grid += "<div class='panel-body summary-counts-body' style='flex:1;display:flex;align-items:center;justify-content:center;padding:2px;min-height:0;overflow:hidden;'>";
-            grid += "<div class='btn-toolbar text-center' style='display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px;'>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-critical' style='cursor:default'>CRITICAL</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='nessus-critical' style='cursor:default'>-</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-danger' style='cursor:default'>HIGH</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='nessus-high' style='cursor:default'>-</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-warning' style='cursor:default'>MEDIUM</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='nessus-medium' style='cursor:default'>-</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-info' style='cursor:default'>LOW</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='nessus-low' style='cursor:default'>-</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-success' style='cursor:default'>INFO</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='nessus-info' style='cursor:default'>-</button></div>";
-            grid += "</div></div></div>";
+            // External Vulnerabilities panel
+            grid += "<div class='summary-right-panel srp-extvuln'>";
+            grid += "<div class='srp-header'><i class='glyphicon glyphicon-search srp-icon'></i><span class='srp-title'>EXT. VULNERABILITIES</span></div>";
+            grid += "<div class='srp-body'>" + _sevRow('nessus', '-') + "</div></div>";
 
-            // Web App Vulnerabilities panel (CYAN)
-            grid += "<div class='panel panel-default summary-right-panel' style='margin-bottom:0;flex:1;display:flex;flex-direction:column;min-height:0;'>";
-            grid += "<div class='panel-heading' style='" + _hdrWebVuln + "'><i class='glyphicon glyphicon-fire' style='" + _hdrIcon + "'></i>&nbsp;&nbsp;WEB APP VULNERABILITIES</div>";
-            grid += "<div class='panel-body summary-counts-body' style='flex:1;display:flex;align-items:center;justify-content:center;padding:2px;min-height:0;overflow:hidden;'>";
-            grid += "<div class='btn-toolbar text-center' style='display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px;'>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-critical' style='cursor:default'>CRITICAL</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='burp-critical' style='cursor:default'>-</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-danger' style='cursor:default'>HIGH</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='burp-high' style='cursor:default'>-</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-warning' style='cursor:default'>MEDIUM</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='burp-medium' style='cursor:default'>-</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-info' style='cursor:default'>LOW</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='burp-low' style='cursor:default'>-</button></div>";
-            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-success' style='cursor:default'>INFO</button>";
-            grid += "<button class='btn disabled summary-count-btn btn-default' id='burp-info' style='cursor:default'>-</button></div>";
-            grid += "</div></div></div>";
+            // Web App Vulnerabilities panel
+            grid += "<div class='summary-right-panel srp-webvuln'>";
+            grid += "<div class='srp-header'><i class='glyphicon glyphicon-fire srp-icon'></i><span class='srp-title'>WEB APP VULNS</span></div>";
+            grid += "<div class='srp-body'>" + _sevRow('burp', '-') + "</div></div>";
 
             grid += "</div>"; // end right column
             grid += "</div>"; // end row 1
@@ -2694,7 +2646,7 @@
                             scanSummary[i].name = data[i][1];
                             scanSummary[i].total = data[i][3];
                             scanSummary[i].counter = data[i][4];
-                            scanSummary[i].link = function(d) { return browseEventData(d.scanId, d.name, d.id, "full"); };
+                            scanSummary[i].link = function(d) { return dataEventData(d.scanId, d.name, d.id, "full"); };
                             totalCount += data[i][3];
                             uniqueCount += data[i][4];
                             scanStatus = data[i][5];
@@ -3037,7 +2989,7 @@
                         var d = cat.details[di];
                         var ptColor = d.points < 0 ? 'var(--accent-red)' : 'var(--text-muted)';
                         var ptStr = d.points < 0 ? d.points : '0';
-                        // Build clickable link to Browse > Type for this event type
+                        // Build clickable link to Data > Type for this event type
                         var typeLink = '';
                         var safeType = d.type.replace(/"/g, '&quot;');
                         if (d.type === 'EXTERNAL_VULNERABILITIES') {
@@ -3045,7 +2997,7 @@
                         } else if (d.type === 'WEBAPP_VULNERABILITIES') {
                             typeLink = "<a class='finding-type-link' style='cursor:pointer;color:var(--text-secondary);text-decoration:none;border-bottom:1px dotted var(--text-muted);' onclick='viewVulnerabilities(\"" + instanceId + "\"); switchVulnTab(\"burp\", \"" + instanceId + "\"); window.scrollTo(0,0);' title='View Web App Vulnerabilities'>" + d.type + "</a>";
                         } else {
-                            typeLink = "<a class='finding-type-link' style='cursor:pointer;color:var(--text-secondary);text-decoration:none;border-bottom:1px dotted var(--text-muted);' onclick='browseEventData(\"" + instanceId + "\", \"" + safeType + "\", \"" + safeType + "\", \"full\"); window.scrollTo(0,0);' title='Browse " + safeType + " data'>" + d.type + "</a>";
+                            typeLink = "<a class='finding-type-link' style='cursor:pointer;color:var(--text-secondary);text-decoration:none;border-bottom:1px dotted var(--text-muted);' onclick='dataEventData(\"" + instanceId + "\", \"" + safeType + "\", \"" + safeType + "\", \"full\"); window.scrollTo(0,0);' title='View " + safeType + " data'>" + d.type + "</a>";
                         }
                         h += "<div style='display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;'>";
                         h += "<span style='font-family:var(--font-mono);'>" + typeLink + " <span style='color:var(--text-muted);'>(" + d.count + ")</span></span>";
@@ -3093,7 +3045,7 @@
         // === DYNAMIC PANEL SIZING ===
         // Force right column to exactly match grade panel height.
         // CSS flex:1 on each panel distributes space evenly.
-        // Then scale the severity buttons to fit the available body space.
+        // Then scale severity values and stat values to fit the available body space.
         function syncRightPanelHeights() {
             var gradeOuter = document.getElementById('grade-outer-panel');
             var rightCol = document.getElementById('right-panels-col');
@@ -3104,30 +3056,38 @@
             rightCol.style.height = gradeH + 'px';
             rightCol.style.maxHeight = gradeH + 'px';
 
-            // Step 2: After layout settles, measure actual body heights and scale buttons
+            // Step 2: After layout settles, measure actual body heights and scale values
             requestAnimationFrame(function() {
-                var bodies = rightCol.querySelectorAll('.summary-counts-body');
+                var bodies = rightCol.querySelectorAll('.srp-body');
                 if (bodies.length === 0) return;
 
                 // Get the actual rendered height of one body (they should all be equal via flex:1)
                 var bodyH = bodies[0].offsetHeight;
 
-                // Scale buttons proportional to body height
-                var fs = Math.max(8, Math.min(13, Math.round(bodyH / 5)));
-                var padV = Math.max(1, Math.min(7, Math.round(bodyH / 10)));
-                var padH = Math.max(3, Math.min(12, Math.round(bodyH / 6)));
-                var gapPx = Math.max(1, Math.min(4, Math.round(bodyH / 16)));
+                // Scale value font sizes proportional to body height
+                var valFs = Math.max(12, Math.min(22, Math.round(bodyH / 3)));
+                var labelFs = Math.max(7, Math.min(10, Math.round(bodyH / 8)));
+                var gapPx = Math.max(3, Math.min(8, Math.round(bodyH / 10)));
+                var padPx = Math.max(3, Math.min(8, Math.round(bodyH / 8)));
 
-                var btns = rightCol.querySelectorAll('.summary-count-btn');
-                for (var i = 0; i < btns.length; i++) {
-                    btns[i].style.setProperty('font-size', fs + 'px', 'important');
-                    btns[i].style.setProperty('padding', padV + 'px ' + padH + 'px', 'important');
-                    btns[i].style.setProperty('line-height', '1.2', 'important');
+                var vals = rightCol.querySelectorAll('.sev-val, .stat-value');
+                for (var i = 0; i < vals.length; i++) {
+                    vals[i].style.setProperty('font-size', valFs + 'px', 'important');
                 }
 
-                var groups = rightCol.querySelectorAll('.btn-group');
-                for (var i = 0; i < groups.length; i++) {
-                    groups[i].style.setProperty('margin', gapPx + 'px', 'important');
+                var labels = rightCol.querySelectorAll('.sev-label, .stat-label');
+                for (var i = 0; i < labels.length; i++) {
+                    labels[i].style.setProperty('font-size', labelFs + 'px', 'important');
+                }
+
+                var pills = rightCol.querySelectorAll('.sev-pill, .stat-item');
+                for (var i = 0; i < pills.length; i++) {
+                    pills[i].style.setProperty('padding', padPx + 'px 4px', 'important');
+                }
+
+                var rows = rightCol.querySelectorAll('.sev-row, .stat-grid');
+                for (var i = 0; i < rows.length; i++) {
+                    rows[i].style.setProperty('gap', gapPx + 'px', 'important');
                 }
             });
         }
@@ -4087,9 +4047,9 @@
                 for (var i = 0; i < data.length; i++) {
                     var evtType = data[i][10] || '';
                     table += "<tr>";
-                    // Type column with link to Browse
+                    // Type column with link to Data
                     if (evtType) {
-                        table += "<td><a class='finding-type-link' onclick='browseEventData(\"" + instanceId + "\", \"" + evtType.replace(/"/g, '&quot;') + "\", \"" + evtType.replace(/"/g, '&quot;') + "\", \"full\");' title='Browse " + evtType + " data'>" + evtType + "</a></td>";
+                        table += "<td><a class='finding-type-link' onclick='dataEventData(\"" + instanceId + "\", \"" + evtType.replace(/"/g, '&quot;') + "\", \"" + evtType.replace(/"/g, '&quot;') + "\", \"full\");' title='View " + evtType + " data'>" + evtType + "</a></td>";
                     } else {
                         table += "<td></td>";
                     }
@@ -4107,8 +4067,8 @@
             });
         }
 
-        // Legacy browseCorrelations - redirect to Findings page with Correlations tab
-        function browseCorrelations(instanceId) {
+        // Legacy dataCorrelations - redirect to Findings page with Correlations tab
+        function dataCorrelations(instanceId) {
             viewFindings(instanceId);
             // Switch to correlations tab after a short delay to let the DOM render
             setTimeout(function() {
@@ -4118,7 +4078,7 @@
         }
 
         // Original correlation data fetching (kept for reference by AI correlation refresh)
-        function browseCorrelationsLegacy(instanceId) {
+        function dataCorrelationsLegacy(instanceId) {
             $("#scansummary-content").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
@@ -4130,7 +4090,7 @@
             $("#btn-export").hide();
             $("#scanreminder").hide();
             navTo("btn-findings");
-            refresh = function() { browseCorrelations(instanceId); }
+            refresh = function() { dataCorrelations(instanceId); }
             
             console.log("Fetching correlation data for scan ID: " + instanceId);
             
@@ -4285,7 +4245,7 @@
                 errorMsg += "<p>Server response: " + xhr.responseText + "</p>";
             }
             
-            errorMsg += "<button class='btn btn-primary' onclick='browseCorrelations(\"" + instanceId + "\")'>Retry</button>";
+            errorMsg += "<button class='btn btn-primary' onclick='dataCorrelations(\"" + instanceId + "\")'>Retry</button>";
             errorMsg += "</div>";
             $("#loader").fadeOut(500);
             $("#mainbody").append(errorMsg);
@@ -4401,8 +4361,8 @@
                             }
                             msg += "</span>";
                             $("#dedup-results").html(msg);
-                            // Refresh the browse view after a brief delay
-                            setTimeout(function() { browseEventList(instanceId); }, 1500);
+                            // Refresh the data view after a brief delay
+                            setTimeout(function() { dataEventList(instanceId); }, 1500);
                         } else {
                             $("#dedup-results").html("<span class='text-success'><i class='glyphicon glyphicon-ok'></i>&nbsp;No duplicates found. Scan data is clean.</span>");
                         }
@@ -4456,7 +4416,7 @@
         }
 
         // Summary of event types and counts for a scan
-        function browseEventList(instanceId) {
+        function dataEventList(instanceId) {
             currentType = "ALL";
             currentTypeName = "All";
 
@@ -4468,14 +4428,14 @@
             $("#scanlogs-content").remove();
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
-            navTo("btn-browse");
+            navTo("btn-data");
             $("#loader").show();
             $("#btn-export").show();
             $("#btn-download-logs").hide();
             $("#btn-refresh").show();
             $("#btn-search").show();
             $("#scanreminder").hide();
-            refresh = function() { browseEventList(instanceId); }
+            refresh = function() { dataEventList(instanceId); }
             sf.fetchData('${docroot}/scansummary', {'id': instanceId, 'by': 'type'}, function(data) {
                             var dedupBar = "<div id='dedup-bar' style='margin-bottom: 15px; display: flex; align-items: center; gap: 15px;'>";
                             dedupBar += "<button id='btn-run-dedup' class='btn btn-warning' onclick='runDeduplication(\"${id}\")'>";
@@ -4487,7 +4447,7 @@
                             table += "<thead><tr> <th>Type</th><th>Unique Data Elements</th> <th>Total Data Elements</th><th>Last Data Element</th></tr></thead><tbody>";
                             for (var i = 0; i < data.length; i++) {
                                 table += "<tr><td><a class='link' onClick='";
-                                table += "browseEventData(\"${id}\", \"" + escape(data[i][1]) + "\", \"" + data[i][0] + "\", \"full\");'>";
+                                table += "dataEventData(\"${id}\", \"" + escape(data[i][1]) + "\", \"" + data[i][0] + "\", \"full\");'>";
                                 table += data[i][1] + "</a></td>";
                                 table += "<td>" + data[i][4] + "</td>";
                                 table += "<td>" + data[i][3] + "</td>";
@@ -4506,7 +4466,7 @@
         }
 
         // Detailed view of data for an event type for a scan
-        function browseEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated, filterImportedEntries) {
+        function dataEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated, filterImportedEntries) {
             if (filterFP === 'undefined' || filterFP === undefined) {
                 filterFP = false;
             }
@@ -4525,7 +4485,7 @@
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
             $("#loader").show();
-            navTo("btn-browse");
+            navTo("btn-data");
             $("#btn-export").show();
             $("#btn-download-logs").hide();
             $("#btn-refresh").show();
@@ -4535,9 +4495,9 @@
             currentType = eventType;
             currentTypeName = eventTypeLabel;
             updatePageTitle(currentTypeName);
-            refresh = function() { browseEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated, filterImportedEntries); }
-            browseUpdate = function(newformat) { browseEventData(instanceId, eventTypeLabel, eventType, newformat, filterFP, filterValidated, filterImportedEntries); }
-            currentBrowseFormat = format;
+            refresh = function() { dataEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated, filterImportedEntries); }
+            dataUpdate = function(newformat) { dataEventData(instanceId, eventTypeLabel, eventType, newformat, filterFP, filterValidated, filterImportedEntries); }
+            currentDataFormat = format;
 
             if (format == 'full') {
                 $("#btn-fullview").addClass("active");
@@ -5050,8 +5010,8 @@
                 efr.src = urlBase + instanceId + '&eventType=' + type + "&value=" + lastSearchQuery;
             }
 
-            if (currentSection == "btn-browse") {
-                if (currentBrowseFormat == "discovery-path") {
+            if (currentSection == "btn-data") {
+                if (currentDataFormat == "discovery-path") {
                     if (fileType == "excel") {
                         var urlBase = '${docroot}/scandiscoverypathexport?filetype=excel&id=';
                     } else {

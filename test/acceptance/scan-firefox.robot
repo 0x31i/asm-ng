@@ -31,7 +31,7 @@ Create a module scan
     Click Element    id:module_${module_name}
     Scroll To Element    id:btn-run-scan
     Click Element    id:btn-run-scan
-    Wait Until Element Is Visible    id:btn-browse    timeout=120s #Add wait for the browse button.
+    Wait Until Element Is Visible    id:btn-data    timeout=120s #Add wait for the data button.
     Element Should Be Visible    id:scanstatusbadge #verify that the scan status badge is visible
     ${scan_status}=    Get Text    id:scanstatusbadge
     Should Not Be Equal As Strings    ${scan_status}    ERROR    msg=Scan creation failed.
@@ -45,12 +45,12 @@ Create a use case scan
     Click Element    id:usecase_${use_case}
     Scroll To Element    id:btn-run-scan
     Click Element    id:btn-run-scan
-    Wait Until Element Is Visible    id:btn-browse    timeout=120s #Add wait for the browse button.
+    Wait Until Element Is Visible    id:btn-data    timeout=120s #Add wait for the data button.
     Element Should Be Visible    id:scanstatusbadge #verify that the scan status badge is visible
 
 Scan info page should render tabs
     Element Should Be Visible    id:btn-status
-    Element Should Be Visible    id:btn-browse
+    Element Should Be Visible    id:btn-data
     Element Should Be Visible    id:btn-findings
     Element Should Be Visible    id:btn-graph
     Element Should Be Visible    id:btn-info
@@ -60,7 +60,7 @@ Scan info Summary tab should render
     Scan info page should render tabs
     Element Should Be Visible    id:vbarsummary
 
-Scan info Browse tab should render
+Scan info Data tab should render
     Scan info page should render tabs
     Element Should Be Visible    id:btn-refresh
     Element Should Be Visible    id:btn-export
@@ -116,7 +116,7 @@ Scroll To Element
 
 Wait For Scan To Finish
     [Arguments]    ${scan_name}
-    Wait Until Element Is Visible    id:btn-browse    timeout=30s
+    Wait Until Element Is Visible    id:btn-data    timeout=30s
     Wait Until Element Contains    scanstatusbadge    FINISHED    timeout=120s    # Increased timeout
 
 ***Test Cases***
@@ -138,8 +138,8 @@ Scan info page should render correctly
     Wait For Scan To Finish    test scan info
     Click Element    id:btn-status
     Scan info Summary tab should render
-    Click Element    id:btn-browse
-    Scan info Browse tab should render
+    Click Element    id:btn-data
+    Scan info Data tab should render
     Click Element    id:btn-graph
     Scan info Graph tab should render
     Click Element    id:btn-info
@@ -155,24 +155,24 @@ Scan list page should list scans
 A sfp_dnsresolve scan should resolve INTERNET_NAME to IP_ADDRESS
     Create a module scan    dns resolve    van1shland.io    sfp_dnsresolve
     Wait For Scan To Finish    dns resolve
-    Click Element    id:btn-browse
-    Scan info Browse tab should render
-    Element Should Contain    id:browse-table-content    Domain Name
-    Element Should Contain    id:browse-table-content    Internet Name
-    Element Should Contain    id:browse-table-content    IP Address
+    Click Element    id:btn-data
+    Scan info Data tab should render
+    Element Should Contain    id:data-table-content    Domain Name
+    Element Should Contain    id:data-table-content    Internet Name
+    Element Should Contain    id:data-table-content    IP Address
 
 A sfp_dnsresolve scan should reverse resolve IP_ADDRESS to INTERNET_NAME
     Create a module scan    reverse resolve    1.1.1.1    sfp_dnsresolve
     Wait For Scan To Finish    reverse resolve
-    Click Element    id:btn-browse
-    Scan info Browse tab should render
-    Element Should Contain    id:browse-table-content    Domain Name
-    Element Should Contain    id:browse-table-content    Internet Name
-    Element Should Contain    id:browse-table-content    IP Address
+    Click Element    id:btn-data
+    Scan info Data tab should render
+    Element Should Contain    id:data-table-content    Domain Name
+    Element Should Contain    id:data-table-content    Internet Name
+    Element Should Contain    id:data-table-content    IP Address
 
 A passive scan with unresolvable target internet name should fail
     Create a use case scan    shouldnotresolve    shouldnotresolve.doesnotexist.local    Passive
-    Wait Until Element Is Visible    id:btn-browse    timeout=15s
+    Wait Until Element Is Visible    id:btn-data    timeout=15s
     Wait Until Element Contains    scanstatusbadge    ERROR    timeout=60s
     Click Element    id:btn-log
     Page Should Contain    Could not resolve
