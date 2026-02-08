@@ -215,7 +215,32 @@ class SpiderFootDb:
         )",
         "CREATE INDEX idx_audit_log_username ON tbl_audit_log (username)",
         "CREATE INDEX idx_audit_log_created ON tbl_audit_log (created)",
-        "CREATE INDEX idx_audit_log_action ON tbl_audit_log (action)"
+        "CREATE INDEX idx_audit_log_action ON tbl_audit_log (action)",
+        "CREATE TABLE tbl_known_assets ( \
+            id              INTEGER PRIMARY KEY AUTOINCREMENT, \
+            target          VARCHAR NOT NULL, \
+            asset_type      VARCHAR NOT NULL, \
+            asset_value     VARCHAR NOT NULL, \
+            source          VARCHAR NOT NULL DEFAULT 'CLIENT_PROVIDED', \
+            import_batch    VARCHAR, \
+            date_added      INT NOT NULL, \
+            added_by        VARCHAR, \
+            notes           VARCHAR, \
+            UNIQUE(target, asset_type, asset_value) \
+        )",
+        "CREATE INDEX idx_known_assets_target ON tbl_known_assets (target)",
+        "CREATE INDEX idx_known_assets_type ON tbl_known_assets (target, asset_type)",
+        "CREATE INDEX idx_known_assets_value ON tbl_known_assets (asset_value)",
+        "CREATE TABLE tbl_asset_import_history ( \
+            id              INTEGER PRIMARY KEY AUTOINCREMENT, \
+            target          VARCHAR NOT NULL, \
+            asset_type      VARCHAR NOT NULL, \
+            file_name       VARCHAR, \
+            item_count      INT NOT NULL DEFAULT 0, \
+            imported_by     VARCHAR, \
+            date_imported   INT NOT NULL \
+        )",
+        "CREATE INDEX idx_asset_import_history_target ON tbl_asset_import_history (target)"
     ]
 
     # PostgreSQL-specific schema queries
@@ -394,7 +419,32 @@ class SpiderFootDb:
         )",
         "CREATE INDEX IF NOT EXISTS idx_audit_log_username ON tbl_audit_log (username)",
         "CREATE INDEX IF NOT EXISTS idx_audit_log_created ON tbl_audit_log (created)",
-        "CREATE INDEX IF NOT EXISTS idx_audit_log_action ON tbl_audit_log (action)"
+        "CREATE INDEX IF NOT EXISTS idx_audit_log_action ON tbl_audit_log (action)",
+        "CREATE TABLE IF NOT EXISTS tbl_known_assets ( \
+            id              SERIAL PRIMARY KEY, \
+            target          VARCHAR NOT NULL, \
+            asset_type      VARCHAR NOT NULL, \
+            asset_value     TEXT NOT NULL, \
+            source          VARCHAR NOT NULL DEFAULT 'CLIENT_PROVIDED', \
+            import_batch    VARCHAR, \
+            date_added      BIGINT NOT NULL, \
+            added_by        VARCHAR, \
+            notes           TEXT, \
+            UNIQUE(target, asset_type, asset_value) \
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_known_assets_target ON tbl_known_assets (target)",
+        "CREATE INDEX IF NOT EXISTS idx_known_assets_type ON tbl_known_assets (target, asset_type)",
+        "CREATE INDEX IF NOT EXISTS idx_known_assets_value ON tbl_known_assets (asset_value)",
+        "CREATE TABLE IF NOT EXISTS tbl_asset_import_history ( \
+            id              SERIAL PRIMARY KEY, \
+            target          VARCHAR NOT NULL, \
+            asset_type      VARCHAR NOT NULL, \
+            file_name       VARCHAR, \
+            item_count      INT NOT NULL DEFAULT 0, \
+            imported_by     VARCHAR, \
+            date_imported   BIGINT NOT NULL \
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_asset_import_history_target ON tbl_asset_import_history (target)"
     ]
 
     eventDetails = [
@@ -877,6 +927,29 @@ class SpiderFootDb:
                     except sqlite3.Error:
                         pass
 
+                # Migration: Create known assets tables
+                try:
+                    self.dbh.execute("SELECT COUNT(*) FROM tbl_known_assets")
+                except sqlite3.Error:
+                    try:
+                        for qry in self.createSchemaQueries:
+                            if "tbl_known_assets" in qry:
+                                self.dbh.execute(qry)
+                        self.conn.commit()
+                    except sqlite3.Error:
+                        pass
+
+                try:
+                    self.dbh.execute("SELECT COUNT(*) FROM tbl_asset_import_history")
+                except sqlite3.Error:
+                    try:
+                        for qry in self.createSchemaQueries:
+                            if "tbl_asset_import_history" in qry:
+                                self.dbh.execute(qry)
+                        self.conn.commit()
+                    except sqlite3.Error:
+                        pass
+
                 if init:
                     for row in self.eventDetails:
                         event = row[0]
@@ -1078,6 +1151,31 @@ class SpiderFootDb:
                     self.conn.rollback()
                     try:
                         self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN tracking INT NOT NULL DEFAULT 0")
+                        self.conn.commit()
+                    except psycopg2.Error:
+                        self.conn.rollback()
+
+                # Migration: Create known assets tables
+                try:
+                    self.dbh.execute("SELECT COUNT(*) FROM tbl_known_assets")
+                except psycopg2.Error:
+                    self.conn.rollback()
+                    try:
+                        for query in self.createPostgreSQLSchemaQueries:
+                            if "tbl_known_assets" in query:
+                                self.dbh.execute(query)
+                        self.conn.commit()
+                    except psycopg2.Error:
+                        self.conn.rollback()
+
+                try:
+                    self.dbh.execute("SELECT COUNT(*) FROM tbl_asset_import_history")
+                except psycopg2.Error:
+                    self.conn.rollback()
+                    try:
+                        for query in self.createPostgreSQLSchemaQueries:
+                            if "tbl_asset_import_history" in query:
+                                self.dbh.execute(query)
                         self.conn.commit()
                     except psycopg2.Error:
                         self.conn.rollback()
@@ -2622,6 +2720,364 @@ class SpiderFootDb:
                 return {(row[0], row[1], row[2]) for row in self.dbh.fetchall()}
             except (sqlite3.Error, psycopg2.Error) as e:
                 raise IOError("SQL error encountered when fetching target validated entries") from e
+
+    # -------------------------------------------------------------------
+    # Known Assets methods
+    # -------------------------------------------------------------------
+
+    def knownAssetAdd(self, target: str, assetType: str, assetValue: str,
+                      source: str = 'CLIENT_PROVIDED', importBatch: str = None,
+                      addedBy: str = None, notes: str = None) -> bool:
+        """Add a known asset entry.
+
+        Args:
+            target: scan target this asset belongs to
+            assetType: 'ip', 'domain', or 'employee'
+            assetValue: the asset value
+            source: 'CLIENT_PROVIDED' or 'ANALYST_CONFIRMED'
+            importBatch: optional batch identifier for bulk imports
+            addedBy: username who added this
+            notes: optional notes
+
+        Returns:
+            bool: True on success
+
+        Raises:
+            IOError: database I/O failed
+        """
+        if self.db_type == 'sqlite':
+            qry = "INSERT OR IGNORE INTO tbl_known_assets \
+                (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes) \
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        else:
+            qry = "INSERT INTO tbl_known_assets \
+                (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes) \
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target, assetType, assetValue, source,
+                                       importBatch, int(time.time() * 1000), addedBy, notes))
+                self.conn.commit()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when adding known asset") from e
+        return True
+
+    def knownAssetAddBulk(self, target: str, assetType: str, assets: list,
+                          source: str = 'CLIENT_PROVIDED', importBatch: str = None,
+                          addedBy: str = None) -> int:
+        """Add multiple known assets in bulk.
+
+        Args:
+            target: scan target
+            assetType: 'ip', 'domain', or 'employee'
+            assets: list of asset value strings
+            source: 'CLIENT_PROVIDED' or 'ANALYST_CONFIRMED'
+            importBatch: optional batch identifier
+            addedBy: username
+
+        Returns:
+            int: number of assets actually inserted
+        """
+        if self.db_type == 'sqlite':
+            qry = "INSERT OR IGNORE INTO tbl_known_assets \
+                (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes) \
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        else:
+            qry = "INSERT INTO tbl_known_assets \
+                (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes) \
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING"
+
+        now = int(time.time() * 1000)
+        count = 0
+        with self.dbhLock:
+            try:
+                for val in assets:
+                    val = val.strip()
+                    if not val:
+                        continue
+                    self.dbh.execute(qry, (target, assetType, val, source,
+                                           importBatch, now, addedBy, None))
+                    count += self.dbh.rowcount if self.dbh.rowcount > 0 else 0
+                self.conn.commit()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when bulk adding known assets") from e
+        return count
+
+    def knownAssetRemove(self, assetId: int = None, target: str = None,
+                         assetType: str = None, assetValue: str = None) -> bool:
+        """Remove a known asset by ID or by (target, type, value).
+
+        Returns:
+            bool: True on success
+        """
+        with self.dbhLock:
+            try:
+                if assetId is not None:
+                    self.dbh.execute("DELETE FROM tbl_known_assets WHERE id = ?", (assetId,))
+                elif target and assetType and assetValue:
+                    self.dbh.execute(
+                        "DELETE FROM tbl_known_assets WHERE target = ? AND asset_type = ? AND asset_value = ?",
+                        (target, assetType, assetValue))
+                else:
+                    return False
+                self.conn.commit()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when removing known asset") from e
+        return True
+
+    def knownAssetRemoveBulk(self, assetIds: list) -> int:
+        """Remove multiple known assets by ID list.
+
+        Returns:
+            int: number removed
+        """
+        count = 0
+        with self.dbhLock:
+            try:
+                for aid in assetIds:
+                    self.dbh.execute("DELETE FROM tbl_known_assets WHERE id = ?", (int(aid),))
+                    count += self.dbh.rowcount if self.dbh.rowcount > 0 else 0
+                self.conn.commit()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when bulk removing known assets") from e
+        return count
+
+    def knownAssetUpdate(self, assetId: int, notes: str = None, source: str = None) -> bool:
+        """Update a known asset's notes or source.
+
+        Returns:
+            bool: True on success
+        """
+        updates = []
+        vals = []
+        if notes is not None:
+            updates.append("notes = ?")
+            vals.append(notes)
+        if source is not None:
+            updates.append("source = ?")
+            vals.append(source)
+        if not updates:
+            return False
+
+        vals.append(int(assetId))
+        qry = "UPDATE tbl_known_assets SET " + ", ".join(updates) + " WHERE id = ?"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, tuple(vals))
+                self.conn.commit()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when updating known asset") from e
+        return True
+
+    def knownAssetList(self, target: str, assetType: str = None) -> list:
+        """Get known assets for a target, optionally filtered by type.
+
+        Returns:
+            list: list of asset rows [id, target, asset_type, asset_value, source, import_batch, date_added, added_by, notes]
+        """
+        if assetType:
+            qry = "SELECT id, target, asset_type, asset_value, source, import_batch, \
+                ROUND(date_added/1000) as date_added, added_by, notes \
+                FROM tbl_known_assets WHERE target = ? AND asset_type = ? ORDER BY date_added DESC"
+            qvars = [target, assetType]
+        else:
+            qry = "SELECT id, target, asset_type, asset_value, source, import_batch, \
+                ROUND(date_added/1000) as date_added, added_by, notes \
+                FROM tbl_known_assets WHERE target = ? ORDER BY asset_type, date_added DESC"
+            qvars = [target]
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, qvars)
+                return self.dbh.fetchall()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when listing known assets") from e
+
+    def knownAssetValues(self, target: str) -> dict:
+        """Get all known asset values for a target grouped by type for fast lookups.
+
+        Returns:
+            dict: {'ip': set(), 'domain': set(), 'employee': set()}
+        """
+        qry = "SELECT asset_type, asset_value FROM tbl_known_assets WHERE target = ?"
+
+        result = {'ip': set(), 'domain': set(), 'employee': set()}
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target,))
+                for row in self.dbh.fetchall():
+                    atype = row[0]
+                    if atype in result:
+                        result[atype].add(row[1].lower())
+                return result
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when fetching known asset values") from e
+
+    def knownAssetCount(self, target: str) -> dict:
+        """Get counts of known assets by type and source.
+
+        Returns:
+            dict: counts breakdown
+        """
+        qry = "SELECT asset_type, source, COUNT(*) FROM tbl_known_assets WHERE target = ? GROUP BY asset_type, source"
+
+        result = {'total': 0, 'client_provided': 0, 'analyst_confirmed': 0,
+                  'by_type': {'ip': 0, 'domain': 0, 'employee': 0}}
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target,))
+                for row in self.dbh.fetchall():
+                    cnt = row[2]
+                    result['total'] += cnt
+                    if row[0] in result['by_type']:
+                        result['by_type'][row[0]] += cnt
+                    if row[1] == 'CLIENT_PROVIDED':
+                        result['client_provided'] += cnt
+                    elif row[1] == 'ANALYST_CONFIRMED':
+                        result['analyst_confirmed'] += cnt
+                return result
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when counting known assets") from e
+
+    def knownAssetMatchScanResults(self, scanId: str, target: str) -> list:
+        """Find scan results that match known assets.
+
+        Performs matching:
+        - IP assets: exact match against IP_ADDRESS, IPV6_ADDRESS, AFFILIATE_IPADDR
+        - Domain assets: exact or subdomain match against DOMAIN_NAME, INTERNET_NAME, etc.
+        - Employee assets: case-insensitive partial match against HUMAN_NAME, USERNAME, EMAILADDR
+
+        Returns:
+            list: matching scan result rows with match info
+        """
+        assets = self.knownAssetValues(target)
+        if not any(assets.values()):
+            return []
+
+        # Fetch all relevant scan results
+        ip_types = "('IP_ADDRESS','IPV6_ADDRESS','AFFILIATE_IPADDR')"
+        domain_types = "('DOMAIN_NAME','INTERNET_NAME','AFFILIATE_INTERNET_NAME','CO_HOSTED_SITE','SIMILARDOMAIN','INTERNET_NAME_UNRESOLVED')"
+        employee_types = "('HUMAN_NAME','USERNAME','EMAILADDR','AFFILIATE_EMAILADDR','SOCIAL_MEDIA')"
+
+        all_types = f"{ip_types[1:-1]},{domain_types[1:-1]},{employee_types[1:-1]}"
+        qry = f"SELECT scan_instance_id, hash, type, generated, confidence, visibility, risk, \
+            module, data, false_positive, source_event_hash, imported_from_scan \
+            FROM tbl_scan_results WHERE scan_instance_id = ? AND type IN ({all_types})"
+
+        matches = []
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (scanId,))
+                rows = self.dbh.fetchall()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when matching known assets") from e
+
+        ip_types_set = {'IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'}
+        domain_types_set = {'DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
+                            'CO_HOSTED_SITE', 'SIMILARDOMAIN', 'INTERNET_NAME_UNRESOLVED'}
+        employee_types_set = {'HUMAN_NAME', 'USERNAME', 'EMAILADDR', 'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'}
+
+        for row in rows:
+            event_type = row[2]
+            data_val = row[8] if row[8] else ''
+            data_lower = data_val.lower().strip()
+            matched_asset = None
+            match_type = None
+
+            if event_type in ip_types_set and assets['ip']:
+                if data_lower in assets['ip']:
+                    matched_asset = data_val
+                    match_type = 'ip_exact'
+
+            elif event_type in domain_types_set and assets['domain']:
+                if data_lower in assets['domain']:
+                    matched_asset = data_val
+                    match_type = 'domain_exact'
+                else:
+                    # Subdomain match: check if data ends with .known_domain
+                    for known_domain in assets['domain']:
+                        if data_lower.endswith('.' + known_domain):
+                            matched_asset = known_domain
+                            match_type = 'domain_subdomain'
+                            break
+
+            elif event_type in employee_types_set and assets['employee']:
+                for known_emp in assets['employee']:
+                    if known_emp in data_lower:
+                        matched_asset = known_emp
+                        match_type = 'employee_partial'
+                        break
+                    # Also check email prefix
+                    if event_type in ('EMAILADDR', 'AFFILIATE_EMAILADDR') and '@' in data_lower:
+                        prefix = data_lower.split('@')[0]
+                        name_parts = known_emp.split()
+                        if len(name_parts) >= 2:
+                            # Check first.last, flast, firstl patterns
+                            first = name_parts[0]
+                            last = name_parts[-1]
+                            patterns = [
+                                first + '.' + last,
+                                first[0] + last,
+                                first + last[0],
+                                first + last,
+                            ]
+                            if prefix in patterns:
+                                matched_asset = known_emp
+                                match_type = 'employee_email'
+                                break
+
+            if matched_asset:
+                matches.append({
+                    'hash': row[1],
+                    'type': event_type,
+                    'data': data_val,
+                    'module': row[7],
+                    'generated': row[3],
+                    'false_positive': row[9],
+                    'imported': row[11],
+                    'matched_asset': matched_asset,
+                    'match_type': match_type,
+                    'confidence': row[4],
+                    'risk': row[6],
+                })
+
+        return matches
+
+    def assetImportHistoryAdd(self, target: str, assetType: str, fileName: str,
+                              itemCount: int, importedBy: str = None) -> bool:
+        """Record an asset import event."""
+        if self.db_type == 'sqlite':
+            qry = "INSERT INTO tbl_asset_import_history \
+                (target, asset_type, file_name, item_count, imported_by, date_imported) \
+                VALUES (?, ?, ?, ?, ?, ?)"
+        else:
+            qry = "INSERT INTO tbl_asset_import_history \
+                (target, asset_type, file_name, item_count, imported_by, date_imported) \
+                VALUES (%s, %s, %s, %s, %s, %s)"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target, assetType, fileName, itemCount,
+                                       importedBy, int(time.time() * 1000)))
+                self.conn.commit()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when recording asset import") from e
+        return True
+
+    def assetImportHistoryList(self, target: str) -> list:
+        """Get import history for a target."""
+        qry = "SELECT id, target, asset_type, file_name, item_count, imported_by, \
+            ROUND(date_imported/1000) as date_imported \
+            FROM tbl_asset_import_history WHERE target = ? ORDER BY date_imported DESC"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target,))
+                return self.dbh.fetchall()
+            except (sqlite3.Error, psycopg2.Error) as e:
+                raise IOError("SQL error encountered when listing asset imports") from e
 
     def configSet(self, optMap: dict = {}) -> bool:
         """Store the default configuration in the database.
