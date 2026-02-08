@@ -2773,10 +2773,42 @@ tr.active td {
   cursor: grabbing;
 }
 
+/* ============================================
+   Findings / Correlations Tab Switcher
+   ============================================ */
+.fc-tab {
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5), 0 0 20px rgba(255, 255, 255, 0.3) !important;
+  background: var(--bg-tertiary) !important;
+  transition: all 0.15s ease !important;
+}
+
+.fc-tab:hover {
+  background: var(--bg-elevated) !important;
+  opacity: 0.8 !important;
+}
+
+.fc-tab.fc-tab-active {
+  opacity: 1 !important;
+}
+
 /* Asset Overview + Module Activity panels */
 #asset-overview-body,
 #module-activity-body {
   font-family: var(--font-mono) !important;
+}
+
+/* Asset Overview rows - ensure proper text contrast */
+.asset-overview-row {
+  transition: background 0.15s ease;
+}
+.asset-overview-row:hover {
+  background: var(--bg-tertiary) !important;
 }
 
 /* All text inside summary panels - uppercase mono font */
