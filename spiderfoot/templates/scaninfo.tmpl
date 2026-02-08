@@ -2396,10 +2396,10 @@
             grid += "</div></div></div>";
 
             // RIGHT COLUMN: Scan Status + Findings/Correlations(tabbed) + Asset Overview + Top Modules stacked
-            grid += "<div class='col-sm-5'>";
+            grid += "<div class='col-sm-5' style='display:flex;flex-direction:column;'>";
 
             // Scan Status panel
-            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel panel-default' style='flex:0 0 auto;'>";
             grid += "<div class='panel-heading'><i class='glyphicon glyphicon-eye-open'></i>&nbsp;&nbsp;SCAN STATUS</div><div class='panel-body' style='padding: 5px'>";
             grid += "<div class='btn-toolbar text-center'>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-secondary' style='cursor: default;'>TOTAL</button>";
@@ -2424,13 +2424,13 @@
             grid += "</div></div>";
 
             // Combined Findings / Correlations panel with tab switching
-            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel panel-default' style='flex:0 0 auto;'>";
             // Split panel heading with two clickable tabs
             grid += "<div class='panel-heading' style='padding:0 !important;display:flex;'>";
-            grid += "<div id='fc-tab-findings' class='fc-tab fc-tab-active' onclick='switchFCTab(\"findings\")' style='flex:1;padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:2px solid var(--text-primary);transition:all 0.15s;'>";
-            grid += "<i class='glyphicon glyphicon-list-alt'></i>&nbsp;FINDINGS</div>";
-            grid += "<div id='fc-tab-correlations' class='fc-tab' onclick='switchFCTab(\"correlations\")' style='flex:1;padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:2px solid transparent;opacity:0.5;transition:all 0.15s;'>";
-            grid += "<i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;CORRELATIONS</div>";
+            grid += "<div id='fc-tab-findings' class='summary-tab summary-tab-active' onclick='switchFCTab(\"findings\")'>";
+            grid += "<i class='glyphicon glyphicon-list-alt'></i><span class='summary-tab-label'>FINDINGS</span></div>";
+            grid += "<div id='fc-tab-correlations' class='summary-tab' onclick='switchFCTab(\"correlations\")'>";
+            grid += "<i class='glyphicon glyphicon-exclamation-sign'></i><span class='summary-tab-label'>CORRELATIONS</span></div>";
             grid += "</div>";
             // Findings content (visible by default)
             grid += "<div id='fc-findings-content' class='panel-body' style='padding: 5px'>";
@@ -2462,31 +2462,74 @@
             grid += "</div></div>";
             grid += "</div>"; // end combined panel
 
+            // Combined Nessus / Burp panel with tab switching
+            grid += "<div class='panel panel-default' style='flex:0 0 auto;'>";
+            grid += "<div class='panel-heading' style='padding:0 !important;display:flex;'>";
+            grid += "<div id='nb-tab-nessus' class='summary-tab summary-tab-active' onclick='switchNBTab(\"nessus\")'>";
+            grid += "<i class='glyphicon glyphicon-search'></i><span class='summary-tab-label'>NESSUS</span></div>";
+            grid += "<div id='nb-tab-burp' class='summary-tab' onclick='switchNBTab(\"burp\")'>";
+            grid += "<i class='glyphicon glyphicon-fire'></i><span class='summary-tab-label'>BURP</span></div>";
+            grid += "</div>";
+            // Nessus content (visible by default)
+            grid += "<div id='nb-nessus-content' class='panel-body' style='padding: 5px'>";
+            grid += "<div class='btn-toolbar text-center'>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-critical' style='cursor: default;'>CRITICAL</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='nessus-critical' style='cursor: default;'>0</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-danger' style='cursor: default;'>HIGH</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='nessus-high' style='cursor: default;'>0</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-warning' style='cursor: default;'>MEDIUM</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='nessus-medium' style='cursor: default;'>0</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-info' style='cursor: default;'>LOW</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='nessus-low' style='cursor: default;'>0</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-success' style='cursor: default;'>INFO</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='nessus-info' style='cursor: default;'>0</button></div>";
+            grid += "</div></div>";
+            // Burp content (hidden by default)
+            grid += "<div id='nb-burp-content' class='panel-body' style='padding: 5px; display: none;'>";
+            grid += "<div class='btn-toolbar text-center'>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-critical' style='cursor: default;'>CRITICAL</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='burp-critical' style='cursor: default;'>0</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-danger' style='cursor: default;'>HIGH</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='burp-high' style='cursor: default;'>0</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-warning' style='cursor: default;'>MEDIUM</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='burp-medium' style='cursor: default;'>0</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-info' style='cursor: default;'>LOW</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='burp-low' style='cursor: default;'>0</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-success' style='cursor: default;'>INFO</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='burp-info' style='cursor: default;'>0</button></div>";
+            grid += "</div></div>";
+            grid += "</div>"; // end nessus/burp panel
+
+            // Asset Overview + Top Modules side by side
+            grid += "<div style='display:flex;gap:0;flex:1 1 auto;min-height:0;'>";
+
             // Asset Overview panel
-            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel panel-default' style='flex:1;display:flex;flex-direction:column;margin-bottom:0;'>";
             grid += "<div class='panel-heading'><i class='glyphicon glyphicon-th-large'></i>&nbsp;&nbsp;ASSET OVERVIEW</div>";
-            grid += "<div class='panel-body' style='padding: 0;'>";
+            grid += "<div class='panel-body' style='padding: 0;flex:1;overflow:auto;'>";
             grid += "<div id='asset-overview-body'>";
             grid += "<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;LOADING ASSETS...</div>";
             grid += "</div></div></div>";
 
             // Module Activity panel
-            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel panel-default' style='flex:1;display:flex;flex-direction:column;margin-bottom:0;'>";
             grid += "<div class='panel-heading'><i class='glyphicon glyphicon-cog'></i>&nbsp;&nbsp;TOP MODULES</div>";
-            grid += "<div class='panel-body' style='padding: 0;'>";
+            grid += "<div class='panel-body' style='padding: 0;flex:1;overflow:auto;'>";
             grid += "<div id='module-activity-body'>";
             grid += "<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;LOADING MODULES...</div>";
             grid += "</div></div></div>";
 
+            grid += "</div>"; // end asset+modules flex row
+
             grid += "</div>"; // end right column
             grid += "</div>"; // end row 1
 
-            // === ROW 2: Geo Intelligence Globe (full width) ===
+            // === ROW 2: Geo Intelligence Globe + Attack Surface side by side ===
             grid += "<div class='row'>";
-            grid += "<div class='col-sm-12'>";
+            grid += "<div class='col-sm-8'>";
             grid += "<div class='panel panel-default'>";
             grid += "<div class='panel-heading' style='display:flex; justify-content:space-between; align-items:center;'>";
-            grid += "<span><i class='glyphicon glyphicon-globe'></i>&nbsp;&nbsp;GEO INTELLIGENCE</span>";
+            grid += "<span><i class='glyphicon glyphicon-globe'></i>&nbsp;&nbsp;GEO INTEL</span>";
             grid += "<span id='globe-hotspot-count' style='font-family:var(--font-mono);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;'></span>";
             grid += "</div>";
             grid += "<div class='panel-body' style='padding: 0; position: relative; overflow: hidden;'>";
@@ -2494,6 +2537,24 @@
             grid += "<div id='globe-tooltip' style='display:none;position:absolute;background:rgba(12,12,12,0.95);border:1px solid rgba(255,255,255,0.2);border-radius:0;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:#fff;text-transform:uppercase;letter-spacing:0.5px;pointer-events:none;z-index:10;box-shadow:0 0 15px rgba(255,255,255,0.1);text-shadow:0 0 8px rgba(255,255,255,0.5);max-width:280px;'></div>";
             grid += "<div id='globe-loading' style='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--font-mono);font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 10px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-refresh glyphicon-spin'></i>&nbsp;SCANNING COORDINATES...</div>";
             grid += "</div></div></div>";
+
+            // Attack Surface panel (right side of globe row)
+            grid += "<div class='col-sm-4'>";
+            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-warning-sign'></i>&nbsp;&nbsp;ATTACK SURFACE</div>";
+            grid += "<div class='panel-body' style='padding: 0;'>";
+            grid += "<div id='attack-surface-body'>";
+            grid += "<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;ANALYZING...</div>";
+            grid += "</div></div></div>";
+
+            // Exposure Indicators panel
+            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-lock'></i>&nbsp;&nbsp;EXPOSURE INDICATORS</div>";
+            grid += "<div class='panel-body' style='padding: 0;'>";
+            grid += "<div id='exposure-indicators-body'>";
+            grid += "<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;ANALYZING...</div>";
+            grid += "</div></div></div>";
+            grid += "</div>"; // end col-sm-4
             grid += "</div>"; // end row 2
 
             // === ROW 3: Data Types (full width) ===
@@ -2660,19 +2721,19 @@
                 function() {
                     var geoPoints = [];
                     var countryHits = {};
+                    var addressCount = 0;
                     var loaded = 0;
                     var total = 4;
                     function checkDone() {
                         loaded++;
                         if (loaded >= total) {
-                            renderGlobe(geoPoints, countryHits);
+                            renderGlobe(geoPoints, countryHits, addressCount);
                         }
                     }
                     // Fetch PHYSICAL_COORDINATES
                     sf.fetchData('${docroot}/scaneventresults', {'id': instanceId, 'eventType': 'PHYSICAL_COORDINATES'}, function(data) {
                         for (var i = 0; i < data.length; i++) {
                             var raw = data[i][1];
-                            // Parse "lat, lon" format
                             var parts = raw.split(',');
                             if (parts.length >= 2) {
                                 var lat = parseFloat(parts[0].trim());
@@ -2688,7 +2749,6 @@
                     sf.fetchData('${docroot}/scaneventresults', {'id': instanceId, 'eventType': 'GEOINFO'}, function(data) {
                         for (var i = 0; i < data.length; i++) {
                             var raw = data[i][1];
-                            // Try to extract coords from geoinfo text
                             var latMatch = raw.match(/(?:latitude|lat)[:\s]*(-?[\d.]+)/i);
                             var lonMatch = raw.match(/(?:longitude|lon|lng)[:\s]*(-?[\d.]+)/i);
                             if (latMatch && lonMatch) {
@@ -2698,7 +2758,6 @@
                                     geoPoints.push({lat: lat, lon: lon, label: raw.substring(0, 80), type: 'GEOINFO', source: data[i][2] || ''});
                                 }
                             }
-                            // Also try "lat, lon" format directly
                             var parts = raw.split(',');
                             if (!latMatch && parts.length >= 2) {
                                 var lat2 = parseFloat(parts[0].trim());
@@ -2710,9 +2769,9 @@
                         }
                         checkDone();
                     });
-                    // Fetch PHYSICAL_ADDRESS for context
+                    // Fetch PHYSICAL_ADDRESS - count them for header
                     sf.fetchData('${docroot}/scaneventresults', {'id': instanceId, 'eventType': 'PHYSICAL_ADDRESS'}, function(data) {
-                        // Physical addresses don't have coords but we note them
+                        addressCount = data.length;
                         checkDone();
                     });
                     // Fetch COUNTRY_NAME for country highlighting
@@ -2743,6 +2802,44 @@
                 function() {
                     sf.fetchData('${docroot}/scansummary', {'id': instanceId, 'by': 'module'}, function(data) {
                         renderModuleActivity(data);
+                    });
+                }
+            );
+
+            // Attack Surface loader
+            dataloaders.push(
+                function() {
+                    sf.fetchData('${docroot}/scansummary', {'id': instanceId, 'by': 'type'}, function(data) {
+                        renderAttackSurface(data);
+                    });
+                }
+            );
+
+            // Exposure Indicators loader
+            dataloaders.push(
+                function() {
+                    sf.fetchData('${docroot}/scansummary', {'id': instanceId, 'by': 'type'}, function(data) {
+                        renderExposureIndicators(data);
+                    });
+                }
+            );
+
+            // Nessus/Burp counts loader
+            dataloaders.push(
+                function() {
+                    sf.fetchData('${docroot}/scanstatus', {'id': instanceId}, function(data) {
+                        var nessusCounts = data[8] || {};
+                        var burpCounts = data[9] || {};
+                        $('#nessus-critical').html(nessusCounts['CRITICAL'] || 0);
+                        $('#nessus-high').html(nessusCounts['HIGH'] || 0);
+                        $('#nessus-medium').html(nessusCounts['MEDIUM'] || 0);
+                        $('#nessus-low').html(nessusCounts['LOW'] || 0);
+                        $('#nessus-info').html(nessusCounts['INFO'] || 0);
+                        $('#burp-critical').html(burpCounts['CRITICAL'] || 0);
+                        $('#burp-high').html(burpCounts['HIGH'] || 0);
+                        $('#burp-medium').html(burpCounts['MEDIUM'] || 0);
+                        $('#burp-low').html(burpCounts['LOW'] || 0);
+                        $('#burp-info').html(burpCounts['INFO'] || 0);
                     });
                 }
             );
@@ -2917,17 +3014,30 @@
 
         // === FINDINGS / CORRELATIONS TAB SWITCHER ===
         function switchFCTab(tab) {
-            var activeColor = getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim() || '#fff';
             if (tab === 'findings') {
                 $('#fc-findings-content').show();
                 $('#fc-correlations-content').hide();
-                $('#fc-tab-findings').css({'border-bottom': '2px solid ' + activeColor, 'opacity': '1'}).addClass('fc-tab-active');
-                $('#fc-tab-correlations').css({'border-bottom': '2px solid transparent', 'opacity': '0.5'}).removeClass('fc-tab-active');
+                $('#fc-tab-findings').addClass('summary-tab-active');
+                $('#fc-tab-correlations').removeClass('summary-tab-active');
             } else {
                 $('#fc-findings-content').hide();
                 $('#fc-correlations-content').show();
-                $('#fc-tab-correlations').css({'border-bottom': '2px solid ' + activeColor, 'opacity': '1'}).addClass('fc-tab-active');
-                $('#fc-tab-findings').css({'border-bottom': '2px solid transparent', 'opacity': '0.5'}).removeClass('fc-tab-active');
+                $('#fc-tab-correlations').addClass('summary-tab-active');
+                $('#fc-tab-findings').removeClass('summary-tab-active');
+            }
+        }
+
+        function switchNBTab(tab) {
+            if (tab === 'nessus') {
+                $('#nb-nessus-content').show();
+                $('#nb-burp-content').hide();
+                $('#nb-tab-nessus').addClass('summary-tab-active');
+                $('#nb-tab-burp').removeClass('summary-tab-active');
+            } else {
+                $('#nb-nessus-content').hide();
+                $('#nb-burp-content').show();
+                $('#nb-tab-burp').addClass('summary-tab-active');
+                $('#nb-tab-nessus').removeClass('summary-tab-active');
             }
         }
 
@@ -3001,9 +3111,78 @@
             "COTE D'IVOIRE":[8,-5.5],'IVORY COAST':[8,-5.5]
         };
 
+        // Simplified country boundary polygons for globe fill rendering
+        var countryPolygons = {
+            'UNITED STATES':[[49,-125],[49,-67],[45,-67],[41,-70],[35,-75],[30,-81],[25,-80],[25,-97],[32,-117],[37,-122],[48,-125]],
+            'UNITED STATES OF AMERICA':[[49,-125],[49,-67],[45,-67],[41,-70],[35,-75],[30,-81],[25,-80],[25,-97],[32,-117],[37,-122],[48,-125]],
+            'USA':[[49,-125],[49,-67],[45,-67],[41,-70],[35,-75],[30,-81],[25,-80],[25,-97],[32,-117],[37,-122],[48,-125]],
+            'CANADA':[[49,-125],[49,-67],[47,-52],[53,-56],[60,-64],[58,-75],[60,-95],[70,-110],[72,-140],[60,-140],[55,-130],[49,-125]],
+            'MEXICO':[[32,-117],[32,-106],[26,-97],[21,-97],[16,-94],[15,-92],[17,-90],[21,-87],[22,-98],[25,-110],[32,-117]],
+            'BRAZIL':[[-5,-35],[-2,-44],[2,-50],[5,-52],[5,-60],[2,-67],[-4,-70],[-10,-74],[-17,-68],[-22,-58],[-33,-52],[-30,-50],[-23,-43],[-18,-40],[-12,-37],[-5,-35]],
+            'RUSSIA':[[50,30],[55,40],[58,50],[60,60],[55,90],[52,113],[50,120],[50,130],[55,135],[60,130],[65,140],[68,170],[65,180],[70,180],[72,120],[70,50],[65,40],[60,30],[50,30]],
+            'RUSSIAN FEDERATION':[[50,30],[55,40],[58,50],[60,60],[55,90],[52,113],[50,120],[50,130],[55,135],[60,130],[65,140],[68,170],[65,180],[70,180],[72,120],[70,50],[65,40],[60,30],[50,30]],
+            'CHINA':[[22,98],[22,108],[25,120],[30,122],[35,119],[40,118],[42,130],[47,135],[50,130],[53,120],[48,88],[42,80],[35,75],[28,84],[22,98]],
+            'INDIA':[[8,77],[10,77],[15,73],[20,73],[24,69],[28,70],[35,75],[35,80],[28,88],[22,88],[18,84],[13,80],[8,77]],
+            'AUSTRALIA':[[-12,130],[-12,136],[-17,141],[-20,149],[-27,153],[-35,151],[-38,146],[-38,141],[-35,137],[-32,130],[-25,113],[-20,118],[-14,127],[-12,130]],
+            'UNITED KINGDOM':[[50,-5],[50,1],[53,0],[55,-1],[58,-3],[58,-5],[57,-7],[55,-7],[52,-5],[50,-5]],
+            'UK':[[50,-5],[50,1],[53,0],[55,-1],[58,-3],[58,-5],[57,-7],[55,-7],[52,-5],[50,-5]],
+            'FRANCE':[[43,-1],[43,3],[44,8],[46,6],[48,8],[49,3],[51,2],[49,-1],[48,-5],[47,-1],[43,-1]],
+            'GERMANY':[[47,6],[47,13],[49,13],[51,15],[54,14],[55,9],[54,9],[52,7],[50,6],[47,6]],
+            'JAPAN':[[31,130],[33,130],[35,133],[36,137],[37,140],[40,140],[42,141],[44,145],[43,146],[41,140],[38,139],[35,140],[34,137],[34,132],[31,130]],
+            'SOUTH KOREA':[[34,126],[35,126],[37,127],[38,128],[37,130],[35,129],[34,127],[34,126]],
+            'NORTH KOREA':[[38,125],[39,125],[41,126],[43,130],[42,131],[40,129],[38,128],[38,125]],
+            'ITALY':[[37,13],[38,16],[40,16],[41,14],[43,11],[44,12],[46,13],[47,12],[46,7],[44,7],[43,10],[42,12],[40,15],[38,13],[37,13]],
+            'SPAIN':[[36,-5],[36,-2],[37,0],[39,0],[42,3],[43,0],[43,-2],[43,-8],[42,-9],[40,-8],[37,-7],[36,-5]],
+            'PORTUGAL':[[37,-9],[37,-7],[40,-8],[42,-8],[42,-9],[40,-8],[38,-9],[37,-9]],
+            'NETHERLANDS':[[51,4],[51,7],[53,7],[53,5],[52,4],[51,4]],
+            'BELGIUM':[[49,3],[49,6],[51,6],[51,3],[50,3],[49,3]],
+            'SWITZERLAND':[[46,6],[46,10],[48,10],[48,6],[46,6]],
+            'AUSTRIA':[[47,10],[47,17],[49,17],[49,10],[47,10]],
+            'POLAND':[[49,15],[49,24],[52,24],[55,18],[54,14],[51,15],[49,15]],
+            'UKRAINE':[[45,22],[45,40],[49,40],[52,40],[52,24],[49,22],[45,22]],
+            'TURKEY':[[36,26],[36,36],[37,44],[40,44],[42,43],[42,26],[40,26],[38,26],[36,26]],
+            'IRAN':[[25,54],[27,60],[30,60],[35,52],[38,44],[38,48],[35,54],[30,62],[25,60],[25,54]],
+            'IRAQ':[[30,38],[30,48],[37,46],[37,39],[33,39],[30,38]],
+            'SAUDI ARABIA':[[16,42],[18,44],[22,55],[28,50],[30,38],[28,35],[24,38],[20,40],[16,42]],
+            'EGYPT':[[22,25],[22,37],[31,34],[32,32],[31,25],[22,25]],
+            'SOUTH AFRICA':[[-22,17],[-26,28],[-28,32],[-34,26],[-35,18],[-32,18],[-28,17],[-22,17]],
+            'NIGERIA':[[4,3],[4,12],[7,12],[10,14],[14,14],[14,3],[10,3],[4,3]],
+            'KENYA':[[-4,34],[-1,41],[4,41],[4,34],[1,34],[-4,34]],
+            'ETHIOPIA':[[3,33],[3,48],[15,43],[15,33],[8,33],[3,33]],
+            'ARGENTINA':[[-22,-65],[-27,-60],[-35,-57],[-42,-63],[-50,-68],[-55,-68],[-52,-70],[-42,-72],[-35,-70],[-27,-70],[-22,-65]],
+            'COLOMBIA':[[-1,-69],[2,-77],[5,-76],[10,-75],[12,-72],[8,-67],[4,-67],[0,-70],[-1,-69]],
+            'INDONESIA':[[-8,106],[-8,115],[-5,120],[-2,125],[0,128],[0,140],[-5,140],[-8,135],[-8,120],[-8,106]],
+            'PAKISTAN':[[24,62],[24,70],[30,70],[36,71],[37,75],[35,78],[30,67],[25,62],[24,62]],
+            'BANGLADESH':[[21,88],[21,92],[26,92],[26,88],[23,88],[21,88]],
+            'THAILAND':[[6,100],[6,102],[12,102],[15,105],[18,100],[20,100],[20,105],[14,100],[10,99],[6,100]],
+            'VIETNAM':[[8,104],[10,108],[15,108],[20,107],[22,103],[22,107],[16,108],[10,107],[8,104]],
+            'PHILIPPINES':[[5,120],[7,122],[10,124],[15,121],[18,122],[17,120],[13,120],[10,118],[5,120]],
+            'MALAYSIA':[[1,110],[1,104],[5,103],[7,117],[5,118],[2,111],[1,110]],
+            'SINGAPORE':[[1.2,103.6],[1.2,104],[1.5,104],[1.5,103.6],[1.2,103.6]],
+            'ISRAEL':[[29,34],[31,34],[33,35],[33,36],[31,35],[29,35],[29,34]],
+            'UNITED ARAB EMIRATES':[[22,51],[22,56],[26,56],[26,51],[22,51]],
+            'SWEDEN':[[55,12],[58,11],[62,12],[67,15],[69,18],[66,24],[63,19],[60,17],[56,16],[55,12]],
+            'NORWAY':[[58,5],[59,5],[62,5],[66,13],[70,20],[71,26],[70,30],[66,16],[62,5],[58,5]],
+            'FINLAND':[[60,20],[60,30],[64,26],[68,24],[70,27],[70,30],[68,30],[64,30],[60,28],[60,20]],
+            'DENMARK':[[54,8],[55,8],[58,8],[58,13],[56,13],[55,10],[54,8]],
+            'IRELAND':[[51,-10],[51,-6],[53,-6],[55,-6],[55,-10],[53,-10],[51,-10]],
+            'CZECH REPUBLIC':[[49,12],[49,18],[51,18],[51,12],[49,12]],
+            'CZECHIA':[[49,12],[49,18],[51,18],[51,12],[49,12]],
+            'ROMANIA':[[44,22],[44,30],[48,27],[48,22],[46,22],[44,22]],
+            'HUNGARY':[[46,16],[46,23],[48,23],[48,16],[46,16]],
+            'GREECE':[[35,20],[35,27],[39,26],[41,24],[41,20],[39,20],[35,20]],
+            'MOROCCO':[[28,-13],[28,0],[35,0],[36,-5],[34,-10],[28,-13]],
+            'ALGERIA':[[19,0],[19,12],[28,9],[37,3],[37,-2],[35,-2],[28,-9],[19,0]],
+            'TUNISIA':[[30,8],[30,11],[37,10],[37,8],[34,8],[30,8]],
+            'LIBYA':[[20,10],[20,25],[33,25],[33,10],[25,10],[20,10]],
+            'NEW ZEALAND':[[-34,172],[-37,174],[-41,175],[-47,167],[-45,167],[-41,172],[-37,174],[-34,172]],
+            'TAIWAN':[[22,120],[22,121],[25,122],[25,121],[22,120]],
+            'HONG KONG':[[22.15,113.85],[22.15,114.35],[22.55,114.35],[22.55,113.85],[22.15,113.85]]
+        };
+
         var globeCountryData = []; // [{lat, lon, name, count, intensity}]
 
-        function renderGlobe(geoPoints, countryHits) {
+        function renderGlobe(geoPoints, countryHits, addressCount) {
             $('#globe-loading').hide();
             var canvas = document.getElementById('globe-canvas');
             if (!canvas) return;
@@ -3038,7 +3217,6 @@
             for (var name in countryHits) {
                 var coords = countryCoords[name];
                 if (!coords) {
-                    // Try common variations
                     var altNames = [name, name.replace(/\s+/g, ' ')];
                     for (var a = 0; a < altNames.length; a++) {
                         if (countryCoords[altNames[a]]) { coords = countryCoords[altNames[a]]; break; }
@@ -3049,7 +3227,6 @@
                     globeCountryData.push({lat: coords[0], lon: coords[1], name: name, count: countryHits[name], intensity: intensity});
                 }
             }
-            // Sort so brightest (most hits) renders last (on top)
             globeCountryData.sort(function(a, b) { return a.intensity - b.intensity; });
 
             // Store on hotspots for hover detection
@@ -3059,8 +3236,10 @@
 
             var totalCountries = Object.keys(countryHits).length;
             var totalCoords = uniquePoints.length;
+            var totalAddresses = addressCount || 0;
             var countParts = [];
-            if (totalCoords > 0) countParts.push(totalCoords + ' POINT' + (totalCoords !== 1 ? 'S' : ''));
+            if (totalAddresses > 0) countParts.push(totalAddresses + ' ADDRESS' + (totalAddresses !== 1 ? 'ES' : ''));
+            if (totalCoords > 0) countParts.push(totalCoords + ' COORDINATE' + (totalCoords !== 1 ? 'S' : ''));
             if (totalCountries > 0) countParts.push(totalCountries + ' COUNTR' + (totalCountries !== 1 ? 'IES' : 'Y'));
             var countText = countParts.length > 0 ? countParts.join(' &bull; ') : 'NO GEO DATA';
             $('#globe-hotspot-count').html(countText);
@@ -3171,50 +3350,90 @@
                 // Simplified continent outlines
                 drawContinents(ctx, project);
 
-                // === COUNTRY HOTSPOTS (white glow, intensity based on hit count) ===
+                // === COUNTRY FILLS (white glow polygons, intensity based on hit count) ===
+                // Clip to globe circle for country fills
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2);
+                ctx.clip();
+
                 for (var i = 0; i < globeCountryData.length; i++) {
                     var cd = globeCountryData[i];
-                    var p = project(cd.lat, cd.lon);
-                    if (!p.visible) continue;
+                    var poly = countryPolygons[cd.name];
+                    var centroid = project(cd.lat, cd.lon);
+                    if (!centroid.visible) continue;
 
                     var pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.002 + i * 2.0);
-                    var alpha = 0.15 + cd.intensity * 0.85; // min 0.15, max 1.0
-                    var glowSize = 18 + cd.intensity * 22 + pulse * 6;
-                    var coreSize = 4 + cd.intensity * 4;
+                    var alpha = 0.1 + cd.intensity * 0.5;
 
-                    // Large diffuse glow
-                    var cGrd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowSize);
-                    cGrd.addColorStop(0, 'rgba(255, 255, 255, ' + (alpha * 0.6) + ')');
-                    cGrd.addColorStop(0.2, 'rgba(255, 255, 255, ' + (alpha * 0.35) + ')');
-                    cGrd.addColorStop(0.5, 'rgba(255, 255, 255, ' + (alpha * 0.12) + ')');
-                    cGrd.addColorStop(0.75, 'rgba(255, 255, 255, ' + (alpha * 0.03) + ')');
-                    cGrd.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, glowSize, 0, Math.PI * 2);
-                    ctx.fillStyle = cGrd;
-                    ctx.fill();
+                    if (poly && poly.length >= 3) {
+                        // Draw filled country polygon
+                        var projected = [];
+                        var visCount = 0;
+                        for (var j = 0; j < poly.length; j++) {
+                            var pp = project(poly[j][0], poly[j][1]);
+                            projected.push(pp);
+                            if (pp.visible) visCount++;
+                        }
+                        // Only draw if majority of points visible
+                        if (visCount >= poly.length * 0.4) {
+                            // Fill polygon with white glow
+                            ctx.beginPath();
+                            var started = false;
+                            for (var j = 0; j < projected.length; j++) {
+                                if (projected[j].visible) {
+                                    if (!started) { ctx.moveTo(projected[j].x, projected[j].y); started = true; }
+                                    else ctx.lineTo(projected[j].x, projected[j].y);
+                                }
+                            }
+                            ctx.closePath();
+                            ctx.fillStyle = 'rgba(255, 255, 255, ' + (alpha * (0.25 + pulse * 0.1)) + ')';
+                            ctx.shadowColor = 'rgba(255, 255, 255, ' + (alpha * 0.8) + ')';
+                            ctx.shadowBlur = 12 + cd.intensity * 15;
+                            ctx.fill();
+                            ctx.shadowBlur = 0;
 
-                    // Core bright spot
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, coreSize, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(255, 255, 255, ' + (alpha * 0.9) + ')';
-                    ctx.shadowColor = 'rgba(255, 255, 255, ' + alpha + ')';
-                    ctx.shadowBlur = 20 * alpha;
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
+                            // Stroke outline
+                            ctx.beginPath();
+                            started = false;
+                            for (var j = 0; j < projected.length; j++) {
+                                if (projected[j].visible) {
+                                    if (!started) { ctx.moveTo(projected[j].x, projected[j].y); started = true; }
+                                    else ctx.lineTo(projected[j].x, projected[j].y);
+                                }
+                            }
+                            ctx.closePath();
+                            ctx.strokeStyle = 'rgba(255, 255, 255, ' + (alpha * 0.6) + ')';
+                            ctx.lineWidth = 1;
+                            ctx.stroke();
+                        }
+                    } else {
+                        // Fallback: draw a larger glowing region for countries without polygon data
+                        var glowSize = 20 + cd.intensity * 20 + pulse * 6;
+                        var cGrd = ctx.createRadialGradient(centroid.x, centroid.y, 0, centroid.x, centroid.y, glowSize);
+                        cGrd.addColorStop(0, 'rgba(255, 255, 255, ' + (alpha * 0.5) + ')');
+                        cGrd.addColorStop(0.3, 'rgba(255, 255, 255, ' + (alpha * 0.25) + ')');
+                        cGrd.addColorStop(0.6, 'rgba(255, 255, 255, ' + (alpha * 0.08) + ')');
+                        cGrd.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                        ctx.beginPath();
+                        ctx.arc(centroid.x, centroid.y, glowSize, 0, Math.PI * 2);
+                        ctx.fillStyle = cGrd;
+                        ctx.fill();
+                    }
 
                     // Country name label for high-intensity countries
-                    if (cd.intensity > 0.4) {
+                    if (cd.intensity > 0.3) {
                         ctx.font = '600 ' + (8 + cd.intensity * 3) + 'px "JetBrains Mono", monospace';
-                        ctx.fillStyle = 'rgba(255, 255, 255, ' + (alpha * 0.7) + ')';
-                        ctx.shadowColor = 'rgba(255, 255, 255, ' + (alpha * 0.5) + ')';
-                        ctx.shadowBlur = 8;
+                        ctx.fillStyle = 'rgba(255, 255, 255, ' + (alpha * 1.2) + ')';
+                        ctx.shadowColor = 'rgba(255, 255, 255, ' + (alpha * 0.7) + ')';
+                        ctx.shadowBlur = 10;
                         ctx.textAlign = 'center';
-                        ctx.fillText(cd.name, p.x, p.y - coreSize - 6);
+                        ctx.fillText(cd.name, centroid.x, centroid.y + 4);
                         ctx.shadowBlur = 0;
                         ctx.textAlign = 'left';
                     }
                 }
+                ctx.restore(); // restore clipping
 
                 // === COORDINATE/ADDRESS HOTSPOTS (bright green dots) ===
                 for (var i = 0; i < uniquePoints.length; i++) {
@@ -3496,6 +3715,111 @@
                 h += "<div style='height:4px;background:var(--bg-tertiary);border-radius:0;overflow:hidden;'>";
                 h += "<div style='height:100%;width:" + pct + "%;background:linear-gradient(90deg, " + mc.color + "66, " + mc.color + ");box-shadow:0 0 8px " + mc.glow + ";transition:width 0.5s ease;'></div>";
                 h += "</div>";
+                h += "</div>";
+            }
+            panel.html(h);
+        }
+
+        // === ATTACK SURFACE PANEL ===
+        function renderAttackSurface(data) {
+            var panel = $('#attack-surface-body');
+            if (!data || data.length === 0) {
+                panel.html("<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;'>NO DATA</div>");
+                return;
+            }
+
+            var surface = {
+                'OPEN PORTS': {icon: 'glyphicon-transfer', count: 0, severity: 'warning', types: ['TCP_PORT_OPEN', 'TCP_PORT_OPEN_BANNER', 'UDP_PORT_OPEN', 'UDP_PORT_OPEN_INFO']},
+                'WEB SERVERS': {icon: 'glyphicon-cloud', count: 0, severity: 'info', types: ['WEBSERVER_BANNER', 'WEBSERVER_TECHNOLOGY']},
+                'SSL/TLS ISSUES': {icon: 'glyphicon-lock', count: 0, severity: 'danger', types: ['SSL_CERTIFICATE_EXPIRED', 'SSL_CERTIFICATE_EXPIRING', 'SSL_CERTIFICATE_MISMATCH', 'SSL_CERTIFICATE_ISSUE']},
+                'SUBDOMAINS': {icon: 'glyphicon-list', count: 0, severity: 'info', types: ['INTERNET_NAME', 'INTERNET_NAME_UNRESOLVED']},
+                'DNS RECORDS': {icon: 'glyphicon-record', count: 0, severity: 'default', types: ['DNS_TEXT', 'DNS_SPF', 'DNS_SRV']},
+                'LEAKED CREDS': {icon: 'glyphicon-alert', count: 0, severity: 'danger', types: ['PASSWORD_COMPROMISED', 'EMAILADDR_COMPROMISED', 'ACCOUNT_EXTERNAL_OWNED']},
+                'DARK WEB': {icon: 'glyphicon-eye-close', count: 0, severity: 'danger', types: ['DARKNET_MENTION_URL', 'DARKNET_MENTION_CONTENT']},
+                'SOCIAL MEDIA': {icon: 'glyphicon-comment', count: 0, severity: 'default', types: ['SOCIAL_MEDIA', 'USERNAME']}
+            };
+
+            var severityColors = {
+                'danger': {color: 'var(--accent-red)', glow: 'var(--glow-red)'},
+                'warning': {color: 'var(--accent-yellow)', glow: 'var(--glow-yellow)'},
+                'info': {color: 'var(--accent-blue)', glow: 'var(--glow-blue)'},
+                'default': {color: 'var(--text-secondary)', glow: 'none'}
+            };
+
+            for (var i = 0; i < data.length; i++) {
+                var evtType = data[i][0];
+                var unique = data[i][4];
+                for (var cat in surface) {
+                    if (surface[cat].types.indexOf(evtType) >= 0) {
+                        surface[cat].count += unique;
+                    }
+                }
+            }
+
+            var h = '';
+            for (var cat in surface) {
+                var s = surface[cat];
+                var sc = severityColors[s.severity] || severityColors['default'];
+                var textColor = s.count > 0 ? sc.color : 'var(--text-muted)';
+                var countColor = s.count > 0 ? sc.color : 'var(--text-muted)';
+                h += "<div class='asset-overview-row' style='display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--glass-border);'>";
+                h += "<div style='display:flex;align-items:center;gap:10px;'>";
+                h += "<i class='glyphicon " + s.icon + "' style='color:" + textColor + ";font-size:13px;'></i>";
+                h += "<span style='font-family:var(--font-mono);font-size:11px;font-weight:700;color:" + textColor + ";text-transform:uppercase;letter-spacing:0.5px;'>" + cat + "</span>";
+                h += "</div>";
+                h += "<span style='font-family:var(--font-mono);font-size:14px;font-weight:700;color:" + countColor + ";'>" + s.count + "</span>";
+                h += "</div>";
+            }
+            panel.html(h);
+        }
+
+        // === EXPOSURE INDICATORS PANEL ===
+        function renderExposureIndicators(data) {
+            var panel = $('#exposure-indicators-body');
+            if (!data || data.length === 0) {
+                panel.html("<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;'>NO DATA</div>");
+                return;
+            }
+
+            var indicators = {
+                'BREACHED EMAILS': {count: 0, severity: 'critical', types: ['EMAILADDR_COMPROMISED']},
+                'LEAKED PASSWORDS': {count: 0, severity: 'critical', types: ['PASSWORD_COMPROMISED']},
+                'EXPOSED ACCOUNTS': {count: 0, severity: 'high', types: ['ACCOUNT_EXTERNAL_OWNED', 'ACCOUNT_EXTERNAL_USER_SHARED']},
+                'MALICIOUS AFFILIATES': {count: 0, severity: 'high', types: ['MALICIOUS_AFFILIATE_IPADDR', 'MALICIOUS_AFFILIATE_INTERNET_NAME']},
+                'BLACKLISTED IPS': {count: 0, severity: 'high', types: ['BLACKLISTED_IPADDR', 'BLACKLISTED_AFFILIATE_IPADDR']},
+                'DEFACED SITES': {count: 0, severity: 'medium', types: ['DEFACED_INTERNET_NAME', 'DEFACED_AFFILIATE_INTERNET_NAME']},
+                'PHONE NUMBERS': {count: 0, severity: 'low', types: ['PHONE_NUMBER']},
+                'PUBLIC CODE': {count: 0, severity: 'medium', types: ['PUBLIC_CODE_REPO']}
+            };
+
+            var severityIcons = {
+                'critical': {icon: 'glyphicon-fire', color: '#dc2626'},
+                'high': {icon: 'glyphicon-warning-sign', color: 'var(--accent-red)'},
+                'medium': {icon: 'glyphicon-exclamation-sign', color: 'var(--accent-yellow)'},
+                'low': {icon: 'glyphicon-info-sign', color: 'var(--accent-blue)'}
+            };
+
+            for (var i = 0; i < data.length; i++) {
+                var evtType = data[i][0];
+                var unique = data[i][4];
+                for (var cat in indicators) {
+                    if (indicators[cat].types.indexOf(evtType) >= 0) {
+                        indicators[cat].count += unique;
+                    }
+                }
+            }
+
+            var h = '';
+            for (var cat in indicators) {
+                var ind = indicators[cat];
+                var si = severityIcons[ind.severity] || severityIcons['low'];
+                var textColor = ind.count > 0 ? si.color : 'var(--text-muted)';
+                h += "<div class='asset-overview-row' style='display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--glass-border);'>";
+                h += "<div style='display:flex;align-items:center;gap:10px;'>";
+                h += "<i class='glyphicon " + si.icon + "' style='color:" + textColor + ";font-size:13px;'></i>";
+                h += "<span style='font-family:var(--font-mono);font-size:11px;font-weight:700;color:" + textColor + ";text-transform:uppercase;letter-spacing:0.5px;'>" + cat + "</span>";
+                h += "</div>";
+                h += "<span style='font-family:var(--font-mono);font-size:14px;font-weight:700;color:" + textColor + ";'>" + ind.count + "</span>";
                 h += "</div>";
             }
             panel.html(h);

@@ -2776,6 +2776,53 @@ tr.active td {
 /* ============================================
    Findings / Correlations Tab Switcher
    ============================================ */
+/* Summary panel tabs (Findings/Correlations, Nessus/Burp) */
+.summary-tab {
+  flex: 1;
+  padding: 12px 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  color: var(--text-muted) !important;
+  background: var(--bg-secondary) !important;
+  border-bottom: 3px solid transparent !important;
+  transition: all 0.2s ease !important;
+  position: relative;
+  text-shadow: none !important;
+}
+
+.summary-tab .summary-tab-label {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.summary-tab:hover {
+  color: var(--text-secondary) !important;
+  background: var(--bg-tertiary) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.summary-tab.summary-tab-active {
+  color: #ffffff !important;
+  background: var(--bg-tertiary) !important;
+  border-bottom: 3px solid var(--accent-green) !important;
+  text-shadow: 0 0 10px rgba(34, 197, 94, 0.5) !important;
+}
+
+.summary-tab.summary-tab-active .glyphicon {
+  color: var(--accent-green) !important;
+  text-shadow: 0 0 8px var(--glow-green) !important;
+}
+
+/* Legacy fc-tab support */
 .fc-tab {
   font-family: var(--font-mono) !important;
   font-weight: 700 !important;
@@ -2800,6 +2847,24 @@ tr.active td {
 /* Asset Overview + Module Activity panels */
 #asset-overview-body,
 #module-activity-body {
+  font-family: var(--font-mono) !important;
+}
+
+/* Right column flex layout */
+#scansummary-content .col-sm-5 {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure panels in flex column don't have extra margin */
+#scansummary-content .col-sm-5 > .panel {
+  margin-bottom: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* Attack surface + exposure panels */
+#attack-surface-body,
+#exposure-indicators-body {
   font-family: var(--font-mono) !important;
 }
 
@@ -6112,13 +6177,14 @@ i.glyphicon-white,
   gap: 6px;
   padding: 24px 20px;
   background: var(--bg-secondary);
-  border: 1px solid var(--glass-border);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
   border-radius: var(--radius-lg);
-  color: var(--text-secondary);
+  color: var(--text-muted);
   cursor: pointer;
   transition: all var(--transition-normal);
   position: relative;
   overflow: hidden;
+  opacity: 0.6;
 }
 
 .vuln-tab-btn::before {
@@ -6127,29 +6193,52 @@ i.glyphicon-white,
   top: 0;
   left: 0;
   right: 0;
-  height: 2px;
+  height: 3px;
   background: transparent;
   transition: background var(--transition-normal);
 }
 
+.vuln-tab-btn::after {
+  content: 'CLICK TO VIEW';
+  position: absolute;
+  bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+
 .vuln-tab-btn:hover {
   background: var(--bg-tertiary);
-  border-color: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   color: var(--text-primary);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 10px rgba(255, 255, 255, 0.05);
+  opacity: 0.85;
+}
+
+.vuln-tab-btn:hover::after {
+  opacity: 1;
 }
 
 .vuln-tab-btn.active {
   background: var(--bg-tertiary);
-  border-color: var(--accent-green);
+  border: 1px solid var(--accent-green);
   color: var(--text-primary);
-  box-shadow: 0 0 15px rgba(34, 197, 94, 0.15), 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.2), 0 0 40px rgba(34, 197, 94, 0.1), 0 4px 12px rgba(0, 0, 0, 0.3);
+  opacity: 1;
 }
 
 .vuln-tab-btn.active::before {
   background: var(--accent-green);
-  box-shadow: 0 0 10px var(--glow-green);
+  box-shadow: 0 0 15px var(--glow-green);
+  height: 3px;
+}
+
+.vuln-tab-btn.active::after {
+  display: none;
 }
 
 .vuln-btn-icon {
