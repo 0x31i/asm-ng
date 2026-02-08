@@ -82,7 +82,6 @@ document.getElementById('btn-filter').addEventListener('click', function() {
     if (action) params.push('action=' + encodeURIComponent(action));
     if (user) params.push('username=' + encodeURIComponent(user));
     var qs = params.length > 0 ? '?' + params.join('&') : '';
-    if (window.sfMarkNavigation) window.sfMarkNavigation();
     window.location.href = docroot + '/auditlog' + qs;
 });
 </script>

@@ -1144,9 +1144,6 @@ function displayWorkspaces(workspaces) {
 }
 
 function viewWorkspace(workspaceId) {
-    // Mark as navigation to prevent auto-logout
-    if (window.sfMarkNavigation) window.sfMarkNavigation();
-    // Redirect to the enhanced workspace details page
     window.location.href = '${docroot}/workspacedetails?workspace_id=' + workspaceId;
 }
 
