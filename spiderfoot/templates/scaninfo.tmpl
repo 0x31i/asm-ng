@@ -2659,12 +2659,13 @@
             dataloaders.push(
                 function() {
                     var geoPoints = [];
+                    var countryHits = {};
                     var loaded = 0;
-                    var total = 3;
+                    var total = 4;
                     function checkDone() {
                         loaded++;
                         if (loaded >= total) {
-                            renderGlobe(geoPoints);
+                            renderGlobe(geoPoints, countryHits);
                         }
                     }
                     // Fetch PHYSICAL_COORDINATES
@@ -2712,6 +2713,17 @@
                     // Fetch PHYSICAL_ADDRESS for context
                     sf.fetchData('${docroot}/scaneventresults', {'id': instanceId, 'eventType': 'PHYSICAL_ADDRESS'}, function(data) {
                         // Physical addresses don't have coords but we note them
+                        checkDone();
+                    });
+                    // Fetch COUNTRY_NAME for country highlighting
+                    sf.fetchData('${docroot}/scaneventresults', {'id': instanceId, 'eventType': 'COUNTRY_NAME'}, function(data) {
+                        for (var i = 0; i < data.length; i++) {
+                            var name = data[i][1].trim();
+                            if (name) {
+                                var key = name.toUpperCase();
+                                countryHits[key] = (countryHits[key] || 0) + 1;
+                            }
+                        }
                         checkDone();
                     });
                 }
@@ -2928,7 +2940,70 @@
         var globeRotY = 0;
         var globeHotspots = [];
 
-        function renderGlobe(geoPoints) {
+        // Country name to approximate centroid lat/lon lookup
+        var countryCoords = {
+            'AFGHANISTAN':[33,65],'ALBANIA':[41,20],'ALGERIA':[28,3],'ANDORRA':[42.5,1.5],'ANGOLA':[-12.5,18.5],
+            'ANGUILLA':[18.2,-63],'ANTIGUA AND BARBUDA':[17.05,-61.8],'ARGENTINA':[-34,-64],'ARMENIA':[40,45],
+            'ASCENSION ISLAND':[-8,-14.4],'AUSTRALIA':[-27,133],'AUSTRIA':[47.3,13.3],'AZERBAIJAN':[40.5,47.5],
+            'BAHAMAS':[24.25,-76],'BAHRAIN':[26,50.5],'BANGLADESH':[24,90],'BARBADOS':[13.2,-59.5],
+            'BELARUS':[53,28],'BELGIUM':[50.8,4],'BELIZE':[17.2,-88.7],'BENIN':[9.5,2.2],'BERMUDA':[32.3,-64.8],
+            'BHUTAN':[27.5,90.5],'BOLIVIA':[-17,-65],'BOSNIA AND HERZEGOVINA':[44,18],'BOTSWANA':[-22,24],
+            'BRAZIL':[-10,-55],'BRUNEI':[4.5,114.7],'BULGARIA':[43,25],'BURKINA FASO':[13,-2],
+            'BURUNDI':[-3.5,30],'CAMBODIA':[13,105],'CAMEROON':[6,12],'CANADA':[60,-95],'CAPE VERDE':[16,-24],
+            'CAYMAN ISLANDS':[19.5,-80.5],'CENTRAL AFRICAN REPUBLIC':[7,21],'CHAD':[15,19],'CHILE':[-30,-71],
+            'CHINA':[35,105],'COLOMBIA':[4,-72],'COMOROS':[-12.2,44.2],'CONGO':[-1,15],
+            'DEMOCRATIC REPUBLIC OF THE CONGO':[-4,22],'COSTA RICA':[10,-84],'CROATIA':[45.2,15.5],
+            'CUBA':[21.5,-80],'CURACAO':[12.2,-69],'CYPRUS':[35,33],'CZECH REPUBLIC':[49.8,15.5],
+            'CZECHIA':[49.8,15.5],'DENMARK':[56,10],'DJIBOUTI':[11.5,43],'DOMINICA':[15.4,-61.4],
+            'DOMINICAN REPUBLIC':[19,-70.7],'EAST TIMOR':[-8.8,126],'ECUADOR':[-2,-77.5],
+            'EGYPT':[27,30],'EL SALVADOR':[13.8,-88.9],'EQUATORIAL GUINEA':[2,10],'ERITREA':[15,39],
+            'ESTONIA':[59,26],'ESWATINI':[-26.5,31.5],'ETHIOPIA':[8,38],'FIJI':[-18,175],
+            'FINLAND':[64,26],'FRANCE':[46,2],'GABON':[-1,11.7],'GAMBIA':[13.5,-16.6],
+            'GEORGIA':[42,43.5],'GERMANY':[51,9],'GHANA':[8,-2],'GIBRALTAR':[36.1,-5.4],
+            'GREECE':[39,22],'GREENLAND':[72,-40],'GRENADA':[12.1,-61.7],'GUAM':[13.4,144.8],
+            'GUATEMALA':[15.5,-90.2],'GUERNSEY':[49.5,-2.5],'GUINEA':[11,-10],'GUINEA-BISSAU':[12,-15],
+            'GUYANA':[5,-59],'HAITI':[19,-72.4],'HONDURAS':[15,-86.5],'HONG KONG':[22.3,114.2],
+            'HUNGARY':[47,20],'ICELAND':[65,-18],'INDIA':[20,77],'INDONESIA':[-5,120],
+            'IRAN':[32,53],'IRAQ':[33,44],'IRELAND':[53,-8],'ISLE OF MAN':[54.2,-4.5],
+            'ISRAEL':[31.5,34.8],'ITALY':[42.8,12.8],'IVORY COAST':[8,-5.5],'JAMAICA':[18.1,-77.3],
+            'JAPAN':[36,138],'JERSEY':[49.2,-2.1],'JORDAN':[31,36],'KAZAKHSTAN':[48,68],
+            'KENYA':[1,38],'KIRIBATI':[1.4,173],'KOSOVO':[42.6,21],'KUWAIT':[29.5,47.8],
+            'KYRGYZSTAN':[41,75],'LAOS':[18,105],'LATVIA':[57,25],'LEBANON':[33.8,35.8],
+            'LESOTHO':[-29.5,28.5],'LIBERIA':[6.5,-9.5],'LIBYA':[25,17],'LIECHTENSTEIN':[47.2,9.5],
+            'LITHUANIA':[56,24],'LUXEMBOURG':[49.8,6.2],'MACAO':[22.2,113.5],'NORTH MACEDONIA':[41.5,22],
+            'MADAGASCAR':[-20,47],'MALAWI':[-13.5,34],'MALAYSIA':[2.5,112.5],'MALDIVES':[3.2,73],
+            'MALI':[17,-4],'MALTA':[35.9,14.4],'MARSHALL ISLANDS':[9,168],'MAURITANIA':[20,-12],
+            'MAURITIUS':[-20.3,57.6],'MEXICO':[23,-102],'MICRONESIA':[6.9,158.2],'MOLDOVA':[47,29.5],
+            'MONACO':[43.7,7.4],'MONGOLIA':[46,105],'MONTENEGRO':[42.5,19.3],'MOROCCO':[32,-5],
+            'MOZAMBIQUE':[-18.2,35],'MYANMAR':[22,98],'NAMIBIA':[-22,17],'NAURU':[-0.5,166.9],
+            'NEPAL':[28,84],'NETHERLANDS':[52.5,5.8],'NEW CALEDONIA':[-22.3,166.5],'NEW ZEALAND':[-41,174],
+            'NICARAGUA':[13,-85],'NIGER':[16,8],'NIGERIA':[10,8],'NORTH KOREA':[40,127],
+            'NORWAY':[62,10],'OMAN':[21,57],'PAKISTAN':[30,70],'PALAU':[7.5,134.5],
+            'PALESTINE':[32,35.3],'PANAMA':[9,-80],'PAPUA NEW GUINEA':[-6,147],'PARAGUAY':[-23,-58],
+            'PERU':[-10,-76],'PHILIPPINES':[13,122],'POLAND':[52,20],'PORTUGAL':[39.5,-8],
+            'PUERTO RICO':[18.2,-66.5],'QATAR':[25.5,51.3],'REUNION':[-21.1,55.5],'ROMANIA':[46,25],
+            'RUSSIA':[60,100],'RUSSIAN FEDERATION':[60,100],'RWANDA':[-2,29.9],'SAINT KITTS AND NEVIS':[17.3,-62.7],
+            'SAINT LUCIA':[13.9,-61],'SAINT VINCENT AND THE GRENADINES':[13.2,-61.2],'SAMOA':[-13.8,-172],
+            'SAN MARINO':[43.9,12.4],'SAO TOME AND PRINCIPE':[1,7],'SAUDI ARABIA':[25,45],
+            'SENEGAL':[14,-14],'SERBIA':[44,21],'SEYCHELLES':[-4.7,55.5],'SIERRA LEONE':[8.5,-11.8],
+            'SINGAPORE':[1.4,103.8],'SINT MAARTEN':[18,-63.1],'SLOVAKIA':[48.7,19.5],'SLOVENIA':[46.1,15],
+            'SOLOMON ISLANDS':[-8,159],'SOMALIA':[5,46],'SOUTH AFRICA':[-29,24],'SOUTH KOREA':[37,127.5],
+            'SOUTH SUDAN':[8,30],'SPAIN':[40,-4],'SRI LANKA':[7,81],'SUDAN':[15,30],
+            'SURINAME':[4,-56],'SWEDEN':[62,15],'SWITZERLAND':[47,8.2],'SYRIA':[35,38],
+            'TAIWAN':[23.5,121],'TAJIKISTAN':[39,71],'TANZANIA':[-6,35],'THAILAND':[15,100],
+            'TOGO':[8,1.2],'TONGA':[-20,-175],'TRINIDAD AND TOBAGO':[10.4,-61.3],'TUNISIA':[34,9],
+            'TURKEY':[39,35],'TURKMENISTAN':[40,60],'TURKS AND CAICOS ISLANDS':[21.8,-71.8],
+            'TUVALU':[-8,178],'UGANDA':[1,32],'UKRAINE':[49,32],'UNITED ARAB EMIRATES':[24,54],
+            'UNITED KINGDOM':[54,-2],'UNITED STATES':[38,-97],'UNITED STATES OF AMERICA':[38,-97],
+            'USA':[38,-97],'UK':[54,-2],'URUGUAY':[-33,-56],'UZBEKISTAN':[41,64],
+            'VANUATU':[-16,167],'VATICAN CITY':[41.9,12.5],'VENEZUELA':[8,-66],'VIETNAM':[16,108],
+            'VIRGIN ISLANDS':[18.3,-64.8],'YEMEN':[15,48],'ZAMBIA':[-15,30],'ZIMBABWE':[-20,30],
+            "COTE D'IVOIRE":[8,-5.5],'IVORY COAST':[8,-5.5]
+        };
+
+        var globeCountryData = []; // [{lat, lon, name, count, intensity}]
+
+        function renderGlobe(geoPoints, countryHits) {
             $('#globe-loading').hide();
             var canvas = document.getElementById('globe-canvas');
             if (!canvas) return;
@@ -2942,7 +3017,7 @@
             var ctx = canvas.getContext('2d');
             ctx.scale(2, 2);
 
-            // Deduplicate points by rounding to 0.1 degree
+            // Deduplicate coordinate points by rounding to 0.1 degree
             var seen = {};
             var uniquePoints = [];
             for (var i = 0; i < geoPoints.length; i++) {
@@ -2954,9 +3029,41 @@
             }
             globeHotspots = uniquePoints;
 
-            var countText = uniquePoints.length + ' HOTSPOT' + (uniquePoints.length !== 1 ? 'S' : '') + ' DETECTED';
-            if (uniquePoints.length === 0) countText = 'NO GEO DATA';
-            $('#globe-hotspot-count').text(countText);
+            // Build country hotspot data from countryHits
+            globeCountryData = [];
+            var maxHits = 0;
+            for (var name in countryHits) {
+                if (countryHits[name] > maxHits) maxHits = countryHits[name];
+            }
+            for (var name in countryHits) {
+                var coords = countryCoords[name];
+                if (!coords) {
+                    // Try common variations
+                    var altNames = [name, name.replace(/\s+/g, ' ')];
+                    for (var a = 0; a < altNames.length; a++) {
+                        if (countryCoords[altNames[a]]) { coords = countryCoords[altNames[a]]; break; }
+                    }
+                }
+                if (coords) {
+                    var intensity = maxHits > 0 ? countryHits[name] / maxHits : 0.3;
+                    globeCountryData.push({lat: coords[0], lon: coords[1], name: name, count: countryHits[name], intensity: intensity});
+                }
+            }
+            // Sort so brightest (most hits) renders last (on top)
+            globeCountryData.sort(function(a, b) { return a.intensity - b.intensity; });
+
+            // Store on hotspots for hover detection
+            for (var i = 0; i < globeCountryData.length; i++) {
+                globeHotspots.push({lat: globeCountryData[i].lat, lon: globeCountryData[i].lon, label: globeCountryData[i].name, type: 'COUNTRY', source: '', count: globeCountryData[i].count, intensity: globeCountryData[i].intensity});
+            }
+
+            var totalCountries = Object.keys(countryHits).length;
+            var totalCoords = uniquePoints.length;
+            var countParts = [];
+            if (totalCoords > 0) countParts.push(totalCoords + ' POINT' + (totalCoords !== 1 ? 'S' : ''));
+            if (totalCountries > 0) countParts.push(totalCountries + ' COUNTR' + (totalCountries !== 1 ? 'IES' : 'Y'));
+            var countText = countParts.length > 0 ? countParts.join(' &bull; ') : 'NO GEO DATA';
+            $('#globe-hotspot-count').html(countText);
 
             var cx = w / 2;
             var cy = h / 2;
@@ -2972,7 +3079,6 @@
                     globeRotY = globeDragStart.rotY + (e.clientX - globeDragStart.x) * 0.005;
                     globeRotX = Math.max(-Math.PI/2, Math.min(Math.PI/2, globeDragStart.rotX + (e.clientY - globeDragStart.y) * 0.005));
                 } else {
-                    // Tooltip on hover
                     checkGlobeHover(e, canvas, cx, cy, radius);
                 }
             };
@@ -2986,18 +3092,11 @@
                 var x3d = cosP * Math.sin(lam);
                 var y3d = Math.sin(phi);
                 var z3d = cosP * Math.cos(lam);
-                // Rotate around Y axis
                 var x2 = x3d * Math.cos(globeRotY) - z3d * Math.sin(globeRotY);
                 var z2 = x3d * Math.sin(globeRotY) + z3d * Math.cos(globeRotY);
-                // Rotate around X axis (tilt)
                 var y2 = y3d * Math.cos(globeRotX) - z2 * Math.sin(globeRotX);
                 var z3 = y3d * Math.sin(globeRotX) + z2 * Math.cos(globeRotX);
-                return {
-                    x: cx + x2 * radius,
-                    y: cy - y2 * radius,
-                    z: z3,
-                    visible: z3 > 0
-                };
+                return { x: cx + x2 * radius, y: cy - y2 * radius, z: z3, visible: z3 > 0 };
             }
 
             function drawFrame() {
@@ -3050,9 +3149,7 @@
                         if (p.visible) {
                             if (first) { ctx.moveTo(p.x, p.y); first = false; }
                             else ctx.lineTo(p.x, p.y);
-                        } else {
-                            first = true;
-                        }
+                        } else { first = true; }
                     }
                     ctx.stroke();
                 }
@@ -3066,55 +3163,98 @@
                         if (p.visible) {
                             if (first) { ctx.moveTo(p.x, p.y); first = false; }
                             else ctx.lineTo(p.x, p.y);
-                        } else {
-                            first = true;
-                        }
+                        } else { first = true; }
                     }
                     ctx.stroke();
                 }
 
-                // Simplified continent outlines (major coastline points)
+                // Simplified continent outlines
                 drawContinents(ctx, project);
 
-                // Hotspots
+                // === COUNTRY HOTSPOTS (white glow, intensity based on hit count) ===
+                for (var i = 0; i < globeCountryData.length; i++) {
+                    var cd = globeCountryData[i];
+                    var p = project(cd.lat, cd.lon);
+                    if (!p.visible) continue;
+
+                    var pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.002 + i * 2.0);
+                    var alpha = 0.15 + cd.intensity * 0.85; // min 0.15, max 1.0
+                    var glowSize = 18 + cd.intensity * 22 + pulse * 6;
+                    var coreSize = 4 + cd.intensity * 4;
+
+                    // Large diffuse glow
+                    var cGrd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowSize);
+                    cGrd.addColorStop(0, 'rgba(255, 255, 255, ' + (alpha * 0.6) + ')');
+                    cGrd.addColorStop(0.2, 'rgba(255, 255, 255, ' + (alpha * 0.35) + ')');
+                    cGrd.addColorStop(0.5, 'rgba(255, 255, 255, ' + (alpha * 0.12) + ')');
+                    cGrd.addColorStop(0.75, 'rgba(255, 255, 255, ' + (alpha * 0.03) + ')');
+                    cGrd.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, glowSize, 0, Math.PI * 2);
+                    ctx.fillStyle = cGrd;
+                    ctx.fill();
+
+                    // Core bright spot
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, coreSize, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255, 255, 255, ' + (alpha * 0.9) + ')';
+                    ctx.shadowColor = 'rgba(255, 255, 255, ' + alpha + ')';
+                    ctx.shadowBlur = 20 * alpha;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                    // Country name label for high-intensity countries
+                    if (cd.intensity > 0.4) {
+                        ctx.font = '600 ' + (8 + cd.intensity * 3) + 'px "JetBrains Mono", monospace';
+                        ctx.fillStyle = 'rgba(255, 255, 255, ' + (alpha * 0.7) + ')';
+                        ctx.shadowColor = 'rgba(255, 255, 255, ' + (alpha * 0.5) + ')';
+                        ctx.shadowBlur = 8;
+                        ctx.textAlign = 'center';
+                        ctx.fillText(cd.name, p.x, p.y - coreSize - 6);
+                        ctx.shadowBlur = 0;
+                        ctx.textAlign = 'left';
+                    }
+                }
+
+                // === COORDINATE/ADDRESS HOTSPOTS (bright green dots) ===
                 for (var i = 0; i < uniquePoints.length; i++) {
                     var pt = uniquePoints[i];
                     var p = project(pt.lat, pt.lon);
                     if (!p.visible) continue;
 
-                    // Pulse animation
                     var pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.003 + i * 1.5);
 
-                    // Outer glow
-                    var hotGrd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 12 + pulse * 8);
-                    hotGrd.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
-                    hotGrd.addColorStop(0.3, 'rgba(255, 255, 255, 0.2)');
-                    hotGrd.addColorStop(0.6, 'rgba(255, 255, 255, 0.05)');
-                    hotGrd.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    // Outer green glow
+                    var hotGrd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 14 + pulse * 8);
+                    hotGrd.addColorStop(0, 'rgba(34, 197, 94, 0.7)');
+                    hotGrd.addColorStop(0.25, 'rgba(34, 197, 94, 0.35)');
+                    hotGrd.addColorStop(0.5, 'rgba(34, 197, 94, 0.12)');
+                    hotGrd.addColorStop(0.75, 'rgba(34, 197, 94, 0.03)');
+                    hotGrd.addColorStop(1, 'rgba(34, 197, 94, 0)');
                     ctx.beginPath();
-                    ctx.arc(p.x, p.y, 12 + pulse * 8, 0, Math.PI * 2);
+                    ctx.arc(p.x, p.y, 14 + pulse * 8, 0, Math.PI * 2);
                     ctx.fillStyle = hotGrd;
                     ctx.fill();
 
-                    // Core dot
+                    // Core green dot
                     ctx.beginPath();
-                    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-                    ctx.fillStyle = '#ffffff';
-                    ctx.shadowColor = 'rgba(255, 255, 255, 0.9)';
-                    ctx.shadowBlur = 15;
+                    ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+                    ctx.fillStyle = '#22c55e';
+                    ctx.shadowColor = 'rgba(34, 197, 94, 0.9)';
+                    ctx.shadowBlur = 18;
                     ctx.fill();
                     ctx.shadowBlur = 0;
 
-                    // Crosshair lines
-                    ctx.strokeStyle = 'rgba(255, 255, 255, ' + (0.15 + pulse * 0.1) + ')';
+                    // Green crosshair lines
+                    ctx.strokeStyle = 'rgba(34, 197, 94, ' + (0.2 + pulse * 0.15) + ')';
                     ctx.lineWidth = 0.5;
                     ctx.beginPath();
-                    ctx.moveTo(p.x - 8, p.y); ctx.lineTo(p.x + 8, p.y);
-                    ctx.moveTo(p.x, p.y - 8); ctx.lineTo(p.x, p.y + 8);
+                    ctx.moveTo(p.x - 9, p.y); ctx.lineTo(p.x + 9, p.y);
+                    ctx.moveTo(p.x, p.y - 9); ctx.lineTo(p.x, p.y + 9);
                     ctx.stroke();
                 }
 
-                // Scanning line effect (sweeping radial line)
+                // Scanning line effect
                 var scanAngle = (Date.now() * 0.001) % (Math.PI * 2);
                 ctx.beginPath();
                 ctx.moveTo(cx, cy);
@@ -3162,10 +3302,18 @@
                     if (!p.visible) continue;
                     var dx = mx - p.x;
                     var dy = my - p.y;
-                    if (dx * dx + dy * dy < 225) { // 15px radius
-                        var html = '<div style="font-weight:700;margin-bottom:4px;color:#fff;text-shadow:0 0 10px rgba(255,255,255,0.8);">' + pt.type + '</div>';
-                        html += '<div style="color:var(--text-secondary);">' + pt.lat.toFixed(4) + ', ' + pt.lon.toFixed(4) + '</div>';
-                        if (pt.source) html += '<div style="color:var(--text-muted);margin-top:2px;font-size:10px;">SRC: ' + $('<span>').text(pt.source).html().substring(0, 50) + '</div>';
+                    var hitRadius = pt.type === 'COUNTRY' ? 400 : 225;
+                    if (dx * dx + dy * dy < hitRadius) {
+                        var html = '';
+                        if (pt.type === 'COUNTRY') {
+                            html += '<div style="font-weight:700;margin-bottom:4px;color:#fff;text-shadow:0 0 10px rgba(255,255,255,0.8);">' + pt.label + '</div>';
+                            html += '<div style="color:var(--text-secondary);">' + pt.count + ' HIT' + (pt.count !== 1 ? 'S' : '') + '</div>';
+                            html += '<div style="color:var(--text-muted);margin-top:2px;font-size:10px;">COUNTRY</div>';
+                        } else {
+                            html += '<div style="font-weight:700;margin-bottom:4px;color:#22c55e;text-shadow:0 0 10px rgba(34,197,94,0.8);">' + pt.type + '</div>';
+                            html += '<div style="color:var(--text-secondary);">' + pt.lat.toFixed(4) + ', ' + pt.lon.toFixed(4) + '</div>';
+                            if (pt.source) html += '<div style="color:var(--text-muted);margin-top:2px;font-size:10px;">SRC: ' + $('<span>').text(pt.source).html().substring(0, 50) + '</div>';
+                        }
                         tooltip.html(html).css({left: mx + 15, top: my - 10}).show();
                         found = true;
                         break;
