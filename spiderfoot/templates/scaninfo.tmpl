@@ -2396,12 +2396,13 @@
             grid += "</div></div></div>";
 
             // Inline style vars for header badge colors
-            var _hdrBase = 'font-family:\"JetBrains Mono\",monospace;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#fff;border-bottom:none;padding:8px 14px;';
+            // NOTE: Using &quot; for quotes in font-family to avoid breaking the style attribute
+            var _hdrBase = 'font-family:JetBrains Mono,monospace;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#fff;border-bottom:none;padding:8px 14px;';
             var _hdrScanStatus = _hdrBase + 'background:linear-gradient(135deg,#f59e0b,#d97706);box-shadow:0 0 12px rgba(245,158,11,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(245,158,11,0.5);';
             var _hdrFindings   = _hdrBase + 'background:linear-gradient(135deg,#22c55e,#16a34a);box-shadow:0 0 12px rgba(34,197,94,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(34,197,94,0.5);';
             var _hdrCorr       = _hdrBase + 'background:linear-gradient(135deg,#3b82f6,#2563eb);box-shadow:0 0 12px rgba(59,130,246,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(59,130,246,0.5);';
-            var _hdrNessus     = _hdrBase + 'background:linear-gradient(135deg,#8b5cf6,#7c3aed);box-shadow:0 0 12px rgba(139,92,246,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(139,92,246,0.5);';
-            var _hdrBurp       = _hdrBase + 'background:linear-gradient(135deg,#22d3ee,#06b6d4);box-shadow:0 0 12px rgba(34,211,238,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(34,211,238,0.5);';
+            var _hdrExtVuln    = _hdrBase + 'background:linear-gradient(135deg,#8b5cf6,#7c3aed);box-shadow:0 0 12px rgba(139,92,246,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(139,92,246,0.5);';
+            var _hdrWebVuln    = _hdrBase + 'background:linear-gradient(135deg,#22d3ee,#06b6d4);box-shadow:0 0 12px rgba(34,211,238,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(34,211,238,0.5);';
             var _hdrIcon = 'color:#fff;text-shadow:0 0 8px rgba(255,255,255,0.7);';
 
             // RIGHT COLUMN: 5 separate panels stacked
@@ -2467,9 +2468,9 @@
             grid += "<button class='btn disabled summary-count-btn btn-default' id='corr-info' style='cursor:default'>?</button></div>";
             grid += "</div></div></div>";
 
-            // Nessus panel (PURPLE)
+            // External Vulnerabilities panel (PURPLE)
             grid += "<div class='panel panel-default summary-right-panel' style='margin-bottom:0;flex:1;display:flex;flex-direction:column;min-height:0;'>";
-            grid += "<div class='panel-heading' style='" + _hdrNessus + "'><i class='glyphicon glyphicon-search' style='" + _hdrIcon + "'></i>&nbsp;&nbsp;NESSUS</div>";
+            grid += "<div class='panel-heading' style='" + _hdrExtVuln + "'><i class='glyphicon glyphicon-search' style='" + _hdrIcon + "'></i>&nbsp;&nbsp;EXTERNAL VULNERABILITIES</div>";
             grid += "<div class='panel-body summary-counts-body' style='flex:1;display:flex;align-items:center;justify-content:center;padding:2px;min-height:0;overflow:hidden;'>";
             grid += "<div class='btn-toolbar text-center' style='display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px;'>";
             grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-critical' style='cursor:default'>CRITICAL</button>";
@@ -2484,9 +2485,9 @@
             grid += "<button class='btn disabled summary-count-btn btn-default' id='nessus-info' style='cursor:default'>-</button></div>";
             grid += "</div></div></div>";
 
-            // Burp panel (CYAN)
+            // Web App Vulnerabilities panel (CYAN)
             grid += "<div class='panel panel-default summary-right-panel' style='margin-bottom:0;flex:1;display:flex;flex-direction:column;min-height:0;'>";
-            grid += "<div class='panel-heading' style='" + _hdrBurp + "'><i class='glyphicon glyphicon-fire' style='" + _hdrIcon + "'></i>&nbsp;&nbsp;BURP</div>";
+            grid += "<div class='panel-heading' style='" + _hdrWebVuln + "'><i class='glyphicon glyphicon-fire' style='" + _hdrIcon + "'></i>&nbsp;&nbsp;WEB APP VULNERABILITIES</div>";
             grid += "<div class='panel-body summary-counts-body' style='flex:1;display:flex;align-items:center;justify-content:center;padding:2px;min-height:0;overflow:hidden;'>";
             grid += "<div class='btn-toolbar text-center' style='display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px;'>";
             grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-critical' style='cursor:default'>CRITICAL</button>";
@@ -3348,47 +3349,57 @@
                 return { x: cx + x2 * radius, y: cy - y2 * radius, z: z3, visible: z3 > 0 };
             }
 
+            // Threat color based on intensity
+            function threatColor(intensity) {
+                if (intensity > 0.7) return {r:239,g:68,b:68};   // red - critical
+                if (intensity > 0.4) return {r:245,g:158,b:11};  // amber - medium
+                return {r:34,g:197,b:94};                          // green - low
+            }
+
             function drawFrame() {
+                var now = Date.now();
                 ctx.clearRect(0, 0, w, h);
 
                 // Background
                 ctx.fillStyle = '#0c0c0c';
                 ctx.fillRect(0, 0, w, h);
 
-                // Globe outer glow
-                var grd = ctx.createRadialGradient(cx, cy, radius * 0.95, cx, cy, radius * 1.3);
-                grd.addColorStop(0, 'rgba(255, 255, 255, 0.03)');
-                grd.addColorStop(0.5, 'rgba(255, 255, 255, 0.01)');
-                grd.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                // Globe outer glow - green tinted atmosphere
+                var grd = ctx.createRadialGradient(cx, cy, radius * 0.9, cx, cy, radius * 1.4);
+                grd.addColorStop(0, 'rgba(34, 197, 94, 0.04)');
+                grd.addColorStop(0.5, 'rgba(34, 197, 94, 0.015)');
+                grd.addColorStop(1, 'rgba(34, 197, 94, 0)');
                 ctx.fillStyle = grd;
                 ctx.fillRect(0, 0, w, h);
 
-                // Globe sphere
+                // Globe sphere - darker with subtle blue tint
                 ctx.beginPath();
                 ctx.arc(cx, cy, radius, 0, Math.PI * 2);
                 var sphereGrd = ctx.createRadialGradient(cx - radius * 0.3, cy - radius * 0.3, 0, cx, cy, radius);
-                sphereGrd.addColorStop(0, 'rgba(30, 30, 30, 1)');
-                sphereGrd.addColorStop(0.7, 'rgba(15, 15, 15, 1)');
-                sphereGrd.addColorStop(1, 'rgba(8, 8, 8, 1)');
+                sphereGrd.addColorStop(0, 'rgba(20, 25, 35, 1)');
+                sphereGrd.addColorStop(0.7, 'rgba(10, 12, 20, 1)');
+                sphereGrd.addColorStop(1, 'rgba(5, 6, 12, 1)');
                 ctx.fillStyle = sphereGrd;
                 ctx.fill();
 
-                // Globe border glow
+                // Globe border glow - green tinted
                 ctx.beginPath();
                 ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.strokeStyle = 'rgba(34, 197, 94, 0.2)';
                 ctx.lineWidth = 1.5;
                 ctx.stroke();
 
-                // Subtle atmosphere glow
-                ctx.beginPath();
-                ctx.arc(cx, cy, radius + 2, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-                ctx.lineWidth = 3;
-                ctx.stroke();
+                // Outer atmosphere rings
+                for (var ring = 1; ring <= 3; ring++) {
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, radius + ring * 3, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(34, 197, 94, ' + (0.06 / ring) + ')';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
 
-                // Grid lines - latitude
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+                // Grid lines - latitude (green tinted)
+                ctx.strokeStyle = 'rgba(34, 197, 94, 0.06)';
                 ctx.lineWidth = 0.5;
                 for (var lat = -60; lat <= 60; lat += 30) {
                     ctx.beginPath();
@@ -3417,11 +3428,10 @@
                     ctx.stroke();
                 }
 
-                // Simplified continent outlines
+                // Continent outlines + fills
                 drawContinents(ctx, project);
 
-                // === COUNTRY FILLS (white glow polygons, intensity based on hit count) ===
-                // Clip to globe circle for country fills
+                // === COUNTRY FILLS (threat-colored glow, intensity based) ===
                 ctx.save();
                 ctx.beginPath();
                 ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2);
@@ -3433,11 +3443,12 @@
                     var centroid = project(cd.lat, cd.lon);
                     if (!centroid.visible) continue;
 
-                    var pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.002 + i * 2.0);
-                    var alpha = 0.1 + cd.intensity * 0.5;
+                    var pulse = 0.5 + 0.5 * Math.sin(now * 0.002 + i * 2.0);
+                    var alpha = 0.15 + cd.intensity * 0.6;
+                    var tc = threatColor(cd.intensity);
+                    var tcStr = tc.r + ',' + tc.g + ',' + tc.b;
 
                     if (poly && poly.length >= 3) {
-                        // Draw filled country polygon
                         var projected = [];
                         var visCount = 0;
                         for (var j = 0; j < poly.length; j++) {
@@ -3445,9 +3456,8 @@
                             projected.push(pp);
                             if (pp.visible) visCount++;
                         }
-                        // Only draw if majority of points visible
                         if (visCount >= poly.length * 0.4) {
-                            // Fill polygon with white glow
+                            // Filled country polygon - threat colored
                             ctx.beginPath();
                             var started = false;
                             for (var j = 0; j < projected.length; j++) {
@@ -3457,13 +3467,13 @@
                                 }
                             }
                             ctx.closePath();
-                            ctx.fillStyle = 'rgba(255, 255, 255, ' + (alpha * (0.25 + pulse * 0.1)) + ')';
-                            ctx.shadowColor = 'rgba(255, 255, 255, ' + (alpha * 0.8) + ')';
-                            ctx.shadowBlur = 12 + cd.intensity * 15;
+                            ctx.fillStyle = 'rgba(' + tcStr + ',' + (alpha * (0.3 + pulse * 0.15)) + ')';
+                            ctx.shadowColor = 'rgba(' + tcStr + ',' + (alpha * 0.9) + ')';
+                            ctx.shadowBlur = 15 + cd.intensity * 20;
                             ctx.fill();
                             ctx.shadowBlur = 0;
 
-                            // Stroke outline
+                            // Bright stroke outline
                             ctx.beginPath();
                             started = false;
                             for (var j = 0; j < projected.length; j++) {
@@ -3473,90 +3483,175 @@
                                 }
                             }
                             ctx.closePath();
-                            ctx.strokeStyle = 'rgba(255, 255, 255, ' + (alpha * 0.6) + ')';
-                            ctx.lineWidth = 1;
+                            ctx.strokeStyle = 'rgba(' + tcStr + ',' + (alpha * 0.8) + ')';
+                            ctx.lineWidth = 1.2;
                             ctx.stroke();
                         }
                     } else {
-                        // Fallback: draw a larger glowing region for countries without polygon data
-                        var glowSize = 20 + cd.intensity * 20 + pulse * 6;
+                        // Fallback glow region - threat colored
+                        var glowSize = 25 + cd.intensity * 25 + pulse * 8;
                         var cGrd = ctx.createRadialGradient(centroid.x, centroid.y, 0, centroid.x, centroid.y, glowSize);
-                        cGrd.addColorStop(0, 'rgba(255, 255, 255, ' + (alpha * 0.5) + ')');
-                        cGrd.addColorStop(0.3, 'rgba(255, 255, 255, ' + (alpha * 0.25) + ')');
-                        cGrd.addColorStop(0.6, 'rgba(255, 255, 255, ' + (alpha * 0.08) + ')');
-                        cGrd.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                        cGrd.addColorStop(0, 'rgba(' + tcStr + ',' + (alpha * 0.6) + ')');
+                        cGrd.addColorStop(0.3, 'rgba(' + tcStr + ',' + (alpha * 0.3) + ')');
+                        cGrd.addColorStop(0.6, 'rgba(' + tcStr + ',' + (alpha * 0.1) + ')');
+                        cGrd.addColorStop(1, 'rgba(' + tcStr + ',0)');
                         ctx.beginPath();
                         ctx.arc(centroid.x, centroid.y, glowSize, 0, Math.PI * 2);
                         ctx.fillStyle = cGrd;
                         ctx.fill();
                     }
 
-                    // Country name label for high-intensity countries
-                    if (cd.intensity > 0.3) {
-                        ctx.font = '600 ' + (8 + cd.intensity * 3) + 'px "JetBrains Mono", monospace';
-                        ctx.fillStyle = 'rgba(255, 255, 255, ' + (alpha * 1.2) + ')';
-                        ctx.shadowColor = 'rgba(255, 255, 255, ' + (alpha * 0.7) + ')';
-                        ctx.shadowBlur = 10;
+                    // Country name labels - always show for countries with data
+                    if (cd.intensity > 0.15) {
+                        var labelSize = Math.max(7, Math.min(11, 7 + cd.intensity * 5));
+                        ctx.font = '700 ' + labelSize + 'px JetBrains Mono,monospace';
+                        ctx.fillStyle = 'rgba(' + tcStr + ',' + Math.min(1, alpha * 1.5) + ')';
+                        ctx.shadowColor = 'rgba(' + tcStr + ',' + (alpha * 0.8) + ')';
+                        ctx.shadowBlur = 12;
                         ctx.textAlign = 'center';
                         ctx.fillText(cd.name, centroid.x, centroid.y + 4);
+                        // Hit count below name for high-intensity
+                        if (cd.intensity > 0.3) {
+                            ctx.font = '600 ' + (labelSize - 2) + 'px JetBrains Mono,monospace';
+                            ctx.fillStyle = 'rgba(255,255,255,' + (alpha * 0.8) + ')';
+                            ctx.fillText(cd.count + ' HITS', centroid.x, centroid.y + 4 + labelSize);
+                        }
                         ctx.shadowBlur = 0;
                         ctx.textAlign = 'left';
+                    }
+
+                    // Animated expanding ring pulse for high-activity countries
+                    if (cd.intensity > 0.4) {
+                        var ringPhase = ((now * 0.001 + i * 1.3) % 3) / 3; // 0..1 over 3 seconds
+                        var ringR = 8 + ringPhase * 35;
+                        var ringAlpha = (1 - ringPhase) * 0.3 * cd.intensity;
+                        ctx.beginPath();
+                        ctx.arc(centroid.x, centroid.y, ringR, 0, Math.PI * 2);
+                        ctx.strokeStyle = 'rgba(' + tcStr + ',' + ringAlpha + ')';
+                        ctx.lineWidth = 1.5;
+                        ctx.stroke();
                     }
                 }
                 ctx.restore(); // restore clipping
 
-                // === COORDINATE/ADDRESS HOTSPOTS (bright green dots) ===
+                // === CONNECTION ARCS between hotspot pairs (green curved lines) ===
+                if (uniquePoints.length >= 2) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2);
+                    ctx.clip();
+
+                    var maxArcs = Math.min(15, uniquePoints.length - 1);
+                    for (var i = 0; i < maxArcs; i++) {
+                        var p1 = project(uniquePoints[i].lat, uniquePoints[i].lon);
+                        var j = (i + 1) % uniquePoints.length;
+                        var p2 = project(uniquePoints[j].lat, uniquePoints[j].lon);
+                        if (!p1.visible || !p2.visible) continue;
+
+                        // Animated dash offset for data flow effect
+                        var arcPulse = 0.15 + 0.15 * Math.sin(now * 0.002 + i * 0.8);
+
+                        // Quadratic bezier arc - control point above the midpoint
+                        var mx = (p1.x + p2.x) / 2;
+                        var my = (p1.y + p2.y) / 2;
+                        var dist = Math.sqrt((p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y));
+                        var cpx = mx;
+                        var cpy = my - dist * 0.3; // arc upward
+
+                        ctx.beginPath();
+                        ctx.moveTo(p1.x, p1.y);
+                        ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y);
+                        ctx.strokeStyle = 'rgba(34, 197, 94, ' + arcPulse + ')';
+                        ctx.lineWidth = 0.8;
+                        ctx.stroke();
+
+                        // Animated travel dot along arc
+                        var t = ((now * 0.0005 + i * 0.2) % 1);
+                        var tt = 1 - t;
+                        var dotX = tt * tt * p1.x + 2 * tt * t * cpx + t * t * p2.x;
+                        var dotY = tt * tt * p1.y + 2 * tt * t * cpy + t * t * p2.y;
+                        ctx.beginPath();
+                        ctx.arc(dotX, dotY, 2, 0, Math.PI * 2);
+                        ctx.fillStyle = 'rgba(34, 197, 94, 0.8)';
+                        ctx.shadowColor = 'rgba(34, 197, 94, 0.9)';
+                        ctx.shadowBlur = 8;
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                    }
+                    ctx.restore();
+                }
+
+                // === COORDINATE/ADDRESS HOTSPOTS (bright green dots with rings) ===
                 for (var i = 0; i < uniquePoints.length; i++) {
                     var pt = uniquePoints[i];
                     var p = project(pt.lat, pt.lon);
                     if (!p.visible) continue;
 
-                    var pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.003 + i * 1.5);
+                    var pulse = 0.5 + 0.5 * Math.sin(now * 0.003 + i * 1.5);
 
-                    // Outer green glow
-                    var hotGrd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 14 + pulse * 8);
-                    hotGrd.addColorStop(0, 'rgba(34, 197, 94, 0.7)');
-                    hotGrd.addColorStop(0.25, 'rgba(34, 197, 94, 0.35)');
+                    // Outer green glow - bigger and brighter
+                    var hotGrd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 18 + pulse * 10);
+                    hotGrd.addColorStop(0, 'rgba(34, 197, 94, 0.8)');
+                    hotGrd.addColorStop(0.2, 'rgba(34, 197, 94, 0.4)');
                     hotGrd.addColorStop(0.5, 'rgba(34, 197, 94, 0.12)');
-                    hotGrd.addColorStop(0.75, 'rgba(34, 197, 94, 0.03)');
                     hotGrd.addColorStop(1, 'rgba(34, 197, 94, 0)');
                     ctx.beginPath();
-                    ctx.arc(p.x, p.y, 14 + pulse * 8, 0, Math.PI * 2);
+                    ctx.arc(p.x, p.y, 18 + pulse * 10, 0, Math.PI * 2);
                     ctx.fillStyle = hotGrd;
                     ctx.fill();
 
-                    // Core green dot
+                    // Core bright dot
                     ctx.beginPath();
-                    ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
-                    ctx.fillStyle = '#22c55e';
-                    ctx.shadowColor = 'rgba(34, 197, 94, 0.9)';
-                    ctx.shadowBlur = 18;
+                    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = '#4ade80';
+                    ctx.shadowColor = 'rgba(34, 197, 94, 1)';
+                    ctx.shadowBlur = 20;
                     ctx.fill();
                     ctx.shadowBlur = 0;
 
-                    // Green crosshair lines
-                    ctx.strokeStyle = 'rgba(34, 197, 94, ' + (0.2 + pulse * 0.15) + ')';
+                    // Animated expanding ring
+                    var ringT = ((now * 0.001 + i * 0.7) % 2) / 2;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 4 + ringT * 18, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(34, 197, 94, ' + ((1 - ringT) * 0.5) + ')';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    // Crosshair
+                    ctx.strokeStyle = 'rgba(34, 197, 94, ' + (0.25 + pulse * 0.2) + ')';
                     ctx.lineWidth = 0.5;
                     ctx.beginPath();
-                    ctx.moveTo(p.x - 9, p.y); ctx.lineTo(p.x + 9, p.y);
-                    ctx.moveTo(p.x, p.y - 9); ctx.lineTo(p.x, p.y + 9);
+                    ctx.moveTo(p.x - 12, p.y); ctx.lineTo(p.x + 12, p.y);
+                    ctx.moveTo(p.x, p.y - 12); ctx.lineTo(p.x, p.y + 12);
                     ctx.stroke();
                 }
 
-                // Scanning line effect
-                var scanAngle = (Date.now() * 0.001) % (Math.PI * 2);
+                // === SCANNING SWEEP ===
+                var scanAngle = (now * 0.0008) % (Math.PI * 2);
+
+                // Radar sweep cone
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2);
+                ctx.clip();
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.arc(cx, cy, radius, scanAngle - 0.4, scanAngle, false);
+                ctx.closePath();
+                var sweepGrd = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+                sweepGrd.addColorStop(0, 'rgba(34, 197, 94, 0)');
+                sweepGrd.addColorStop(0.5, 'rgba(34, 197, 94, 0.02)');
+                sweepGrd.addColorStop(1, 'rgba(34, 197, 94, 0.06)');
+                ctx.fillStyle = sweepGrd;
+                ctx.fill();
+                ctx.restore();
+
+                // Sweep leading edge line
                 ctx.beginPath();
                 ctx.moveTo(cx, cy);
                 ctx.lineTo(cx + Math.cos(scanAngle) * radius, cy + Math.sin(scanAngle) * radius);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+                ctx.strokeStyle = 'rgba(34, 197, 94, 0.15)';
                 ctx.lineWidth = 1;
-                ctx.stroke();
-
-                // Scan arc trail
-                ctx.beginPath();
-                ctx.arc(cx, cy, radius * 0.98, scanAngle - 0.3, scanAngle, false);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
-                ctx.lineWidth = 2;
                 ctx.stroke();
 
                 if (!globeDragging) {
@@ -3697,14 +3792,19 @@
                         }
                     }
                     ctx.closePath();
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+                    // Green-tinted continent fill - much more visible
+                    ctx.fillStyle = 'rgba(34, 197, 94, 0.07)';
                     ctx.fill();
+                    // Add a subtle inner glow edge
+                    ctx.strokeStyle = 'rgba(34, 197, 94, 0.1)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
                 }
             }
 
-            // Second pass: draw continent outlines (white stroke)
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-            ctx.lineWidth = 0.8;
+            // Second pass: draw continent outlines (brighter green-white stroke)
+            ctx.strokeStyle = 'rgba(34, 197, 94, 0.25)';
+            ctx.lineWidth = 1;
 
             for (var c = 0; c < continents.length; c++) {
                 var pts = continents[c];
