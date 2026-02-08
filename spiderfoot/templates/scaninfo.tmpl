@@ -2699,8 +2699,18 @@
                         var d = cat.details[di];
                         var ptColor = d.points < 0 ? 'var(--accent-red)' : 'var(--text-muted)';
                         var ptStr = d.points < 0 ? d.points : '0';
+                        // Build clickable link to Browse > Type for this event type
+                        var typeLink = '';
+                        var safeType = d.type.replace(/"/g, '&quot;');
+                        if (d.type === 'EXTERNAL_VULNERABILITIES') {
+                            typeLink = "<a class='finding-type-link' style='cursor:pointer;color:var(--text-secondary);text-decoration:none;border-bottom:1px dotted var(--text-muted);' onclick='viewVulnerabilities(\"" + instanceId + "\"); window.scrollTo(0,0);' title='View External Vulnerabilities'>" + d.type + "</a>";
+                        } else if (d.type === 'WEBAPP_VULNERABILITIES') {
+                            typeLink = "<a class='finding-type-link' style='cursor:pointer;color:var(--text-secondary);text-decoration:none;border-bottom:1px dotted var(--text-muted);' onclick='viewVulnerabilities(\"" + instanceId + "\"); switchVulnTab(\"burp\", \"" + instanceId + "\"); window.scrollTo(0,0);' title='View Web App Vulnerabilities'>" + d.type + "</a>";
+                        } else {
+                            typeLink = "<a class='finding-type-link' style='cursor:pointer;color:var(--text-secondary);text-decoration:none;border-bottom:1px dotted var(--text-muted);' onclick='browseEventData(\"" + instanceId + "\", \"" + safeType + "\", \"" + safeType + "\", \"full\"); window.scrollTo(0,0);' title='Browse " + safeType + " data'>" + d.type + "</a>";
+                        }
                         h += "<div style='display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;'>";
-                        h += "<span style='font-family:var(--font-mono);color:var(--text-secondary);'>" + d.type + " <span style='color:var(--text-muted);'>(" + d.count + ")</span></span>";
+                        h += "<span style='font-family:var(--font-mono);'>" + typeLink + " <span style='color:var(--text-muted);'>(" + d.count + ")</span></span>";
                         h += "<span style='font-family:var(--font-mono);font-weight:600;color:" + ptColor + ";'>" + ptStr + "</span>";
                         h += "</div>";
                     }
