@@ -2822,113 +2822,146 @@ tr.active td {
   text-shadow: 0 0 8px var(--glow-green) !important;
 }
 
-/* === Split Panel Header Colors === */
-/* Findings panel - green header */
-.panel-heading-findings {
-  border-bottom: 3px solid #22c55e !important;
-  color: #22c55e !important;
-  text-shadow: 0 0 10px rgba(34, 197, 94, 0.5) !important;
+/* === Split Panel Header Colors - Badge/Button Aesthetic === */
+/* These need .panel-default > specificity to override the base .panel-heading rules */
+
+/* Findings panel - GREEN badge header */
+.panel-default > .panel-heading.panel-heading-findings {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
+  color: #ffffff !important;
+  border-bottom: none !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 10px rgba(34, 197, 94, 0.5) !important;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
   font-family: var(--font-mono) !important;
   font-weight: 700 !important;
   font-size: 12px !important;
   text-transform: uppercase !important;
   letter-spacing: 1px !important;
+  padding: 8px 14px !important;
 }
-.panel-heading-findings .glyphicon {
-  color: #22c55e !important;
-  text-shadow: 0 0 8px rgba(34, 197, 94, 0.6) !important;
+.panel-default > .panel-heading.panel-heading-findings .glyphicon {
+  color: #ffffff !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6) !important;
 }
 
-/* Correlations panel - blue header */
-.panel-heading-correlations {
-  border-bottom: 3px solid #3b82f6 !important;
-  color: #3b82f6 !important;
-  text-shadow: 0 0 10px rgba(59, 130, 246, 0.5) !important;
+/* Correlations panel - BLUE badge header */
+.panel-default > .panel-heading.panel-heading-correlations {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+  color: #ffffff !important;
+  border-bottom: none !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 10px rgba(59, 130, 246, 0.5) !important;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
   font-family: var(--font-mono) !important;
   font-weight: 700 !important;
   font-size: 12px !important;
   text-transform: uppercase !important;
   letter-spacing: 1px !important;
+  padding: 8px 14px !important;
 }
-.panel-heading-correlations .glyphicon {
-  color: #3b82f6 !important;
-  text-shadow: 0 0 8px rgba(59, 130, 246, 0.6) !important;
+.panel-default > .panel-heading.panel-heading-correlations .glyphicon {
+  color: #ffffff !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6) !important;
 }
 
-/* Nessus panel - purple header */
-.panel-heading-nessus {
-  border-bottom: 3px solid #8b5cf6 !important;
-  color: #8b5cf6 !important;
-  text-shadow: 0 0 10px rgba(139, 92, 246, 0.5) !important;
+/* Nessus panel - PURPLE badge header */
+.panel-default > .panel-heading.panel-heading-nessus {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%) !important;
+  color: #ffffff !important;
+  border-bottom: none !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 10px rgba(139, 92, 246, 0.5) !important;
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
   font-family: var(--font-mono) !important;
   font-weight: 700 !important;
   font-size: 12px !important;
   text-transform: uppercase !important;
   letter-spacing: 1px !important;
+  padding: 8px 14px !important;
 }
-.panel-heading-nessus .glyphicon {
-  color: #8b5cf6 !important;
-  text-shadow: 0 0 8px rgba(139, 92, 246, 0.6) !important;
+.panel-default > .panel-heading.panel-heading-nessus .glyphicon {
+  color: #ffffff !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6) !important;
 }
 
-/* Burp panel - cyan header */
-.panel-heading-burp {
-  border-bottom: 3px solid #22d3ee !important;
-  color: #22d3ee !important;
-  text-shadow: 0 0 10px rgba(34, 211, 238, 0.5) !important;
+/* Burp panel - CYAN badge header */
+.panel-default > .panel-heading.panel-heading-burp {
+  background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%) !important;
+  color: #ffffff !important;
+  border-bottom: none !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 10px rgba(34, 211, 238, 0.5) !important;
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
   font-family: var(--font-mono) !important;
   font-weight: 700 !important;
   font-size: 12px !important;
   text-transform: uppercase !important;
   letter-spacing: 1px !important;
+  padding: 8px 14px !important;
 }
-.panel-heading-burp .glyphicon {
-  color: #22d3ee !important;
-  text-shadow: 0 0 8px rgba(34, 211, 238, 0.6) !important;
+.panel-default > .panel-heading.panel-heading-burp .glyphicon {
+  color: #ffffff !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6) !important;
 }
 
-/* Scan Status panel - distinct styling */
-.panel-heading-scan-status {
-  border-bottom: 3px solid #f59e0b !important;
-  color: #f59e0b !important;
-  text-shadow: 0 0 10px rgba(245, 158, 11, 0.5) !important;
+/* Scan Status panel - amber/orange badge header */
+.panel-default > .panel-heading.panel-heading-scan-status {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+  color: #ffffff !important;
+  border-bottom: none !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 10px rgba(245, 158, 11, 0.5) !important;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
   font-family: var(--font-mono) !important;
   font-weight: 700 !important;
   font-size: 12px !important;
   text-transform: uppercase !important;
   letter-spacing: 1px !important;
+  padding: 8px 14px !important;
 }
-.panel-heading-scan-status .glyphicon {
-  color: #f59e0b !important;
-  text-shadow: 0 0 8px rgba(245, 158, 11, 0.6) !important;
+.panel-default > .panel-heading.panel-heading-scan-status .glyphicon {
+  color: #ffffff !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6) !important;
 }
 
 /* Right panel flex layout */
 .summary-right-panel {
+  margin-bottom: 0 !important;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.summary-right-panel .panel-body {
   flex: 1;
-  margin-bottom: 8px !important;
   min-height: 0;
 }
-.summary-right-panel:last-child {
-  margin-bottom: 0 !important;
-}
 
-/* Adjustable count buttons inside right panels */
-.summary-count-btn {
-  transition: font-size 0.2s ease, padding 0.2s ease !important;
+/* Adjustable count buttons inside right panels - override the fixed sizing */
+.summary-right-panel .summary-count-btn {
+  transition: font-size 0.15s ease, padding 0.15s ease !important;
+}
+/* Override the fixed .panel-body .btn-toolbar .btn-group > .btn sizing for right panels */
+.summary-right-panel .panel-body .btn-toolbar .btn-group > .btn.summary-count-btn {
+  font-size: inherit !important;
+  padding: inherit !important;
 }
 
 /* Panel body flex centering for dynamic sizing */
 .summary-counts-body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 2px !important;
 }
 .summary-counts-body .btn-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 2px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 100%;
+}
+.summary-counts-body .btn-toolbar .btn-group {
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 /* Legacy fc-tab support */
