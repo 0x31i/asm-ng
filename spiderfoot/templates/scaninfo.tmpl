@@ -2426,17 +2426,7 @@
             grid += "<div class='panel panel-default' style='border: 1px solid var(--glass-border); background: var(--bg-secondary);'>";
             grid += "<div class='panel-heading' style='display:flex; justify-content:space-between; align-items:center;'>";
             grid += "<span><i class='glyphicon glyphicon-certificate'></i>&nbsp;&nbsp;Overall Grade</span>";
-            grid += "<div style='display:flex;align-items:center;gap:10px;'>";
-            // Live auto-refresh toggle
-            grid += "<label style='display:flex;align-items:center;gap:5px;margin:0;cursor:pointer;font-size:11px;color:var(--text-muted);font-weight:normal;' title='Auto-refresh grade every 10 seconds'>";
-            grid += "<span>Live</span>";
-            grid += "<div class='grade-toggle" + (localStorage.getItem('gradeAutoRefresh') === 'true' ? " active" : "") + "' id='grade-auto-toggle' onclick='toggleGradeAutoRefresh(\"" + instanceId + "\")'>";
-            grid += "<div class='grade-toggle-knob'></div>";
-            grid += "</div>";
-            grid += "</label>";
-            // Refresh button
             grid += "<button class='btn btn-xs btn-default' id='grade-refresh-btn' onclick='refreshGrade(\"" + instanceId + "\")' title='Recalculate grade'><i class='glyphicon glyphicon-refresh'></i> Refresh</button>";
-            grid += "</div>";
             grid += "</div>";
             grid += "<div id='grade-panel-body' style='padding: 0;'>";
             grid += "<div style='text-align: center; padding: 30px; color: var(--text-muted);'><i class='glyphicon glyphicon-hourglass'></i> Calculating grade...</div>";
@@ -2580,14 +2570,14 @@
                 }
             );
 
-            // Initial grade load (managed separately for toggle control)
-            sf.fetchData('${docroot}/scangrade', {'id': instanceId}, function(data) {
-                renderGradePanel(data, instanceId);
-            });
-            // Start auto-refresh if previously enabled
-            if (localStorage.getItem('gradeAutoRefresh') === 'true') {
-                startGradeAutoRefresh(instanceId);
-            }
+            // Overall Grade loader
+            dataloaders.push(
+                function() {
+                    sf.fetchData('${docroot}/scangrade', {'id': instanceId}, function(data) {
+                        renderGradePanel(data, instanceId);
+                    });
+                }
+            );
 
             loadersrunning = true;
             for (var i = 0; i < dataloaders.length; i++) {
@@ -2595,8 +2585,6 @@
             }
             loadersrunning = false;
         }
-
-        var gradeAutoRefreshInterval = null;
 
         // Refresh grade (called from button click)
         function refreshGrade(iid) {
@@ -2607,35 +2595,6 @@
                 renderGradePanel(data, iid);
                 btn.prop('disabled', false).find('i').removeClass('glyphicon-spin');
             });
-        }
-
-        // Grade auto-refresh (live mode)
-        function startGradeAutoRefresh(iid) {
-            if (gradeAutoRefreshInterval) clearInterval(gradeAutoRefreshInterval);
-            gradeAutoRefreshInterval = setInterval(function() {
-                sf.fetchData('${docroot}/scangrade', {'id': iid}, function(data) {
-                    renderGradePanel(data, iid);
-                });
-            }, 10000);
-            $('#grade-auto-toggle').addClass('active');
-            localStorage.setItem('gradeAutoRefresh', 'true');
-        }
-
-        function stopGradeAutoRefresh() {
-            if (gradeAutoRefreshInterval) {
-                clearInterval(gradeAutoRefreshInterval);
-                gradeAutoRefreshInterval = null;
-            }
-            $('#grade-auto-toggle').removeClass('active');
-            localStorage.setItem('gradeAutoRefresh', 'false');
-        }
-
-        function toggleGradeAutoRefresh(iid) {
-            if ($('#grade-auto-toggle').hasClass('active')) {
-                stopGradeAutoRefresh();
-            } else {
-                startGradeAutoRefresh(iid);
-            }
         }
 
         // Grade color map
@@ -2689,7 +2648,7 @@
             h += "</div>";
             // Subtitle
             h += "<div style='margin-top:12px;color:var(--text-secondary);font-size:13px;'>Overall Security Rating</div>";
-            h += "<div style='color:var(--text-muted);font-size:11px;margin-top:2px;'>Only unverified &amp; open items count against the grade</div>";
+            h += "<div style='color:var(--text-muted);font-size:11px;margin-top:2px;'>Only unvalidated items count &mdash; validated &amp; false positives are excluded</div>";
             if (scanStatus && scanStatus != 'FINISHED' && scanStatus != 'ABORTED' && scanStatus.indexOf('FAILED') < 0) {
                 h += "<div style='display:inline-block;margin-top:8px;font-size:10px;color:var(--accent-yellow);background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);border-radius:4px;padding:3px 10px;'>";
                 h += "<i class='glyphicon glyphicon-exclamation-sign'></i> Scan in progress &mdash; grade may change</div>";
@@ -2740,8 +2699,18 @@
                         var d = cat.details[di];
                         var ptColor = d.points < 0 ? 'var(--accent-red)' : 'var(--text-muted)';
                         var ptStr = d.points < 0 ? d.points : '0';
+                        // Build clickable link to Browse > Type for this event type
+                        var typeLink = '';
+                        var safeType = d.type.replace(/"/g, '&quot;');
+                        if (d.type === 'EXTERNAL_VULNERABILITIES') {
+                            typeLink = "<a class='finding-type-link' style='cursor:pointer;color:var(--text-secondary);text-decoration:none;border-bottom:1px dotted var(--text-muted);' onclick='viewVulnerabilities(\"" + instanceId + "\"); window.scrollTo(0,0);' title='View External Vulnerabilities'>" + d.type + "</a>";
+                        } else if (d.type === 'WEBAPP_VULNERABILITIES') {
+                            typeLink = "<a class='finding-type-link' style='cursor:pointer;color:var(--text-secondary);text-decoration:none;border-bottom:1px dotted var(--text-muted);' onclick='viewVulnerabilities(\"" + instanceId + "\"); switchVulnTab(\"burp\", \"" + instanceId + "\"); window.scrollTo(0,0);' title='View Web App Vulnerabilities'>" + d.type + "</a>";
+                        } else {
+                            typeLink = "<a class='finding-type-link' style='cursor:pointer;color:var(--text-secondary);text-decoration:none;border-bottom:1px dotted var(--text-muted);' onclick='browseEventData(\"" + instanceId + "\", \"" + safeType + "\", \"" + safeType + "\", \"full\"); window.scrollTo(0,0);' title='Browse " + safeType + " data'>" + d.type + "</a>";
+                        }
                         h += "<div style='display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;'>";
-                        h += "<span style='font-family:var(--font-mono);color:var(--text-secondary);'>" + d.type + " <span style='color:var(--text-muted);'>(" + d.count + ")</span></span>";
+                        h += "<span style='font-family:var(--font-mono);'>" + typeLink + " <span style='color:var(--text-muted);'>(" + d.count + ")</span></span>";
                         h += "<span style='font-family:var(--font-mono);font-weight:600;color:" + ptColor + ";'>" + ptStr + "</span>";
                         h += "</div>";
                     }
