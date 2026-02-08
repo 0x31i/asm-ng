@@ -2381,7 +2381,7 @@
         function scanSummaryView(instanceId) {
             grid = "<div id='scansummary-content'>";
 
-            // === ROW 1: Overall Grade (left col-sm-7) + Scan Status / Findings / Correlations stacked (right col-sm-5) ===
+            // === ROW 1: Overall Grade (left col-sm-7) + Scan Status / Findings-Correlations / Asset Overview / Top Modules stacked (right col-sm-5) ===
             grid += "<div class='row'>";
 
             // LEFT COLUMN: Overall Grade (wider)
@@ -2395,7 +2395,7 @@
             grid += "<div style='text-align: center; padding: 30px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 1px;'><i class='glyphicon glyphicon-hourglass'></i> CALCULATING GRADE...</div>";
             grid += "</div></div></div>";
 
-            // RIGHT COLUMN: Scan Status + Findings + Correlations stacked
+            // RIGHT COLUMN: Scan Status + Findings/Correlations(tabbed) + Asset Overview + Top Modules stacked
             grid += "<div class='col-sm-5'>";
 
             // Scan Status panel
@@ -2423,9 +2423,17 @@
             grid += "</div>";
             grid += "</div></div>";
 
-            // Findings panel (stacked under Scan Status)
+            // Combined Findings / Correlations panel with tab switching
             grid += "<div class='panel panel-default'>";
-            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-list-alt'></i>&nbsp;&nbsp;FINDINGS</div><div class='panel-body' style='padding: 5px'>";
+            // Split panel heading with two clickable tabs
+            grid += "<div class='panel-heading' style='padding:0 !important;display:flex;'>";
+            grid += "<div id='fc-tab-findings' class='fc-tab fc-tab-active' onclick='switchFCTab(\"findings\")' style='flex:1;padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:2px solid var(--text-primary);transition:all 0.15s;'>";
+            grid += "<i class='glyphicon glyphicon-list-alt'></i>&nbsp;FINDINGS</div>";
+            grid += "<div id='fc-tab-correlations' class='fc-tab' onclick='switchFCTab(\"correlations\")' style='flex:1;padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:2px solid transparent;opacity:0.5;transition:all 0.15s;'>";
+            grid += "<i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;CORRELATIONS</div>";
+            grid += "</div>";
+            // Findings content (visible by default)
+            grid += "<div id='fc-findings-content' class='panel-body' style='padding: 5px'>";
             grid += "<div class='btn-toolbar text-center'>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-critical' style='cursor: default;'>CRITICAL</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='findings-critical' style='cursor: default;'>?</button></div>";
@@ -2437,11 +2445,9 @@
             grid += "<button class='btn disabled btn-md btn-default' id='findings-low' style='cursor: default;'>?</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-success' style='cursor: default;'>INFO</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='findings-info' style='cursor: default;'>?</button></div>";
-            grid += "</div></div></div>";
-
-            // Correlations panel (stacked under Findings)
-            grid += "<div class='panel panel-default'>";
-            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;&nbsp;CORRELATIONS</div><div class='panel-body' style='padding: 5px'>";
+            grid += "</div></div>";
+            // Correlations content (hidden by default)
+            grid += "<div id='fc-correlations-content' class='panel-body' style='padding: 5px; display: none;'>";
             grid += "<div class='btn-toolbar text-center'>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-critical' style='cursor: default;'>CRITICAL</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='corr-critical' style='cursor: default;'>?</button></div>";
@@ -2453,29 +2459,8 @@
             grid += "<button class='btn disabled btn-md btn-default' id='corr-low' style='cursor: default;'>?</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-success' style='cursor: default;'>INFO</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='corr-info' style='cursor: default;'>?</button></div>";
-            grid += "</div></div></div>";
-
-            grid += "</div>"; // end right column
-            grid += "</div>"; // end row 1
-
-            // === ROW 2: Geo Intelligence Globe (left) + Asset Overview (right) ===
-            grid += "<div class='row'>";
-
-            // LEFT: Geo Intelligence Globe
-            grid += "<div class='col-sm-7'>";
-            grid += "<div class='panel panel-default'>";
-            grid += "<div class='panel-heading' style='display:flex; justify-content:space-between; align-items:center;'>";
-            grid += "<span><i class='glyphicon glyphicon-globe'></i>&nbsp;&nbsp;GEO INTELLIGENCE</span>";
-            grid += "<span id='globe-hotspot-count' style='font-family:var(--font-mono);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;'></span>";
-            grid += "</div>";
-            grid += "<div class='panel-body' style='padding: 0; position: relative; overflow: hidden;'>";
-            grid += "<canvas id='globe-canvas' style='width: 100%; display: block; background: var(--bg-primary);'></canvas>";
-            grid += "<div id='globe-tooltip' style='display:none;position:absolute;background:rgba(12,12,12,0.95);border:1px solid rgba(255,255,255,0.2);border-radius:0;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:#fff;text-transform:uppercase;letter-spacing:0.5px;pointer-events:none;z-index:10;box-shadow:0 0 15px rgba(255,255,255,0.1);text-shadow:0 0 8px rgba(255,255,255,0.5);max-width:280px;'></div>";
-            grid += "<div id='globe-loading' style='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--font-mono);font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 10px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-refresh glyphicon-spin'></i>&nbsp;SCANNING COORDINATES...</div>";
-            grid += "</div></div></div>";
-
-            // RIGHT: Asset Overview + Module Activity stacked
-            grid += "<div class='col-sm-5'>";
+            grid += "</div></div>";
+            grid += "</div>"; // end combined panel
 
             // Asset Overview panel
             grid += "<div class='panel panel-default'>";
@@ -2493,7 +2478,22 @@
             grid += "<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;LOADING MODULES...</div>";
             grid += "</div></div></div>";
 
-            grid += "</div>"; // end right col
+            grid += "</div>"; // end right column
+            grid += "</div>"; // end row 1
+
+            // === ROW 2: Geo Intelligence Globe (full width) ===
+            grid += "<div class='row'>";
+            grid += "<div class='col-sm-12'>";
+            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel-heading' style='display:flex; justify-content:space-between; align-items:center;'>";
+            grid += "<span><i class='glyphicon glyphicon-globe'></i>&nbsp;&nbsp;GEO INTELLIGENCE</span>";
+            grid += "<span id='globe-hotspot-count' style='font-family:var(--font-mono);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;'></span>";
+            grid += "</div>";
+            grid += "<div class='panel-body' style='padding: 0; position: relative; overflow: hidden;'>";
+            grid += "<canvas id='globe-canvas' style='width: 100%; display: block; background: var(--bg-primary);'></canvas>";
+            grid += "<div id='globe-tooltip' style='display:none;position:absolute;background:rgba(12,12,12,0.95);border:1px solid rgba(255,255,255,0.2);border-radius:0;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:#fff;text-transform:uppercase;letter-spacing:0.5px;pointer-events:none;z-index:10;box-shadow:0 0 15px rgba(255,255,255,0.1);text-shadow:0 0 8px rgba(255,255,255,0.5);max-width:280px;'></div>";
+            grid += "<div id='globe-loading' style='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--font-mono);font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 10px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-refresh glyphicon-spin'></i>&nbsp;SCANNING COORDINATES...</div>";
+            grid += "</div></div></div>";
             grid += "</div>"; // end row 2
 
             // === ROW 3: Data Types (full width) ===
@@ -2831,7 +2831,7 @@
                 // Left: color bar + name + mini badge
                 h += "<div style='display:flex;align-items:center;gap:10px;flex:1;'>";
                 h += "<div style='width:4px;height:28px;border-radius:2px;background:" + cat.color + ";flex-shrink:0;'></div>";
-                h += "<span style='font-weight:600;font-size:13px;color:var(--text-primary);'>" + catName + "</span>";
+                h += "<span style='font-weight:600;font-size:13px;color:var(--text-primary);text-transform:uppercase;font-family:var(--font-mono);letter-spacing:0.5px;'>" + catName + "</span>";
                 // Mini grade badge with glow
                 h += "<span style='display:inline-block;width:26px;height:22px;line-height:22px;text-align:center;border-radius:4px;font-family:var(--font-mono);font-size:11px;font-weight:700;color:#fff;background:" + cc.grad + ";box-shadow:0 0 8px " + cc.glow + ";text-shadow:0 0 6px rgba(255,255,255,0.7);'>" + cat.grade + "</span>";
                 h += "</div>";
@@ -2900,6 +2900,22 @@
             } else {
                 detail.slideDown(150);
                 icon.css('transform', 'rotate(90deg)');
+            }
+        }
+
+        // === FINDINGS / CORRELATIONS TAB SWITCHER ===
+        function switchFCTab(tab) {
+            var activeColor = getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim() || '#fff';
+            if (tab === 'findings') {
+                $('#fc-findings-content').show();
+                $('#fc-correlations-content').hide();
+                $('#fc-tab-findings').css({'border-bottom': '2px solid ' + activeColor, 'opacity': '1'}).addClass('fc-tab-active');
+                $('#fc-tab-correlations').css({'border-bottom': '2px solid transparent', 'opacity': '0.5'}).removeClass('fc-tab-active');
+            } else {
+                $('#fc-findings-content').hide();
+                $('#fc-correlations-content').show();
+                $('#fc-tab-correlations').css({'border-bottom': '2px solid ' + activeColor, 'opacity': '1'}).addClass('fc-tab-active');
+                $('#fc-tab-findings').css({'border-bottom': '2px solid transparent', 'opacity': '0.5'}).removeClass('fc-tab-active');
             }
         }
 
@@ -3274,20 +3290,33 @@
             var h = '';
             for (var cat in assets) {
                 var a = assets[cat];
-                var glowIntensity = a.count > 0 ? '0.5' : '0.15';
-                var textColor = a.count > 0 ? '#fff' : 'var(--text-muted)';
-                h += "<div style='display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.04);'>";
+                var textColor = a.count > 0 ? 'var(--text-primary)' : 'var(--text-muted)';
+                var countColor = a.count > 0 ? 'var(--text-primary)' : 'var(--text-muted)';
+                h += "<div class='asset-overview-row' style='display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--glass-border);'>";
                 h += "<div style='display:flex;align-items:center;gap:10px;'>";
-                h += "<i class='glyphicon " + a.icon + "' style='color:rgba(255,255,255," + glowIntensity + ");font-size:13px;text-shadow:0 0 8px rgba(255,255,255," + glowIntensity + ");'></i>";
-                h += "<span style='font-family:var(--font-mono);font-size:11px;font-weight:700;color:" + textColor + ";text-transform:uppercase;letter-spacing:0.5px;text-shadow:0 0 8px rgba(255,255,255," + glowIntensity + ");'>" + cat + "</span>";
+                h += "<i class='glyphicon " + a.icon + "' style='color:" + textColor + ";font-size:13px;'></i>";
+                h += "<span style='font-family:var(--font-mono);font-size:11px;font-weight:700;color:" + textColor + ";text-transform:uppercase;letter-spacing:0.5px;'>" + cat + "</span>";
                 h += "</div>";
-                h += "<span style='font-family:var(--font-mono);font-size:14px;font-weight:700;color:" + textColor + ";text-shadow:0 0 10px rgba(255,255,255," + glowIntensity + ");'>" + a.count + "</span>";
+                h += "<span style='font-family:var(--font-mono);font-size:14px;font-weight:700;color:" + countColor + ";'>" + a.count + "</span>";
                 h += "</div>";
             }
             panel.html(h);
         }
 
         // === TOP MODULES PANEL ===
+        var moduleColors = [
+            {color: '#22c55e', glow: 'rgba(34, 197, 94, 0.5)'},   // green
+            {color: '#3b82f6', glow: 'rgba(59, 130, 246, 0.5)'},  // blue
+            {color: '#f59e0b', glow: 'rgba(245, 158, 11, 0.5)'},  // amber
+            {color: '#ef4444', glow: 'rgba(239, 68, 68, 0.5)'},   // red
+            {color: '#8b5cf6', glow: 'rgba(139, 92, 246, 0.5)'},  // purple
+            {color: '#22d3ee', glow: 'rgba(34, 211, 238, 0.5)'},  // cyan
+            {color: '#f97316', glow: 'rgba(249, 115, 22, 0.5)'},  // orange
+            {color: '#ec4899', glow: 'rgba(236, 72, 153, 0.5)'},  // pink
+            {color: '#14b8a6', glow: 'rgba(20, 184, 166, 0.5)'},  // teal
+            {color: '#a3e635', glow: 'rgba(163, 230, 53, 0.5)'}   // lime
+        ];
+
         function renderModuleActivity(data) {
             var panel = $('#module-activity-body');
             if (!data || data.length === 0) {
@@ -3295,25 +3324,29 @@
                 return;
             }
 
-            // Sort by unique count descending, take top 8
-            var sorted = data.slice().sort(function(a, b) { return b[4] - a[4]; });
-            var top = sorted.slice(0, 8);
+            // Filter out entries with no module name, sort by unique count descending, take top 10
+            var filtered = data.filter(function(d) {
+                var name = (d[1] || d[0] || '').toString().trim();
+                return name.length > 0 && name !== 'ROOT';
+            });
+            var sorted = filtered.sort(function(a, b) { return b[4] - a[4]; });
+            var top = sorted.slice(0, 10);
             var maxCount = top.length > 0 ? top[0][4] : 1;
 
             var h = '';
             for (var i = 0; i < top.length; i++) {
-                var modName = top[i][1] || top[i][0];
+                var modName = (top[i][1] || top[i][0]).toString().toUpperCase();
                 var count = top[i][4];
                 var pct = Math.max(5, (count / maxCount) * 100);
-                var barGlow = 'rgba(255, 255, 255, 0.3)';
+                var mc = moduleColors[i % moduleColors.length];
 
-                h += "<div style='padding:6px 12px;border-bottom:1px solid rgba(255,255,255,0.04);'>";
+                h += "<div style='padding:6px 12px;border-bottom:1px solid var(--glass-border);'>";
                 h += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;'>";
-                h += "<span style='font-family:var(--font-mono);font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;text-shadow:0 0 6px rgba(255,255,255,0.3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%;' title='" + modName + "'>" + modName + "</span>";
-                h += "<span style='font-family:var(--font-mono);font-size:11px;font-weight:700;color:#fff;text-shadow:0 0 8px rgba(255,255,255,0.5);'>" + count + "</span>";
+                h += "<span style='font-family:var(--font-mono);font-size:10px;font-weight:700;color:" + mc.color + ";text-transform:uppercase;letter-spacing:0.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%;' title='" + modName + "'>" + modName + "</span>";
+                h += "<span style='font-family:var(--font-mono);font-size:11px;font-weight:700;color:" + mc.color + ";'>" + count + "</span>";
                 h += "</div>";
-                h += "<div style='height:3px;background:var(--bg-tertiary);border-radius:0;overflow:hidden;'>";
-                h += "<div style='height:100%;width:" + pct + "%;background:linear-gradient(90deg, rgba(255,255,255,0.2), rgba(255,255,255,0.5));box-shadow:0 0 8px " + barGlow + ";transition:width 0.5s ease;'></div>";
+                h += "<div style='height:4px;background:var(--bg-tertiary);border-radius:0;overflow:hidden;'>";
+                h += "<div style='height:100%;width:" + pct + "%;background:linear-gradient(90deg, " + mc.color + "66, " + mc.color + ");box-shadow:0 0 8px " + mc.glow + ";transition:width 0.5s ease;'></div>";
                 h += "</div>";
                 h += "</div>";
             }
