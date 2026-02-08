@@ -695,6 +695,7 @@
                 var statusCell = row.find("td.validation-status");
 
                 var isImported = row.hasClass("imported-row");
+                var isKnownAsset = row.hasClass("known-asset-row");
                 var importedClass = isImported ? " status-imported-glow" : "";
                 var statusHtml = "";
 
@@ -707,6 +708,10 @@
                 } else {
                     statusHtml = "<span class='status-unvalidated" + importedClass + "' title='Not yet reviewed'>UNVALIDATED</span>";
                     row.attr('data-status', 'unvalidated');
+                }
+                // Preserve known asset badge
+                if (isKnownAsset) {
+                    statusHtml += "<br><span class='status-known-asset' title='Matches a known asset'>KNOWN ASSET</span>";
                 }
 
                 statusCell.html(statusHtml);
@@ -926,6 +931,12 @@
             loadNessusData(instanceId);
         }
 
+        // =====================================================================
+        // ASSETS PAGE
+        // =====================================================================
+        var currentAssetsView = 'overview';
+        var assetsTarget = '${seedtarget}';
+
         function viewAssets(instanceId) {
             $("#scansummary-content").remove();
             $("#ai-correlation-section").remove();
@@ -938,20 +949,540 @@
             $("#btn-download-logs").hide();
             $("#btn-refresh").show();
             $("#btn-search").hide();
+            $("#customtabview").hide();
+            $("#modifyactions").hide();
             $("#scanreminder").hide();
             navTo("btn-assets");
             currentSection = 'btn-assets';
             refresh = function() { viewAssets(instanceId); }
 
             var grid = "<div id='scansummary-content'>";
-            grid += "<div style='padding: 40px; text-align: center;'>";
-            grid += "<i class='glyphicon glyphicon-hdd' style='font-size: 48px; color: #4ade80; margin-bottom: 16px;'></i>";
-            grid += "<h3 style='color: #e2e8f0; margin-bottom: 8px;'>ASSETS</h3>";
-            grid += "<p style='color: #94a3b8; font-size: 14px;'>Asset discovery and inventory features coming soon.</p>";
-            grid += "</div></div>";
+
+            // Top button bar for view switching
+            grid += "<div class='assets-view-bar'>";
+            grid += "<div class='assets-view-buttons'>";
+            grid += "<button id='assets-btn-overview' class='assets-view-btn assets-view-btn-active' onclick='assetsShowOverview(\"" + instanceId + "\")'>";
+            grid += "<i class='glyphicon glyphicon-dashboard'></i> Overview</button>";
+            grid += "<button id='assets-btn-known' class='assets-view-btn' onclick='assetsShowKnown(\"" + instanceId + "\")'>";
+            grid += "<i class='glyphicon glyphicon-list'></i> Known Assets</button>";
+            grid += "<button id='assets-btn-potential' class='assets-view-btn' onclick='assetsShowPotential(\"" + instanceId + "\")'>";
+            grid += "<i class='glyphicon glyphicon-search'></i> Potential Matches</button>";
+            grid += "</div>";
+            // Action buttons
+            grid += "<div class='assets-action-buttons'>";
+            grid += "<button class='btn btn-sm assets-import-btn' onclick='assetsShowImportModal()'>";
+            grid += "<i class='glyphicon glyphicon-upload'></i> Import List</button>";
+            grid += "<button class='btn btn-sm assets-add-btn' onclick='assetsShowAddModal()'>";
+            grid += "<i class='glyphicon glyphicon-plus'></i> Add Asset</button>";
+            grid += "<a class='btn btn-sm assets-export-btn' href='${docroot}/knownassetexport?target=" + encodeURIComponent(assetsTarget) + "&format=excel'>";
+            grid += "<i class='glyphicon glyphicon-download-alt'></i> Export</a>";
+            grid += "</div>";
+            grid += "</div>";
+
+            // Content container
+            grid += "<div id='assets-content'></div>";
+            grid += "</div>";
+
+            // Import Modal
+            grid += "<div id='assets-import-modal' class='assets-modal-overlay' style='display:none;'>";
+            grid += "<div class='assets-modal'>";
+            grid += "<div class='assets-modal-header'>";
+            grid += "<h4>Import Known Assets</h4>";
+            grid += "<button class='close-btn' onclick='assetsCloseModals()'>&times;</button>";
+            grid += "</div>";
+            grid += "<div class='assets-modal-body'>";
+            grid += "<div class='form-group'><label>Asset Type</label>";
+            grid += "<select id='import-asset-type' class='form-control assets-input'>";
+            grid += "<option value='ip'>IP Addresses</option>";
+            grid += "<option value='domain'>Domains / Subdomains</option>";
+            grid += "<option value='employee'>Employee Names</option>";
+            grid += "</select></div>";
+            grid += "<div class='form-group'><label>File (.txt, .csv, .xlsx)</label>";
+            grid += "<input type='file' id='import-asset-file' class='form-control assets-input' accept='.txt,.csv,.xlsx,.xls'></div>";
+            grid += "<p class='assets-hint'>TXT: one value per line. CSV/XLSX: first column used. Header rows auto-detected.</p>";
+            grid += "</div>";
+            grid += "<div class='assets-modal-footer'>";
+            grid += "<button class='btn assets-btn-cancel' onclick='assetsCloseModals()'>Cancel</button>";
+            grid += "<button class='btn assets-btn-confirm' onclick='assetsDoImport(\"" + instanceId + "\")'>Import</button>";
+            grid += "</div></div></div>";
+
+            // Add Single Asset Modal
+            grid += "<div id='assets-add-modal' class='assets-modal-overlay' style='display:none;'>";
+            grid += "<div class='assets-modal'>";
+            grid += "<div class='assets-modal-header'>";
+            grid += "<h4>Add Known Asset</h4>";
+            grid += "<button class='close-btn' onclick='assetsCloseModals()'>&times;</button>";
+            grid += "</div>";
+            grid += "<div class='assets-modal-body'>";
+            grid += "<div class='form-group'><label>Asset Type</label>";
+            grid += "<select id='add-asset-type' class='form-control assets-input'>";
+            grid += "<option value='ip'>IP Address</option>";
+            grid += "<option value='domain'>Domain / Subdomain</option>";
+            grid += "<option value='employee'>Employee Name</option>";
+            grid += "</select></div>";
+            grid += "<div class='form-group'><label>Value</label>";
+            grid += "<input type='text' id='add-asset-value' class='form-control assets-input' placeholder='e.g. 192.168.1.1 or corp.example.com'></div>";
+            grid += "<div class='form-group'><label>Source</label>";
+            grid += "<select id='add-asset-source' class='form-control assets-input'>";
+            grid += "<option value='CLIENT_PROVIDED'>Client Provided</option>";
+            grid += "<option value='ANALYST_CONFIRMED'>Analyst Confirmed</option>";
+            grid += "</select></div>";
+            grid += "<div class='form-group'><label>Notes (optional)</label>";
+            grid += "<input type='text' id='add-asset-notes' class='form-control assets-input' placeholder='Optional notes'></div>";
+            grid += "</div>";
+            grid += "<div class='assets-modal-footer'>";
+            grid += "<button class='btn assets-btn-cancel' onclick='assetsCloseModals()'>Cancel</button>";
+            grid += "<button class='btn assets-btn-confirm' onclick='assetsDoAdd(\"" + instanceId + "\")'>Add Asset</button>";
+            grid += "</div></div></div>";
 
             $("#mainbody").append(grid);
-            $("#loader").hide();
+
+            // Load the default view
+            assetsShowOverview(instanceId);
+        }
+
+        function assetsSetActiveBtn(viewName) {
+            $(".assets-view-btn").removeClass("assets-view-btn-active");
+            $("#assets-btn-" + viewName).addClass("assets-view-btn-active");
+            currentAssetsView = viewName;
+        }
+
+        function assetsShowImportModal() { $("#assets-import-modal").show(); }
+        function assetsShowAddModal() { $("#assets-add-modal").show(); }
+        function assetsCloseModals() { $(".assets-modal-overlay").hide(); }
+
+        // ---- OVERVIEW VIEW ----
+        function assetsShowOverview(instanceId) {
+            assetsSetActiveBtn('overview');
+            $("#assets-content").html("<div style='text-align:center; padding:30px;'><img src='${docroot}/static/img/loader.gif'></div>");
+
+            // Fetch counts and matches in parallel
+            var countsLoaded = false, matchesLoaded = false;
+            var counts = {total:0, client_provided:0, analyst_confirmed:0, by_type:{ip:0, domain:0, employee:0}};
+            var matchCount = 0;
+
+            sf.fetchData('${docroot}/knownassetcount', {target: assetsTarget}, function(data) {
+                counts = data;
+                countsLoaded = true;
+                if (matchesLoaded) renderOverview(instanceId, counts, matchCount);
+            });
+
+            sf.fetchData('${docroot}/knownassetmatches', {id: instanceId}, function(data) {
+                matchCount = data.length;
+                matchesLoaded = true;
+                if (countsLoaded) renderOverview(instanceId, counts, matchCount);
+            });
+        }
+
+        function renderOverview(instanceId, counts, matchCount) {
+            var pendingMatches = 0;
+            // Count matches that are still unvalidated
+            sf.fetchData('${docroot}/knownassetmatches', {id: instanceId}, function(matches) {
+                for (var i = 0; i < matches.length; i++) {
+                    if (matches[i].false_positive == 0 && !matches[i].isTargetFp && !matches[i].isTargetValidated) {
+                        pendingMatches++;
+                    }
+                }
+
+                var html = "<div class='assets-overview-grid'>";
+
+                // Summary Cards Row
+                html += "<div class='assets-cards-row'>";
+                html += "<div class='assets-card assets-card-total'>";
+                html += "<div class='assets-card-icon'><i class='glyphicon glyphicon-hdd'></i></div>";
+                html += "<div class='assets-card-info'><span class='assets-card-number'>" + counts.total + "</span>";
+                html += "<span class='assets-card-label'>TOTAL KNOWN ASSETS</span></div></div>";
+
+                html += "<div class='assets-card assets-card-client'>";
+                html += "<div class='assets-card-icon'><i class='glyphicon glyphicon-briefcase'></i></div>";
+                html += "<div class='assets-card-info'><span class='assets-card-number'>" + counts.client_provided + "</span>";
+                html += "<span class='assets-card-label'>CLIENT PROVIDED</span></div></div>";
+
+                html += "<div class='assets-card assets-card-analyst'>";
+                html += "<div class='assets-card-icon'><i class='glyphicon glyphicon-ok-sign'></i></div>";
+                html += "<div class='assets-card-info'><span class='assets-card-number'>" + counts.analyst_confirmed + "</span>";
+                html += "<span class='assets-card-label'>ANALYST CONFIRMED</span></div></div>";
+
+                html += "<div class='assets-card assets-card-pending'>";
+                html += "<div class='assets-card-icon'><i class='glyphicon glyphicon-search'></i></div>";
+                html += "<div class='assets-card-info'><span class='assets-card-number'>" + pendingMatches + "</span>";
+                html += "<span class='assets-card-label'>PENDING MATCHES</span></div></div>";
+                html += "</div>";
+
+                // Type Breakdown Row
+                html += "<div class='assets-breakdown-row'>";
+                html += "<div class='assets-breakdown-card'>";
+                html += "<i class='glyphicon glyphicon-map-marker' style='color:#3b82f6;'></i>";
+                html += "<span class='assets-breakdown-count'>" + (counts.by_type.ip || 0) + "</span>";
+                html += "<span class='assets-breakdown-label'>IP Addresses</span></div>";
+
+                html += "<div class='assets-breakdown-card'>";
+                html += "<i class='glyphicon glyphicon-globe' style='color:#8b5cf6;'></i>";
+                html += "<span class='assets-breakdown-count'>" + (counts.by_type.domain || 0) + "</span>";
+                html += "<span class='assets-breakdown-label'>Domains</span></div>";
+
+                html += "<div class='assets-breakdown-card'>";
+                html += "<i class='glyphicon glyphicon-user' style='color:#f59e0b;'></i>";
+                html += "<span class='assets-breakdown-count'>" + (counts.by_type.employee || 0) + "</span>";
+                html += "<span class='assets-breakdown-label'>Employees</span></div>";
+
+                // Coverage metric
+                var scanTotal = 0;
+                var shadowIT = 0;
+                html += "<div class='assets-breakdown-card'>";
+                html += "<i class='glyphicon glyphicon-warning-sign' style='color:#ef4444;'></i>";
+                html += "<span class='assets-breakdown-count'>" + matchCount + "</span>";
+                html += "<span class='assets-breakdown-label'>Scan Matches</span></div>";
+                html += "</div>";
+
+                // Quick action callout
+                if (pendingMatches > 0) {
+                    html += "<div class='assets-callout'>";
+                    html += "<i class='glyphicon glyphicon-bell'></i> ";
+                    html += "<strong>" + pendingMatches + " potential matches</strong> need review. ";
+                    html += "<a class='link assets-callout-link' onclick='assetsShowPotential(\"" + instanceId + "\")'>Review Now</a>";
+                    html += "</div>";
+                }
+
+                // Import History
+                html += "<div class='assets-section-header'>Import History</div>";
+                html += "<div id='assets-import-history'><em style='color:var(--text-muted);'>Loading...</em></div>";
+
+                html += "</div>";
+                $("#assets-content").html(html);
+                $("#loader").hide();
+
+                // Load import history
+                sf.fetchData('${docroot}/knownassetimporthistory', {target: assetsTarget}, function(history) {
+                    if (history.length === 0) {
+                        $("#assets-import-history").html("<p style='color:var(--text-muted); font-size:13px;'>No imports yet. Use the Import List button to get started.</p>");
+                        return;
+                    }
+                    var tbl = "<table class='table table-bordered table-striped assets-table'>";
+                    tbl += "<thead><tr><th>Date</th><th>Type</th><th>File</th><th>Items</th><th>By</th></tr></thead><tbody>";
+                    for (var i = 0; i < history.length; i++) {
+                        var h = history[i];
+                        var d = new Date(h.date_imported * 1000);
+                        tbl += "<tr><td>" + d.toLocaleString() + "</td>";
+                        tbl += "<td><span class='assets-type-badge assets-type-" + h.asset_type + "'>" + h.asset_type.toUpperCase() + "</span></td>";
+                        tbl += "<td>" + (h.file_name || '-') + "</td>";
+                        tbl += "<td>" + h.item_count + "</td>";
+                        tbl += "<td>" + (h.imported_by || '-') + "</td></tr>";
+                    }
+                    tbl += "</tbody></table>";
+                    $("#assets-import-history").html(tbl);
+                });
+            });
+        }
+
+        // ---- KNOWN ASSETS VIEW ----
+        function assetsShowKnown(instanceId) {
+            assetsSetActiveBtn('known');
+            $("#assets-content").html("<div style='text-align:center; padding:30px;'><img src='${docroot}/static/img/loader.gif'></div>");
+
+            sf.fetchData('${docroot}/knownassetlist', {target: assetsTarget}, function(data) {
+                var html = "";
+
+                // Filter bar
+                html += "<div class='assets-filter-bar'>";
+                html += "<button class='assets-filter-btn assets-filter-active' onclick='assetsFilterKnown(\"all\", this)'>All (" + data.length + ")</button>";
+                var ipCount = 0, domainCount = 0, empCount = 0, clientCount = 0, analystCount = 0;
+                for (var i = 0; i < data.length; i++) {
+                    if (data[i].asset_type === 'ip') ipCount++;
+                    if (data[i].asset_type === 'domain') domainCount++;
+                    if (data[i].asset_type === 'employee') empCount++;
+                    if (data[i].source === 'CLIENT_PROVIDED') clientCount++;
+                    if (data[i].source === 'ANALYST_CONFIRMED') analystCount++;
+                }
+                html += "<button class='assets-filter-btn' onclick='assetsFilterKnown(\"ip\", this)'>IPs (" + ipCount + ")</button>";
+                html += "<button class='assets-filter-btn' onclick='assetsFilterKnown(\"domain\", this)'>Domains (" + domainCount + ")</button>";
+                html += "<button class='assets-filter-btn' onclick='assetsFilterKnown(\"employee\", this)'>Employees (" + empCount + ")</button>";
+                html += "<span class='assets-filter-separator'>|</span>";
+                html += "<button class='assets-filter-btn' onclick='assetsFilterKnown(\"CLIENT_PROVIDED\", this)'>Client (" + clientCount + ")</button>";
+                html += "<button class='assets-filter-btn' onclick='assetsFilterKnown(\"ANALYST_CONFIRMED\", this)'>Analyst (" + analystCount + ")</button>";
+                html += "<div style='flex:1;'></div>";
+                html += "<button class='btn btn-sm assets-remove-selected-btn' onclick='assetsRemoveSelected(\"" + instanceId + "\")' style='display:none;' id='assets-remove-sel-btn'>";
+                html += "<i class='glyphicon glyphicon-trash'></i> Remove Selected</button>";
+                html += "</div>";
+
+                if (data.length === 0) {
+                    html += "<div class='assets-empty'>";
+                    html += "<i class='glyphicon glyphicon-inbox' style='font-size:36px; color:var(--text-muted); margin-bottom:10px;'></i>";
+                    html += "<p>No known assets yet. Import a list or add assets individually.</p></div>";
+                } else {
+                    html += "<table class='table table-bordered table-striped assets-table' id='known-assets-table'>";
+                    html += "<thead><tr><th style='width:30px;'><input type='checkbox' id='assets-select-all' onchange='assetsToggleSelectAll()'></th>";
+                    html += "<th>Type</th><th>Value</th><th>Source</th><th>Date Added</th><th>Added By</th><th>Notes</th><th style='width:60px;'>Actions</th></tr></thead><tbody>";
+                    for (var i = 0; i < data.length; i++) {
+                        var a = data[i];
+                        var d = new Date(a.date_added * 1000);
+                        var sourceClass = a.source === 'CLIENT_PROVIDED' ? 'assets-source-client' : 'assets-source-analyst';
+                        var sourceLabel = a.source === 'CLIENT_PROVIDED' ? 'CLIENT' : 'ANALYST';
+                        html += "<tr data-asset-id='" + a.id + "' data-asset-type='" + a.asset_type + "' data-asset-source='" + a.source + "'>";
+                        html += "<td><input type='checkbox' class='asset-cb' value='" + a.id + "' onchange='assetsUpdateSelection()'></td>";
+                        html += "<td><span class='assets-type-badge assets-type-" + a.asset_type + "'>" + a.asset_type.toUpperCase() + "</span></td>";
+                        html += "<td class='assets-value-cell'>" + $('<span>').text(a.asset_value).html() + "</td>";
+                        html += "<td><span class='assets-source-badge " + sourceClass + "'>" + sourceLabel + "</span></td>";
+                        html += "<td>" + d.toLocaleDateString() + "</td>";
+                        html += "<td>" + (a.added_by || '-') + "</td>";
+                        html += "<td>" + (a.notes ? $('<span>').text(a.notes).html() : '-') + "</td>";
+                        html += "<td><button class='btn btn-xs assets-delete-btn' onclick='assetsRemoveSingle(" + a.id + ", \"" + instanceId + "\")'>";
+                        html += "<i class='glyphicon glyphicon-trash'></i></button></td>";
+                        html += "</tr>";
+                    }
+                    html += "</tbody></table>";
+                }
+
+                $("#assets-content").html(html);
+                $("#loader").hide();
+                if (data.length > 0) {
+                    $("#known-assets-table").tablesorter();
+                }
+            });
+        }
+
+        function assetsFilterKnown(filter, btn) {
+            $(".assets-filter-btn").removeClass("assets-filter-active");
+            $(btn).addClass("assets-filter-active");
+            $("#known-assets-table tbody tr").each(function() {
+                var row = $(this);
+                if (filter === 'all') {
+                    row.show();
+                } else if (filter === 'CLIENT_PROVIDED' || filter === 'ANALYST_CONFIRMED') {
+                    row.toggle(row.data('asset-source') === filter);
+                } else {
+                    row.toggle(row.data('asset-type') === filter);
+                }
+            });
+        }
+
+        function assetsToggleSelectAll() {
+            var checked = $("#assets-select-all").is(":checked");
+            $(".asset-cb:visible").prop("checked", checked);
+            assetsUpdateSelection();
+        }
+
+        function assetsUpdateSelection() {
+            var count = $(".asset-cb:checked").length;
+            if (count > 0) {
+                $("#assets-remove-sel-btn").show().text("Remove Selected (" + count + ")");
+            } else {
+                $("#assets-remove-sel-btn").hide();
+            }
+        }
+
+        function assetsRemoveSingle(assetId, instanceId) {
+            if (!confirm("Remove this asset from known assets?")) return;
+            sf.fetchData('${docroot}/knownassetremove', {id: assetId}, function(ret) {
+                if (ret[0] === "SUCCESS") {
+                    alertify.success("Asset removed.");
+                    assetsShowKnown(instanceId);
+                } else {
+                    alertify.error("Error: " + ret[1]);
+                }
+            });
+        }
+
+        function assetsRemoveSelected(instanceId) {
+            var ids = [];
+            $(".asset-cb:checked").each(function() { ids.push($(this).val()); });
+            if (ids.length === 0) return;
+            if (!confirm("Remove " + ids.length + " selected assets?")) return;
+            sf.fetchData('${docroot}/knownassetremove', {ids: JSON.stringify(ids)}, function(ret) {
+                if (ret[0] === "SUCCESS") {
+                    alertify.success(ret[1]);
+                    assetsShowKnown(instanceId);
+                } else {
+                    alertify.error("Error: " + ret[1]);
+                }
+            });
+        }
+
+        // ---- POTENTIAL MATCHES VIEW ----
+        function assetsShowPotential(instanceId) {
+            assetsSetActiveBtn('potential');
+            $("#assets-content").html("<div style='text-align:center; padding:30px;'><img src='${docroot}/static/img/loader.gif'></div>");
+
+            sf.fetchData('${docroot}/knownassetmatches', {id: instanceId}, function(matches) {
+                var html = "";
+
+                // Stats bar for matches
+                var pending = 0, verified = 0, fps = 0;
+                for (var i = 0; i < matches.length; i++) {
+                    var m = matches[i];
+                    if (m.false_positive == 2 || m.isTargetValidated == 1) verified++;
+                    else if (m.false_positive == 1 || m.isTargetFp == 1) fps++;
+                    else pending++;
+                }
+
+                html += "<div class='assets-match-stats'>";
+                html += "<div class='assets-match-stat'><span class='assets-match-stat-num'>" + matches.length + "</span><span class='assets-match-stat-label'>TOTAL MATCHES</span></div>";
+                html += "<div class='assets-match-stat assets-match-stat-pending'><span class='assets-match-stat-num'>" + pending + "</span><span class='assets-match-stat-label'>PENDING</span></div>";
+                html += "<div class='assets-match-stat assets-match-stat-verified'><span class='assets-match-stat-num'>" + verified + "</span><span class='assets-match-stat-label'>VERIFIED</span></div>";
+                html += "<div class='assets-match-stat assets-match-stat-fp'><span class='assets-match-stat-num'>" + fps + "</span><span class='assets-match-stat-label'>FALSE POSITIVE</span></div>";
+                html += "<div style='flex:1;'></div>";
+                if (pending > 0) {
+                    html += "<button class='btn assets-bulk-verify-btn' onclick='assetsBulkAction(\"" + instanceId + "\", \"verify\")'>";
+                    html += "<i class='glyphicon glyphicon-ok-circle'></i> Verify Selected</button>";
+                    html += "<button class='btn assets-bulk-fp-btn' onclick='assetsBulkAction(\"" + instanceId + "\", \"fp\")'>";
+                    html += "<i class='glyphicon glyphicon-ban-circle'></i> FP Selected</button>";
+                }
+                html += "</div>";
+
+                if (matches.length === 0) {
+                    html += "<div class='assets-empty'>";
+                    html += "<i class='glyphicon glyphicon-ok-sign' style='font-size:36px; color:#4ade80; margin-bottom:10px;'></i>";
+                    html += "<p>No matches found. Import known assets to start matching against scan data.</p></div>";
+                } else {
+                    html += "<table class='table table-bordered table-striped assets-table' id='potential-matches-table'>";
+                    html += "<thead><tr>";
+                    html += "<th style='width:30px;'><input type='checkbox' id='matches-select-all' onchange='matchesToggleSelectAll()'></th>";
+                    html += "<th>Status</th><th>Match Type</th><th>Known Asset</th><th>Data Element</th><th>Event Type</th><th>Source Module</th><th style='width:180px;'>Actions</th>";
+                    html += "</tr></thead><tbody>";
+                    for (var i = 0; i < matches.length; i++) {
+                        var m = matches[i];
+                        var statusBadge = "";
+                        var rowClass = "";
+                        if (m.false_positive == 2 || m.isTargetValidated == 1) {
+                            statusBadge = "<span class='status-validated'>VERIFIED</span>";
+                            rowClass = "assets-row-verified";
+                        } else if (m.false_positive == 1 || m.isTargetFp == 1) {
+                            statusBadge = "<span class='status-fp'>FALSE POSITIVE</span>";
+                            rowClass = "assets-row-fp";
+                        } else {
+                            statusBadge = "<span class='status-unvalidated'>PENDING</span>";
+                            rowClass = "assets-row-pending";
+                        }
+
+                        var matchLabel = m.match_type.replace('_', ' ').replace('ip ', 'IP ').replace('domain ', 'Domain ').replace('employee ', 'Employee ');
+
+                        html += "<tr class='" + rowClass + "' data-hash='" + m.hash + "'>";
+                        html += "<td><input type='checkbox' class='match-cb' value='" + m.hash + "'></td>";
+                        html += "<td class='text-center'>" + statusBadge + "</td>";
+                        html += "<td><span class='assets-match-type-badge'>" + matchLabel + "</span></td>";
+                        html += "<td class='assets-matched-asset'>" + $('<span>').text(m.matched_asset).html() + "</td>";
+                        html += "<td>" + $('<span>').text(m.data).html() + "</td>";
+                        html += "<td>" + m.type + "</td>";
+                        html += "<td>" + m.module + "</td>";
+                        html += "<td class='assets-action-cell'>";
+                        if (m.false_positive == 0 && !m.isTargetFp && !m.isTargetValidated) {
+                            html += "<button class='btn btn-xs assets-verify-action' onclick='assetsSingleAction(\"" + instanceId + "\", \"" + m.hash + "\", \"verify\")'>";
+                            html += "<i class='glyphicon glyphicon-ok'></i> Verify</button> ";
+                            html += "<button class='btn btn-xs assets-fp-action' onclick='assetsSingleAction(\"" + instanceId + "\", \"" + m.hash + "\", \"fp\")'>";
+                            html += "<i class='glyphicon glyphicon-remove'></i> FP</button>";
+                        } else {
+                            html += "<span style='color:var(--text-muted); font-size:11px;'>Resolved</span>";
+                        }
+                        html += "</td></tr>";
+                    }
+                    html += "</tbody></table>";
+                }
+
+                $("#assets-content").html(html);
+                $("#loader").hide();
+                if (matches.length > 0) {
+                    $("#potential-matches-table").tablesorter();
+                }
+            });
+        }
+
+        function matchesToggleSelectAll() {
+            var checked = $("#matches-select-all").is(":checked");
+            $(".match-cb").prop("checked", checked);
+        }
+
+        function assetsSingleAction(instanceId, hash, action) {
+            sf.fetchData('${docroot}/knownassetverifymatch', {
+                id: instanceId, result_hash: hash, action: action
+            }, function(ret) {
+                if (ret[0] === "SUCCESS") {
+                    alertify.success(ret[1]);
+                    assetsShowPotential(instanceId);
+                } else {
+                    alertify.error("Error: " + ret[1]);
+                }
+            });
+        }
+
+        function assetsBulkAction(instanceId, action) {
+            var hashes = [];
+            $(".match-cb:checked").each(function() { hashes.push($(this).val()); });
+            if (hashes.length === 0) {
+                alertify.error("Select at least one match.");
+                return;
+            }
+            sf.fetchData('${docroot}/knownassetverifymatch', {
+                id: instanceId, result_hashes: JSON.stringify(hashes), action: action
+            }, function(ret) {
+                if (ret[0] === "SUCCESS") {
+                    alertify.success(ret[1]);
+                    assetsShowPotential(instanceId);
+                } else {
+                    alertify.error("Error: " + ret[1]);
+                }
+            });
+        }
+
+        // ---- IMPORT / ADD HANDLERS ----
+        function assetsDoImport(instanceId) {
+            var fileInput = document.getElementById('import-asset-file');
+            var assetType = document.getElementById('import-asset-type').value;
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alertify.error("Please select a file.");
+                return;
+            }
+            var formData = new FormData();
+            formData.append('target', assetsTarget);
+            formData.append('asset_type', assetType);
+            formData.append('importfile', fileInput.files[0]);
+
+            $.ajax({
+                url: '${docroot}/knownassetimport',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    var ret = typeof response === 'string' ? JSON.parse(response) : response;
+                    if (ret[0] === "SUCCESS") {
+                        alertify.success(ret[1]);
+                        assetsCloseModals();
+                        // Refresh current view
+                        if (currentAssetsView === 'known') assetsShowKnown(instanceId);
+                        else if (currentAssetsView === 'potential') assetsShowPotential(instanceId);
+                        else assetsShowOverview(instanceId);
+                    } else {
+                        alertify.error("Import failed: " + ret[1]);
+                    }
+                },
+                error: function() { alertify.error("Import request failed."); }
+            });
+        }
+
+        function assetsDoAdd(instanceId) {
+            var assetType = document.getElementById('add-asset-type').value;
+            var assetValue = document.getElementById('add-asset-value').value.trim();
+            var source = document.getElementById('add-asset-source').value;
+            var notes = document.getElementById('add-asset-notes').value.trim();
+            if (!assetValue) {
+                alertify.error("Please enter a value.");
+                return;
+            }
+            sf.fetchData('${docroot}/knownassetadd', {
+                target: assetsTarget, asset_type: assetType,
+                asset_value: assetValue, source: source, notes: notes || ''
+            }, function(ret) {
+                if (ret[0] === "SUCCESS") {
+                    alertify.success("Asset added.");
+                    assetsCloseModals();
+                    document.getElementById('add-asset-value').value = '';
+                    document.getElementById('add-asset-notes').value = '';
+                    if (currentAssetsView === 'known') assetsShowKnown(instanceId);
+                    else assetsShowOverview(instanceId);
+                } else {
+                    alertify.error("Error: " + ret[1]);
+                }
+            });
         }
 
         // Switch between NESSUS and BURP vulnerability tabs
@@ -4521,7 +5052,8 @@
                                 validated: 0,     // Current scan validated
                                 validatedLegacy: 0, // Target-level validated from previous scans
                                 unvalidated: 0,
-                                imported: 0      // Entries imported from older scans
+                                imported: 0,     // Entries imported from older scans
+                                knownAsset: 0    // Entries matching known assets
                             };
 
                             for (var i = 0; i < data.length; i++) {
@@ -4529,6 +5061,10 @@
                                 // Count imported entries (data[13] is imported_from_scan)
                                 if (data[i][13] != null) {
                                     stats.imported++;
+                                }
+                                // Count known asset matches (data[14])
+                                if (data[i][14] && data[i][14] > 0) {
+                                    stats.knownAsset++;
                                 }
                                 if (data[i][8] == "1") {
                                     stats.fp++;
@@ -4558,6 +5094,9 @@
                             statsBar += "<div class='stats-item stats-unvalidated'><span class='stats-value'>" + stats.unvalidated + "</span><span class='stats-label'>UNVALIDATED</span></div>";
                             if (stats.imported > 0) {
                                 statsBar += "<div class='stats-item stats-imported'><span class='stats-value'>" + stats.imported + "</span><span class='stats-label'>IMPORTED</span></div>";
+                            }
+                            if (stats.knownAsset > 0) {
+                                statsBar += "<div class='stats-item stats-known-asset'><span class='stats-value'>" + stats.knownAsset + "</span><span class='stats-label'>KNOWN ASSETS</span></div>";
                             }
                             statsBar += "</div>";
 
@@ -4611,8 +5150,13 @@
                                 // All rows are rendered - filtering is done client-side
                                 // Check if this entry is imported
                                 var isImported = data[i][13] != null;
+                                // Check if this matches a known asset (index 14)
+                                var isKnownAsset = data[i][14] && data[i][14] > 0;
 
-                                table += "<tr" + (isImported ? " class='imported-row'" : "") + ">";
+                                var rowClasses = [];
+                                if (isImported) rowClasses.push("imported-row");
+                                if (isKnownAsset) rowClasses.push("known-asset-row");
+                                table += "<tr" + (rowClasses.length > 0 ? " class='" + rowClasses.join(" ") + "'" : "") + ">";
                                 // Checkbox column (simple checkbox only, no persistence indicators)
                                 table += "<td class='text-center'><input type='checkbox' id='cb_" + data[i][7] + "'></td>";
 
@@ -4631,6 +5175,10 @@
                                     table += "<span class='status-validated" + importedClass + "' title='Validated - confirmed belongs to organization'>VALIDATED</span>";
                                 } else {
                                     table += "<span class='status-unvalidated" + importedClass + "' title='Not yet reviewed'>UNVALIDATED</span>";
+                                }
+                                // Known asset badge
+                                if (isKnownAsset) {
+                                    table += "<br><span class='status-known-asset' title='Matches a known asset'>KNOWN ASSET</span>";
                                 }
                                 table += "</td>";
 
@@ -4821,10 +5369,12 @@
                         var leafHash = d[7]; // hash
                         var path = leafPaths[leafHash];
                         var isImported = d[13] != null;
+                        var isKnownAsset = d[14] && d[14] > 0;
 
                         // Row classes
                         var rowClasses = [];
                         if (isImported) rowClasses.push("imported-row");
+                        if (isKnownAsset) rowClasses.push("known-asset-row");
                         var rowClassAttr = rowClasses.length > 0 ? " class='" + rowClasses.join(" ") + "'" : "";
 
                         table += "<tr" + rowClassAttr + ">";
@@ -4841,6 +5391,9 @@
                             table += "<span class='status-validated" + importedClass + "' title='Validated'>VALIDATED</span>";
                         } else {
                             table += "<span class='status-unvalidated" + importedClass + "' title='Not yet reviewed'>UNVALIDATED</span>";
+                        }
+                        if (isKnownAsset) {
+                            table += "<br><span class='status-known-asset' title='Matches a known asset'>KNOWN ASSET</span>";
                         }
                         table += "</td>";
 

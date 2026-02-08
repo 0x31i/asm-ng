@@ -2844,7 +2844,7 @@ class SpiderFootWebUi:
         templ = Template(filename='spiderfoot/templates/scaninfo.tmpl',
                          lookup=self.lookup, input_encoding='utf-8')
         return templ.render(id=id, name=html.escape(res[0]), status=res[5], docroot=self.docroot, version=__version__,
-                            pageid="SCANLIST", current_user=self.currentUser())
+                            pageid="SCANLIST", current_user=self.currentUser(), seedtarget=res[1])
 
     @cherrypy.expose
     def opts(self: 'SpiderFootWebUi', updated: str = None) -> str:
@@ -3476,6 +3476,19 @@ class SpiderFootWebUi:
                         # Mark as validated - add to validated table, remove from FP
                         dbh.targetValidatedAdd(target, eventType, data, sourceData)
                         dbh.targetFalsePositiveRemove(target, eventType, data, sourceData)
+                        # Two-way sync: also add to known assets as ANALYST_CONFIRMED
+                        try:
+                            ka_type = 'domain'
+                            if eventType in ('IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'):
+                                ka_type = 'ip'
+                            elif eventType in ('HUMAN_NAME', 'USERNAME', 'EMAILADDR',
+                                               'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'):
+                                ka_type = 'employee'
+                            current_user = cherrypy.session.get('user', 'anonymous')
+                            dbh.knownAssetAdd(target, ka_type, data,
+                                              source='ANALYST_CONFIRMED', addedBy=current_user)
+                        except Exception:
+                            pass  # Non-critical - asset table may not exist on older DBs
                     else:
                         # Clear status - remove from both tables
                         dbh.targetFalsePositiveRemove(target, eventType, data, sourceData)
@@ -3676,6 +3689,459 @@ class SpiderFootWebUi:
             return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
         return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
+
+    # -------------------------------------------------------------------
+    # Known Assets endpoints
+    # -------------------------------------------------------------------
+
+    @cherrypy.expose
+    def knownassetlist(self: 'SpiderFootWebUi', target: str = None, asset_type: str = None) -> str:
+        """List known assets for a target.
+
+        Args:
+            target: scan target
+            asset_type: optional filter by type (ip, domain, employee)
+
+        Returns:
+            str: JSON list of assets
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not target:
+            return json.dumps([]).encode('utf-8')
+
+        dbh = SpiderFootDb(self.config)
+        try:
+            rows = dbh.knownAssetList(target, asset_type)
+            result = []
+            for r in rows:
+                result.append({
+                    'id': r[0],
+                    'target': r[1],
+                    'asset_type': r[2],
+                    'asset_value': r[3],
+                    'source': r[4],
+                    'import_batch': r[5],
+                    'date_added': r[6],
+                    'added_by': r[7],
+                    'notes': r[8]
+                })
+            return json.dumps(result).encode('utf-8')
+        except Exception as e:
+            return json.dumps([]).encode('utf-8')
+
+    @cherrypy.expose
+    def knownassetadd(self: 'SpiderFootWebUi', target: str = None, asset_type: str = None,
+                      asset_value: str = None, source: str = 'CLIENT_PROVIDED',
+                      notes: str = None) -> str:
+        """Add a single known asset.
+
+        Returns:
+            str: JSON status
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not target or not asset_type or not asset_value:
+            return json.dumps(["ERROR", "target, asset_type, and asset_value are required."]).encode('utf-8')
+
+        if asset_type not in ('ip', 'domain', 'employee'):
+            return json.dumps(["ERROR", "asset_type must be ip, domain, or employee."]).encode('utf-8')
+
+        if source not in ('CLIENT_PROVIDED', 'ANALYST_CONFIRMED'):
+            source = 'CLIENT_PROVIDED'
+
+        current_user = cherrypy.session.get('user', 'anonymous')
+        dbh = SpiderFootDb(self.config)
+        try:
+            dbh.knownAssetAdd(target, asset_type, asset_value.strip(),
+                              source=source, addedBy=current_user, notes=notes)
+            return json.dumps(["SUCCESS", ""]).encode('utf-8')
+        except Exception as e:
+            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+
+    @cherrypy.expose
+    def knownassetremove(self: 'SpiderFootWebUi', id: str = None, ids: str = None) -> str:
+        """Remove known asset(s) by ID.
+
+        Args:
+            id: single asset ID
+            ids: JSON array of IDs for bulk removal
+
+        Returns:
+            str: JSON status
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        dbh = SpiderFootDb(self.config)
+        try:
+            if ids:
+                id_list = json.loads(ids)
+                count = dbh.knownAssetRemoveBulk(id_list)
+                return json.dumps(["SUCCESS", f"Removed {count} assets."]).encode('utf-8')
+            elif id:
+                dbh.knownAssetRemove(assetId=int(id))
+                return json.dumps(["SUCCESS", ""]).encode('utf-8')
+            else:
+                return json.dumps(["ERROR", "id or ids required."]).encode('utf-8')
+        except Exception as e:
+            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+
+    @cherrypy.expose
+    def knownassetupdate(self: 'SpiderFootWebUi', id: str = None,
+                         notes: str = None, source: str = None) -> str:
+        """Update a known asset's notes or source.
+
+        Returns:
+            str: JSON status
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not id:
+            return json.dumps(["ERROR", "id is required."]).encode('utf-8')
+
+        dbh = SpiderFootDb(self.config)
+        try:
+            dbh.knownAssetUpdate(int(id), notes=notes, source=source)
+            return json.dumps(["SUCCESS", ""]).encode('utf-8')
+        except Exception as e:
+            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+
+    @cherrypy.expose
+    def knownassetimport(self: 'SpiderFootWebUi', target: str = None,
+                         asset_type: str = None, importfile: object = None) -> str:
+        """Import known assets from a file (.txt, .csv, .xlsx).
+
+        Args:
+            target: scan target
+            asset_type: 'ip', 'domain', or 'employee'
+            importfile: uploaded file object
+
+        Returns:
+            str: JSON status with count
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not target or not asset_type or not importfile:
+            return json.dumps(["ERROR", "target, asset_type, and importfile are required."]).encode('utf-8')
+
+        if asset_type not in ('ip', 'domain', 'employee'):
+            return json.dumps(["ERROR", "asset_type must be ip, domain, or employee."]).encode('utf-8')
+
+        current_user = cherrypy.session.get('user', 'anonymous')
+        file_name = getattr(importfile, 'filename', 'unknown')
+        file_ext = file_name.lower().rsplit('.', 1)[-1] if '.' in file_name else ''
+
+        try:
+            raw = importfile.file.read()
+        except Exception as e:
+            return json.dumps(["ERROR", f"Failed to read file: {str(e)}"]).encode('utf-8')
+
+        assets = []
+        import_batch = str(uuid.uuid4())[:8]
+
+        try:
+            if file_ext == 'txt':
+                # One value per line
+                text = raw.decode('utf-8', errors='ignore')
+                for line in text.splitlines():
+                    val = line.strip()
+                    if val and not val.startswith('#'):
+                        assets.append(val)
+
+            elif file_ext == 'csv':
+                text = raw.decode('utf-8', errors='ignore')
+                reader = csv.reader(StringIO(text))
+                # Try to detect if there's a header
+                first_row = None
+                for row in reader:
+                    if not row:
+                        continue
+                    if first_row is None:
+                        first_row = row
+                        # If first cell looks like a header, skip it
+                        cell = row[0].strip().lower()
+                        if cell in ('ip', 'ip address', 'ip_address', 'domain', 'hostname',
+                                    'subdomain', 'name', 'employee', 'email', 'value',
+                                    'asset', 'host', 'address', 'fqdn'):
+                            continue
+                    # Take the first column
+                    val = row[0].strip()
+                    if val:
+                        assets.append(val)
+
+            elif file_ext in ('xlsx', 'xls'):
+                wb = openpyxl.load_workbook(BytesIO(raw), read_only=True)
+                ws = wb.active
+                first_row = True
+                for row in ws.iter_rows(values_only=True):
+                    if not row or not row[0]:
+                        continue
+                    val = str(row[0]).strip()
+                    if first_row:
+                        first_row = False
+                        cell_lower = val.lower()
+                        if cell_lower in ('ip', 'ip address', 'ip_address', 'domain', 'hostname',
+                                          'subdomain', 'name', 'employee', 'email', 'value',
+                                          'asset', 'host', 'address', 'fqdn'):
+                            continue
+                    if val:
+                        assets.append(val)
+                wb.close()
+            else:
+                return json.dumps(["ERROR", f"Unsupported file type: .{file_ext}. Use .txt, .csv, or .xlsx"]).encode('utf-8')
+
+        except Exception as e:
+            return json.dumps(["ERROR", f"Failed to parse file: {str(e)}"]).encode('utf-8')
+
+        if not assets:
+            return json.dumps(["ERROR", "No valid entries found in file."]).encode('utf-8')
+
+        dbh = SpiderFootDb(self.config)
+        try:
+            count = dbh.knownAssetAddBulk(target, asset_type, assets,
+                                          source='CLIENT_PROVIDED',
+                                          importBatch=import_batch,
+                                          addedBy=current_user)
+            dbh.assetImportHistoryAdd(target, asset_type, file_name, count, current_user)
+            return json.dumps(["SUCCESS", f"Imported {count} new assets ({len(assets)} total in file)."]).encode('utf-8')
+        except Exception as e:
+            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+
+    @cherrypy.expose
+    def knownassetmatches(self: 'SpiderFootWebUi', id: str = None) -> str:
+        """Find scan results that match known assets (Potential Matches).
+
+        Args:
+            id: scan instance ID
+
+        Returns:
+            str: JSON list of matches
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not id:
+            return json.dumps([]).encode('utf-8')
+
+        dbh = SpiderFootDb(self.config)
+        try:
+            # Get scan target
+            scan_info = dbh.scanInstanceGet(id)
+            if not scan_info:
+                return json.dumps([]).encode('utf-8')
+            target = scan_info[1]  # seed_target
+
+            # Get target-level FP/validated status
+            targetFps = dbh.targetFalsePositivesForTarget(target)
+            targetValidated = dbh.targetValidatedForTarget(target)
+
+            matches = dbh.knownAssetMatchScanResults(id, target)
+
+            # Enrich matches with target-level status
+            for m in matches:
+                m['isTargetFp'] = 0
+                m['isTargetValidated'] = 0
+                # Check target-level status
+                for fp_tuple in targetFps:
+                    if fp_tuple[0] == m['type'] and fp_tuple[1] == m['data']:
+                        m['isTargetFp'] = 1
+                        break
+                for val_tuple in targetValidated:
+                    if val_tuple[0] == m['type'] and val_tuple[1] == m['data']:
+                        m['isTargetValidated'] = 1
+                        break
+
+            return json.dumps(matches).encode('utf-8')
+        except Exception as e:
+            return json.dumps([]).encode('utf-8')
+
+    @cherrypy.expose
+    def knownassetcount(self: 'SpiderFootWebUi', target: str = None) -> str:
+        """Get known asset counts for a target.
+
+        Returns:
+            str: JSON with count breakdown
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not target:
+            return json.dumps({'total': 0}).encode('utf-8')
+
+        dbh = SpiderFootDb(self.config)
+        try:
+            counts = dbh.knownAssetCount(target)
+            return json.dumps(counts).encode('utf-8')
+        except Exception as e:
+            return json.dumps({'total': 0}).encode('utf-8')
+
+    @cherrypy.expose
+    def knownassetexport(self: 'SpiderFootWebUi', target: str = None, format: str = 'csv') -> bytes:
+        """Export known assets as CSV or XLSX.
+
+        Returns:
+            bytes: file data
+        """
+        if not target:
+            return b''
+
+        dbh = SpiderFootDb(self.config)
+        rows = dbh.knownAssetList(target)
+
+        if format == 'excel':
+            cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            cherrypy.response.headers['Content-Disposition'] = 'attachment; filename="known_assets.xlsx"'
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Known Assets"
+            ws.append(["Type", "Value", "Source", "Date Added", "Added By", "Notes"])
+            for r in rows:
+                ws.append([r[2], r[3], r[4], r[6], r[7], r[8]])
+            output = BytesIO()
+            wb.save(output)
+            return output.getvalue()
+        else:
+            cherrypy.response.headers['Content-Type'] = "text/csv; charset=utf-8"
+            cherrypy.response.headers['Content-Disposition'] = 'attachment; filename="known_assets.csv"'
+            output = StringIO()
+            writer = csv.writer(output)
+            writer.writerow(["Type", "Value", "Source", "Date Added", "Added By", "Notes"])
+            for r in rows:
+                writer.writerow([r[2], r[3], r[4], r[6], r[7], r[8]])
+            return output.getvalue().encode('utf-8')
+
+    @cherrypy.expose
+    def knownassetimporthistory(self: 'SpiderFootWebUi', target: str = None) -> str:
+        """Get asset import history for a target.
+
+        Returns:
+            str: JSON list of imports
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not target:
+            return json.dumps([]).encode('utf-8')
+
+        dbh = SpiderFootDb(self.config)
+        try:
+            rows = dbh.assetImportHistoryList(target)
+            result = []
+            for r in rows:
+                result.append({
+                    'id': r[0],
+                    'target': r[1],
+                    'asset_type': r[2],
+                    'file_name': r[3],
+                    'item_count': r[4],
+                    'imported_by': r[5],
+                    'date_imported': r[6]
+                })
+            return json.dumps(result).encode('utf-8')
+        except Exception:
+            return json.dumps([]).encode('utf-8')
+
+    @cherrypy.expose
+    def knownassetverifymatch(self: 'SpiderFootWebUi', id: str = None,
+                              result_hash: str = None, result_hashes: str = None,
+                              action: str = 'verify') -> str:
+        """Verify or FP a potential match from the assets page.
+
+        This handles the two-way sync: when verifying, marks the scan result as
+        validated (FP=2), persists at target level, and adds to known assets
+        as ANALYST_CONFIRMED.
+
+        Args:
+            id: scan instance ID
+            result_hash: single result hash
+            result_hashes: JSON array of hashes
+            action: 'verify', 'fp', or 'dismiss'
+
+        Returns:
+            str: JSON status
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not id:
+            return json.dumps(["ERROR", "scan id is required."]).encode('utf-8')
+
+        hashes = []
+        if result_hashes:
+            hashes = json.loads(result_hashes)
+        elif result_hash:
+            hashes = [result_hash]
+        else:
+            return json.dumps(["ERROR", "result_hash or result_hashes required."]).encode('utf-8')
+
+        dbh = SpiderFootDb(self.config)
+        current_user = cherrypy.session.get('user', 'anonymous')
+
+        try:
+            scan_info = dbh.scanInstanceGet(id)
+            if not scan_info:
+                return json.dumps(["ERROR", "Scan not found."]).encode('utf-8')
+            target = scan_info[1]
+
+            # Build event map from all scan results (same pattern as resultsetfppersist)
+            events = dbh.scanResultEvent(id)
+            eventMap = {row[8]: row for row in events}  # hash -> event row
+
+            if action == 'verify':
+                # Mark as validated (FP=2) in scan with children
+                childs = dbh.scanElementChildrenAll(id, hashes)
+                allIds = hashes + childs
+                dbh.scanResultsUpdateFP(id, allIds, 2)
+
+                # Persist at target level and add to known assets
+                for h in allIds:
+                    if h in eventMap:
+                        ev = eventMap[h]
+                        event_type = ev[4]
+                        event_data = ev[1]
+                        source_data = ev[2]
+                        # Persist as target validated
+                        dbh.targetValidatedAdd(target, event_type, event_data, source_data)
+                        dbh.targetFalsePositiveRemove(target, event_type, event_data, source_data)
+                        # Sync across scans
+                        dbh.syncFalsePositiveAcrossScans(target, event_type, event_data, source_data, 2)
+
+                # Add only the directly matched items (not children) to known assets
+                for h in hashes:
+                    if h in eventMap:
+                        ev = eventMap[h]
+                        event_type = ev[4]
+                        event_data = ev[1]
+                        asset_type = 'domain'
+                        if event_type in ('IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'):
+                            asset_type = 'ip'
+                        elif event_type in ('HUMAN_NAME', 'USERNAME', 'EMAILADDR',
+                                            'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'):
+                            asset_type = 'employee'
+                        dbh.knownAssetAdd(target, asset_type, event_data,
+                                          source='ANALYST_CONFIRMED', addedBy=current_user)
+
+                return json.dumps(["SUCCESS", f"Verified {len(hashes)} items."]).encode('utf-8')
+
+            elif action == 'fp':
+                # Mark as false positive (FP=1) in scan with children
+                childs = dbh.scanElementChildrenAll(id, hashes)
+                allIds = hashes + childs
+                dbh.scanResultsUpdateFP(id, allIds, 1)
+
+                for h in allIds:
+                    if h in eventMap:
+                        ev = eventMap[h]
+                        dbh.targetFalsePositiveAdd(target, ev[4], ev[1], ev[2])
+                        dbh.targetValidatedRemove(target, ev[4], ev[1], ev[2])
+                        dbh.syncFalsePositiveAcrossScans(target, ev[4], ev[1], ev[2], 1)
+
+                return json.dumps(["SUCCESS", f"Marked {len(hashes)} as false positive."]).encode('utf-8')
+
+            elif action == 'dismiss':
+                return json.dumps(["SUCCESS", "Dismissed."]).encode('utf-8')
+
+            else:
+                return json.dumps(["ERROR", f"Unknown action: {action}"]).encode('utf-8')
+
+        except Exception as e:
+            return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -5705,7 +6171,7 @@ class SpiderFootWebUi:
 
         try:
             data = dbh.scanResultEvent(
-                id, eventType, filterfp, correlationId=correlationId)
+                id, eventType, filterFp=filterfp, correlationId=correlationId)
         except Exception:
             return retdata
 
@@ -5716,6 +6182,7 @@ class SpiderFootWebUi:
         # Get all target-level false positives and validated entries for fast lookup
         targetFps = set()
         targetValidated = set()
+        knownAssets = {'ip': set(), 'domain': set(), 'employee': set()}
         if target:
             try:
                 targetFps = dbh.targetFalsePositivesForTarget(target)
@@ -5725,6 +6192,17 @@ class SpiderFootWebUi:
                 targetValidated = dbh.targetValidatedForTarget(target)
             except Exception:
                 pass  # Table may not exist in older databases
+            try:
+                knownAssets = dbh.knownAssetValues(target)
+            except Exception:
+                pass  # Table may not exist in older databases
+
+        # Pre-compute known asset matching sets
+        ip_match_types = {'IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'}
+        domain_match_types = {'DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
+                              'CO_HOSTED_SITE', 'SIMILARDOMAIN', 'INTERNET_NAME_UNRESOLVED'}
+        employee_match_types = {'HUMAN_NAME', 'USERNAME', 'EMAILADDR', 'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'}
+        hasKnownAssets = any(knownAssets.values())
 
         for row in data:
             lastseen = time.strftime(
@@ -5737,6 +6215,26 @@ class SpiderFootWebUi:
             isTargetFp = 1 if (eventTypeRaw, eventDataRaw, sourceDataRaw) in targetFps else 0
             # Check if this result matches a target-level validated entry
             isTargetValidated = 1 if (eventTypeRaw, eventDataRaw, sourceDataRaw) in targetValidated else 0
+
+            # Check if this result matches a known asset
+            isKnownAsset = 0  # 0=no match, 1=client_provided match, 2=analyst_confirmed match
+            if hasKnownAssets and eventDataRaw:
+                dataLower = eventDataRaw.lower().strip()
+                if eventTypeRaw in ip_match_types and dataLower in knownAssets['ip']:
+                    isKnownAsset = 1
+                elif eventTypeRaw in domain_match_types:
+                    if dataLower in knownAssets['domain']:
+                        isKnownAsset = 1
+                    else:
+                        for kd in knownAssets['domain']:
+                            if dataLower.endswith('.' + kd):
+                                isKnownAsset = 1
+                                break
+                elif eventTypeRaw in employee_match_types:
+                    for ke in knownAssets['employee']:
+                        if ke in dataLower:
+                            isKnownAsset = 1
+                            break
 
             retdata.append([
                 lastseen,
@@ -5752,7 +6250,8 @@ class SpiderFootWebUi:
                 row[4],
                 isTargetFp,  # Index 11: target-level false positive flag
                 isTargetValidated,  # Index 12: target-level validated flag
-                row[15]  # Index 13: imported_from_scan (scan ID if imported, None otherwise)
+                row[15],  # Index 13: imported_from_scan (scan ID if imported, None otherwise)
+                isKnownAsset  # Index 14: known asset match (0=no, 1=match)
             ])
 
         return retdata
@@ -6879,9 +7378,9 @@ This is a placeholder MCP report. Integration with actual MCP server required.
 
                 # Get recent events
                 if event_type:
-                    events = dbh.scanResultEvent(sid, event_type, False)
+                    events = dbh.scanResultEvent(sid, event_type, filterFp=False)
                 else:
-                    events = dbh.scanResultEvent(sid, 'ALL', False)
+                    events = dbh.scanResultEvent(sid, 'ALL', filterFp=False)
 
                 # Limit results per scan
                 events = events[:limit] if events else []
