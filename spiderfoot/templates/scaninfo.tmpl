@@ -2382,11 +2382,11 @@
             grid = "<div id='scansummary-content'>";
 
             // === ROW 1: Overall Grade (left col-sm-7) + 5 stacked panels (right col-sm-5) ===
-            grid += "<div class='row' style='display:flex;flex-wrap:wrap;'>";
+            grid += "<div class='row' id='grade-row' style='display:flex;flex-wrap:wrap;'>";
 
             // LEFT COLUMN: Overall Grade (wider)
-            grid += "<div class='col-sm-7'>";
-            grid += "<div class='panel panel-default' style='border: 1px solid var(--glass-border); background: var(--bg-secondary);'>";
+            grid += "<div class='col-sm-7' id='grade-left-col'>";
+            grid += "<div class='panel panel-default' id='grade-outer-panel' style='border: 1px solid var(--glass-border); background: var(--bg-secondary);'>";
             grid += "<div class='panel-heading' style='display:flex; justify-content:space-between; align-items:center;'>";
             grid += "<span><i class='glyphicon glyphicon-certificate'></i>&nbsp;&nbsp;OVERALL GRADE</span>";
             grid += "<button class='btn btn-xs btn-default' id='grade-refresh-btn' onclick='refreshGrade(\"" + instanceId + "\")' title='Recalculate grade'><i class='glyphicon glyphicon-refresh'></i> REFRESH</button>";
@@ -2395,23 +2395,33 @@
             grid += "<div style='text-align: center; padding: 30px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 1px;'><i class='glyphicon glyphicon-hourglass'></i> CALCULATING GRADE...</div>";
             grid += "</div></div></div>";
 
-            // RIGHT COLUMN: Scan Status + Findings + Correlations + Nessus + Burp (5 separate panels)
-            grid += "<div class='col-sm-5' id='right-panels-col' style='display:flex;flex-direction:column;'>";
+            // Inline style vars for header badge colors
+            var _hdrBase = 'font-family:\"JetBrains Mono\",monospace;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#fff;border-bottom:none;padding:8px 14px;';
+            var _hdrScanStatus = _hdrBase + 'background:linear-gradient(135deg,#f59e0b,#d97706);box-shadow:0 0 12px rgba(245,158,11,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(245,158,11,0.5);';
+            var _hdrFindings   = _hdrBase + 'background:linear-gradient(135deg,#22c55e,#16a34a);box-shadow:0 0 12px rgba(34,197,94,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(34,197,94,0.5);';
+            var _hdrCorr       = _hdrBase + 'background:linear-gradient(135deg,#3b82f6,#2563eb);box-shadow:0 0 12px rgba(59,130,246,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(59,130,246,0.5);';
+            var _hdrNessus     = _hdrBase + 'background:linear-gradient(135deg,#8b5cf6,#7c3aed);box-shadow:0 0 12px rgba(139,92,246,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(139,92,246,0.5);';
+            var _hdrBurp       = _hdrBase + 'background:linear-gradient(135deg,#22d3ee,#06b6d4);box-shadow:0 0 12px rgba(34,211,238,0.5);text-shadow:0 1px 2px rgba(0,0,0,0.3),0 0 10px rgba(34,211,238,0.5);';
+            var _hdrIcon = 'color:#fff;text-shadow:0 0 8px rgba(255,255,255,0.7);';
 
-            // Scan Status panel (amber header)
-            grid += "<div class='panel panel-default summary-right-panel'>";
-            grid += "<div class='panel-heading panel-heading-scan-status'><i class='glyphicon glyphicon-eye-open'></i>&nbsp;&nbsp;SCAN STATUS</div><div class='panel-body summary-counts-body'>";
-            grid += "<div class='btn-toolbar text-center'>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-secondary' style='cursor:default'>TOTAL</button>";
+            // RIGHT COLUMN: 5 separate panels stacked
+            grid += "<div class='col-sm-5' id='right-panels-col' style='display:flex;flex-direction:column;gap:4px;'>";
+
+            // Scan Status panel (AMBER)
+            grid += "<div class='panel panel-default summary-right-panel' style='margin-bottom:0;flex:1;display:flex;flex-direction:column;min-height:0;'>";
+            grid += "<div class='panel-heading' style='" + _hdrScanStatus + "'><i class='glyphicon glyphicon-eye-open' style='" + _hdrIcon + "'></i>&nbsp;&nbsp;SCAN STATUS</div>";
+            grid += "<div class='panel-body summary-counts-body' style='flex:1;display:flex;align-items:center;justify-content:center;padding:2px;min-height:0;overflow:hidden;'>";
+            grid += "<div class='btn-toolbar text-center' style='display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px;'>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-secondary' style='cursor:default'>TOTAL</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='tcounter' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-secondary' style='cursor:default'>UNIQUE</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-secondary' style='cursor:default'>UNIQUE</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='ucounter' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-secondary' style='cursor:default'>STATUS</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-secondary' style='cursor:default'>STATUS</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='status' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-secondary' style='cursor:default'>ERRORS</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-secondary' style='cursor:default'>ERRORS</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='errors' style='cursor:default'>?</button></div>";
             grid += "</div>";
-            // Progress bar inside Scan Status panel (shown only for active scans)
+            // Progress bar (shown only for active scans)
             grid += "<div id='summary-progress-container' style='display:none;padding:4px 10px 2px 10px;'>";
             grid += "<div style='display:flex;align-items:center;gap:8px;'>";
             grid += "<div class='progress' style='flex:1;height:14px;margin-bottom:0;'>";
@@ -2423,77 +2433,73 @@
             grid += "</div>";
             grid += "</div></div>";
 
-            // Findings panel (GREEN header)
-            grid += "<div class='panel panel-default summary-right-panel'>";
-            grid += "<div class='panel-heading panel-heading-findings'><i class='glyphicon glyphicon-list-alt'></i>&nbsp;&nbsp;FINDINGS</div>";
-            grid += "<div class='panel-body summary-counts-body'>";
-            grid += "<div class='btn-toolbar text-center'>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-critical' style='cursor:default'>CRITICAL</button>";
+            // Findings panel (GREEN)
+            grid += "<div class='panel panel-default summary-right-panel' style='margin-bottom:0;flex:1;display:flex;flex-direction:column;min-height:0;'>";
+            grid += "<div class='panel-heading' style='" + _hdrFindings + "'><i class='glyphicon glyphicon-list-alt' style='" + _hdrIcon + "'></i>&nbsp;&nbsp;FINDINGS</div>";
+            grid += "<div class='panel-body summary-counts-body' style='flex:1;display:flex;align-items:center;justify-content:center;padding:2px;min-height:0;overflow:hidden;'>";
+            grid += "<div class='btn-toolbar text-center' style='display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px;'>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-critical' style='cursor:default'>CRITICAL</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='findings-critical' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-danger' style='cursor:default'>HIGH</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-danger' style='cursor:default'>HIGH</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='findings-high' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-warning' style='cursor:default'>MEDIUM</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-warning' style='cursor:default'>MEDIUM</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='findings-medium' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-info' style='cursor:default'>LOW</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-info' style='cursor:default'>LOW</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='findings-low' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-success' style='cursor:default'>INFO</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-success' style='cursor:default'>INFO</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='findings-info' style='cursor:default'>?</button></div>";
-            grid += "</div></div>";
-            grid += "</div>";
+            grid += "</div></div></div>";
 
-            // Correlations panel (BLUE header)
-            grid += "<div class='panel panel-default summary-right-panel'>";
-            grid += "<div class='panel-heading panel-heading-correlations'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;&nbsp;CORRELATIONS</div>";
-            grid += "<div class='panel-body summary-counts-body'>";
-            grid += "<div class='btn-toolbar text-center'>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-critical' style='cursor:default'>CRITICAL</button>";
+            // Correlations panel (BLUE)
+            grid += "<div class='panel panel-default summary-right-panel' style='margin-bottom:0;flex:1;display:flex;flex-direction:column;min-height:0;'>";
+            grid += "<div class='panel-heading' style='" + _hdrCorr + "'><i class='glyphicon glyphicon-exclamation-sign' style='" + _hdrIcon + "'></i>&nbsp;&nbsp;CORRELATIONS</div>";
+            grid += "<div class='panel-body summary-counts-body' style='flex:1;display:flex;align-items:center;justify-content:center;padding:2px;min-height:0;overflow:hidden;'>";
+            grid += "<div class='btn-toolbar text-center' style='display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px;'>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-critical' style='cursor:default'>CRITICAL</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='corr-critical' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-danger' style='cursor:default'>HIGH</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-danger' style='cursor:default'>HIGH</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='corr-high' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-warning' style='cursor:default'>MEDIUM</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-warning' style='cursor:default'>MEDIUM</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='corr-medium' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-info' style='cursor:default'>LOW</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-info' style='cursor:default'>LOW</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='corr-low' style='cursor:default'>?</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-success' style='cursor:default'>INFO</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-success' style='cursor:default'>INFO</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='corr-info' style='cursor:default'>?</button></div>";
-            grid += "</div></div>";
-            grid += "</div>";
+            grid += "</div></div></div>";
 
-            // Nessus panel (PURPLE header)
-            grid += "<div class='panel panel-default summary-right-panel'>";
-            grid += "<div class='panel-heading panel-heading-nessus'><i class='glyphicon glyphicon-search'></i>&nbsp;&nbsp;NESSUS</div>";
-            grid += "<div class='panel-body summary-counts-body'>";
-            grid += "<div class='btn-toolbar text-center'>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-critical' style='cursor:default'>CRITICAL</button>";
+            // Nessus panel (PURPLE)
+            grid += "<div class='panel panel-default summary-right-panel' style='margin-bottom:0;flex:1;display:flex;flex-direction:column;min-height:0;'>";
+            grid += "<div class='panel-heading' style='" + _hdrNessus + "'><i class='glyphicon glyphicon-search' style='" + _hdrIcon + "'></i>&nbsp;&nbsp;NESSUS</div>";
+            grid += "<div class='panel-body summary-counts-body' style='flex:1;display:flex;align-items:center;justify-content:center;padding:2px;min-height:0;overflow:hidden;'>";
+            grid += "<div class='btn-toolbar text-center' style='display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px;'>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-critical' style='cursor:default'>CRITICAL</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='nessus-critical' style='cursor:default'>-</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-danger' style='cursor:default'>HIGH</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-danger' style='cursor:default'>HIGH</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='nessus-high' style='cursor:default'>-</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-warning' style='cursor:default'>MEDIUM</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-warning' style='cursor:default'>MEDIUM</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='nessus-medium' style='cursor:default'>-</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-info' style='cursor:default'>LOW</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-info' style='cursor:default'>LOW</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='nessus-low' style='cursor:default'>-</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-success' style='cursor:default'>INFO</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-success' style='cursor:default'>INFO</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='nessus-info' style='cursor:default'>-</button></div>";
-            grid += "</div></div>";
-            grid += "</div>";
+            grid += "</div></div></div>";
 
-            // Burp panel (CYAN header)
-            grid += "<div class='panel panel-default summary-right-panel'>";
-            grid += "<div class='panel-heading panel-heading-burp'><i class='glyphicon glyphicon-fire'></i>&nbsp;&nbsp;BURP</div>";
-            grid += "<div class='panel-body summary-counts-body'>";
-            grid += "<div class='btn-toolbar text-center'>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-critical' style='cursor:default'>CRITICAL</button>";
+            // Burp panel (CYAN)
+            grid += "<div class='panel panel-default summary-right-panel' style='margin-bottom:0;flex:1;display:flex;flex-direction:column;min-height:0;'>";
+            grid += "<div class='panel-heading' style='" + _hdrBurp + "'><i class='glyphicon glyphicon-fire' style='" + _hdrIcon + "'></i>&nbsp;&nbsp;BURP</div>";
+            grid += "<div class='panel-body summary-counts-body' style='flex:1;display:flex;align-items:center;justify-content:center;padding:2px;min-height:0;overflow:hidden;'>";
+            grid += "<div class='btn-toolbar text-center' style='display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px;'>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-critical' style='cursor:default'>CRITICAL</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='burp-critical' style='cursor:default'>-</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-danger' style='cursor:default'>HIGH</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-danger' style='cursor:default'>HIGH</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='burp-high' style='cursor:default'>-</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-warning' style='cursor:default'>MEDIUM</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-warning' style='cursor:default'>MEDIUM</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='burp-medium' style='cursor:default'>-</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-info' style='cursor:default'>LOW</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-info' style='cursor:default'>LOW</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='burp-low' style='cursor:default'>-</button></div>";
-            grid += "<div class='btn-group'><button class='btn disabled summary-count-btn btn-success' style='cursor:default'>INFO</button>";
+            grid += "<div class='btn-group' style='margin:0;padding:0;'><button class='btn disabled summary-count-btn btn-success' style='cursor:default'>INFO</button>";
             grid += "<button class='btn disabled summary-count-btn btn-default' id='burp-info' style='cursor:default'>-</button></div>";
-            grid += "</div></div>";
-            grid += "</div>";
+            grid += "</div></div></div>";
 
             grid += "</div>"; // end right column
             grid += "</div>"; // end row 1
@@ -3032,8 +3038,10 @@
 
             panel.html(h);
 
-            // Sync right panel heights after grade panel renders
+            // Sync right panel heights after grade panel renders (multiple passes for layout settling)
             setTimeout(syncRightPanelHeights, 100);
+            setTimeout(syncRightPanelHeights, 400);
+            setTimeout(syncRightPanelHeights, 800);
         }
 
         // Toggle grade category detail row
@@ -3050,87 +3058,54 @@
         }
 
         // === DYNAMIC PANEL SIZING ===
-        // Precisely match 5 right-column panels to OVERALL GRADE panel height.
-        // All gaps between panels are uniform. Severity buttons scale to fit.
-        var _syncGap = 6; // uniform gap in px between right panels
-
+        // Force right column to exactly match grade panel height.
+        // CSS flex:1 on each panel distributes space evenly.
+        // Then scale the severity buttons to fit the available body space.
         function syncRightPanelHeights() {
-            var gradePanel = document.getElementById('grade-panel-body');
-            var gradeOuter = gradePanel ? gradePanel.closest('.panel') : null;
+            var gradeOuter = document.getElementById('grade-outer-panel');
             var rightCol = document.getElementById('right-panels-col');
             if (!gradeOuter || !rightCol) return;
 
-            var panels = rightCol.querySelectorAll('.summary-right-panel');
-            if (panels.length === 0) return;
+            // Step 1: Force right column to exact grade panel pixel height
+            var gradeH = gradeOuter.offsetHeight;
+            rightCol.style.height = gradeH + 'px';
+            rightCol.style.maxHeight = gradeH + 'px';
 
-            // Set uniform gap on the flex container
-            rightCol.style.gap = _syncGap + 'px';
+            // Step 2: After layout settles, measure actual body heights and scale buttons
+            requestAnimationFrame(function() {
+                var bodies = rightCol.querySelectorAll('.summary-counts-body');
+                if (bodies.length === 0) return;
 
-            // Target height = the overall grade panel outer height
-            var gradeHeight = gradeOuter.offsetHeight;
+                // Get the actual rendered height of one body (they should all be equal via flex:1)
+                var bodyH = bodies[0].offsetHeight;
 
-            // First pass: measure fixed (non-body) heights per panel
-            // Temporarily clear body heights so they don't influence measurement
-            for (var i = 0; i < panels.length; i++) {
-                var body = panels[i].querySelector('.summary-counts-body');
-                if (body) body.style.height = '0px';
-            }
+                // Scale buttons proportional to body height
+                var fs = Math.max(8, Math.min(13, Math.round(bodyH / 5)));
+                var padV = Math.max(1, Math.min(7, Math.round(bodyH / 10)));
+                var padH = Math.max(3, Math.min(12, Math.round(bodyH / 6)));
+                var gapPx = Math.max(1, Math.min(4, Math.round(bodyH / 16)));
 
-            var totalFixed = 0;
-            for (var i = 0; i < panels.length; i++) {
-                var panelStyle = window.getComputedStyle(panels[i]);
-                var borderT = parseFloat(panelStyle.borderTopWidth) || 0;
-                var borderB = parseFloat(panelStyle.borderBottomWidth) || 0;
-
-                var heading = panels[i].querySelector('.panel-heading');
-                var headH = heading ? heading.offsetHeight : 0;
-
-                totalFixed += headH + borderT + borderB;
-            }
-
-            // Total gaps between panels
-            var totalGaps = (panels.length - 1) * _syncGap;
-
-            // Available height for all panel bodies combined
-            var availBody = gradeHeight - totalFixed - totalGaps;
-            var perBody = Math.max(20, Math.floor(availBody / panels.length));
-
-            // Scale severity buttons: font-size and padding proportional to body height
-            var btnFontSize = Math.max(8, Math.min(12, Math.floor(perBody / 5.5)));
-            var btnPadV = Math.max(1, Math.min(6, Math.floor(perBody / 12)));
-            var btnPadH = Math.max(4, Math.min(10, Math.floor(perBody / 7)));
-            var btnGroupPad = Math.max(1, Math.min(4, Math.floor(perBody / 18)));
-
-            // Apply to every count button via inline styles (overrides CSS !important)
-            var countBtns = rightCol.querySelectorAll('.summary-count-btn');
-            for (var i = 0; i < countBtns.length; i++) {
-                countBtns[i].style.setProperty('font-size', btnFontSize + 'px', 'important');
-                countBtns[i].style.setProperty('padding', btnPadV + 'px ' + btnPadH + 'px', 'important');
-                countBtns[i].style.setProperty('line-height', '1.2', 'important');
-            }
-
-            // Adjust btn-group spacing
-            var btnGroups = rightCol.querySelectorAll('.summary-counts-body .btn-group');
-            for (var i = 0; i < btnGroups.length; i++) {
-                btnGroups[i].style.setProperty('padding', btnGroupPad + 'px', 'important');
-                btnGroups[i].style.setProperty('margin', '0', 'important');
-            }
-
-            // Set each panel body height
-            for (var i = 0; i < panels.length; i++) {
-                var body = panels[i].querySelector('.summary-counts-body');
-                if (body) {
-                    body.style.setProperty('height', perBody + 'px', 'important');
-                    body.style.setProperty('overflow', 'hidden', 'important');
-                    body.style.setProperty('padding', '0 2px', 'important');
+                var btns = rightCol.querySelectorAll('.summary-count-btn');
+                for (var i = 0; i < btns.length; i++) {
+                    btns[i].style.setProperty('font-size', fs + 'px', 'important');
+                    btns[i].style.setProperty('padding', padV + 'px ' + padH + 'px', 'important');
+                    btns[i].style.setProperty('line-height', '1.2', 'important');
                 }
-            }
+
+                var groups = rightCol.querySelectorAll('.btn-group');
+                for (var i = 0; i < groups.length; i++) {
+                    groups[i].style.setProperty('margin', gapPx + 'px', 'important');
+                }
+            });
         }
 
         // Run sync after grade loads and on resize
-        $(window).on('resize', function() { setTimeout(syncRightPanelHeights, 100); });
-        // Observe grade panel DOM changes
-        $(document).on('DOMNodeInserted', '#grade-panel-body', function() { setTimeout(syncRightPanelHeights, 300); });
+        $(window).on('resize', function() { setTimeout(syncRightPanelHeights, 50); });
+        // Watch for grade content changes
+        $(document).on('DOMNodeInserted', '#grade-panel-body', function() {
+            setTimeout(syncRightPanelHeights, 200);
+            setTimeout(syncRightPanelHeights, 600);
+        });
 
         // === GEO INTELLIGENCE GLOBE ===
         var globeAnimationId = null;
