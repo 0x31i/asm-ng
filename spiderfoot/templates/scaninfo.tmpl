@@ -2381,32 +2381,34 @@
         function scanSummaryView(instanceId) {
             grid = "<div id='scansummary-content'>";
 
-            // === ROW 1: Overall Grade (left) + Scan Status (right) ===
+            // === ROW 1: Overall Grade (left col-sm-7) + Scan Status / Findings / Correlations stacked (right col-sm-5) ===
             grid += "<div class='row'>";
 
-            // TOP-LEFT: Overall Grade (half-width)
-            grid += "<div class='col-sm-6'>";
+            // LEFT COLUMN: Overall Grade (wider)
+            grid += "<div class='col-sm-7'>";
             grid += "<div class='panel panel-default' style='border: 1px solid var(--glass-border); background: var(--bg-secondary);'>";
             grid += "<div class='panel-heading' style='display:flex; justify-content:space-between; align-items:center;'>";
-            grid += "<span><i class='glyphicon glyphicon-certificate'></i>&nbsp;&nbsp;Overall Grade</span>";
-            grid += "<button class='btn btn-xs btn-default' id='grade-refresh-btn' onclick='refreshGrade(\"" + instanceId + "\")' title='Recalculate grade'><i class='glyphicon glyphicon-refresh'></i> Refresh</button>";
+            grid += "<span><i class='glyphicon glyphicon-certificate'></i>&nbsp;&nbsp;OVERALL GRADE</span>";
+            grid += "<button class='btn btn-xs btn-default' id='grade-refresh-btn' onclick='refreshGrade(\"" + instanceId + "\")' title='Recalculate grade'><i class='glyphicon glyphicon-refresh'></i> REFRESH</button>";
             grid += "</div>";
             grid += "<div id='grade-panel-body' style='padding: 0;'>";
-            grid += "<div style='text-align: center; padding: 30px; color: var(--text-muted);'><i class='glyphicon glyphicon-hourglass'></i> Calculating grade...</div>";
+            grid += "<div style='text-align: center; padding: 30px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 1px;'><i class='glyphicon glyphicon-hourglass'></i> CALCULATING GRADE...</div>";
             grid += "</div></div></div>";
 
-            // TOP-RIGHT: Scan Status (half-width)
-            grid += "<div class='col-sm-6'>";
+            // RIGHT COLUMN: Scan Status + Findings + Correlations stacked
+            grid += "<div class='col-sm-5'>";
+
+            // Scan Status panel
             grid += "<div class='panel panel-default'>";
-            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-eye-open'></i>&nbsp;&nbsp;Scan Status</div><div class='panel-body' style='padding: 5px'>";
+            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-eye-open'></i>&nbsp;&nbsp;SCAN STATUS</div><div class='panel-body' style='padding: 5px'>";
             grid += "<div class='btn-toolbar text-center'>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-secondary' style='cursor: default;'>Total</button>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-secondary' style='cursor: default;'>TOTAL</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='tcounter' style='cursor: default;'>?</button></div>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-secondary' style='cursor: default;'>Unique</button>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-secondary' style='cursor: default;'>UNIQUE</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='ucounter' style='cursor: default;'>?</button></div>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-secondary' style='cursor: default;'>Status</button>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-secondary' style='cursor: default;'>STATUS</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='status' style='cursor: default;'>?</button></div>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-secondary' style='cursor: default;'>Errors</button>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-secondary' style='cursor: default;'>ERRORS</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='errors' style='cursor: default;'>?</button></div>";
             grid += "</div>";
             // Progress bar inside Scan Status panel (shown only for active scans)
@@ -2419,56 +2421,92 @@
             grid += "</div>";
             grid += "<div id='summary-progress-details' style='margin-top: 3px; font-size: 10px; color: #888; display: flex; gap: 12px; flex-wrap: wrap;'></div>";
             grid += "</div>";
+            grid += "</div></div>";
+
+            // Findings panel (stacked under Scan Status)
+            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-list-alt'></i>&nbsp;&nbsp;FINDINGS</div><div class='panel-body' style='padding: 5px'>";
+            grid += "<div class='btn-toolbar text-center'>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-critical' style='cursor: default;'>CRITICAL</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='findings-critical' style='cursor: default;'>?</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-danger' style='cursor: default;'>HIGH</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='findings-high' style='cursor: default;'>?</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-warning' style='cursor: default;'>MEDIUM</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='findings-medium' style='cursor: default;'>?</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-info' style='cursor: default;'>LOW</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='findings-low' style='cursor: default;'>?</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-success' style='cursor: default;'>INFO</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='findings-info' style='cursor: default;'>?</button></div>";
             grid += "</div></div></div>";
 
-            grid += "</div>";
+            // Correlations panel (stacked under Findings)
+            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;&nbsp;CORRELATIONS</div><div class='panel-body' style='padding: 5px'>";
+            grid += "<div class='btn-toolbar text-center'>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-critical' style='cursor: default;'>CRITICAL</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='corr-critical' style='cursor: default;'>?</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-danger' style='cursor: default;'>HIGH</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='corr-high' style='cursor: default;'>?</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-warning' style='cursor: default;'>MEDIUM</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='corr-medium' style='cursor: default;'>?</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-info' style='cursor: default;'>LOW</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='corr-low' style='cursor: default;'>?</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-success' style='cursor: default;'>INFO</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='corr-info' style='cursor: default;'>?</button></div>";
+            grid += "</div></div></div>";
 
-            // === ROW 2: Findings (left) + Correlations (right) ===
+            grid += "</div>"; // end right column
+            grid += "</div>"; // end row 1
+
+            // === ROW 2: Geo Intelligence Globe (left) + Asset Overview (right) ===
             grid += "<div class='row'>";
 
-            // BOTTOM-LEFT: Findings
-            grid += "<div class='col-sm-6'>";
+            // LEFT: Geo Intelligence Globe
+            grid += "<div class='col-sm-7'>";
             grid += "<div class='panel panel-default'>";
-            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-list-alt'></i>&nbsp;&nbsp;Findings</div><div class='panel-body' style='padding: 5px'>";
-            grid += "<div class='btn-toolbar text-center'>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-critical' style='cursor: default;'>Critical</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='findings-critical' style='cursor: default;'>?</button></div>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-danger' style='cursor: default;'>High</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='findings-high' style='cursor: default;'>?</button></div>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-warning' style='cursor: default;'>Medium</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='findings-medium' style='cursor: default;'>?</button></div>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-info' style='cursor: default;'>Low</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='findings-low' style='cursor: default;'>?</button></div>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-success' style='cursor: default;'>Info</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='findings-info' style='cursor: default;'>?</button></div>";
-            grid += "</div></div></div></div>";
-
-            // BOTTOM-RIGHT: Correlations
-            grid += "<div class='col-sm-6'>";
-            grid += "<div class='panel panel-default'>";
-            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;&nbsp;Correlations</div><div class='panel-body' style='padding: 5px'>";
-            grid += "<div class='btn-toolbar text-center'>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-critical' style='cursor: default;'>Critical</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='corr-critical' style='cursor: default;'>?</button></div>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-danger' style='cursor: default;'>High</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='corr-high' style='cursor: default;'>?</button></div>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-warning' style='cursor: default;'>Medium</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='corr-medium' style='cursor: default;'>?</button></div>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-info' style='cursor: default;'>Low</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='corr-low' style='cursor: default;'>?</button></div>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-success' style='cursor: default;'>Info</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='corr-info' style='cursor: default;'>?</button></div>";
-            grid += "</div></div></div></div>";
-
+            grid += "<div class='panel-heading' style='display:flex; justify-content:space-between; align-items:center;'>";
+            grid += "<span><i class='glyphicon glyphicon-globe'></i>&nbsp;&nbsp;GEO INTELLIGENCE</span>";
+            grid += "<span id='globe-hotspot-count' style='font-family:var(--font-mono);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;'></span>";
             grid += "</div>";
+            grid += "<div class='panel-body' style='padding: 0; position: relative; overflow: hidden;'>";
+            grid += "<canvas id='globe-canvas' style='width: 100%; display: block; background: var(--bg-primary);'></canvas>";
+            grid += "<div id='globe-tooltip' style='display:none;position:absolute;background:rgba(12,12,12,0.95);border:1px solid rgba(255,255,255,0.2);border-radius:0;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:#fff;text-transform:uppercase;letter-spacing:0.5px;pointer-events:none;z-index:10;box-shadow:0 0 15px rgba(255,255,255,0.1);text-shadow:0 0 8px rgba(255,255,255,0.5);max-width:280px;'></div>";
+            grid += "<div id='globe-loading' style='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--font-mono);font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 10px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-refresh glyphicon-spin'></i>&nbsp;SCANNING COORDINATES...</div>";
+            grid += "</div></div></div>";
+
+            // RIGHT: Asset Overview + Module Activity stacked
+            grid += "<div class='col-sm-5'>";
+
+            // Asset Overview panel
+            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-th-large'></i>&nbsp;&nbsp;ASSET OVERVIEW</div>";
+            grid += "<div class='panel-body' style='padding: 0;'>";
+            grid += "<div id='asset-overview-body'>";
+            grid += "<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;LOADING ASSETS...</div>";
+            grid += "</div></div></div>";
+
+            // Module Activity panel
+            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-cog'></i>&nbsp;&nbsp;TOP MODULES</div>";
+            grid += "<div class='panel-body' style='padding: 0;'>";
+            grid += "<div id='module-activity-body'>";
+            grid += "<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;LOADING MODULES...</div>";
+            grid += "</div></div></div>";
+
+            grid += "</div>"; // end right col
+            grid += "</div>"; // end row 2
 
             // === ROW 3: Data Types (full width) ===
             grid += "<div class='row'><div class='col-sm-12'>";
             grid += "<div class='panel panel-default'>";
-            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-stats'></i>&nbsp;&nbsp;Data Types</div><div class='panel-body'>";
+            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-stats'></i>&nbsp;&nbsp;DATA TYPES</div><div class='panel-body'>";
             grid += "<div id='vbarsummary'></div>";
             grid += "</div></div></div></div>";
 
+            grid += "</div>"; // close scansummary-content
+
+            // Cancel globe animation before removing content
+            if (globeAnimationId) { cancelAnimationFrame(globeAnimationId); globeAnimationId = null; }
             $("#scansummary-content").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
@@ -2541,13 +2579,13 @@
                             $('#summary-progress-pct').text('~' + pct + '%');
 
                             var details = '';
-                            details += '<span><i class="glyphicon glyphicon-th-list"></i> ' + data.modulesWithResults + '/' + data.modulesTotal + ' modules</span>';
-                            details += '<span><i class="glyphicon glyphicon-play"></i> ' + data.modulesRunning + ' running</span>';
+                            details += '<span style="font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;text-shadow:0 0 6px rgba(255,255,255,0.3);"><i class="glyphicon glyphicon-th-list"></i> ' + data.modulesWithResults + '/' + data.modulesTotal + ' MODULES</span>';
+                            details += '<span style="font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;text-shadow:0 0 6px rgba(255,255,255,0.3);"><i class="glyphicon glyphicon-play"></i> ' + data.modulesRunning + ' RUNNING</span>';
                             var ql = data.eventsQueued; if (ql > 999) ql = (ql/1000).toFixed(1) + 'k';
-                            details += '<span><i class="glyphicon glyphicon-inbox"></i> ' + ql + ' queued</span>';
+                            details += '<span style="font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;text-shadow:0 0 6px rgba(255,255,255,0.3);"><i class="glyphicon glyphicon-inbox"></i> ' + ql + ' QUEUED</span>';
                             var tl = data.totalEvents; if (tl > 999) tl = (tl/1000).toFixed(1) + 'k';
-                            details += '<span><i class="glyphicon glyphicon-signal"></i> ' + tl + ' events</span>';
-                            details += '<span><i class="glyphicon glyphicon-dashboard"></i> ' + data.eventsPerSecond + '/sec</span>';
+                            details += '<span style="font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;text-shadow:0 0 6px rgba(255,255,255,0.3);"><i class="glyphicon glyphicon-signal"></i> ' + tl + ' EVENTS</span>';
+                            details += '<span style="font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;text-shadow:0 0 6px rgba(255,255,255,0.3);"><i class="glyphicon glyphicon-dashboard"></i> ' + data.eventsPerSecond + '/SEC</span>';
                             $('#summary-progress-details').html(details);
                         } else {
                             container.hide();
@@ -2599,7 +2637,7 @@
                         $('#status').html(scanStatus);
                         $("#vbarsummary").empty();
                         if (scanSummary.length == 0) {
-                          $("#vbarsummary").append("<div id='scansummary-content' class='alert alert-warning'><h4>No data.</h4>If the scan is still running this section will update shortly.</div>");
+                          $("#vbarsummary").append("<div id='scansummary-content' class='alert alert-warning' style='font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;'><h4>NO DATA.</h4>IF THE SCAN IS STILL RUNNING THIS SECTION WILL UPDATE SHORTLY.</div>");
                         } else {
                           sf_viz_vbar("#vbarsummary", scanSummary);
                         }
@@ -2617,6 +2655,86 @@
                 }
             );
 
+            // Geo Intelligence Globe loader
+            dataloaders.push(
+                function() {
+                    var geoPoints = [];
+                    var loaded = 0;
+                    var total = 3;
+                    function checkDone() {
+                        loaded++;
+                        if (loaded >= total) {
+                            renderGlobe(geoPoints);
+                        }
+                    }
+                    // Fetch PHYSICAL_COORDINATES
+                    sf.fetchData('${docroot}/scaneventresults', {'id': instanceId, 'eventType': 'PHYSICAL_COORDINATES'}, function(data) {
+                        for (var i = 0; i < data.length; i++) {
+                            var raw = data[i][1];
+                            // Parse "lat, lon" format
+                            var parts = raw.split(',');
+                            if (parts.length >= 2) {
+                                var lat = parseFloat(parts[0].trim());
+                                var lon = parseFloat(parts[1].trim());
+                                if (!isNaN(lat) && !isNaN(lon)) {
+                                    geoPoints.push({lat: lat, lon: lon, label: raw.trim(), type: 'COORDINATES', source: data[i][2] || ''});
+                                }
+                            }
+                        }
+                        checkDone();
+                    });
+                    // Fetch GEOINFO (may contain lat/lon in text)
+                    sf.fetchData('${docroot}/scaneventresults', {'id': instanceId, 'eventType': 'GEOINFO'}, function(data) {
+                        for (var i = 0; i < data.length; i++) {
+                            var raw = data[i][1];
+                            // Try to extract coords from geoinfo text
+                            var latMatch = raw.match(/(?:latitude|lat)[:\s]*(-?[\d.]+)/i);
+                            var lonMatch = raw.match(/(?:longitude|lon|lng)[:\s]*(-?[\d.]+)/i);
+                            if (latMatch && lonMatch) {
+                                var lat = parseFloat(latMatch[1]);
+                                var lon = parseFloat(lonMatch[1]);
+                                if (!isNaN(lat) && !isNaN(lon)) {
+                                    geoPoints.push({lat: lat, lon: lon, label: raw.substring(0, 80), type: 'GEOINFO', source: data[i][2] || ''});
+                                }
+                            }
+                            // Also try "lat, lon" format directly
+                            var parts = raw.split(',');
+                            if (!latMatch && parts.length >= 2) {
+                                var lat2 = parseFloat(parts[0].trim());
+                                var lon2 = parseFloat(parts[1].trim());
+                                if (!isNaN(lat2) && !isNaN(lon2) && Math.abs(lat2) <= 90 && Math.abs(lon2) <= 180) {
+                                    geoPoints.push({lat: lat2, lon: lon2, label: raw.substring(0, 80), type: 'GEOINFO', source: data[i][2] || ''});
+                                }
+                            }
+                        }
+                        checkDone();
+                    });
+                    // Fetch PHYSICAL_ADDRESS for context
+                    sf.fetchData('${docroot}/scaneventresults', {'id': instanceId, 'eventType': 'PHYSICAL_ADDRESS'}, function(data) {
+                        // Physical addresses don't have coords but we note them
+                        checkDone();
+                    });
+                }
+            );
+
+            // Asset Overview loader
+            dataloaders.push(
+                function() {
+                    sf.fetchData('${docroot}/scansummary', {'id': instanceId, 'by': 'type'}, function(data) {
+                        renderAssetOverview(data);
+                    });
+                }
+            );
+
+            // Module Activity loader
+            dataloaders.push(
+                function() {
+                    sf.fetchData('${docroot}/scansummary', {'id': instanceId, 'by': 'module'}, function(data) {
+                        renderModuleActivity(data);
+                    });
+                }
+            );
+
             loadersrunning = true;
             for (var i = 0; i < dataloaders.length; i++) {
                 dataloaders[i]();
@@ -2628,7 +2746,7 @@
         function refreshGrade(iid) {
             var btn = $('#grade-refresh-btn');
             btn.prop('disabled', true).find('i').addClass('glyphicon-spin');
-            $('#grade-panel-body').html("<div style='text-align: center; padding: 30px; color: var(--text-muted);'><i class='glyphicon glyphicon-refresh glyphicon-spin'></i> Recalculating...</div>");
+            $('#grade-panel-body').html("<div style='text-align: center; padding: 30px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-refresh glyphicon-spin'></i> RECALCULATING...</div>");
             sf.fetchData('${docroot}/scangrade', {'id': iid}, function(data) {
                 renderGradePanel(data, iid);
                 btn.prop('disabled', false).find('i').removeClass('glyphicon-spin');
@@ -2652,11 +2770,11 @@
             var panel = $('#grade-panel-body');
 
             if (!gradeData || !gradeData.enabled) {
-                panel.html("<div style='text-align:center;padding:20px;color:var(--text-muted);'>Grade calculation is disabled. Enable it in Settings.</div>");
+                panel.html("<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'>GRADE CALCULATION IS DISABLED. ENABLE IT IN SETTINGS.</div>");
                 return;
             }
             if (gradeData.error) {
-                panel.html("<div style='text-align:center;padding:20px;color:var(--accent-orange);'>" + gradeData.error + "</div>");
+                panel.html("<div style='text-align:center;padding:20px;color:var(--accent-orange);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;'>" + gradeData.error + "</div>");
                 return;
             }
 
@@ -2685,11 +2803,11 @@
             h += "<span style='font-family:var(--font-mono);font-size:16px;font-weight:600;color:rgba(255,255,255,0.9);text-shadow:0 0 10px rgba(255,255,255,0.7);'>" + score + "</span>";
             h += "</div>";
             // Subtitle
-            h += "<div style='margin-top:12px;color:var(--text-secondary);font-size:13px;'>Overall Security Rating</div>";
-            h += "<div style='color:var(--text-muted);font-size:11px;margin-top:2px;'>Only unvalidated items count &mdash; validated &amp; false positives are excluded</div>";
+            h += "<div style='margin-top:12px;color:var(--text-secondary);font-size:13px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 10px rgba(255,255,255,0.4);'>OVERALL SECURITY RATING</div>";
+            h += "<div style='color:var(--text-muted);font-size:11px;margin-top:2px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;'>ONLY UNVALIDATED ITEMS COUNT &mdash; VALIDATED &amp; FALSE POSITIVES ARE EXCLUDED</div>";
             if (scanStatus && scanStatus != 'FINISHED' && scanStatus != 'ABORTED' && scanStatus.indexOf('FAILED') < 0) {
                 h += "<div style='display:inline-block;margin-top:8px;font-size:10px;color:var(--accent-yellow);background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);border-radius:4px;padding:3px 10px;'>";
-                h += "<i class='glyphicon glyphicon-exclamation-sign'></i> Scan in progress &mdash; grade may change</div>";
+                h += "<i class='glyphicon glyphicon-exclamation-sign'></i> SCAN IN PROGRESS &mdash; GRADE MAY CHANGE</div>";
             }
             h += "</div>";
 
@@ -2762,8 +2880,8 @@
             if (gradeData.unmapped_types && gradeData.unmapped_types.length > 0) {
                 h += "<div style='font-size:11px;color:var(--accent-yellow);background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.12);border-radius:var(--radius-sm);padding:6px 12px;margin-top:4px;'>";
                 h += "<i class='glyphicon glyphicon-info-sign'></i> ";
-                h += gradeData.unmapped_types.length + " event type(s) auto-categorized. ";
-                h += "Review in <a href='${docroot}/opts' style='color:var(--accent-yellow);text-decoration:underline;'>Settings</a>.";
+                h += gradeData.unmapped_types.length + " EVENT TYPE(S) AUTO-CATEGORIZED. ";
+                h += "REVIEW IN <a href='${docroot}/opts' style='color:var(--accent-yellow);text-decoration:underline;font-family:var(--font-mono);'>SETTINGS</a>.";
                 h += "</div>";
             }
 
@@ -2783,6 +2901,423 @@
                 detail.slideDown(150);
                 icon.css('transform', 'rotate(90deg)');
             }
+        }
+
+        // === GEO INTELLIGENCE GLOBE ===
+        var globeAnimationId = null;
+        var globeRotation = 0;
+        var globeDragging = false;
+        var globeDragStart = {x: 0, y: 0};
+        var globeRotX = 0.4; // tilt
+        var globeRotY = 0;
+        var globeHotspots = [];
+
+        function renderGlobe(geoPoints) {
+            $('#globe-loading').hide();
+            var canvas = document.getElementById('globe-canvas');
+            if (!canvas) return;
+
+            var container = canvas.parentElement;
+            var w = container.offsetWidth;
+            var h = Math.max(380, Math.min(480, w * 0.6));
+            canvas.width = w * 2; // retina
+            canvas.height = h * 2;
+            canvas.style.height = h + 'px';
+            var ctx = canvas.getContext('2d');
+            ctx.scale(2, 2);
+
+            // Deduplicate points by rounding to 0.1 degree
+            var seen = {};
+            var uniquePoints = [];
+            for (var i = 0; i < geoPoints.length; i++) {
+                var key = Math.round(geoPoints[i].lat * 10) + ',' + Math.round(geoPoints[i].lon * 10);
+                if (!seen[key]) {
+                    seen[key] = true;
+                    uniquePoints.push(geoPoints[i]);
+                }
+            }
+            globeHotspots = uniquePoints;
+
+            var countText = uniquePoints.length + ' HOTSPOT' + (uniquePoints.length !== 1 ? 'S' : '') + ' DETECTED';
+            if (uniquePoints.length === 0) countText = 'NO GEO DATA';
+            $('#globe-hotspot-count').text(countText);
+
+            var cx = w / 2;
+            var cy = h / 2;
+            var radius = Math.min(w, h) * 0.38;
+
+            // Globe interaction
+            canvas.onmousedown = function(e) {
+                globeDragging = true;
+                globeDragStart = {x: e.clientX, y: e.clientY, rotY: globeRotY, rotX: globeRotX};
+            };
+            canvas.onmousemove = function(e) {
+                if (globeDragging) {
+                    globeRotY = globeDragStart.rotY + (e.clientX - globeDragStart.x) * 0.005;
+                    globeRotX = Math.max(-Math.PI/2, Math.min(Math.PI/2, globeDragStart.rotX + (e.clientY - globeDragStart.y) * 0.005));
+                } else {
+                    // Tooltip on hover
+                    checkGlobeHover(e, canvas, cx, cy, radius);
+                }
+            };
+            canvas.onmouseup = function() { globeDragging = false; };
+            canvas.onmouseleave = function() { globeDragging = false; $('#globe-tooltip').hide(); };
+
+            function project(lat, lon) {
+                var phi = lat * Math.PI / 180;
+                var lam = lon * Math.PI / 180;
+                var cosP = Math.cos(phi);
+                var x3d = cosP * Math.sin(lam);
+                var y3d = Math.sin(phi);
+                var z3d = cosP * Math.cos(lam);
+                // Rotate around Y axis
+                var x2 = x3d * Math.cos(globeRotY) - z3d * Math.sin(globeRotY);
+                var z2 = x3d * Math.sin(globeRotY) + z3d * Math.cos(globeRotY);
+                // Rotate around X axis (tilt)
+                var y2 = y3d * Math.cos(globeRotX) - z2 * Math.sin(globeRotX);
+                var z3 = y3d * Math.sin(globeRotX) + z2 * Math.cos(globeRotX);
+                return {
+                    x: cx + x2 * radius,
+                    y: cy - y2 * radius,
+                    z: z3,
+                    visible: z3 > 0
+                };
+            }
+
+            function drawFrame() {
+                ctx.clearRect(0, 0, w, h);
+
+                // Background
+                ctx.fillStyle = '#0c0c0c';
+                ctx.fillRect(0, 0, w, h);
+
+                // Globe outer glow
+                var grd = ctx.createRadialGradient(cx, cy, radius * 0.95, cx, cy, radius * 1.3);
+                grd.addColorStop(0, 'rgba(255, 255, 255, 0.03)');
+                grd.addColorStop(0.5, 'rgba(255, 255, 255, 0.01)');
+                grd.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                ctx.fillStyle = grd;
+                ctx.fillRect(0, 0, w, h);
+
+                // Globe sphere
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                var sphereGrd = ctx.createRadialGradient(cx - radius * 0.3, cy - radius * 0.3, 0, cx, cy, radius);
+                sphereGrd.addColorStop(0, 'rgba(30, 30, 30, 1)');
+                sphereGrd.addColorStop(0.7, 'rgba(15, 15, 15, 1)');
+                sphereGrd.addColorStop(1, 'rgba(8, 8, 8, 1)');
+                ctx.fillStyle = sphereGrd;
+                ctx.fill();
+
+                // Globe border glow
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // Subtle atmosphere glow
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius + 2, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // Grid lines - latitude
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+                ctx.lineWidth = 0.5;
+                for (var lat = -60; lat <= 60; lat += 30) {
+                    ctx.beginPath();
+                    var first = true;
+                    for (var lon = -180; lon <= 180; lon += 3) {
+                        var p = project(lat, lon);
+                        if (p.visible) {
+                            if (first) { ctx.moveTo(p.x, p.y); first = false; }
+                            else ctx.lineTo(p.x, p.y);
+                        } else {
+                            first = true;
+                        }
+                    }
+                    ctx.stroke();
+                }
+
+                // Grid lines - longitude
+                for (var lon = -180; lon < 180; lon += 30) {
+                    ctx.beginPath();
+                    var first = true;
+                    for (var lat = -90; lat <= 90; lat += 3) {
+                        var p = project(lat, lon);
+                        if (p.visible) {
+                            if (first) { ctx.moveTo(p.x, p.y); first = false; }
+                            else ctx.lineTo(p.x, p.y);
+                        } else {
+                            first = true;
+                        }
+                    }
+                    ctx.stroke();
+                }
+
+                // Simplified continent outlines (major coastline points)
+                drawContinents(ctx, project);
+
+                // Hotspots
+                for (var i = 0; i < uniquePoints.length; i++) {
+                    var pt = uniquePoints[i];
+                    var p = project(pt.lat, pt.lon);
+                    if (!p.visible) continue;
+
+                    // Pulse animation
+                    var pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.003 + i * 1.5);
+
+                    // Outer glow
+                    var hotGrd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 12 + pulse * 8);
+                    hotGrd.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
+                    hotGrd.addColorStop(0.3, 'rgba(255, 255, 255, 0.2)');
+                    hotGrd.addColorStop(0.6, 'rgba(255, 255, 255, 0.05)');
+                    hotGrd.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 12 + pulse * 8, 0, Math.PI * 2);
+                    ctx.fillStyle = hotGrd;
+                    ctx.fill();
+
+                    // Core dot
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.shadowColor = 'rgba(255, 255, 255, 0.9)';
+                    ctx.shadowBlur = 15;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                    // Crosshair lines
+                    ctx.strokeStyle = 'rgba(255, 255, 255, ' + (0.15 + pulse * 0.1) + ')';
+                    ctx.lineWidth = 0.5;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x - 8, p.y); ctx.lineTo(p.x + 8, p.y);
+                    ctx.moveTo(p.x, p.y - 8); ctx.lineTo(p.x, p.y + 8);
+                    ctx.stroke();
+                }
+
+                // Scanning line effect (sweeping radial line)
+                var scanAngle = (Date.now() * 0.001) % (Math.PI * 2);
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(cx + Math.cos(scanAngle) * radius, cy + Math.sin(scanAngle) * radius);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Scan arc trail
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius * 0.98, scanAngle - 0.3, scanAngle, false);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                if (!globeDragging) {
+                    globeRotY += 0.002;
+                }
+
+                globeAnimationId = requestAnimationFrame(drawFrame);
+            }
+
+            // Store project function for hover detection
+            canvas._project = project;
+            canvas._cx = cx;
+            canvas._cy = cy;
+            canvas._radius = radius;
+
+            // Cancel previous animation if any
+            if (globeAnimationId) cancelAnimationFrame(globeAnimationId);
+            drawFrame();
+        }
+
+        function checkGlobeHover(e, canvas, cx, cy, radius) {
+            var rect = canvas.getBoundingClientRect();
+            var mx = e.clientX - rect.left;
+            var my = e.clientY - rect.top;
+            var tooltip = $('#globe-tooltip');
+            var found = false;
+
+            if (canvas._project) {
+                for (var i = 0; i < globeHotspots.length; i++) {
+                    var pt = globeHotspots[i];
+                    var p = canvas._project(pt.lat, pt.lon);
+                    if (!p.visible) continue;
+                    var dx = mx - p.x;
+                    var dy = my - p.y;
+                    if (dx * dx + dy * dy < 225) { // 15px radius
+                        var html = '<div style="font-weight:700;margin-bottom:4px;color:#fff;text-shadow:0 0 10px rgba(255,255,255,0.8);">' + pt.type + '</div>';
+                        html += '<div style="color:var(--text-secondary);">' + pt.lat.toFixed(4) + ', ' + pt.lon.toFixed(4) + '</div>';
+                        if (pt.source) html += '<div style="color:var(--text-muted);margin-top:2px;font-size:10px;">SRC: ' + $('<span>').text(pt.source).html().substring(0, 50) + '</div>';
+                        tooltip.html(html).css({left: mx + 15, top: my - 10}).show();
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (!found) tooltip.hide();
+        }
+
+        // Simplified continent outlines for the globe
+        function drawContinents(ctx, project) {
+            var continents = [
+                // North America (simplified)
+                [
+                    [60,-140],[65,-168],[72,-168],[71,-155],[60,-140],[55,-130],[48,-125],
+                    [37,-122],[32,-117],[25,-110],[20,-105],[18,-97],[20,-87],[25,-80],
+                    [30,-81],[35,-75],[40,-74],[42,-70],[45,-67],[47,-64],[50,-57],
+                    [52,-56],[55,-60],[60,-64],[58,-75],[60,-80],[55,-85],[50,-90],
+                    [48,-88],[45,-83],[42,-82],[43,-79],[47,-84],[50,-85],[55,-90],
+                    [58,-94],[60,-95],[65,-100],[70,-110],[72,-120],[70,-140],[65,-150]
+                ],
+                // South America
+                [
+                    [10,-75],[12,-72],[10,-67],[8,-63],[7,-60],[5,-52],[2,-50],
+                    [-2,-44],[-5,-35],[-8,-35],[-12,-37],[-15,-39],[-18,-40],
+                    [-22,-41],[-23,-43],[-25,-48],[-30,-50],[-33,-52],[-38,-57],
+                    [-42,-63],[-46,-66],[-50,-68],[-53,-70],[-55,-68],[-54,-66],
+                    [-52,-70],[-48,-75],[-42,-73],[-37,-73],[-33,-72],[-27,-71],
+                    [-20,-70],[-15,-75],[-10,-77],[-5,-80],[0,-80],[2,-77],[5,-76]
+                ],
+                // Europe
+                [
+                    [36,-5],[37,0],[38,2],[40,0],[43,3],[43,5],[44,8],[44,12],
+                    [41,12],[40,15],[38,16],[39,20],[38,24],[40,26],[41,29],
+                    [43,28],[44,34],[46,30],[48,24],[50,20],[52,14],[54,10],
+                    [55,8],[57,8],[58,6],[59,5],[62,5],[64,10],[68,16],[70,20],
+                    [71,26],[70,28],[68,28],[65,25],[63,20],[60,18],[59,10],
+                    [57,12],[55,13],[54,14],[53,8],[51,4],[51,1],[50,-5],
+                    [48,-5],[47,-1],[44,-1],[43,-8],[40,-8],[37,-9]
+                ],
+                // Africa
+                [
+                    [37,10],[35,0],[33,-8],[28,-13],[22,-17],[18,-16],[15,-17],
+                    [12,-16],[8,-8],[5,-4],[5,2],[2,10],[0,10],[-1,12],
+                    [-5,12],[-10,14],[-12,14],[-15,12],[-18,12],[-20,14],
+                    [-23,16],[-25,15],[-28,16],[-30,18],[-33,18],[-34,19],
+                    [-34,24],[-34,26],[-33,28],[-30,30],[-25,33],[-20,35],
+                    [-15,40],[-10,42],[-5,42],[0,42],[5,43],[10,45],[12,44],
+                    [15,40],[20,38],[25,35],[30,32],[32,32],[35,10]
+                ],
+                // Asia (simplified)
+                [
+                    [42,30],[40,40],[38,45],[35,45],[30,48],[25,55],[22,60],
+                    [25,65],[24,68],[20,73],[15,75],[10,77],[8,80],[5,80],
+                    [2,103],[1,104],[5,105],[10,106],[15,108],[20,107],[22,114],
+                    [30,122],[35,129],[38,130],[40,132],[43,132],[45,135],[42,140],
+                    [45,142],[50,143],[55,135],[60,130],[65,140],[68,160],[66,170],
+                    [64,178],[62,179],[60,165],[55,155],[50,140],[55,138],
+                    [52,130],[50,120],[52,113],[55,90],[58,70],[60,60],[62,50],
+                    [58,50],[55,40],[45,38],[42,30]
+                ],
+                // Australia
+                [
+                    [-12,130],[-12,136],[-15,136],[-15,140],[-17,141],[-18,146],
+                    [-20,149],[-23,150],[-27,153],[-30,153],[-33,152],[-35,151],
+                    [-37,150],[-38,146],[-38,141],[-35,137],[-35,135],[-32,133],
+                    [-32,130],[-30,115],[-25,113],[-22,114],[-20,118],[-16,123],
+                    [-14,127],[-12,130]
+                ]
+            ];
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+            ctx.lineWidth = 0.8;
+
+            for (var c = 0; c < continents.length; c++) {
+                var pts = continents[c];
+                ctx.beginPath();
+                var started = false;
+                for (var j = 0; j < pts.length; j++) {
+                    var p = project(pts[j][0], pts[j][1]);
+                    if (p.visible) {
+                        if (!started) { ctx.moveTo(p.x, p.y); started = true; }
+                        else ctx.lineTo(p.x, p.y);
+                    } else {
+                        started = false;
+                    }
+                }
+                ctx.stroke();
+            }
+        }
+
+        // === ASSET OVERVIEW PANEL ===
+        function renderAssetOverview(data) {
+            var panel = $('#asset-overview-body');
+            if (!data || data.length === 0) {
+                panel.html("<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'>NO DATA AVAILABLE</div>");
+                return;
+            }
+
+            // Categorize event types into asset groups
+            var assets = {
+                'DOMAINS': {icon: 'glyphicon-globe', count: 0, types: ['INTERNET_NAME', 'DOMAIN_NAME', 'AFFILIATE_INTERNET_NAME', 'CO_HOSTED_SITE', 'SIMILARDOMAIN']},
+                'IP ADDRESSES': {icon: 'glyphicon-map-marker', count: 0, types: ['IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR']},
+                'EMAILS': {icon: 'glyphicon-envelope', count: 0, types: ['EMAILADDR', 'AFFILIATE_EMAILADDR']},
+                'HOSTS': {icon: 'glyphicon-hdd', count: 0, types: ['INTERNET_NAME', 'INTERNET_NAME_UNRESOLVED']},
+                'PORTS': {icon: 'glyphicon-transfer', count: 0, types: ['TCP_PORT_OPEN', 'TCP_PORT_OPEN_BANNER', 'UDP_PORT_OPEN', 'UDP_PORT_OPEN_INFO']},
+                'CREDENTIALS': {icon: 'glyphicon-lock', count: 0, types: ['ACCOUNT_EXTERNAL_OWNED', 'ACCOUNT_EXTERNAL_USER_SHARED', 'PASSWORD_COMPROMISED', 'EMAILADDR_COMPROMISED']},
+                'NAMES': {icon: 'glyphicon-user', count: 0, types: ['HUMAN_NAME', 'USERNAME', 'SOCIAL_MEDIA']},
+                'TECH': {icon: 'glyphicon-wrench', count: 0, types: ['WEBSERVER_TECHNOLOGY', 'SOFTWARE_USED', 'OPERATING_SYSTEM', 'WEBSERVER_BANNER']}
+            };
+
+            for (var i = 0; i < data.length; i++) {
+                var evtType = data[i][0];
+                var unique = data[i][4];
+                for (var cat in assets) {
+                    if (assets[cat].types.indexOf(evtType) >= 0) {
+                        assets[cat].count += unique;
+                    }
+                }
+            }
+
+            var h = '';
+            for (var cat in assets) {
+                var a = assets[cat];
+                var glowIntensity = a.count > 0 ? '0.5' : '0.15';
+                var textColor = a.count > 0 ? '#fff' : 'var(--text-muted)';
+                h += "<div style='display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.04);'>";
+                h += "<div style='display:flex;align-items:center;gap:10px;'>";
+                h += "<i class='glyphicon " + a.icon + "' style='color:rgba(255,255,255," + glowIntensity + ");font-size:13px;text-shadow:0 0 8px rgba(255,255,255," + glowIntensity + ");'></i>";
+                h += "<span style='font-family:var(--font-mono);font-size:11px;font-weight:700;color:" + textColor + ";text-transform:uppercase;letter-spacing:0.5px;text-shadow:0 0 8px rgba(255,255,255," + glowIntensity + ");'>" + cat + "</span>";
+                h += "</div>";
+                h += "<span style='font-family:var(--font-mono);font-size:14px;font-weight:700;color:" + textColor + ";text-shadow:0 0 10px rgba(255,255,255," + glowIntensity + ");'>" + a.count + "</span>";
+                h += "</div>";
+            }
+            panel.html(h);
+        }
+
+        // === TOP MODULES PANEL ===
+        function renderModuleActivity(data) {
+            var panel = $('#module-activity-body');
+            if (!data || data.length === 0) {
+                panel.html("<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'>NO MODULE DATA</div>");
+                return;
+            }
+
+            // Sort by unique count descending, take top 8
+            var sorted = data.slice().sort(function(a, b) { return b[4] - a[4]; });
+            var top = sorted.slice(0, 8);
+            var maxCount = top.length > 0 ? top[0][4] : 1;
+
+            var h = '';
+            for (var i = 0; i < top.length; i++) {
+                var modName = top[i][1] || top[i][0];
+                var count = top[i][4];
+                var pct = Math.max(5, (count / maxCount) * 100);
+                var barGlow = 'rgba(255, 255, 255, 0.3)';
+
+                h += "<div style='padding:6px 12px;border-bottom:1px solid rgba(255,255,255,0.04);'>";
+                h += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;'>";
+                h += "<span style='font-family:var(--font-mono);font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;text-shadow:0 0 6px rgba(255,255,255,0.3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%;' title='" + modName + "'>" + modName + "</span>";
+                h += "<span style='font-family:var(--font-mono);font-size:11px;font-weight:700;color:#fff;text-shadow:0 0 8px rgba(255,255,255,0.5);'>" + count + "</span>";
+                h += "</div>";
+                h += "<div style='height:3px;background:var(--bg-tertiary);border-radius:0;overflow:hidden;'>";
+                h += "<div style='height:100%;width:" + pct + "%;background:linear-gradient(90deg, rgba(255,255,255,0.2), rgba(255,255,255,0.5));box-shadow:0 0 8px " + barGlow + ";transition:width 0.5s ease;'></div>";
+                h += "</div>";
+                h += "</div>";
+            }
+            panel.html(h);
         }
 
         // Expand the correlation list to show the events associated

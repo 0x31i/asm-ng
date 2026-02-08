@@ -2764,6 +2764,36 @@ tr.active td {
 }
 
 /* ============================================
+   Geo Intelligence Globe
+   ============================================ */
+#globe-canvas {
+  cursor: grab;
+}
+#globe-canvas:active {
+  cursor: grabbing;
+}
+
+/* Asset Overview + Module Activity panels */
+#asset-overview-body,
+#module-activity-body {
+  font-family: var(--font-mono) !important;
+}
+
+/* All text inside summary panels - uppercase mono font */
+#scansummary-content .panel-body .alert {
+  font-family: var(--font-mono) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+#scansummary-content .panel-body .alert h4 {
+  font-family: var(--font-mono) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* ============================================
    NEW SCAN Page - Modern Sharp Style
    Sharp corners, code font, glowing text
    ============================================ */
