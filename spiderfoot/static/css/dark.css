@@ -2822,6 +2822,115 @@ tr.active td {
   text-shadow: 0 0 8px var(--glow-green) !important;
 }
 
+/* === Split Panel Header Colors === */
+/* Findings panel - green header */
+.panel-heading-findings {
+  border-bottom: 3px solid #22c55e !important;
+  color: #22c55e !important;
+  text-shadow: 0 0 10px rgba(34, 197, 94, 0.5) !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+}
+.panel-heading-findings .glyphicon {
+  color: #22c55e !important;
+  text-shadow: 0 0 8px rgba(34, 197, 94, 0.6) !important;
+}
+
+/* Correlations panel - blue header */
+.panel-heading-correlations {
+  border-bottom: 3px solid #3b82f6 !important;
+  color: #3b82f6 !important;
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.5) !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+}
+.panel-heading-correlations .glyphicon {
+  color: #3b82f6 !important;
+  text-shadow: 0 0 8px rgba(59, 130, 246, 0.6) !important;
+}
+
+/* Nessus panel - purple header */
+.panel-heading-nessus {
+  border-bottom: 3px solid #8b5cf6 !important;
+  color: #8b5cf6 !important;
+  text-shadow: 0 0 10px rgba(139, 92, 246, 0.5) !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+}
+.panel-heading-nessus .glyphicon {
+  color: #8b5cf6 !important;
+  text-shadow: 0 0 8px rgba(139, 92, 246, 0.6) !important;
+}
+
+/* Burp panel - cyan header */
+.panel-heading-burp {
+  border-bottom: 3px solid #22d3ee !important;
+  color: #22d3ee !important;
+  text-shadow: 0 0 10px rgba(34, 211, 238, 0.5) !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+}
+.panel-heading-burp .glyphicon {
+  color: #22d3ee !important;
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.6) !important;
+}
+
+/* Scan Status panel - distinct styling */
+.panel-heading-scan-status {
+  border-bottom: 3px solid #f59e0b !important;
+  color: #f59e0b !important;
+  text-shadow: 0 0 10px rgba(245, 158, 11, 0.5) !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+}
+.panel-heading-scan-status .glyphicon {
+  color: #f59e0b !important;
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.6) !important;
+}
+
+/* Right panel flex layout */
+.summary-right-panel {
+  flex: 1;
+  margin-bottom: 8px !important;
+  min-height: 0;
+}
+.summary-right-panel:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Adjustable count buttons inside right panels */
+.summary-count-btn {
+  transition: font-size 0.2s ease, padding 0.2s ease !important;
+}
+
+/* Panel body flex centering for dynamic sizing */
+.summary-counts-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.summary-counts-body .btn-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+
 /* Legacy fc-tab support */
 .fc-tab {
   font-family: var(--font-mono) !important;
