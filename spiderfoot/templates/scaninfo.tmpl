@@ -2395,11 +2395,11 @@
             grid += "<div style='text-align: center; padding: 30px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 1px;'><i class='glyphicon glyphicon-hourglass'></i> CALCULATING GRADE...</div>";
             grid += "</div></div></div>";
 
-            // RIGHT COLUMN: Scan Status + Findings/Correlations(tabbed) + Asset Overview + Top Modules stacked
-            grid += "<div class='col-sm-5' style='display:flex;flex-direction:column;'>";
+            // RIGHT COLUMN: Scan Status + Findings/Correlations(tabbed) + Nessus/Burp(tabbed) stacked
+            grid += "<div class='col-sm-5'>";
 
             // Scan Status panel
-            grid += "<div class='panel panel-default' style='flex:0 0 auto;'>";
+            grid += "<div class='panel panel-default'>";
             grid += "<div class='panel-heading'><i class='glyphicon glyphicon-eye-open'></i>&nbsp;&nbsp;SCAN STATUS</div><div class='panel-body' style='padding: 5px'>";
             grid += "<div class='btn-toolbar text-center'>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-secondary' style='cursor: default;'>TOTAL</button>";
@@ -2424,15 +2424,13 @@
             grid += "</div></div>";
 
             // Combined Findings / Correlations panel with tab switching
-            grid += "<div class='panel panel-default' style='flex:0 0 auto;'>";
-            // Split panel heading with two clickable tabs
+            grid += "<div class='panel panel-default'>";
             grid += "<div class='panel-heading' style='padding:0 !important;display:flex;'>";
             grid += "<div id='fc-tab-findings' class='summary-tab summary-tab-active' onclick='switchFCTab(\"findings\")'>";
             grid += "<i class='glyphicon glyphicon-list-alt'></i><span class='summary-tab-label'>FINDINGS</span></div>";
             grid += "<div id='fc-tab-correlations' class='summary-tab' onclick='switchFCTab(\"correlations\")'>";
             grid += "<i class='glyphicon glyphicon-exclamation-sign'></i><span class='summary-tab-label'>CORRELATIONS</span></div>";
             grid += "</div>";
-            // Findings content (visible by default)
             grid += "<div id='fc-findings-content' class='panel-body' style='padding: 5px'>";
             grid += "<div class='btn-toolbar text-center'>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-critical' style='cursor: default;'>CRITICAL</button>";
@@ -2446,7 +2444,6 @@
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-success' style='cursor: default;'>INFO</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='findings-info' style='cursor: default;'>?</button></div>";
             grid += "</div></div>";
-            // Correlations content (hidden by default)
             grid += "<div id='fc-correlations-content' class='panel-body' style='padding: 5px; display: none;'>";
             grid += "<div class='btn-toolbar text-center'>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-critical' style='cursor: default;'>CRITICAL</button>";
@@ -2460,73 +2457,81 @@
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-success' style='cursor: default;'>INFO</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='corr-info' style='cursor: default;'>?</button></div>";
             grid += "</div></div>";
-            grid += "</div>"; // end combined panel
+            grid += "</div>";
 
             // Combined Nessus / Burp panel with tab switching
-            grid += "<div class='panel panel-default' style='flex:0 0 auto;'>";
+            grid += "<div class='panel panel-default'>";
             grid += "<div class='panel-heading' style='padding:0 !important;display:flex;'>";
             grid += "<div id='nb-tab-nessus' class='summary-tab summary-tab-active' onclick='switchNBTab(\"nessus\")'>";
             grid += "<i class='glyphicon glyphicon-search'></i><span class='summary-tab-label'>NESSUS</span></div>";
             grid += "<div id='nb-tab-burp' class='summary-tab' onclick='switchNBTab(\"burp\")'>";
             grid += "<i class='glyphicon glyphicon-fire'></i><span class='summary-tab-label'>BURP</span></div>";
             grid += "</div>";
-            // Nessus content (visible by default)
             grid += "<div id='nb-nessus-content' class='panel-body' style='padding: 5px'>";
             grid += "<div class='btn-toolbar text-center'>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-critical' style='cursor: default;'>CRITICAL</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='nessus-critical' style='cursor: default;'>0</button></div>";
+            grid += "<button class='btn disabled btn-md btn-default' id='nessus-critical' style='cursor: default;'>-</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-danger' style='cursor: default;'>HIGH</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='nessus-high' style='cursor: default;'>0</button></div>";
+            grid += "<button class='btn disabled btn-md btn-default' id='nessus-high' style='cursor: default;'>-</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-warning' style='cursor: default;'>MEDIUM</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='nessus-medium' style='cursor: default;'>0</button></div>";
+            grid += "<button class='btn disabled btn-md btn-default' id='nessus-medium' style='cursor: default;'>-</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-info' style='cursor: default;'>LOW</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='nessus-low' style='cursor: default;'>0</button></div>";
+            grid += "<button class='btn disabled btn-md btn-default' id='nessus-low' style='cursor: default;'>-</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-success' style='cursor: default;'>INFO</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='nessus-info' style='cursor: default;'>0</button></div>";
+            grid += "<button class='btn disabled btn-md btn-default' id='nessus-info' style='cursor: default;'>-</button></div>";
             grid += "</div></div>";
-            // Burp content (hidden by default)
             grid += "<div id='nb-burp-content' class='panel-body' style='padding: 5px; display: none;'>";
             grid += "<div class='btn-toolbar text-center'>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-critical' style='cursor: default;'>CRITICAL</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='burp-critical' style='cursor: default;'>0</button></div>";
+            grid += "<button class='btn disabled btn-md btn-default' id='burp-critical' style='cursor: default;'>-</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-danger' style='cursor: default;'>HIGH</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='burp-high' style='cursor: default;'>0</button></div>";
+            grid += "<button class='btn disabled btn-md btn-default' id='burp-high' style='cursor: default;'>-</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-warning' style='cursor: default;'>MEDIUM</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='burp-medium' style='cursor: default;'>0</button></div>";
+            grid += "<button class='btn disabled btn-md btn-default' id='burp-medium' style='cursor: default;'>-</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-info' style='cursor: default;'>LOW</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='burp-low' style='cursor: default;'>0</button></div>";
+            grid += "<button class='btn disabled btn-md btn-default' id='burp-low' style='cursor: default;'>-</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-success' style='cursor: default;'>INFO</button>";
-            grid += "<button class='btn disabled btn-md btn-default' id='burp-info' style='cursor: default;'>0</button></div>";
+            grid += "<button class='btn disabled btn-md btn-default' id='burp-info' style='cursor: default;'>-</button></div>";
             grid += "</div></div>";
-            grid += "</div>"; // end nessus/burp panel
-
-            // Asset Overview + Top Modules side by side
-            grid += "<div style='display:flex;gap:0;flex:1 1 auto;min-height:0;'>";
-
-            // Asset Overview panel
-            grid += "<div class='panel panel-default' style='flex:1;display:flex;flex-direction:column;margin-bottom:0;'>";
-            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-th-large'></i>&nbsp;&nbsp;ASSET OVERVIEW</div>";
-            grid += "<div class='panel-body' style='padding: 0;flex:1;overflow:auto;'>";
-            grid += "<div id='asset-overview-body'>";
-            grid += "<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;LOADING ASSETS...</div>";
-            grid += "</div></div></div>";
-
-            // Module Activity panel
-            grid += "<div class='panel panel-default' style='flex:1;display:flex;flex-direction:column;margin-bottom:0;'>";
-            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-cog'></i>&nbsp;&nbsp;TOP MODULES</div>";
-            grid += "<div class='panel-body' style='padding: 0;flex:1;overflow:auto;'>";
-            grid += "<div id='module-activity-body'>";
-            grid += "<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;LOADING MODULES...</div>";
-            grid += "</div></div></div>";
-
-            grid += "</div>"; // end asset+modules flex row
+            grid += "</div>";
 
             grid += "</div>"; // end right column
             grid += "</div>"; // end row 1
 
-            // === ROW 2: Geo Intelligence Globe + Attack Surface side by side ===
+            // === ROW 2: Four intel panels across (equal width) ===
+            grid += "<div class='row intel-row'>";
+            grid += "<div class='col-sm-3'>";
+            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-th-large'></i>&nbsp;&nbsp;ASSET OVERVIEW</div>";
+            grid += "<div class='panel-body' style='padding: 0;'><div id='asset-overview-body'>";
+            grid += "<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;LOADING...</div>";
+            grid += "</div></div></div></div>";
+
+            grid += "<div class='col-sm-3'>";
+            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-cog'></i>&nbsp;&nbsp;TOP MODULES</div>";
+            grid += "<div class='panel-body' style='padding: 0;'><div id='module-activity-body'>";
+            grid += "<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;LOADING...</div>";
+            grid += "</div></div></div></div>";
+
+            grid += "<div class='col-sm-3'>";
+            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-warning-sign'></i>&nbsp;&nbsp;ATTACK SURFACE</div>";
+            grid += "<div class='panel-body' style='padding: 0;'><div id='attack-surface-body'>";
+            grid += "<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;ANALYZING...</div>";
+            grid += "</div></div></div></div>";
+
+            grid += "<div class='col-sm-3'>";
+            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-lock'></i>&nbsp;&nbsp;EXPOSURE INDICATORS</div>";
+            grid += "<div class='panel-body' style='padding: 0;'><div id='exposure-indicators-body'>";
+            grid += "<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;ANALYZING...</div>";
+            grid += "</div></div></div></div>";
+            grid += "</div>"; // end row 2
+
+            // === ROW 3: Geo Intelligence Globe (full width) ===
             grid += "<div class='row'>";
-            grid += "<div class='col-sm-8'>";
+            grid += "<div class='col-sm-12'>";
             grid += "<div class='panel panel-default'>";
             grid += "<div class='panel-heading' style='display:flex; justify-content:space-between; align-items:center;'>";
             grid += "<span><i class='glyphicon glyphicon-globe'></i>&nbsp;&nbsp;GEO INTEL</span>";
@@ -2537,27 +2542,9 @@
             grid += "<div id='globe-tooltip' style='display:none;position:absolute;background:rgba(12,12,12,0.95);border:1px solid rgba(255,255,255,0.2);border-radius:0;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:#fff;text-transform:uppercase;letter-spacing:0.5px;pointer-events:none;z-index:10;box-shadow:0 0 15px rgba(255,255,255,0.1);text-shadow:0 0 8px rgba(255,255,255,0.5);max-width:280px;'></div>";
             grid += "<div id='globe-loading' style='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--font-mono);font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 10px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-refresh glyphicon-spin'></i>&nbsp;SCANNING COORDINATES...</div>";
             grid += "</div></div></div>";
+            grid += "</div>"; // end row 3
 
-            // Attack Surface panel (right side of globe row)
-            grid += "<div class='col-sm-4'>";
-            grid += "<div class='panel panel-default'>";
-            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-warning-sign'></i>&nbsp;&nbsp;ATTACK SURFACE</div>";
-            grid += "<div class='panel-body' style='padding: 0;'>";
-            grid += "<div id='attack-surface-body'>";
-            grid += "<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;ANALYZING...</div>";
-            grid += "</div></div></div>";
-
-            // Exposure Indicators panel
-            grid += "<div class='panel panel-default'>";
-            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-lock'></i>&nbsp;&nbsp;EXPOSURE INDICATORS</div>";
-            grid += "<div class='panel-body' style='padding: 0;'>";
-            grid += "<div id='exposure-indicators-body'>";
-            grid += "<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;ANALYZING...</div>";
-            grid += "</div></div></div>";
-            grid += "</div>"; // end col-sm-4
-            grid += "</div>"; // end row 2
-
-            // === ROW 3: Data Types (full width) ===
+            // === ROW 4: Data Types (full width) ===
             grid += "<div class='row'><div class='col-sm-12'>";
             grid += "<div class='panel panel-default'>";
             grid += "<div class='panel-heading'><i class='glyphicon glyphicon-stats'></i>&nbsp;&nbsp;DATA TYPES</div><div class='panel-body'>";
@@ -2824,22 +2811,69 @@
                 }
             );
 
-            // Nessus/Burp counts loader
+            // Nessus severity counts loader (from Vulnerabilities page API)
             dataloaders.push(
                 function() {
-                    sf.fetchData('${docroot}/scanstatus', {'id': instanceId}, function(data) {
-                        var nessusCounts = data[8] || {};
-                        var burpCounts = data[9] || {};
-                        $('#nessus-critical').html(nessusCounts['CRITICAL'] || 0);
-                        $('#nessus-high').html(nessusCounts['HIGH'] || 0);
-                        $('#nessus-medium').html(nessusCounts['MEDIUM'] || 0);
-                        $('#nessus-low').html(nessusCounts['LOW'] || 0);
-                        $('#nessus-info').html(nessusCounts['INFO'] || 0);
-                        $('#burp-critical').html(burpCounts['CRITICAL'] || 0);
-                        $('#burp-high').html(burpCounts['HIGH'] || 0);
-                        $('#burp-medium').html(burpCounts['MEDIUM'] || 0);
-                        $('#burp-low').html(burpCounts['LOW'] || 0);
-                        $('#burp-info').html(burpCounts['INFO'] || 0);
+                    sf.fetchData('${docroot}/scannessuscount', {'id': instanceId}, function(data) {
+                        if (data.success && data.count > 0) {
+                            sf.fetchData('${docroot}/scannessuslist', {'id': instanceId}, function(resp) {
+                                if (resp.success && resp.results) {
+                                    var c = {Critical:0, High:0, Medium:0, Low:0, None:0};
+                                    for (var i = 0; i < resp.results.length; i++) {
+                                        var sev = resp.results[i].severity || 'None';
+                                        // Only count open (non-closed) items
+                                        var tracking = resp.results[i].tracking || 0;
+                                        if (tracking === 1) continue; // skip closed
+                                        if (c.hasOwnProperty(sev)) c[sev]++;
+                                        else c['None']++;
+                                    }
+                                    $('#nessus-critical').html(c.Critical);
+                                    $('#nessus-high').html(c.High);
+                                    $('#nessus-medium').html(c.Medium);
+                                    $('#nessus-low').html(c.Low);
+                                    $('#nessus-info').html(c.None);
+                                }
+                            });
+                        } else {
+                            $('#nessus-critical').html(0);
+                            $('#nessus-high').html(0);
+                            $('#nessus-medium').html(0);
+                            $('#nessus-low').html(0);
+                            $('#nessus-info').html(0);
+                        }
+                    }, function() {
+                        $('#nessus-critical').html(0);$('#nessus-high').html(0);$('#nessus-medium').html(0);$('#nessus-low').html(0);$('#nessus-info').html(0);
+                    });
+                }
+            );
+
+            // Burp severity counts loader (from Vulnerabilities page API)
+            dataloaders.push(
+                function() {
+                    sf.fetchData('${docroot}/scanburpcount', {'id': instanceId}, function(data) {
+                        if (data.success && data.count > 0) {
+                            sf.fetchData('${docroot}/scanburplist', {'id': instanceId}, function(resp) {
+                                if (resp.success && resp.results) {
+                                    var c = {High:0, Medium:0, Low:0, Information:0, None:0};
+                                    for (var i = 0; i < resp.results.length; i++) {
+                                        var sev = resp.results[i].severity || 'None';
+                                        var tracking = resp.results[i].tracking || 0;
+                                        if (tracking === 1) continue;
+                                        if (c.hasOwnProperty(sev)) c[sev]++;
+                                        else c['None']++;
+                                    }
+                                    $('#burp-critical').html(0);
+                                    $('#burp-high').html(c.High);
+                                    $('#burp-medium').html(c.Medium);
+                                    $('#burp-low').html(c.Low);
+                                    $('#burp-info').html(c.Information + c.None);
+                                }
+                            });
+                        } else {
+                            $('#burp-critical').html(0);$('#burp-high').html(0);$('#burp-medium').html(0);$('#burp-low').html(0);$('#burp-info').html(0);
+                        }
+                    }, function() {
+                        $('#burp-critical').html(0);$('#burp-high').html(0);$('#burp-medium').html(0);$('#burp-low').html(0);$('#burp-info').html(0);
                     });
                 }
             );
