@@ -2648,7 +2648,7 @@
             h += "</div>";
             // Subtitle
             h += "<div style='margin-top:12px;color:var(--text-secondary);font-size:13px;'>Overall Security Rating</div>";
-            h += "<div style='color:var(--text-muted);font-size:11px;margin-top:2px;'>Only unverified &amp; open items count against the grade</div>";
+            h += "<div style='color:var(--text-muted);font-size:11px;margin-top:2px;'>Only unvalidated items count &mdash; validated &amp; false positives are excluded</div>";
             if (scanStatus && scanStatus != 'FINISHED' && scanStatus != 'ABORTED' && scanStatus.indexOf('FAILED') < 0) {
                 h += "<div style='display:inline-block;margin-top:8px;font-size:10px;color:var(--accent-yellow);background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);border-radius:4px;padding:3px 10px;'>";
                 h += "<i class='glyphicon glyphicon-exclamation-sign'></i> Scan in progress &mdash; grade may change</div>";

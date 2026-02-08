@@ -3387,7 +3387,7 @@ class SpiderFootWebUi:
             childs = dbh.scanElementChildrenAll(id, ids)
             allIds = ids + childs
 
-        ret = dbh.scanResultsUpdateFP(id, allIds, fp)
+        ret = dbh.scanResultsUpdateFP(id, allIds, int(fp))
         if ret:
             return json.dumps(["SUCCESS", ""]).encode('utf-8')
 
@@ -3461,7 +3461,7 @@ class SpiderFootWebUi:
             childs = dbh.scanElementChildrenAll(id, ids)
             allIds = ids + childs
 
-        ret = dbh.scanResultsUpdateFP(id, allIds, fp)
+        ret = dbh.scanResultsUpdateFP(id, allIds, int(fp))
 
         # Handle target-level persistence and cross-scan sync
         if ret and persist == "1":
@@ -4194,14 +4194,15 @@ class SpiderFootWebUi:
             return {'enabled': False, 'overall_grade': '-', 'overall_score': 0, 'categories': {}}
 
         try:
-            # Custom query: only count items where false_positive = 0 (unverified/open)
-            # This excludes false positives (1) and validated items (2)
+            # Custom query: only count UNVALIDATED items (false_positive = 0).
+            # Excludes: 1 = false positive, 2 = validated (acknowledged/being addressed).
+            # CAST ensures correct comparison even if column stored mixed types.
             qry = """SELECT r.type, e.event_descr,
                 count(*) AS total, count(DISTINCT r.data) as utotal
                 FROM tbl_scan_results r, tbl_event_types e
                 WHERE e.event = r.type
                 AND r.scan_instance_id = ?
-                AND r.false_positive = 0
+                AND CAST(r.false_positive AS INTEGER) = 0
                 GROUP BY r.type ORDER BY e.event_descr"""
 
             with dbh.dbhLock:
