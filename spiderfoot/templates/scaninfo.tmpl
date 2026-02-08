@@ -38,7 +38,7 @@
       <a id='btn-findings' class="btn btn-default" onClick='viewFindings("${id}")'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Findings</a>
       <a id='btn-graph' class="btn btn-default" onClick='viewVulnerabilities("${id}")'><i class='glyphicon glyphicon-asterisk'></i>&nbsp;Vulnerabilities</a>
       <a id='btn-assets' class="btn btn-default" onClick='viewAssets("${id}")'><i class='glyphicon glyphicon-hdd'></i>&nbsp;Assets</a>
-      <a id='btn-browse' class="btn btn-default" onClick='browseEventList("${id}")'><i class='glyphicon glyphicon-th-list'></i>&nbsp;Browse</a>
+      <a id='btn-data' class="btn btn-default" onClick='dataEventList("${id}")'><i class='glyphicon glyphicon-th-list'></i>&nbsp;Data</a>
 % if current_user == 'admin':
       <a id='btn-info' class="btn btn-default" onClick='viewScanConfig("${id}")'><i class='glyphicon glyphicon-cog'></i>&nbsp;Manage</a>
 % endif
@@ -60,13 +60,13 @@
             </ul>
         </div>
         <div id='customtabview' role="group" class="btn-group">
-         <a id='btn-fullview' rel="tooltip" data-title="Full Data View" class="btn btn-default active" onClick='browseUpdate("full")'><i class='glyphicon glyphicon-th glyphicon glyphicon-white'></i></a>
-         <a id='btn-discoverypathview' rel="tooltip" data-title="Discovery Path View" class="btn btn-default" onClick='browseUpdate("discovery-path")'><i class='glyphicon glyphicon-random glyphicon glyphicon-white'></i></a>
+         <a id='btn-fullview' rel="tooltip" data-title="Full Data View" class="btn btn-default active" onClick='dataUpdate("full")'><i class='glyphicon glyphicon-th glyphicon glyphicon-white'></i></a>
+         <a id='btn-discoverypathview' rel="tooltip" data-title="Discovery Path View" class="btn btn-default" onClick='dataUpdate("discovery-path")'><i class='glyphicon glyphicon-random glyphicon glyphicon-white'></i></a>
          <a id='btn-vizview' rel="tooltip" data-title="Visualize" class="btn btn-default dropdown-toggle" data-toggle="dropdown"><i class='glyphicon glyphicon-picture glyphicon glyphicon-white'></i></a>
          <ul class="dropdown-menu">
-            <li><a class='link' onClick='browseUpdate("viz-bubble-data")'>Bubble (Data Element)</a></li>
-            <li><a class='link' onClick='browseUpdate("viz-bubble-source")'>Bubble (Source Data Element)</a></li>
-            <li><a class='link' onClick='browseUpdate("viz-dendro")'>Discovery Path (Visual)</a></li>
+            <li><a class='link' onClick='dataUpdate("viz-bubble-data")'>Bubble (Data Element)</a></li>
+            <li><a class='link' onClick='dataUpdate("viz-bubble-source")'>Bubble (Source Data Element)</a></li>
+            <li><a class='link' onClick='dataUpdate("viz-dendro")'>Discovery Path (Visual)</a></li>
          </ul>
         </div>
         <div id='customvizview' class="btn-group">
@@ -186,15 +186,15 @@
     <script type='text/javascript'>
         var currentType = "ALL";
         var currentTypeName = "All";
-        var currentSection = "btn-browse";
-        var currentBrowseFormat = "full";
+        var currentSection = "btn-data";
+        var currentDataFormat = "full";
         var lastSearchType = "ALL";
         var lastSearchQuery = "";
         var dataloaders = [];
         var sharedSigma = "";
         var loadersrunning = false;
         var defaultExportDropdownHtml = '';
-        var refresh = function() { browseEventList("${id}"); }
+        var refresh = function() { dataEventList("${id}"); }
         $('#searchvalue').popover({ 'trigger': 'focus', 'placement': 'bottom'});
         $('#searchvalue').keyup(function(event) {
             if (event.keyCode == 13) {
@@ -753,7 +753,7 @@
             "btn-findings": "FINDINGS",
             "btn-graph": "VULNERABILITIES",
             "btn-assets": "ASSETS",
-            "btn-browse": "BROWSE",
+            "btn-data": "DATA",
             "btn-info": "MANAGE",
             "btn-search": "SEARCH RESULTS"
         };
@@ -771,7 +771,7 @@
         }
 
         function navTo(target) {
-            var targets = [ "btn-browse", "btn-info",
+            var targets = [ "btn-data", "btn-info",
                 "btn-export", "btn-download-logs", "btn-viz",
                 "btn-status", "btn-graph", "btn-findings", "btn-assets" ]
             for (var i = 0; i < targets.length; i++) {
@@ -2016,7 +2016,7 @@
                         } else if (typeVal === 'WEBAPP_VULNERABILITIES') {
                             html += "<td><div class='cell-clamp'><a class='finding-type-link' onclick='event.stopPropagation(); viewVulnerabilities(\"" + instanceId + "\"); switchVulnTab(\"burp\", \"" + instanceId + "\"); window.scrollTo(0,0);' title='View Web App Vulnerabilities (Burp)'>" + typeVal + "</a></div></td>";
                         } else if (typeVal) {
-                            html += "<td><div class='cell-clamp'><a class='finding-type-link' onclick='event.stopPropagation(); browseEventData(\"" + instanceId + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"full\");' title='Browse " + typeVal + " data'>" + typeVal + "</a></div></td>";
+                            html += "<td><div class='cell-clamp'><a class='finding-type-link' onclick='event.stopPropagation(); dataEventData(\"" + instanceId + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"" + typeVal.replace(/"/g, '&quot;') + "\", \"full\");' title='View " + typeVal + " data'>" + typeVal + "</a></div></td>";
                         } else {
                             html += "<td></td>";
                         }
@@ -2337,14 +2337,14 @@
                 html += "</td>";
                 html += "<td><div class='cell-clamp'>" + data[i][1] + "</div></td>";
 
-                // Type column with clickable links to Browse
+                // Type column with clickable links to Data
                 if (eventTypes) {
                     var types = eventTypes.split(',');
                     var typeLinks = [];
                     for (var t = 0; t < types.length; t++) {
                         var typ = types[t].trim();
                         if (typ) {
-                            typeLinks.push("<a class='finding-type-link' onclick='event.stopPropagation(); browseEventData(\"" + instanceId + "\", \"" + typ.replace(/"/g, '&quot;') + "\", \"" + typ.replace(/"/g, '&quot;') + "\", \"full\");' title='Browse " + typ + " data'>" + typ + "</a>");
+                            typeLinks.push("<a class='finding-type-link' onclick='event.stopPropagation(); dataEventData(\"" + instanceId + "\", \"" + typ.replace(/"/g, '&quot;') + "\", \"" + typ.replace(/"/g, '&quot;') + "\", \"full\");' title='View " + typ + " data'>" + typ + "</a>");
                         }
                     }
                     html += "<td><div class='cell-clamp'>" + typeLinks.join(", ") + "</div></td>";
@@ -2694,7 +2694,7 @@
                             scanSummary[i].name = data[i][1];
                             scanSummary[i].total = data[i][3];
                             scanSummary[i].counter = data[i][4];
-                            scanSummary[i].link = function(d) { return browseEventData(d.scanId, d.name, d.id, "full"); };
+                            scanSummary[i].link = function(d) { return dataEventData(d.scanId, d.name, d.id, "full"); };
                             totalCount += data[i][3];
                             uniqueCount += data[i][4];
                             scanStatus = data[i][5];
@@ -3037,7 +3037,7 @@
                         var d = cat.details[di];
                         var ptColor = d.points < 0 ? 'var(--accent-red)' : 'var(--text-muted)';
                         var ptStr = d.points < 0 ? d.points : '0';
-                        // Build clickable link to Browse > Type for this event type
+                        // Build clickable link to Data > Type for this event type
                         var typeLink = '';
                         var safeType = d.type.replace(/"/g, '&quot;');
                         if (d.type === 'EXTERNAL_VULNERABILITIES') {
@@ -3045,7 +3045,7 @@
                         } else if (d.type === 'WEBAPP_VULNERABILITIES') {
                             typeLink = "<a class='finding-type-link' style='cursor:pointer;color:var(--text-secondary);text-decoration:none;border-bottom:1px dotted var(--text-muted);' onclick='viewVulnerabilities(\"" + instanceId + "\"); switchVulnTab(\"burp\", \"" + instanceId + "\"); window.scrollTo(0,0);' title='View Web App Vulnerabilities'>" + d.type + "</a>";
                         } else {
-                            typeLink = "<a class='finding-type-link' style='cursor:pointer;color:var(--text-secondary);text-decoration:none;border-bottom:1px dotted var(--text-muted);' onclick='browseEventData(\"" + instanceId + "\", \"" + safeType + "\", \"" + safeType + "\", \"full\"); window.scrollTo(0,0);' title='Browse " + safeType + " data'>" + d.type + "</a>";
+                            typeLink = "<a class='finding-type-link' style='cursor:pointer;color:var(--text-secondary);text-decoration:none;border-bottom:1px dotted var(--text-muted);' onclick='dataEventData(\"" + instanceId + "\", \"" + safeType + "\", \"" + safeType + "\", \"full\"); window.scrollTo(0,0);' title='View " + safeType + " data'>" + d.type + "</a>";
                         }
                         h += "<div style='display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;'>";
                         h += "<span style='font-family:var(--font-mono);'>" + typeLink + " <span style='color:var(--text-muted);'>(" + d.count + ")</span></span>";
@@ -4087,9 +4087,9 @@
                 for (var i = 0; i < data.length; i++) {
                     var evtType = data[i][10] || '';
                     table += "<tr>";
-                    // Type column with link to Browse
+                    // Type column with link to Data
                     if (evtType) {
-                        table += "<td><a class='finding-type-link' onclick='browseEventData(\"" + instanceId + "\", \"" + evtType.replace(/"/g, '&quot;') + "\", \"" + evtType.replace(/"/g, '&quot;') + "\", \"full\");' title='Browse " + evtType + " data'>" + evtType + "</a></td>";
+                        table += "<td><a class='finding-type-link' onclick='dataEventData(\"" + instanceId + "\", \"" + evtType.replace(/"/g, '&quot;') + "\", \"" + evtType.replace(/"/g, '&quot;') + "\", \"full\");' title='View " + evtType + " data'>" + evtType + "</a></td>";
                     } else {
                         table += "<td></td>";
                     }
@@ -4107,8 +4107,8 @@
             });
         }
 
-        // Legacy browseCorrelations - redirect to Findings page with Correlations tab
-        function browseCorrelations(instanceId) {
+        // Legacy dataCorrelations - redirect to Findings page with Correlations tab
+        function dataCorrelations(instanceId) {
             viewFindings(instanceId);
             // Switch to correlations tab after a short delay to let the DOM render
             setTimeout(function() {
@@ -4118,7 +4118,7 @@
         }
 
         // Original correlation data fetching (kept for reference by AI correlation refresh)
-        function browseCorrelationsLegacy(instanceId) {
+        function dataCorrelationsLegacy(instanceId) {
             $("#scansummary-content").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
@@ -4130,7 +4130,7 @@
             $("#btn-export").hide();
             $("#scanreminder").hide();
             navTo("btn-findings");
-            refresh = function() { browseCorrelations(instanceId); }
+            refresh = function() { dataCorrelations(instanceId); }
             
             console.log("Fetching correlation data for scan ID: " + instanceId);
             
@@ -4285,7 +4285,7 @@
                 errorMsg += "<p>Server response: " + xhr.responseText + "</p>";
             }
             
-            errorMsg += "<button class='btn btn-primary' onclick='browseCorrelations(\"" + instanceId + "\")'>Retry</button>";
+            errorMsg += "<button class='btn btn-primary' onclick='dataCorrelations(\"" + instanceId + "\")'>Retry</button>";
             errorMsg += "</div>";
             $("#loader").fadeOut(500);
             $("#mainbody").append(errorMsg);
@@ -4401,8 +4401,8 @@
                             }
                             msg += "</span>";
                             $("#dedup-results").html(msg);
-                            // Refresh the browse view after a brief delay
-                            setTimeout(function() { browseEventList(instanceId); }, 1500);
+                            // Refresh the data view after a brief delay
+                            setTimeout(function() { dataEventList(instanceId); }, 1500);
                         } else {
                             $("#dedup-results").html("<span class='text-success'><i class='glyphicon glyphicon-ok'></i>&nbsp;No duplicates found. Scan data is clean.</span>");
                         }
@@ -4456,7 +4456,7 @@
         }
 
         // Summary of event types and counts for a scan
-        function browseEventList(instanceId) {
+        function dataEventList(instanceId) {
             currentType = "ALL";
             currentTypeName = "All";
 
@@ -4468,14 +4468,14 @@
             $("#scanlogs-content").remove();
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
-            navTo("btn-browse");
+            navTo("btn-data");
             $("#loader").show();
             $("#btn-export").show();
             $("#btn-download-logs").hide();
             $("#btn-refresh").show();
             $("#btn-search").show();
             $("#scanreminder").hide();
-            refresh = function() { browseEventList(instanceId); }
+            refresh = function() { dataEventList(instanceId); }
             sf.fetchData('${docroot}/scansummary', {'id': instanceId, 'by': 'type'}, function(data) {
                             var dedupBar = "<div id='dedup-bar' style='margin-bottom: 15px; display: flex; align-items: center; gap: 15px;'>";
                             dedupBar += "<button id='btn-run-dedup' class='btn btn-warning' onclick='runDeduplication(\"${id}\")'>";
@@ -4487,7 +4487,7 @@
                             table += "<thead><tr> <th>Type</th><th>Unique Data Elements</th> <th>Total Data Elements</th><th>Last Data Element</th></tr></thead><tbody>";
                             for (var i = 0; i < data.length; i++) {
                                 table += "<tr><td><a class='link' onClick='";
-                                table += "browseEventData(\"${id}\", \"" + escape(data[i][1]) + "\", \"" + data[i][0] + "\", \"full\");'>";
+                                table += "dataEventData(\"${id}\", \"" + escape(data[i][1]) + "\", \"" + data[i][0] + "\", \"full\");'>";
                                 table += data[i][1] + "</a></td>";
                                 table += "<td>" + data[i][4] + "</td>";
                                 table += "<td>" + data[i][3] + "</td>";
@@ -4506,7 +4506,7 @@
         }
 
         // Detailed view of data for an event type for a scan
-        function browseEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated, filterImportedEntries) {
+        function dataEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated, filterImportedEntries) {
             if (filterFP === 'undefined' || filterFP === undefined) {
                 filterFP = false;
             }
@@ -4525,7 +4525,7 @@
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
             $("#loader").show();
-            navTo("btn-browse");
+            navTo("btn-data");
             $("#btn-export").show();
             $("#btn-download-logs").hide();
             $("#btn-refresh").show();
@@ -4535,9 +4535,9 @@
             currentType = eventType;
             currentTypeName = eventTypeLabel;
             updatePageTitle(currentTypeName);
-            refresh = function() { browseEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated, filterImportedEntries); }
-            browseUpdate = function(newformat) { browseEventData(instanceId, eventTypeLabel, eventType, newformat, filterFP, filterValidated, filterImportedEntries); }
-            currentBrowseFormat = format;
+            refresh = function() { dataEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated, filterImportedEntries); }
+            dataUpdate = function(newformat) { dataEventData(instanceId, eventTypeLabel, eventType, newformat, filterFP, filterValidated, filterImportedEntries); }
+            currentDataFormat = format;
 
             if (format == 'full') {
                 $("#btn-fullview").addClass("active");
@@ -5050,8 +5050,8 @@
                 efr.src = urlBase + instanceId + '&eventType=' + type + "&value=" + lastSearchQuery;
             }
 
-            if (currentSection == "btn-browse") {
-                if (currentBrowseFormat == "discovery-path") {
+            if (currentSection == "btn-data") {
+                if (currentDataFormat == "discovery-path") {
                     if (fileType == "excel") {
                         var urlBase = '${docroot}/scandiscoverypathexport?filetype=excel&id=';
                     } else {

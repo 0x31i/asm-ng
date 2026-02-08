@@ -40,7 +40,7 @@ python3 tools/import_legacy_csv.py \
 1. Note the Scan ID from the output
 2. Open SpiderFoot web UI (http://localhost:5001)
 3. Navigate to Scans and find "Test Import - Numeric Status"
-4. Click Browse and select any event type (e.g., IP_ADDRESS)
+4. Click Data and select any event type (e.g., IP_ADDRESS)
 5. Verify the Status column shows:
    - 192.168.1.1 = GREY "UNVALIDATED" badge
    - 10.0.0.1 = ORANGE "FALSE POSITIVE" badge
