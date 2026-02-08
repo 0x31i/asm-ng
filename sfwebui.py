@@ -4120,7 +4120,23 @@ class SpiderFootWebUi:
                 if c[0] in riskmatrix:
                     riskmatrix[c[0]] = c[1]
 
-        return [data[0], data[1], created, started, ended, data[5], riskmatrix]
+        findingsmatrix = {
+            "CRITICAL": 0,
+            "HIGH": 0,
+            "MEDIUM": 0,
+            "LOW": 0,
+            "INFO": 0
+        }
+        try:
+            findings = dbh.scanFindingsList(id)
+            if findings:
+                for f in findings:
+                    if f[1] in findingsmatrix:
+                        findingsmatrix[f[1]] += 1
+        except Exception:
+            pass
+
+        return [data[0], data[1], created, started, ended, data[5], riskmatrix, findingsmatrix]
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
