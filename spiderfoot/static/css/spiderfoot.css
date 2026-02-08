@@ -1809,22 +1809,26 @@ pre {
   color: #111827;
   line-height: 1.2;
 }
+.stat-item-text {
+  justify-content: center;
+}
 .stat-value-text {
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 .btn-sync {
-  background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%) !important;
+  background: #22d3ee !important;
   color: #fff !important;
   border: none !important;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
 .btn-sync:hover,
 .btn-sync:focus {
-  background: linear-gradient(135deg, #67e8f9 0%, #22d3ee 100%) !important;
+  background: #67e8f9 !important;
   color: #fff !important;
 }
 .stat-label {
