@@ -2920,49 +2920,164 @@ tr.active td {
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.6) !important;
 }
 
-/* Right panel flex layout */
+/* ============================================
+   Right Summary Panels - Modern Card Design
+   ============================================ */
 .summary-right-panel {
   margin-bottom: 0 !important;
   min-height: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--text-muted);
+  overflow: hidden;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
-.summary-right-panel .panel-body {
+.summary-right-panel:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Accent border per panel type */
+.summary-right-panel.srp-status       { border-left-color: var(--accent-yellow); }
+.summary-right-panel.srp-findings     { border-left-color: var(--accent-green); }
+.summary-right-panel.srp-correlations { border-left-color: var(--accent-blue); }
+.summary-right-panel.srp-extvuln      { border-left-color: var(--accent-purple); }
+.summary-right-panel.srp-webvuln      { border-left-color: var(--accent-cyan); }
+
+/* Panel header - slim and clean */
+.srp-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
+}
+.srp-icon {
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: color var(--transition-fast);
+}
+/* Tint icon per panel type */
+.srp-status .srp-icon       { color: var(--accent-yellow); }
+.srp-findings .srp-icon     { color: var(--accent-green); }
+.srp-correlations .srp-icon { color: var(--accent-blue); }
+.srp-extvuln .srp-icon      { color: var(--accent-purple); }
+.srp-webvuln .srp-icon      { color: var(--accent-cyan); }
+
+.srp-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-secondary);
+}
+
+/* Panel body - flex centered */
+.srp-body {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
   min-height: 0;
+  overflow: hidden;
 }
 
-/* Adjustable count buttons inside right panels - override the fixed sizing */
-.summary-right-panel .summary-count-btn {
-  transition: font-size 0.15s ease, padding 0.15s ease !important;
-}
-/* Override the fixed .panel-body .btn-toolbar .btn-group > .btn sizing for right panels */
-.summary-right-panel .panel-body .btn-toolbar .btn-group > .btn.summary-count-btn {
-  font-size: inherit !important;
-  padding: inherit !important;
-}
-
-/* Panel body flex centering for dynamic sizing */
-.summary-counts-body {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 2px !important;
-}
-.summary-counts-body .btn-toolbar {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  justify-content: center !important;
-  align-items: center !important;
-  gap: 2px !important;
-  padding: 0 !important;
-  margin: 0 !important;
+/* Stat grid for Scan Status panel */
+.stat-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
   width: 100%;
 }
-.summary-counts-body .btn-toolbar .btn-group {
-  margin: 0 !important;
-  padding: 0 !important;
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 70px;
+  padding: 6px 4px;
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
 }
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+  transition: font-size 0.15s ease;
+}
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Severity pill row for findings/correlations/vuln panels */
+.sev-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+.sev-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 52px;
+  padding: 6px 4px;
+  border-radius: 4px;
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.sev-pill:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.sev-val {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-primary);
+  transition: font-size 0.15s ease;
+}
+.sev-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 3px;
+}
+/* Severity label colors */
+.sev-critical .sev-label { color: var(--accent-purple-light); }
+.sev-high .sev-label     { color: var(--accent-red); }
+.sev-medium .sev-label   { color: var(--accent-yellow); }
+.sev-low .sev-label      { color: var(--accent-blue); }
+.sev-info .sev-label     { color: var(--accent-green); }
+/* Subtle top accent bar on each pill */
+.sev-critical { border-top: 2px solid var(--accent-purple-light); }
+.sev-high     { border-top: 2px solid var(--accent-red); }
+.sev-medium   { border-top: 2px solid var(--accent-yellow); }
+.sev-low      { border-top: 2px solid var(--accent-blue); }
+.sev-info     { border-top: 2px solid var(--accent-green); }
 
 /* Legacy fc-tab support */
 .fc-tab {
