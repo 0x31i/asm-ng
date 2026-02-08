@@ -2380,12 +2380,27 @@
         // Scan status
         function scanSummaryView(instanceId) {
             grid = "<div id='scansummary-content'>";
+
+            // === ROW 1: Overall Grade (left) + Scan Status (right) ===
             grid += "<div class='row'>";
-            grid += "<div class='col-sm-7'>";
+
+            // TOP-LEFT: Overall Grade (half-width)
+            grid += "<div class='col-sm-6'>";
+            grid += "<div class='panel panel-default' style='border: 1px solid var(--glass-border); background: var(--bg-secondary);'>";
+            grid += "<div class='panel-heading' style='display:flex; justify-content:space-between; align-items:center;'>";
+            grid += "<span><i class='glyphicon glyphicon-certificate'></i>&nbsp;&nbsp;Overall Grade</span>";
+            grid += "<button class='btn btn-xs btn-default' id='grade-refresh-btn' onclick='refreshGrade(\"" + instanceId + "\")' title='Recalculate grade'><i class='glyphicon glyphicon-refresh'></i> Refresh</button>";
+            grid += "</div>";
+            grid += "<div id='grade-panel-body' style='padding: 0;'>";
+            grid += "<div style='text-align: center; padding: 30px; color: var(--text-muted);'><i class='glyphicon glyphicon-hourglass'></i> Calculating grade...</div>";
+            grid += "</div></div></div>";
+
+            // TOP-RIGHT: Scan Status (half-width)
+            grid += "<div class='col-sm-6'>";
             grid += "<div class='panel panel-default'>";
             grid += "<div class='panel-heading'><i class='glyphicon glyphicon-eye-open'></i>&nbsp;&nbsp;Scan Status</div><div class='panel-body' style='padding: 5px'>";
             grid += "<div class='btn-toolbar text-center'>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-secondary' style='cursor: default;'>Total</span></button>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-secondary' style='cursor: default;'>Total</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='tcounter' style='cursor: default;'>?</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-secondary' style='cursor: default;'>Unique</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='ucounter' style='cursor: default;'>?</button></div>";
@@ -2405,13 +2420,37 @@
             grid += "<div id='summary-progress-details' style='margin-top: 3px; font-size: 10px; color: #888; display: flex; gap: 12px; flex-wrap: wrap;'></div>";
             grid += "</div>";
             grid += "</div></div></div>";
-            grid += "<div class='col-sm-5'>";
+
+            grid += "</div>";
+
+            // === ROW 2: Findings (left) + Correlations (right) ===
+            grid += "<div class='row'>";
+
+            // BOTTOM-LEFT: Findings
+            grid += "<div class='col-sm-6'>";
+            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-list-alt'></i>&nbsp;&nbsp;Findings</div><div class='panel-body' style='padding: 5px'>";
+            grid += "<div class='btn-toolbar text-center'>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-critical' style='cursor: default;'>Critical</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='findings-critical' style='cursor: default;'>?</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-danger' style='cursor: default;'>High</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='findings-high' style='cursor: default;'>?</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-warning' style='cursor: default;'>Medium</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='findings-medium' style='cursor: default;'>?</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-info' style='cursor: default;'>Low</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='findings-low' style='cursor: default;'>?</button></div>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-success' style='cursor: default;'>Info</button>";
+            grid += "<button class='btn disabled btn-md btn-default' id='findings-info' style='cursor: default;'>?</button></div>";
+            grid += "</div></div></div></div>";
+
+            // BOTTOM-RIGHT: Correlations
+            grid += "<div class='col-sm-6'>";
             grid += "<div class='panel panel-default'>";
             grid += "<div class='panel-heading'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;&nbsp;Correlations</div><div class='panel-body' style='padding: 5px'>";
             grid += "<div class='btn-toolbar text-center'>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-critical' style='cursor: default;'>Critical</span></button>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-critical' style='cursor: default;'>Critical</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='corr-critical' style='cursor: default;'>?</button></div>";
-            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-danger' style='cursor: default;'>High</span></button>";
+            grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-danger' style='cursor: default;'>High</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='corr-high' style='cursor: default;'>?</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-warning' style='cursor: default;'>Medium</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='corr-medium' style='cursor: default;'>?</button></div>";
@@ -2419,19 +2458,11 @@
             grid += "<button class='btn disabled btn-md btn-default' id='corr-low' style='cursor: default;'>?</button></div>";
             grid += "<div class='btn-group' style='float: unset; padding: 5px'><button class='btn disabled btn-md btn-success' style='cursor: default;'>Info</button>";
             grid += "<button class='btn disabled btn-md btn-default' id='corr-info' style='cursor: default;'>?</button></div>";
-            grid += "</div></div></div></div></div>";
-
-            // Overall Grade panel
-            grid += "<div class='row'><div class='col-sm-12'>";
-            grid += "<div class='panel panel-default' style='border: 1px solid var(--glass-border); background: var(--bg-secondary);'>";
-            grid += "<div class='panel-heading' style='display:flex; justify-content:space-between; align-items:center;'>";
-            grid += "<span><i class='glyphicon glyphicon-certificate'></i>&nbsp;&nbsp;Overall Grade</span>";
-            grid += "<button class='btn btn-xs btn-default' id='grade-refresh-btn' onclick='refreshGrade(\"" + instanceId + "\")' title='Recalculate grade'><i class='glyphicon glyphicon-refresh'></i> Refresh</button>";
-            grid += "</div>";
-            grid += "<div id='grade-panel-body' style='padding: 0;'>";
-            grid += "<div style='text-align: center; padding: 30px; color: var(--text-muted);'><i class='glyphicon glyphicon-hourglass'></i> Calculating grade...</div>";
             grid += "</div></div></div></div>";
 
+            grid += "</div>";
+
+            // === ROW 3: Data Types (full width) ===
             grid += "<div class='row'><div class='col-sm-12'>";
             grid += "<div class='panel panel-default'>";
             grid += "<div class='panel-heading'><i class='glyphicon glyphicon-stats'></i>&nbsp;&nbsp;Data Types</div><div class='panel-body'>";
@@ -2465,12 +2496,19 @@
                         scanEnded = data[4];
                         scanStatus = data[5];
                         scanCorrelations = data[6];
+                        var scanFindingsCounts = data[7] || {};
 
                         $("#corr-critical").html(scanCorrelations['CRITICAL']);
                         $("#corr-high").html(scanCorrelations['HIGH']);
                         $("#corr-medium").html(scanCorrelations['MEDIUM']);
                         $("#corr-low").html(scanCorrelations['LOW']);
                         $("#corr-info").html(scanCorrelations['INFO']);
+
+                        $("#findings-critical").html(scanFindingsCounts['CRITICAL'] || 0);
+                        $("#findings-high").html(scanFindingsCounts['HIGH'] || 0);
+                        $("#findings-medium").html(scanFindingsCounts['MEDIUM'] || 0);
+                        $("#findings-low").html(scanFindingsCounts['LOW'] || 0);
+                        $("#findings-info").html(scanFindingsCounts['INFO'] || 0);
                     });
                 }
             );
