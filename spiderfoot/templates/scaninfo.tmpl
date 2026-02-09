@@ -7161,24 +7161,27 @@
                     // Mark cells that have overflow (content taller than collapsed max-height)
                     $("#scansummary-content .discovery-path-cell.dp-collapsed").each(function() {
                         var wrap = this.querySelector('.dp-cell-wrap');
-                        if (wrap && wrap.scrollHeight > 96) {
+                        if (wrap && wrap.scrollHeight > 130) {
                             this.classList.add('dp-has-overflow');
                         } else {
                             this.classList.remove('dp-collapsed');
                         }
                     });
 
-                    // Click anywhere on cell to expand/collapse
+                    // Click anywhere on cell to expand/collapse entire row
                     $("#scansummary-content").on('click', '.discovery-path-cell.dp-has-overflow', function(e) {
                         if ($(e.target).is('a') || $(e.target).closest('a').length) return;
                         e.stopPropagation();
-                        if (this.classList.contains('dp-collapsed')) {
-                            this.classList.remove('dp-collapsed');
-                            this.classList.add('dp-expanded');
-                        } else {
-                            this.classList.remove('dp-expanded');
-                            this.classList.add('dp-collapsed');
-                        }
+                        var expanding = this.classList.contains('dp-collapsed');
+                        $(this).closest('tr').find('.discovery-path-cell.dp-has-overflow').each(function() {
+                            if (expanding) {
+                                this.classList.remove('dp-collapsed');
+                                this.classList.add('dp-expanded');
+                            } else {
+                                this.classList.remove('dp-expanded');
+                                this.classList.add('dp-collapsed');
+                            }
+                        });
                     });
 
                     // Apply any active client-side filters

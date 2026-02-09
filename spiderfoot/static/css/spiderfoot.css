@@ -7060,6 +7060,8 @@ i.glyphicon-white,
   line-height: 1.6;
   cursor: pointer;
   position: relative;
+  overflow: hidden;
+  word-break: break-all;
 }
 
 /* Wrapper inside td handles relative positioning (td can't do it reliably) */
@@ -7069,7 +7071,7 @@ i.glyphicon-white,
 
 /* Collapsed state: limit height and fade out */
 .discovery-path-cell.dp-collapsed .dp-cell-wrap {
-  max-height: 96px;
+  max-height: 130px;
   overflow: hidden;
 }
 
@@ -7111,13 +7113,6 @@ i.glyphicon-white,
 .discovery-path-cell.dp-expanded .dp-cell-wrap {
   max-height: none;
   overflow: visible;
-}
-
-.discovery-path-cell.dp-expanded .dp-type,
-.discovery-path-cell.dp-expanded .dp-module,
-.discovery-path-cell.dp-expanded .dp-data {
-  white-space: normal;
-  word-break: break-all;
 }
 
 /* Labels (TYPE:, SOURCE MODULE:, DATA:) */
