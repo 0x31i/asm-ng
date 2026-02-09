@@ -8570,3 +8570,163 @@ i.glyphicon-white,
   display: inline-block;
   transition: transform 0.2s ease;
 }
+
+/* ============================================================
+   DATA LIST PAGE - Category-grouped type listing
+   ============================================================ */
+
+/* Toolbar: sort buttons left, dedup right */
+.data-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+}
+
+.data-sort-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.data-sort-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  margin-right: 4px;
+  text-transform: uppercase;
+}
+
+.data-sort-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 4px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.data-sort-btn:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.data-sort-btn.data-sort-active {
+  color: #22c55e;
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.data-dedup-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.data-dedup-btn {
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.5px;
+  padding: 4px 12px !important;
+}
+
+/* Category legend */
+.data-list-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 0;
+}
+
+.data-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border: 1px solid;
+  border-radius: 3px;
+  opacity: 0.85;
+}
+
+.data-legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.data-legend-count {
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+/* Data list table */
+.data-list-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.data-list-table thead th {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--glass-border);
+  padding: 10px 12px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.data-list-table tbody td {
+  padding: 6px 12px;
+  vertical-align: middle;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* Group header rows */
+.data-list-group-header td {
+  background: rgba(255, 255, 255, 0.02) !important;
+  padding: 10px 12px !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+}
+
+/* Type button styling */
+.data-type-btn {
+  text-decoration: none !important;
+  transition: all 0.15s ease;
+  border-radius: 2px;
+}
+
+.data-type-btn:hover {
+  filter: brightness(1.3);
+  text-decoration: none !important;
+}
