@@ -5929,8 +5929,8 @@ i.glyphicon-white,
   padding: 12px 16px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  margin-bottom: 16px;
+  border-radius: 0;
+  margin-bottom: 0;
   flex-wrap: wrap;
 }
 
@@ -6024,9 +6024,18 @@ i.glyphicon-white,
 .assets-sticky-bar { position: sticky; top: 0; z-index: 100; background: #ffffff !important; border-bottom: 1px solid #e2e8f0; }
 
 /* Compact matches table */
-.assets-matches-compact { table-layout: fixed; width: 100%; }
+.assets-matches-compact { table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0; }
+
+/* Sticky table header - stacks below the action bar */
+.assets-matches-compact thead th {
+  position: sticky;
+  top: 62px;
+  z-index: 99;
+  background: #ffffff;
+  box-shadow: 0 1px 0 #e2e8f0;
+}
 .assets-matches-compact .assets-col-select { width: 36px; text-align: center; vertical-align: middle; }
-.assets-matches-compact .assets-col-status { width: 80px; text-align: center; }
+.assets-matches-compact .assets-col-status { width: 140px; text-align: center; }
 .assets-matches-compact .assets-col-actions { width: 60px; text-align: right; }
 
 .assets-cell-select {

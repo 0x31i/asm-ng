@@ -1454,6 +1454,13 @@
                 $("#loader").hide();
                 assetsInitSegmentHighlight();
                 assetsInitSelectionTracking();
+
+                // Dynamically set thead sticky offset based on actual sticky bar height
+                var stickyBar = document.getElementById('assets-sticky-bar');
+                if (stickyBar) {
+                    var barHeight = stickyBar.offsetHeight;
+                    $('#potential-matches-table thead th').css('top', barHeight + 'px');
+                }
             });
         }
 
