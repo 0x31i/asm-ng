@@ -1,0 +1,18 @@
+# ...moved from root, see previous content...
+
+parts:
+  asm-ng:
+    plugin: python
+    source: .
+    python-packages:
+      - .
+    stage:
+      - modules/**
+      - correlations/**
+      - spiderfoot/**
+      - sf.py
+      - sfcli.py
+      - sfapi.py
+      - sflib.py
+      - sfscan.py
+      - sfwebui.py

@@ -1,0 +1,412 @@
+<%include file="HEADER.tmpl"/>
+    <script>document.write('<script type="text/javascript" src="${docroot}/static/js/spiderfoot.opts.js?v=' + Date.now() + '"><\/script>');</script>
+    <h2>Settings</h2>
+% if updated:
+<div class="alert alert-success">
+ <button type="button" class="close" data-dismiss="alert">&times;</button>
+ <h4>Success!</h4>
+ Settings updated. These will take effect the next time you run a scan.
+</div>
+% endif
+<form class="form" action='${docroot}/savesettings' id="savesettingsform" method='POST' enctype="multipart/form-data">
+<div class='text-left'>
+    <input type=hidden id='allopts' name='allopts' value=''>
+    <input type=hidden id='token' name='token' value="${token}">
+    <input type="file" name='configFile' id="configFile" class='hidden' onChange='$("#savesettingsform").submit()' />
+    <!-- Default toolbar: Import/Export/Reset/Activity Log (no Save Changes) -->
+    <div id="toolbar-default">
+        <button id="btn-import-config" class='btn btn-info'>Import API Keys</button>
+        <button id="btn-opt-export" class='btn btn-info'>Export API Keys</button>
+        <button id="btn-reset-settings" class='btn btn-danger'>Reset to Factory Default</button>
+        <a href="${docroot}/auditlog" id="btn-activity-log" class='btn btn-default'>Activity Log</a>
+% if current_user == 'admin':
+        <a href="${docroot}/users" id="btn-user-management" class='btn btn-warning'><i class="glyphicon glyphicon-user"></i> User Management</a>
+% endif
+    </div>
+</div>
+<!-- Change toolbar: direct child of form so sticky works against full page height -->
+<div id="toolbar-changes" style="display: none">
+    <button id="btn-save-changes" class='btn btn-primary' type="button">Save Changes</button>
+    <button id="btn-discard-changes" class='btn btn-default' type="button">Discard Changes</button>
+</div>
+<br>
+
+<div class="tabbable tabs-left">
+<ul class="nav nav-pills nav-stacked col-md-3">
+<li id='tab_global' class="active"><a href="javascript:void(0)">Global</a></li>
+<li id='tab_gradeconfig'><a href='javascript:void(0)' onclick='switchTab("gradeconfig");'>Grade Configuration</a></li>
+% for mod in sorted(opts['__modules__'].keys()):
+    <% keylist = dict((k, v) for k, v in opts['__modules__'][mod]['opts'].items() if not k.startswith('_')) %>
+    % if len(keylist) > 0:
+        <% keyicon = "" %>
+        <% apikeylist = dict((k, v) for k, v in opts['__modules__'][mod]['opts'].items() if k.find("api_key") >= 0) %>
+        <% 
+        if len(apikeylist) > 0: 
+            keyicon = "&nbsp;&nbsp;<i class=\"glyphicon glyphicon-lock\"></i>"
+        %>
+        <li id='tab_${mod}'><a href='javascript:void(0)' onclick='switchTab("${mod}");' >${opts['__modules__'][mod].get('name', mod)}${keyicon}</a></li>
+    % endif
+% endfor
+</ul>
+
+<div class="tab-content col-md-9">
+
+<div id='optsect_global' class="tab-pane active">
+<h4>Global Settings</h4>
+<table class='table table-bordered table-striped'>
+<thead><tr> <th>Option</th> <th>Value</th></tr></thead><tbody>
+% for opt in sorted(opts.keys()):
+    % if not opt.startswith("__"):
+    <tr><td>${opts['__globaloptdescs__'].get(opt) or "No description available"}</td><td style='vertical-align: middle'>
+        % if type(opts[opt]) is int:
+        <div class='form-group'>
+            <input id='${opt}' class='form-control' type=text value="${opts[opt]}">
+        </div>
+        % endif
+        % if type(opts[opt]) is str:
+        <div class='form-group'>
+            <input id='${opt}' style='width: 500px' class='form-control' type=text value="${opts[opt]}">
+        </div>
+        % endif
+        % if type(opts[opt]) is bool:
+        <%
+            if opts[opt] == True:
+                seltrue = "selected"
+                selfalse = ""
+            else:
+                selfalse = "selected"  
+                seltrue = ""
+        %>
+            <select id='${opt}' class='form-control'>
+                <option value=1 ${seltrue}>True</option>
+                <option value=0 ${selfalse}>False</option>            </select>
+        % endif
+        % if type(opts[opt]) is list and len(opts[opt]) > 0 and type(opts[opt][0]) is str:
+            <% expandedopt = ','.join(opts[opt]) %>
+            <div class='form-group'>
+                <input id='${opt}' style='width: 500px' class='form-control' type=text value="${expandedopt}">
+            </div>
+        % endif
+        % if type(opts[opt]) is list and len(opts[opt]) > 0 and type(opts[opt][0]) is int:
+            <% expandedopt = ','.join(str(x) for x in opts[opt]) %>
+            <div class='form-group'>
+                <input id='${opt}' class='form-control' type=text value="${expandedopt}">
+            </div>
+        % endif
+        % if type(opts[opt]) is list and len(opts[opt]) == 0:
+            <div class='form-group'>
+                <input id='${opt}' style='width: 500px' class='form-control' type=text value="" placeholder="Enter comma-separated values">
+            </div>
+        % endif
+    </td></tr>
+    % endif
+% endfor
+</tbody>
+</table>
+</div>
+<div id='optsect_gradeconfig' class="tab-pane" style="display: none">
+<h4>Grade Configuration</h4>
+<p style="color: var(--text-secondary); margin-bottom: 15px;">
+Configure how the Overall Grade is calculated on scan summary pages.
+Each event type maps to a security category with scoring rules.
+Categories are weighted and combined into an overall letter grade (A-F).
+</p>
+
+<h5>Enable/Disable</h5>
+<table class='table table-bordered table-striped'>
+<tbody>
+<tr>
+  <td>Enable Overall Grade</td>
+  <td style='vertical-align: middle'>
+    <%
+        grade_enabled = opts.get('_grade_enabled', True)
+        ge_seltrue = "selected" if grade_enabled else ""
+        ge_selfalse = "" if grade_enabled else "selected"
+    %>
+    <select id='_grade_enabled' class='form-control'>
+      <option value=1 ${ge_seltrue}>True</option>
+      <option value=0 ${ge_selfalse}>False</option>
+    </select>
+  </td>
+</tr>
+</tbody>
+</table>
+
+<h5>Category Weights</h5>
+<p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">
+Adjust the weight of each category in the overall grade calculation.
+Weight 0 means the category is informational only and not counted in the overall score.
+</p>
+<table class='table table-bordered table-striped' id='grade-weights-table'>
+<thead><tr><th>Category</th><th>Weight (0.0 - 1.0)</th><th>Description</th></tr></thead>
+<tbody>
+<%
+    from spiderfoot.grade_config import DEFAULT_GRADE_CATEGORIES
+    import json as _json
+    _cat_overrides = {}
+    _cat_weights_str = opts.get('_grade_category_weights', '')
+    if _cat_weights_str and isinstance(_cat_weights_str, str) and _cat_weights_str.strip():
+        try:
+            _cat_overrides = _json.loads(_cat_weights_str)
+        except Exception:
+            pass
+%>
+% for cat_name in ['Network Security', 'Web App Security', 'Information Leakage', 'General Health', 'External Account Exposure', 'DNS Health', 'IP Reputation', 'Information / Reference']:
+<%
+    cat_info = DEFAULT_GRADE_CATEGORIES.get(cat_name, {})
+    cat_override = _cat_overrides.get(cat_name, {})
+    cat_weight = cat_override.get('weight', cat_info.get('weight', 0.0))
+    cat_desc = cat_info.get('description', '')
+    cat_input_id = 'grade_weight_' + cat_name.replace(' ', '_').replace('/', '_')
+%>
+<tr>
+  <td><span style="display:inline-block; width:4px; height:16px; border-radius:2px; background:${cat_info.get('color', '#6b7280')}; margin-right:8px; vertical-align:middle;"></span>${cat_name}</td>
+  <td style='vertical-align: middle; width: 150px;'>
+    <input id='${cat_input_id}' class='form-control grade-weight-input' type='number' step='0.1' min='0' max='1' value='${cat_weight}' data-category='${cat_name}'>
+  </td>
+  <td style='color: var(--text-muted); font-size: 12px;'>${cat_desc}</td>
+</tr>
+% endfor
+</tbody>
+</table>
+
+<h5>Grade Thresholds</h5>
+<p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">
+Define the score ranges for each letter grade. Scores are 0-100.
+</p>
+<table class='table table-bordered table-striped'>
+<thead><tr><th>Grade</th><th>Minimum Score</th></tr></thead>
+<tbody>
+<%
+    from spiderfoot.grade_config import DEFAULT_GRADE_THRESHOLDS
+    _thresh_overrides = None
+    _thresh_str = opts.get('_grade_thresholds', '')
+    if _thresh_str and isinstance(_thresh_str, str) and _thresh_str.strip():
+        try:
+            _thresh_overrides = _json.loads(_thresh_str)
+        except Exception:
+            pass
+    _thresholds = _thresh_overrides if _thresh_overrides else DEFAULT_GRADE_THRESHOLDS
+%>
+% for t in _thresholds:
+<tr>
+  <td><span style="display:inline-block; width:24px; height:20px; line-height:20px; text-align:center; border-radius:3px; color:#fff; font-weight:700; font-size:11px; background:${t.get('color', '#6b7280')};">${t['grade']}</span></td>
+  <td style='width: 150px;'>
+    <input id='grade_threshold_${t["grade"]}' class='form-control grade-threshold-input' type='number' min='0' max='100' value='${t["min"]}' data-grade='${t["grade"]}'>
+  </td>
+</tr>
+% endfor
+</tbody>
+</table>
+
+<h5>Advanced: Event Type Overrides (JSON)</h5>
+<p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">
+Override scoring rules for specific event types. Leave empty to use defaults.
+Format: <code>{"EVENT_TYPE": {"category": "...", "points": -10, "logic": "unverified_exists"}}</code>
+</p>
+<div class='form-group'>
+  <textarea id='_grade_event_overrides' class='form-control' rows='4' style='font-family: var(--font-mono); font-size: 12px;' placeholder='{"EVENT_TYPE": {"category": "Network Security", "points": -10, "logic": "unverified_exists"}}'>${opts.get('_grade_event_overrides', '')}</textarea>
+</div>
+
+<div style="margin-top: 15px;">
+  <button type="button" class="btn btn-default btn-sm" onclick="resetGradeConfig()">
+    <i class="glyphicon glyphicon-refresh"></i> Reset Grade Config to Defaults
+  </button>
+</div>
+
+<script>
+// Collect grade config into the hidden JSON fields before saving
+function collectGradeConfig() {
+    // Category weights
+    var weights = {};
+    $('.grade-weight-input').each(function() {
+        var cat = $(this).data('category');
+        var val = parseFloat($(this).val());
+        if (!isNaN(val)) {
+            weights[cat] = {"weight": val};
+        }
+    });
+    $('#_grade_category_weights').remove();
+    var cwInput = $('<input>').attr({type: 'hidden', id: '_grade_category_weights'}).val(JSON.stringify(weights));
+    $('#savesettingsform').append(cwInput);
+
+    // Thresholds
+    var thresholds = [];
+    var grades = ['A', 'B', 'C', 'D', 'F'];
+    for (var i = 0; i < grades.length; i++) {
+        var el = $('#grade_threshold_' + grades[i]);
+        if (el.length) {
+            thresholds.push({"min": parseInt(el.val()), "grade": grades[i]});
+        }
+    }
+    thresholds.sort(function(a, b) { return b.min - a.min; });
+    $('#_grade_thresholds').remove();
+    var gtInput = $('<input>').attr({type: 'hidden', id: '_grade_thresholds'}).val(JSON.stringify(thresholds));
+    $('#savesettingsform').append(gtInput);
+}
+
+function resetGradeConfig() {
+    if (!confirm('Reset all grade configuration to factory defaults?')) return;
+    // Reset weights
+    var defaults = {
+        'Network Security': 1.0, 'Web App Security': 1.0,
+        'Information Leakage': 0.8, 'General Health': 0.8,
+        'External Account Exposure': 0.7, 'DNS Health': 0.7,
+        'IP Reputation': 0.6, 'Information / Reference': 0.0
+    };
+    $('.grade-weight-input').each(function() {
+        var cat = $(this).data('category');
+        if (defaults[cat] !== undefined) $(this).val(defaults[cat]);
+    });
+    // Reset thresholds
+    $('#grade_threshold_A').val(90);
+    $('#grade_threshold_B').val(80);
+    $('#grade_threshold_C').val(70);
+    $('#grade_threshold_D').val(60);
+    $('#grade_threshold_F').val(0);
+    // Clear overrides
+    $('#_grade_event_overrides').val('');
+}
+
+// Hook into the save flow
+$(document).ready(function() {
+    // Intercept save to collect grade config
+    var origSaveHandler = null;
+    var saveBtn = document.getElementById('btn-save-changes');
+    if (saveBtn) {
+        var origClick = saveBtn.onclick;
+        saveBtn.addEventListener('click', function() {
+            collectGradeConfig();
+        }, true);
+    }
+});
+</script>
+</div>
+
+% for mod in sorted(opts['__modules__'].keys()):
+    <%
+        summary = opts['__modules__'][mod].get('descr') or 'No summary available.'
+        categories = opts['__modules__'][mod].get('cats') or []
+        labels = opts['__modules__'][mod].get('labels') or []
+        meta = opts['__modules__'][mod].get('meta') or {}
+        modopts = opts['__modules__'][mod].get('opts')
+        optdescs = opts['__modules__'][mod].get('optdescs')
+        data_source = meta.get('dataSource') or {}
+        website = data_source.get('website') or ''
+        description = data_source.get('description') or ''
+        apiKeyInstructions = data_source.get('apiKeyInstructions') or ''
+    %>
+    <div id='optsect_${mod}' class="tab-pane" style="display: none">
+    <h4>${opts['__modules__'][mod].get('name', mod)} (${mod})</h4>
+
+    <table class='table table-bordered table-striped'>
+    <tbody>
+    <tr><td>Summary</td><td>${summary}<br/><br/>${description}</td></tr>
+
+    % if categories:
+    <tr><td>Categories:</td><td>${', '.join(categories)}</td><tr>
+    % endif
+
+    % if labels:
+    <tr><td>Tags:</td><td>${', '.join(labels)}</td><tr>
+    % endif
+
+    % if website:
+    <tr><td>Website:</td><td><a href="${website}" target=_new>${website}</a></td></tr>
+    % endif
+
+    </tbody>
+    </table>
+
+    <h4>Settings</h4>
+    <table class='table table-bordered table-striped'>
+    <thead><tr><th>Option</th> <th>Value</th></tr></thead>
+    <tbody>
+
+    % for opt in sorted(modopts.keys()):
+        % if not opt.startswith("_"):
+            <tr>
+              <td>${optdescs.get(opt) or "No description available."}
+                % if "api_key" in opt:
+                    % if apiKeyInstructions:
+                        <%
+                            import re
+                            instructions = ""
+                            for step in apiKeyInstructions:
+                                if "https://" in step or "http://" in step:
+                                    step = re.sub(r'(https?://.[^ ]+)', '<a target=_new href=\'\\1\'>\\1</a>', step)
+                                instructions += f"<li>{step}</li>"
+                        %>
+                        &nbsp;&nbsp;<a href='javascript:void(0)' data-html="true" data-toggle="popover" data-trigger="focus" title="Instructions" data-content="<ol>${instructions}</ol>"><i class="glyphicon glyphicon-question-sign"></i></a>
+                    % endif
+                % endif
+              </td>
+              <td style='vertical-align: middle'>
+            % if type(modopts[opt]) is int:
+                <div class='form-group'>
+                    <input id='${mod}:${opt}' class='form-control' type=text value="${modopts[opt]}">
+                </div>
+            % endif
+            % if type(modopts[opt]) is str:
+                <div class='form-group'>
+                    <input id='${mod}:${opt}' style='width: 500px' class='form-control' type=text value="${modopts[opt]}">
+                </div>
+            % endif
+            % if type(modopts[opt]) is bool:
+            <%
+                if modopts[opt] == True:
+                    seltrue = "selected"
+                    selfalse = ""
+                else:
+                    selfalse = "selected"
+                    seltrue = ""
+            %>
+                <select id='${mod}:${opt}' class='form-control'>
+                    <option value=1 ${seltrue}>True</option>
+                    <option value=0 ${selfalse}>False</option>                </select>
+            % endif
+            % if type(modopts[opt]) is list and len(modopts[opt]) > 0 and type(modopts[opt][0]) is str:
+                <% expandedopt = ','.join(modopts[opt]) %>
+                <div class='form-group'>
+                    <input id='${mod}:${opt}' style='width: 500px' class='form-control' type=text value="${expandedopt}">
+                </div>
+            % endif
+            % if type(modopts[opt]) is list and len(modopts[opt]) > 0 and type(modopts[opt][0]) is int:
+                <% expandedopt = ','.join(str(x) for x in modopts[opt]) %>
+                <div class='form-group'>
+                    <input id='${mod}:${opt}' class='form-control' type=text value="${expandedopt}">
+                </div>
+            % endif
+            % if type(modopts[opt]) is list and len(modopts[opt]) == 0:
+                <div class='form-group'>
+                    <input id='${mod}:${opt}' style='width: 500px' class='form-control' type=text value="" placeholder="Enter comma-separated values">
+                </div>
+            % endif
+
+            </td></tr>
+        % endif
+    % endfor
+    </tbody>
+    </table>
+    </div>
+% endfor
+</div>
+</div> <!-- /tabbable tabs-left -->
+</form>
+
+<!-- Unsaved Changes Warning Modal -->
+<div id="unsaved-warning-overlay" class="unsaved-warning-overlay" style="display: none;">
+  <div class="unsaved-warning-modal">
+    <div class="unsaved-warning-icon">&#9888;</div>
+    <div class="unsaved-warning-title">UNSAVED CHANGES</div>
+    <div class="unsaved-warning-message">You have unsaved settings changes that will be lost if you leave this page.</div>
+    <div class="unsaved-warning-actions">
+      <button id="unsaved-warning-leave" class="unsaved-warning-btn unsaved-warning-btn-leave" type="button">CANCEL &amp; LEAVE</button>
+      <button id="unsaved-warning-continue" class="unsaved-warning-btn unsaved-warning-btn-continue" type="button">CONTINUE EDITING</button>
+      <button id="unsaved-warning-save" class="unsaved-warning-btn unsaved-warning-btn-save" type="button">SAVE &amp; LEAVE</button>
+    </div>
+  </div>
+</div>
+
+<br><br>
+<%include file="FOOTER.tmpl"/>

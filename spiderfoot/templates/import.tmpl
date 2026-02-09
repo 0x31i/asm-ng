@@ -1,0 +1,131 @@
+<%include file="HEADER.tmpl"/>
+<script>document.write('<script type="text/javascript" src="${docroot}/static/js/spiderfoot.import.js?v=' + Date.now() + '"><\/script>');</script>
+<h2>Import Data</h2>
+
+<!-- Info Panel -->
+<div class="import-info-panel">
+  <div class="import-info-header">
+    <i class="glyphicon glyphicon-info-sign"></i> CSV IMPORT FEATURES
+  </div>
+  <div class="import-info-body">
+    <div class="row">
+      <div class="col-sm-6">
+        <ul class="import-info-list">
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>FALSE POSITIVE PRESERVATION</strong> &mdash; All F/P and validated status flags from your original scans are maintained during import.</li>
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>AUTO-POPULATE ALL MODULES</strong> &mdash; Imported data automatically populates all relevant ASM-NG modules, views, and data tables.</li>
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>DISCOVERY PATH RECONSTRUCTION</strong> &mdash; Source-to-target discovery paths and entity relationships are fully rebuilt from the CSV data.</li>
+        </ul>
+      </div>
+      <div class="col-sm-6">
+        <ul class="import-info-list">
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>AI CORRELATION PROCESSING</strong> &mdash; After import, the local AI engine runs correlation analysis to identify patterns, link related findings, and surface insights.</li>
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>DRY-RUN VALIDATION</strong> &mdash; Every import is validated first with a dry-run preview showing row counts, event types, and any warnings before committing.</li>
+          <li><i class="glyphicon glyphicon-ok"></i> <strong>SCAN METADATA DETECTION</strong> &mdash; Target, scan name, and timestamps are auto-detected from the CSV data so you can import with zero manual configuration.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row import-cards-row">
+
+  <!-- Legacy Scan Import (CSV) -->
+  <div class="col-sm-6">
+    <div class="import-card import-card-lg" id="card-legacy" data-import-type="legacy">
+      <div class="import-card-icon">
+        <i class="glyphicon glyphicon-file"></i>
+      </div>
+      <h4 class="import-card-title">LEGACY SCAN IMPORT</h4>
+      <p class="import-card-desc">IMPORT CSV EXPORTS FROM OLDER SPIDERFOOT VERSIONS INTO ASM-NG.</p>
+      <span class="import-card-filetype">.CSV</span>
+    </div>
+  </div>
+
+  <!-- ASM-NG Scan Backup Restore (CSV) -->
+  <div class="col-sm-6">
+    <div class="import-card import-card-lg import-card-alt" id="card-scan" data-import-type="scan">
+      <div class="import-card-icon">
+        <i class="glyphicon glyphicon-refresh"></i>
+      </div>
+      <h4 class="import-card-title">SCAN BACKUP RESTORE</h4>
+      <p class="import-card-desc">RESTORE SCANS FROM ASM-NG / SPIDERFOOT CSV BACKUP FILES.</p>
+      <span class="import-card-filetype">.CSV</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- Import Form (hidden by default, shown when a card is selected) -->
+<div id="import-form-section" style="display: none;">
+  <hr>
+  <h3 id="import-form-title">IMPORT</h3>
+  <form id="import-form" enctype="multipart/form-data">
+    <input type="hidden" id="import-type" name="import_type" value="">
+
+    <div class="row">
+      <div class="col-sm-6">
+        <div class="form-group">
+          <label for="import-file">SELECT FILE</label>
+          <div class="import-file-wrapper">
+            <button type="button" class="btn btn-import-browse" id="btn-browse">
+              <i class="glyphicon glyphicon-folder-open"></i> SELECT FILE
+            </button>
+            <span class="import-file-name" id="import-file-name">NO FILE SELECTED</span>
+            <input type="file" class="import-file-hidden" id="import-file" name="importfile" accept=".csv">
+          </div>
+          <small class="form-text text-muted" id="import-file-hint">ACCEPTED FORMAT: CSV</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-sm-4">
+        <div class="form-group">
+          <label for="import-scan-name">SCAN NAME <small class="text-danger">*</small></label>
+          <input type="text" class="form-control" id="import-scan-name" name="scan_name" placeholder="Enter a name for this scan" required>
+        </div>
+      </div>
+      <div class="col-sm-4">
+        <div class="form-group">
+          <label for="import-target">TARGET <small class="text-danger">*</small></label>
+          <input type="text" class="form-control" id="import-target" name="target" placeholder="Enter the scan target (e.g. domain.com)" required>
+        </div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top: 15px;">
+      <div class="col-sm-12">
+        <button type="submit" class="btn btn-danger" id="btn-import">
+          <i class="glyphicon glyphicon-import"></i> IMPORT
+        </button>
+        <button type="button" class="btn btn-default" id="btn-import-cancel" style="margin-left: 10px;">
+          CANCEL
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Preview section (shown after dry-run) -->
+<div id="import-preview-section" style="display: none;">
+  <hr>
+  <h3 id="import-preview-title">IMPORT PREVIEW</h3>
+  <div id="import-preview-content"></div>
+  <div style="margin-top: 15px;">
+    <button type="button" class="btn btn-danger" id="btn-confirm-import" style="display: none;">
+      <i class="glyphicon glyphicon-ok"></i> CONFIRM IMPORT
+    </button>
+    <button type="button" class="btn btn-default" id="btn-preview-cancel" style="margin-left: 10px;">
+      CANCEL
+    </button>
+  </div>
+</div>
+
+<!-- Results section (shown after actual import) -->
+<div id="import-results-section" style="display: none;">
+  <hr>
+  <h3 id="import-results-title">IMPORT RESULTS</h3>
+  <div id="import-results-content"></div>
+</div>
+
+<%include file="FOOTER.tmpl"/>

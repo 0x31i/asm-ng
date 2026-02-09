@@ -1,0 +1,438 @@
+<%include file="HEADER.tmpl"/>
+    <h2>User Management &nbsp;<img id="loader" src="${docroot}/static/img/loader.gif" style="display: none;"></h2>
+<div id="usercontent" class="container-fluid">
+
+<!-- Create User Modal -->
+<div class="modal fade" id="createUserModal" tabindex="-1" role="dialog" aria-labelledby="createUserModalLabel">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="createUserModalLabel">Create New User</h4>
+      </div>
+      <div class="modal-body">
+        <form id="createUserForm">
+          <div class="form-group">
+            <label for="newUsername">Username</label>
+            <input type="text" class="form-control" id="newUsername" placeholder="Enter username (min 3 alphanumeric characters)" required>
+            <small class="form-text text-muted">Username must be at least 3 alphanumeric characters</small>
+          </div>
+          <div class="form-group">
+            <label for="newDisplayName">Display Name</label>
+            <input type="text" class="form-control" id="newDisplayName" placeholder="Enter display name (optional)">
+          </div>
+          <div class="form-group">
+            <label for="newPassword">Password</label>
+            <input type="password" class="form-control" id="newPassword" placeholder="Enter password (min 8 characters)" required>
+            <small class="form-text text-muted">Password must be at least 8 characters</small>
+          </div>
+          <div class="form-group">
+            <label for="confirmPassword">Confirm Password</label>
+            <input type="password" class="form-control" id="confirmPassword" placeholder="Confirm password" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="createUserBtn">Create User</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1" role="dialog" aria-labelledby="editUserModalLabel">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="editUserModalLabel">Edit User</h4>
+      </div>
+      <div class="modal-body">
+        <form id="editUserForm">
+          <input type="hidden" id="editUsername">
+          <div class="form-group">
+            <label>Username</label>
+            <p class="form-control-static" id="editUsernameDisplay"></p>
+          </div>
+          <div class="form-group">
+            <label for="editDisplayName">Display Name</label>
+            <input type="text" class="form-control" id="editDisplayName" placeholder="Enter display name">
+          </div>
+          <div class="form-group">
+            <label for="editActive">Account Status</label>
+            <select class="form-control" id="editActive">
+              <option value="true">Active</option>
+              <option value="false">Disabled</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="updateUserBtn">Update User</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Change Password Modal -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1" role="dialog" aria-labelledby="changePasswordModalLabel">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="changePasswordModalLabel">Change Password</h4>
+      </div>
+      <div class="modal-body">
+        <form id="changePasswordForm">
+          <input type="hidden" id="passwordUsername">
+          <div class="form-group">
+            <label>Username</label>
+            <p class="form-control-static" id="passwordUsernameDisplay"></p>
+          </div>
+          <div class="form-group">
+            <label for="changeNewPassword">New Password</label>
+            <input type="password" class="form-control" id="changeNewPassword" placeholder="Enter new password (min 8 characters)" required>
+            <small class="form-text text-muted">Password must be at least 8 characters</small>
+          </div>
+          <div class="form-group">
+            <label for="changeConfirmPassword">Confirm New Password</label>
+            <input type="password" class="form-control" id="changeConfirmPassword" placeholder="Confirm new password" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-warning" id="changePasswordBtn">Change Password</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="panel panel-default">
+      <div class="panel-heading" style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 class="panel-title">Users</h3>
+        <div>
+          <a href="${docroot}/opts" class="btn btn-default btn-sm"><i class="glyphicon glyphicon-arrow-left"></i> Back to Settings</a>
+          <button class="btn btn-primary btn-sm" data-toggle="modal" data-target="#createUserModal">
+            <i class="glyphicon glyphicon-plus"></i> Create User
+          </button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="userList">
+          <!-- User list will be populated by JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<style>
+/* User table styling */
+#userList .btn-danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+    color: white !important;
+    border: none !important;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.5) !important;
+}
+
+#userList .btn-danger:hover {
+    background: linear-gradient(135deg, #f87171 0%, #ef4444 100%) !important;
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.6) !important;
+}
+
+.status-active {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.status-disabled {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.admin-badge {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+</style>
+
+<script type='text/javascript'>
+// User management JavaScript
+$(document).ready(function() {
+    loadUsers();
+
+    // Create user
+    $('#createUserBtn').click(function() {
+        var username = $('#newUsername').val().trim();
+        var displayName = $('#newDisplayName').val().trim();
+        var password = $('#newPassword').val();
+        var confirmPassword = $('#confirmPassword').val();
+
+        if (!username || !password) {
+            alertify.error('Username and password are required');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            alertify.error('Passwords do not match');
+            return;
+        }
+
+        if (password.length < 8) {
+            alertify.error('Password must be at least 8 characters');
+            return;
+        }
+
+        $('#createUserBtn').prop('disabled', true).text('Creating...');
+
+        $.post('${docroot}/usercreate', {
+            username: username,
+            password: password,
+            display_name: displayName || username
+        }, function(data) {
+            $('#createUserBtn').prop('disabled', false).text('Create User');
+
+            if (data.success) {
+                $('#createUserModal').modal('hide');
+                $('#createUserForm')[0].reset();
+                alertify.success(data.message);
+                loadUsers();
+            } else {
+                alertify.error(data.error || 'Failed to create user');
+            }
+        }).fail(function() {
+            $('#createUserBtn').prop('disabled', false).text('Create User');
+            alertify.error('Failed to create user: Server error');
+        });
+    });
+
+    // Update user
+    $('#updateUserBtn').click(function() {
+        var username = $('#editUsername').val();
+        var displayName = $('#editDisplayName').val().trim();
+        var active = $('#editActive').val();
+
+        $('#updateUserBtn').prop('disabled', true).text('Updating...');
+
+        $.post('${docroot}/userupdate', {
+            username: username,
+            display_name: displayName,
+            active: active
+        }, function(data) {
+            $('#updateUserBtn').prop('disabled', false).text('Update User');
+
+            if (data.success) {
+                $('#editUserModal').modal('hide');
+                alertify.success(data.message);
+                loadUsers();
+            } else {
+                alertify.error(data.error || 'Failed to update user');
+            }
+        }).fail(function() {
+            $('#updateUserBtn').prop('disabled', false).text('Update User');
+            alertify.error('Failed to update user: Server error');
+        });
+    });
+
+    // Change password
+    $('#changePasswordBtn').click(function() {
+        var username = $('#passwordUsername').val();
+        var newPassword = $('#changeNewPassword').val();
+        var confirmPassword = $('#changeConfirmPassword').val();
+
+        if (!newPassword) {
+            alertify.error('New password is required');
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            alertify.error('Passwords do not match');
+            return;
+        }
+
+        if (newPassword.length < 8) {
+            alertify.error('Password must be at least 8 characters');
+            return;
+        }
+
+        $('#changePasswordBtn').prop('disabled', true).text('Changing...');
+
+        $.post('${docroot}/userchangepassword', {
+            username: username,
+            new_password: newPassword
+        }, function(data) {
+            $('#changePasswordBtn').prop('disabled', false).text('Change Password');
+
+            if (data.success) {
+                $('#changePasswordModal').modal('hide');
+                $('#changePasswordForm')[0].reset();
+                alertify.success(data.message);
+            } else {
+                alertify.error(data.error || 'Failed to change password');
+            }
+        }).fail(function() {
+            $('#changePasswordBtn').prop('disabled', false).text('Change Password');
+            alertify.error('Failed to change password: Server error');
+        });
+    });
+});
+
+function loadUsers() {
+    $('#loader').show();
+    $.ajax({
+        url: '${docroot}/userlist',
+        type: 'GET',
+        dataType: 'json',
+        success: function(data) {
+            $('#loader').hide();
+            if (data.success) {
+                displayUsers(data.users);
+            } else {
+                alertify.error(data.error || 'Failed to load users');
+            }
+        },
+        error: function(jqXHR, textStatus, errorThrown) {
+            $('#loader').hide();
+            console.error('Failed to load users:', textStatus, errorThrown);
+            alertify.error('Failed to load users: ' + textStatus);
+        }
+    });
+}
+
+function displayUsers(users) {
+    var html = '';
+
+    if (!users || users.length === 0) {
+        html = '<div class="alert alert-info">No users found.</div>';
+    } else {
+        var rows = [];
+        users.forEach(function(user, index) {
+            var createdDate = user.created ? new Date(user.created).toLocaleDateString() : '-';
+            var lastLogin = user.last_login ? new Date(user.last_login).toLocaleString() : 'Never';
+            var statusClass = user.active ? 'status-active' : 'status-disabled';
+            var statusText = user.active ? 'Active' : 'Disabled';
+            var isAdmin = user.username === 'admin';
+
+            var row = '<tr>';
+            row += '<td><strong>' + escapeHtml(user.username) + '</strong>';
+            if (isAdmin) {
+                row += ' <span class="admin-badge">ADMIN</span>';
+            }
+            row += '</td>';
+            row += '<td>' + escapeHtml(user.display_name || user.username) + '</td>';
+            row += '<td><span class="' + statusClass + '">' + statusText + '</span></td>';
+            row += '<td>' + createdDate + '</td>';
+            row += '<td>' + lastLogin + '</td>';
+            row += '<td>';
+            row += '<div class="btn-group" role="group">';
+            row += '<button class="btn btn-sm btn-warning" onclick="editUser(\'' + escapeHtml(user.username) + '\')" title="Edit User"><i class="glyphicon glyphicon-edit"></i></button>';
+            row += '<button class="btn btn-sm btn-info" onclick="changePassword(\'' + escapeHtml(user.username) + '\')" title="Change Password"><i class="glyphicon glyphicon-lock"></i></button>';
+            if (!isAdmin) {
+                row += '<button class="btn btn-sm btn-danger" onclick="deleteUser(\'' + escapeHtml(user.username) + '\')" title="Delete User"><i class="glyphicon glyphicon-trash"></i></button>';
+            }
+            row += '</div>';
+            row += '</td>';
+            row += '</tr>';
+            rows.push(row);
+        });
+
+        html = '<table class="table table-striped table-hover">';
+        html += '<thead><tr>';
+        html += '<th>Username</th>';
+        html += '<th>Display Name</th>';
+        html += '<th>Status</th>';
+        html += '<th>Created</th>';
+        html += '<th>Last Login</th>';
+        html += '<th>Actions</th>';
+        html += '</tr></thead>';
+        html += '<tbody>' + rows.join('') + '</tbody>';
+        html += '</table>';
+    }
+
+    $('#userList').html(html);
+}
+
+function editUser(username) {
+    $.get('${docroot}/userlist', function(data) {
+        if (data.success) {
+            var user = data.users.find(function(u) { return u.username === username; });
+            if (user) {
+                $('#editUsername').val(user.username);
+                $('#editUsernameDisplay').text(user.username);
+                $('#editDisplayName').val(user.display_name || '');
+                $('#editActive').val(user.active ? 'true' : 'false');
+                $('#editUserModal').modal('show');
+            } else {
+                alertify.error('User not found');
+            }
+        } else {
+            alertify.error('Failed to load user details');
+        }
+    });
+}
+
+function changePassword(username) {
+    $('#passwordUsername').val(username);
+    $('#passwordUsernameDisplay').text(username);
+    $('#changePasswordForm')[0].reset();
+    $('#passwordUsername').val(username);
+    $('#passwordUsernameDisplay').text(username);
+    $('#changePasswordModal').modal('show');
+}
+
+function deleteUser(username) {
+    alertify.confirm(
+        'Delete User',
+        '<div class="alert alert-warning" style="margin: 10px 0;">' +
+        '<i class="fa fa-exclamation-triangle"></i> <strong>Warning:</strong> This action cannot be undone!' +
+        '</div>' +
+        'Are you sure you want to delete the user <strong>"' + escapeHtml(username) + '"</strong>?<br><br>' +
+        'This will permanently remove the user account.',
+        function() {
+            $.post('${docroot}/userdelete', { username: username }, function(data) {
+                if (data.success) {
+                    alertify.success(data.message);
+                    loadUsers();
+                } else {
+                    alertify.error(data.error || 'Failed to delete user');
+                }
+            }).fail(function() {
+                alertify.error('Failed to delete user: Server error');
+            });
+        },
+        function() {
+            alertify.message('User deletion cancelled');
+        }
+    ).set('labels', {ok:'Delete User', cancel:'Cancel'})
+     .set('closable', false)
+     .set('defaultFocus', 'cancel');
+}
+
+function escapeHtml(text) {
+    if (text === null || text === undefined) {
+        return '';
+    }
+    text = String(text);
+    var map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+</script>
+
+<%include file="FOOTER.tmpl"/>
