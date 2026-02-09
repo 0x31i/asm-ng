@@ -117,7 +117,7 @@
   </div>
 
   <!-- Expandable Info Panel for Module Info / Instructions -->
-  <div id="info-panel-wrapper" class="info-panel-wrapper info-panel-hidden">
+  <div id="info-panel-wrapper" class="info-panel-wrapper" style="display:none;">
     <div id="info-panel" class="info-panel">
       <div class="info-panel-header">
         <div class="info-panel-title">
@@ -1591,26 +1591,25 @@
         };
 
         function closeInfoPanel() {
-            var $wrapper = $("#info-panel-wrapper");
             _infoPanelOpen = false;
             _infoPanelMode = null;
             $("#btn-module-info").removeClass('active');
             $("#btn-instructions").removeClass('active');
-            $wrapper.stop(true, true);
-            $wrapper.slideUp(300, function() {
-                $wrapper.removeClass('mode-module-info mode-instructions');
-                $wrapper.addClass('info-panel-hidden');
-            });
+            var el = document.getElementById("info-panel-wrapper");
+            if (el) {
+                el.style.display = "none";
+                el.className = "info-panel-wrapper";
+            }
         }
 
         function openInfoPanel(mode, contentHtml, titleText, iconClass) {
-            var $wrapper = $("#info-panel-wrapper");
-            var $content = $("#info-panel-content");
-            var $titleEl = $("#info-panel-title-text");
-            var $iconEl = $("#info-panel-icon");
+            var wrapper = document.getElementById("info-panel-wrapper");
+            var content = document.getElementById("info-panel-content");
+            var titleEl = document.getElementById("info-panel-title-text");
+            var iconEl = document.getElementById("info-panel-icon");
 
-            if (!$wrapper.length) {
-                sf.log("ERROR: #info-panel-wrapper not found in DOM");
+            if (!wrapper) {
+                alertify.error("BUG: info-panel-wrapper not found in DOM");
                 return;
             }
 
@@ -1621,26 +1620,15 @@
             }
 
             // Set content, title, and icon
-            $titleEl.text(titleText);
-            $iconEl.attr('class', 'glyphicon ' + iconClass);
-            $content.html(contentHtml);
+            if (titleEl) titleEl.textContent = titleText;
+            if (iconEl) iconEl.className = 'glyphicon ' + iconClass;
+            if (content) content.innerHTML = contentHtml;
 
             // Set mode class for styling
-            $wrapper.removeClass('mode-module-info mode-instructions').addClass('mode-' + mode);
+            wrapper.className = "info-panel-wrapper mode-" + mode;
 
-            // If already open with different mode, just swap (no animation needed)
-            if (_infoPanelOpen) {
-                _infoPanelMode = mode;
-                updatePanelButtonStates(mode);
-                return;
-            }
-
-            // Stop any pending animations, then open
-            $wrapper.stop(true, true);
-            // Remove the hidden class so jQuery animation takes over
-            $wrapper.removeClass('info-panel-hidden');
-            // Force display:none for jQuery slideDown to animate from
-            $wrapper.css('display', 'none').slideDown(400);
+            // Show the panel — simple display toggle, no animation
+            wrapper.style.display = "block";
             _infoPanelOpen = true;
             _infoPanelMode = mode;
             updatePanelButtonStates(mode);
@@ -1703,8 +1691,9 @@
         }
 
         function showModuleInfo() {
+            sf.log("showModuleInfo() called, currentType=" + currentType);
             if (!currentType || currentType === "ALL") {
-                sf.log("showModuleInfo: skipped, currentType=" + currentType);
+                alertify.error("Cannot show module info: no data type selected.");
                 return;
             }
 
@@ -1714,15 +1703,22 @@
                 return;
             }
 
-            // Fetch modules from API using POST (consistent with all other API calls)
-            sf.fetchData('${docroot}/modules', {}, function(data) {
-                if (data && data.length !== undefined) {
+            // Fetch modules from API via GET
+            $.ajax({
+                type: "GET",
+                url: docroot + "/modules",
+                cache: false,
+                dataType: "json"
+            }).done(function(data) {
+                if (data && typeof data.length !== 'undefined') {
                     _modulesCache = data;
                     renderModuleInfo(data);
                 } else {
-                    sf.log("showModuleInfo: unexpected response format");
-                    alertify.error("Failed to load module information.");
+                    alertify.error("Module info: unexpected response format");
                 }
+            }).fail(function(xhr, status, err) {
+                alertify.error("Module info request failed: " + status + " " + err);
+                sf.log("showModuleInfo AJAX failed: " + status + " " + err);
             });
         }
 
@@ -1748,14 +1744,14 @@
         }
 
         function showInstructions() {
+            sf.log("showInstructions() called, currentType=" + currentType);
             if (!currentType || currentType === "ALL") {
-                sf.log("showInstructions: skipped, currentType=" + currentType);
+                alertify.error("Cannot show instructions: no data type selected.");
                 return;
             }
             var data = _instructionsMap[currentType];
             if (!data) {
-                sf.log("showInstructions: no instructions mapped for " + currentType);
-                alertify.error("No review instructions available for " + currentType);
+                alertify.error("No review instructions mapped for: " + currentType);
                 return;
             }
             var html = buildInstructionsHtml(data);
@@ -1764,27 +1760,25 @@
 
         // Update button disabled states based on current type
         function updateInfoButtonStates() {
-            // Hide panel immediately when switching types
+            // Close panel when switching types
             if (_infoPanelOpen) {
-                _infoPanelOpen = false;
-                _infoPanelMode = null;
-                $("#info-panel-wrapper").stop(true, true).hide().addClass('info-panel-hidden').removeClass('mode-module-info mode-instructions');
-                $("#btn-module-info").removeClass('active');
-                $("#btn-instructions").removeClass('active');
+                closeInfoPanel();
             }
+            var btnMod = document.getElementById("btn-module-info");
+            var btnInst = document.getElementById("btn-instructions");
             if (!currentType || currentType === "ALL") {
-                $("#btn-module-info").prop('disabled', true).attr('disabled', 'disabled').addClass('disabled');
-                $("#btn-instructions").prop('disabled', true).attr('disabled', 'disabled').addClass('disabled');
+                if (btnMod) { btnMod.disabled = true; btnMod.classList.add('disabled'); }
+                if (btnInst) { btnInst.disabled = true; btnInst.classList.add('disabled'); }
                 return;
             }
             // Module info is always available (every type has producing modules)
-            $("#btn-module-info").prop('disabled', false).removeAttr('disabled').removeClass('disabled');
+            if (btnMod) { btnMod.disabled = false; btnMod.classList.remove('disabled'); }
 
             // Instructions: only enable if mapping exists
             if (_instructionsMap[currentType]) {
-                $("#btn-instructions").prop('disabled', false).removeAttr('disabled').removeClass('disabled');
+                if (btnInst) { btnInst.disabled = false; btnInst.classList.remove('disabled'); }
             } else {
-                $("#btn-instructions").prop('disabled', true).attr('disabled', 'disabled').addClass('disabled');
+                if (btnInst) { btnInst.disabled = true; btnInst.classList.add('disabled'); }
             }
         }
 
@@ -4991,8 +4985,10 @@
                         } else {
                             typeLink = "<a class='finding-type-link' style='cursor:pointer;color:var(--text-secondary);text-decoration:none;border-bottom:1px dotted var(--text-muted);' onclick='dataEventData(\"" + instanceId + "\", \"" + safeType + "\", \"" + safeType + "\", \"full\"); window.scrollTo(0,0);' title='View " + safeType + " data'>" + d.type + "</a>";
                         }
+                        var foundLabel = d.found ? 'FOUND' : 'NOT FOUND';
+                        var foundColor = d.found ? 'var(--text-muted)' : 'var(--accent-orange)';
                         h += "<div style='display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;'>";
-                        h += "<span style='font-family:var(--font-mono);'>" + typeLink + " <span style='color:var(--text-muted);'>(" + d.count + ")</span></span>";
+                        h += "<span style='font-family:var(--font-mono);'>" + typeLink + " <span style='color:var(--text-muted);'>(" + d.count + " unval)</span> <span style='color:" + foundColor + ";font-size:9px;'>[" + foundLabel + "]</span></span>";
                         h += "<span style='font-family:var(--font-mono);font-weight:600;color:" + ptColor + ";'>" + ptStr + "</span>";
                         h += "</div>";
                     }
