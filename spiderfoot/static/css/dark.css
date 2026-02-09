@@ -6247,22 +6247,20 @@ button[data-target="#createWorkspaceModal"]:hover,
   border-bottom: 1px solid var(--glass-border, rgba(255,255,255,0.08));
 }
 
-/* Compact matches table - position:relative + z-index creates stacking context below action bar */
+/* Compact matches table */
 .assets-matches-compact {
   table-layout: fixed;
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  position: relative;
-  z-index: 1;
 }
 
 /* Sticky table header - stacks below the action bar */
 .assets-matches-compact thead th {
-  position: sticky;
-  top: 62px;
-  z-index: 99;
-  background: var(--bg-primary, #0a0f1a);
+  position: sticky !important;
+  top: var(--sticky-offset, 62px) !important;
+  z-index: 100 !important;
+  background: var(--bg-primary, #0a0f1a) !important;
   box-shadow: 0 1px 0 var(--glass-border, rgba(255,255,255,0.08));
 }
 
@@ -6723,15 +6721,13 @@ button[data-target="#createWorkspaceModal"]:hover,
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  position: relative;
-  z-index: 1;
 }
 
 .assets-known-compact thead th {
-  position: sticky;
-  top: 0;
-  z-index: 99;
-  background: var(--bg-primary, #0a0f1a);
+  position: sticky !important;
+  top: var(--sticky-offset, 0px) !important;
+  z-index: 100 !important;
+  background: var(--bg-primary, #0a0f1a) !important;
   box-shadow: 0 1px 0 var(--glass-border, rgba(255,255,255,0.08));
   font-weight: 700;
 }

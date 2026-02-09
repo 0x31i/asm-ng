@@ -1307,7 +1307,7 @@
                 var knownStickyBar = document.getElementById('assets-known-sticky-bar');
                 if (knownStickyBar) {
                     var barHeight = knownStickyBar.offsetHeight;
-                    $('#known-assets-table thead th').css('top', barHeight + 'px');
+                    document.getElementById('known-assets-table').style.setProperty('--sticky-offset', barHeight + 'px');
                 }
             });
         }
@@ -1641,7 +1641,7 @@
                 var stickyBar = document.getElementById('assets-sticky-bar');
                 if (stickyBar) {
                     var barHeight = stickyBar.offsetHeight;
-                    $('#potential-matches-table thead th').css('top', barHeight + 'px');
+                    document.getElementById('potential-matches-table').style.setProperty('--sticky-offset', barHeight + 'px');
                 }
             });
         }

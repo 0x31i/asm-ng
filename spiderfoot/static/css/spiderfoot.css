@@ -5988,12 +5988,12 @@ i.glyphicon-white,
 .assets-known-remove-sel-btn:hover { background: rgba(239,68,68,0.2) !important; }
 
 /* Known assets compact table */
-.assets-known-compact { table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0; position: relative; z-index: 1; }
+.assets-known-compact { table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0; }
 .assets-known-compact thead th {
-  position: sticky;
-  top: 0;
-  z-index: 99;
-  background: #f1f5f9;
+  position: sticky !important;
+  top: var(--sticky-offset, 0px) !important;
+  z-index: 100 !important;
+  background: #f1f5f9 !important;
   color: #1e293b;
   border-bottom: 2px solid #94a3b8 !important;
   font-weight: 700;
@@ -6151,15 +6151,15 @@ i.glyphicon-white,
 /* Sticky stats bar - z-index must be higher than table stacking context */
 .assets-sticky-bar { position: sticky; top: 0; z-index: 200; background: #f8fafc !important; border-bottom: 1px solid #cbd5e1; }
 
-/* Compact matches table - position:relative + z-index creates stacking context below action bar */
-.assets-matches-compact { table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0; position: relative; z-index: 1; }
+/* Compact matches table */
+.assets-matches-compact { table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0; }
 
 /* Sticky table header - stacks below the action bar */
 .assets-matches-compact thead th {
-  position: sticky;
-  top: 62px;
-  z-index: 99;
-  background: #f1f5f9;
+  position: sticky !important;
+  top: var(--sticky-offset, 62px) !important;
+  z-index: 100 !important;
+  background: #f1f5f9 !important;
   color: #1e293b;
   border-bottom: 2px solid #94a3b8 !important;
   font-weight: 700;
