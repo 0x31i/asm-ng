@@ -4896,9 +4896,9 @@ class SpiderFootWebUi:
         for etype in ['DNS_SPF', 'DNS_TEXT']:
             if etype in event_type_counts:
                 ec = event_type_counts[etype]
-                self.log.debug(f"Grade debug: {etype} unique={ec['unique']} all_total={ec['all_total']} existed={ec['existed']}")
+                self.log.info(f"Grade: {etype} IN scan -> unique={ec['unique']} total={ec['total']} all_total={ec['all_total']} => no fail penalty")
             else:
-                self.log.debug(f"Grade debug: {etype} NOT in event_type_counts (will use default)")
+                self.log.info(f"Grade: {etype} NOT in scan results -> will get fail penalty")
 
         # Load config overrides from settings
         config_overrides = load_grade_config_overrides(self.config)
