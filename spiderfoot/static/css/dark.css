@@ -7588,13 +7588,23 @@ button[data-target="#createWorkspaceModal"]:hover,
   font-weight: 600;
 }
 
-/* Expand/collapse toggle in dark mode */
-.dp-collapsed .dp-expand-toggle {
-  border-bottom-color: #4ade80;
+/* Dark mode: fade overlay matches dark background */
+.discovery-path-cell.dp-collapsed.dp-has-overflow .dp-cell-wrap::after {
+  background: linear-gradient(to bottom, transparent, #141422);
 }
 
-.dp-expanded .dp-expand-toggle {
-  border-bottom-color: #22c55e;
+/* Dark mode: hover highlight on expandable cells */
+.discovery-path-cell.dp-has-overflow:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Dark mode: expandable pre cells in data tables */
+td.pre-expandable.pre-collapsed.pre-has-overflow::after {
+  background: linear-gradient(to bottom, transparent, #141422);
+}
+
+td.pre-expandable.pre-has-overflow:hover {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 /* Responsive adjustments */
