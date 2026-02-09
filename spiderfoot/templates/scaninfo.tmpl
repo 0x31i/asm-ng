@@ -7074,7 +7074,17 @@
                     // Build table header with dynamic node columns
                     var thStyle = "class='data-sticky-th' style='position: sticky; position: -webkit-sticky; top: 50px; z-index: 100;'";
 
-                    var table = "<table id='scansummary-content' class='table table-bordered table-striped small tablesorter discovery-path-table'>";
+                    var table = "<table id='scansummary-content' class='table table-bordered table-striped small tablesorter discovery-path-table' style='table-layout: fixed; width: 100%;'>";
+
+                    // Colgroup forces column widths (highest priority in table layout algorithm)
+                    table += "<colgroup>";
+                    table += "<col style='width: 40px;'>";
+                    table += "<col style='width: 110px;'>";
+                    for (var d = 0; d < maxDepth; d++) {
+                        table += "<col>";
+                    }
+                    table += "</colgroup>";
+
                     table += "<thead><tr>";
                     table += "<th class='text-center' " + thStyle + "><input id='checkall' type='checkbox' onClick='switchSelectAll()'></th>";
                     table += "<th class='text-center validation-status' " + thStyle + ">Status</th>";
