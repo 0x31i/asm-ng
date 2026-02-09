@@ -1,0 +1,7 @@
+Updated,Type,Module,Source,F/P,Data
+2024-01-15 10:30:00,IP_ADDRESS,sfp_dnsresolve,example.com,0,192.168.1.1
+2024-01-15 10:31:00,IP_ADDRESS,sfp_dnsresolve,example.com,1,10.0.0.1
+2024-01-15 10:32:00,IP_ADDRESS,sfp_dnsresolve,api.example.com,2,203.0.113.50
+2024-01-15 10:33:00,DOMAIN_NAME,sfp_dnsbrute,example.com,2,api.example.com
+2024-01-15 10:34:00,DOMAIN_NAME,sfp_dnsbrute,example.com,1,test.example.com
+2024-01-15 10:35:00,EMAILADDR,sfp_email,api.example.com,0,admin@example.com

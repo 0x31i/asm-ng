@@ -1,0 +1,16 @@
+Source: asm-ng
+Section: net
+Priority: optional
+Maintainer: ASM-NG Team <info@van1shland.io>
+Build-Depends: debhelper (>= 9), python3, python3-setuptools
+Standards-Version: 4.5.0
+Homepage: https://www.van1shland.io/
+
+Package: asm-ng
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}, python3, python3-setuptools
+Description: Open source OSINT automation tool for threat intelligence and reconnaissance
+ ASM-NG automates open source intelligence (OSINT) for threat intelligence,
+ red teaming, and digital footprinting. It helps security professionals and
+ researchers gather, correlate, and analyze data from hundreds of sources to
+ discover information about IPs, domains, emails, and more.
