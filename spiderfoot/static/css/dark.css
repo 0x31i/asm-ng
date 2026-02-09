@@ -1978,20 +1978,8 @@ pre.table-border-bg-inherit {
    Expandable Info Panel - Dark Theme
    ============================================ */
 .info-panel-wrapper {
-  max-height: 0;
-  overflow: hidden;
-  opacity: 0;
-  transition: max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-              margin 0.45s cubic-bezier(0.4, 0, 0.2, 1);
-  margin: 0;
-  will-change: max-height, opacity;
-}
-
-.info-panel-wrapper.open {
-  max-height: 600px;
-  opacity: 1;
   margin: 0 0 16px 0;
+  max-height: 600px;
   overflow-y: auto;
 }
 
@@ -2237,20 +2225,20 @@ pre.table-border-bg-inherit {
 }
 
 /* Scrollbar for info panel */
-.info-panel-wrapper.open::-webkit-scrollbar {
+.info-panel-wrapper::-webkit-scrollbar {
   width: 6px;
 }
 
-.info-panel-wrapper.open::-webkit-scrollbar-track {
+.info-panel-wrapper::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.info-panel-wrapper.open::-webkit-scrollbar-thumb {
+.info-panel-wrapper::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 3px;
 }
 
-.info-panel-wrapper.open::-webkit-scrollbar-thumb:hover {
+.info-panel-wrapper::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
 }
 
