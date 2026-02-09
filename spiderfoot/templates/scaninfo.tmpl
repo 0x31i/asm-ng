@@ -195,6 +195,114 @@
         var loadersrunning = false;
         var defaultExportDropdownHtml = '';
         var refresh = function() { dataEventList("${id}"); }
+        var _skipHistoryPush = false; // Flag to prevent pushState during popstate handling
+        var _instanceId = "${id}";
+
+        // ---- BROWSER HISTORY MANAGEMENT ----
+        // Builds a state object representing the current view for history.pushState
+        function buildHistoryState() {
+            return {
+                view: currentSection,
+                dataType: currentType,
+                dataTypeName: currentTypeName,
+                dataFormat: currentDataFormat,
+                vulnTab: (typeof vulnActiveTab !== 'undefined') ? vulnActiveTab : 'nessus',
+                findingsTab: (typeof findingsActiveTab !== 'undefined') ? findingsActiveTab : 'findings',
+                assetsView: (typeof currentAssetsView !== 'undefined') ? currentAssetsView : 'overview',
+                searchQuery: lastSearchQuery,
+                searchType: lastSearchType,
+                scrollY: window.scrollY
+            };
+        }
+
+        // Push a new history entry for the current view state
+        function pushViewState(viewName, extra) {
+            if (_skipHistoryPush) return;
+            var state = buildHistoryState();
+            if (viewName) state.view = viewName;
+            if (extra) {
+                for (var k in extra) {
+                    if (extra.hasOwnProperty(k)) state[k] = extra[k];
+                }
+            }
+            state.scrollY = 0; // New view starts at top
+            history.pushState(state, '', window.location.href);
+        }
+
+        // Restore a view from a history state object (called on popstate)
+        function restoreViewFromState(state) {
+            if (!state || !state.view) return;
+            _skipHistoryPush = true;
+            switch (state.view) {
+                case 'btn-status':
+                    scanSummaryView(_instanceId);
+                    break;
+                case 'btn-findings':
+                    viewFindings(_instanceId);
+                    if (state.findingsTab && state.findingsTab !== 'findings') {
+                        setTimeout(function() {
+                            _skipHistoryPush = true;
+                            switchFindingsTab(state.findingsTab, _instanceId);
+                            _skipHistoryPush = false;
+                        }, 100);
+                    }
+                    break;
+                case 'btn-graph':
+                    viewVulnerabilities(_instanceId);
+                    if (state.vulnTab && state.vulnTab !== 'nessus') {
+                        setTimeout(function() {
+                            _skipHistoryPush = true;
+                            switchVulnTab(state.vulnTab, _instanceId);
+                            _skipHistoryPush = false;
+                        }, 100);
+                    }
+                    break;
+                case 'btn-data':
+                    if (state.dataType && state.dataType !== 'ALL') {
+                        dataEventData(_instanceId, state.dataTypeName, state.dataType, state.dataFormat || 'full');
+                    } else {
+                        dataEventList(_instanceId);
+                    }
+                    break;
+                case 'btn-assets':
+                    viewAssets(_instanceId);
+                    if (state.assetsView && state.assetsView !== 'overview') {
+                        setTimeout(function() {
+                            _skipHistoryPush = true;
+                            if (state.assetsView === 'known') assetsShowKnown(_instanceId);
+                            else if (state.assetsView === 'potential') assetsShowPotential(_instanceId);
+                            _skipHistoryPush = false;
+                        }, 100);
+                    }
+                    break;
+                case 'btn-info':
+                    viewScanConfig(_instanceId);
+                    break;
+                case 'btn-search':
+                    if (state.searchQuery) {
+                        searchResults(_instanceId, state.searchQuery, state.searchType !== 'ALL' ? state.searchType : null);
+                    } else {
+                        scanSummaryView(_instanceId);
+                    }
+                    break;
+                default:
+                    scanSummaryView(_instanceId);
+                    break;
+            }
+            _skipHistoryPush = false;
+            // Restore scroll position after content loads
+            if (state.scrollY) {
+                setTimeout(function() { window.scrollTo(0, state.scrollY); }, 300);
+            }
+        }
+
+        // Listen for browser back/forward button
+        window.addEventListener('popstate', function(event) {
+            if (event.state) {
+                restoreViewFromState(event.state);
+            }
+        });
+
         $('#searchvalue').popover({ 'trigger': 'focus', 'placement': 'bottom'});
         $('#searchvalue').keyup(function(event) {
             if (event.keyCode == 13) {
@@ -842,6 +950,12 @@
         }
 
         function navTo(target) {
+            // Save scroll position in current history state before navigating away
+            if (!_skipHistoryPush && history.state) {
+                var s = history.state;
+                s.scrollY = window.scrollY;
+                history.replaceState(s, '', window.location.href);
+            }
             var targets = [ "btn-data", "btn-info",
                 "btn-export", "btn-download-logs", "btn-viz",
                 "btn-status", "btn-graph", "btn-findings", "btn-assets" ]
@@ -892,6 +1006,7 @@
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
             navTo("btn-search");
+            pushViewState('btn-search', {searchQuery: query, searchType: typeName || 'ALL'});
             $("#modifyactions").hide();
             $("#loader").show();
             $("#btn-export").show();
@@ -957,6 +1072,7 @@
             $("#btn-search").hide();
             $("#scanreminder").hide();
             navTo("btn-graph");
+            pushViewState('btn-graph');
             vulnInstanceId = instanceId;
             currentSection = 'btn-graph';
             refresh = function() { viewVulnerabilities(instanceId); }
@@ -1020,6 +1136,7 @@
             $("#modifyactions").hide();
             $("#scanreminder").hide();
             navTo("btn-assets");
+            pushViewState('btn-assets', {assetsView: 'overview'});
             currentSection = 'btn-assets';
             refresh = function() { viewAssets(instanceId); }
 
@@ -1138,6 +1255,7 @@
         // ---- OVERVIEW VIEW ----
         function assetsShowOverview(instanceId) {
             assetsSetActiveBtn('overview');
+            pushViewState('btn-assets', {assetsView: 'overview'});
             $("#assets-content").html("<div class='assets-loader'><img src='${docroot}/static/img/loader.gif'></div>");
 
             // Fetch counts and matches in parallel
@@ -1265,6 +1383,7 @@
 
         function assetsShowKnown(instanceId) {
             assetsSetActiveBtn('known');
+            pushViewState('btn-assets', {assetsView: 'known'});
             $("#assets-content").html("<div class='assets-loader'><img src='${docroot}/static/img/loader.gif'></div>");
 
             sf.fetchData('${docroot}/knownassetlist', {target: assetsTarget}, function(data) {
@@ -1595,6 +1714,7 @@
         function assetsShowPotential(instanceId) {
             assetsInstanceId = instanceId;
             assetsSetActiveBtn('potential');
+            pushViewState('btn-assets', {assetsView: 'potential'});
             $("#assets-content").html("<div class='assets-loader'><img src='${docroot}/static/img/loader.gif'></div>");
 
             sf.fetchData('${docroot}/knownassetmatches', {id: instanceId}, function(matches) {
@@ -1989,6 +2109,7 @@
             $('.vuln-panel').hide();
             $('#vuln-' + tab + '-content').show();
             vulnActiveTab = tab;
+            pushViewState('btn-graph', {vulnTab: tab});
 
             // Load data on first switch
             if (tab === 'nessus' && $('#vuln-nessus-content').html() === '') {
@@ -2825,6 +2946,7 @@
             $("#btn-search").hide();
             $("#scanreminder").hide();
             navTo("btn-findings");
+            pushViewState('btn-findings');
             refresh = function() { viewFindings(instanceId); }
 
             // Save default export dropdown and replace with findings-specific options
@@ -2875,6 +2997,7 @@
             $('#findings-' + tab + '-content').show();
 
             findingsActiveTab = tab;
+            pushViewState('btn-findings', {findingsTab: tab});
 
             // Load correlations data on first switch
             if (tab === 'correlations' && $('#findings-correlations-content').html() === '') {
@@ -3588,6 +3711,7 @@
             $("#btn-search").hide();
             $("#scanreminder").show();
             navTo("btn-status");
+            pushViewState('btn-status');
 
             $("#mainbody").append(grid);
 
@@ -5126,6 +5250,7 @@
             $("#btn-export").hide();
             $("#scanreminder").hide();
             navTo("btn-findings");
+            pushViewState('btn-findings', {findingsTab: 'correlations'});
             refresh = function() { dataCorrelations(instanceId); }
             
             console.log("Fetching correlation data for scan ID: " + instanceId);
@@ -5428,6 +5553,7 @@
             $("#btn-download-logs").show();
             $("#scanreminder").hide();
             navTo("btn-log");
+            pushViewState('btn-info');
             refresh = function() { viewScanLog(instanceId); }
             sf.fetchData('${docroot}/scanlog', {'id': instanceId}, function(data) {
                             var table = "<table id='scanlogs-content' class='table table-bordered table-striped table-condensed small tablesorter' style='table-layout: fixed'>";
@@ -5465,6 +5591,7 @@
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
             navTo("btn-data");
+            pushViewState('btn-data', {dataType: 'ALL', dataTypeName: 'All'});
             $("#loader").show();
             $("#btn-export").show();
             $("#btn-download-logs").hide();
@@ -5531,6 +5658,7 @@
             currentType = eventType;
             currentTypeName = eventTypeLabel;
             updatePageTitle(currentTypeName);
+            pushViewState('btn-data', {dataType: eventType, dataTypeName: eventTypeLabel, dataFormat: format});
             refresh = function() { dataEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated, filterImportedEntries); }
             dataUpdate = function(newformat) { dataEventData(instanceId, eventTypeLabel, eventType, newformat, filterFP, filterValidated, filterImportedEntries); }
             currentDataFormat = format;
@@ -6137,6 +6265,7 @@
             $("#btn-search").hide();
             $("#scanreminder").hide();
             navTo("btn-info");
+            pushViewState('btn-info');
             scanLogLoaded = false;
             refresh = function() { viewScanConfig(instanceId); }
             sf.fetchData('${docroot}/scanopts', {'id': instanceId}, function(data) {
@@ -6281,7 +6410,11 @@
         }
 
         // Always default to Summary view
+        // Use replaceState for initial load (don't push a new history entry)
+        _skipHistoryPush = true;
         scanSummaryView("${id}");
+        _skipHistoryPush = false;
+        history.replaceState(buildHistoryState(), '', window.location.href);
 
         var refreshSummaryInterval;
 
