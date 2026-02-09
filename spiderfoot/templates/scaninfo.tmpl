@@ -310,6 +310,25 @@
             alertify.success("Selected " + count + " items");
         }
 
+        // Select all known asset rows
+        function selectKnownAssets() {
+            $("input[id*=cb_]").prop('checked', false);
+            $("#checkall").prop('checked', false);
+            var count = 0;
+            $("tr.known-asset-row").each(function() {
+                var row = $(this);
+                if (row.is(':visible')) {
+                    row.find("input[id*=cb_]").prop('checked', true);
+                    count++;
+                }
+            });
+            if (count > 0) {
+                alertify.success("Selected " + count + " known asset items");
+            } else {
+                alertify.warning("No known asset items in current view");
+            }
+        }
+
         // Select only items that match saved target-level FPs
         function selectMatchingFps() {
             $("input[id*=cb_]").prop('checked', false);
@@ -728,7 +747,8 @@
                 imported: 0
             };
 
-            $("#scansummary-content tbody tr:visible").each(function() {
+            // Count ALL rows (not just visible) for accurate stats
+            $("#scansummary-content tbody tr").each(function() {
                 var row = $(this);
                 stats.total++;
 
@@ -750,6 +770,52 @@
             $(".stats-bar-left .stats-fp .stats-value").text(stats.fp);
             $(".stats-bar-left .stats-validated .stats-value").text(stats.validated);
             $(".stats-bar-left .stats-unvalidated .stats-value").text(stats.unvalidated);
+
+            // Dynamically inject HIDE FP button if it doesn't exist and there are FPs
+            var fpBtn = $(".stats-bar-right .filter-btn-fp");
+            if (stats.fp > 0 && fpBtn.length === 0) {
+                var fpBtnClass = clientFilterState.fp ? 'filter-btn filter-btn-active filter-btn-fp' : 'filter-btn filter-btn-fp';
+                var fpBtnText = clientFilterState.fp ? 'HIDING ' + stats.fp + ' FP' : 'HIDE ' + stats.fp + ' FP';
+                var fpHtml = "<button class='" + fpBtnClass + "' data-show-text='HIDE " + stats.fp + " FP' data-hiding-text='HIDING " + stats.fp + " FP' onclick=\"toggleClientFilter('fp')\">" + fpBtnText + "</button>";
+                $(".stats-bar-right").prepend(fpHtml);
+            } else if (stats.fp > 0 && fpBtn.length > 0) {
+                // Update existing button text and data attributes
+                fpBtn.data('show-text', 'HIDE ' + stats.fp + ' FP');
+                fpBtn.data('hiding-text', 'HIDING ' + stats.fp + ' FP');
+                if (clientFilterState.fp) {
+                    fpBtn.text('HIDING ' + stats.fp + ' FP');
+                } else {
+                    fpBtn.text('HIDE ' + stats.fp + ' FP');
+                }
+            }
+
+            // Dynamically inject HIDE VALIDATED button if it doesn't exist and there are validated items
+            var valBtn = $(".stats-bar-right .filter-btn-validated");
+            if (stats.validated > 0 && valBtn.length === 0) {
+                var valBtnClass = clientFilterState.validated ? 'filter-btn filter-btn-active filter-btn-validated' : 'filter-btn filter-btn-validated';
+                var valBtnText = clientFilterState.validated ? 'HIDING ' + stats.validated + ' VALIDATED' : 'HIDE ' + stats.validated + ' VALIDATED';
+                var valHtml = "<button class='" + valBtnClass + "' data-show-text='HIDE " + stats.validated + " VALIDATED' data-hiding-text='HIDING " + stats.validated + " VALIDATED' onclick=\"toggleClientFilter('validated')\">" + valBtnText + "</button>";
+                // Insert after FP button if it exists, otherwise prepend
+                var existingFpBtn = $(".stats-bar-right .filter-btn-fp");
+                if (existingFpBtn.length > 0) {
+                    existingFpBtn.after(valHtml);
+                } else {
+                    $(".stats-bar-right").prepend(valHtml);
+                }
+            } else if (stats.validated > 0 && valBtn.length > 0) {
+                // Update existing button text and data attributes
+                valBtn.data('show-text', 'HIDE ' + stats.validated + ' VALIDATED');
+                valBtn.data('hiding-text', 'HIDING ' + stats.validated + ' VALIDATED');
+                if (clientFilterState.validated) {
+                    valBtn.text('HIDING ' + stats.validated + ' VALIDATED');
+                } else {
+                    valBtn.text('HIDE ' + stats.validated + ' VALIDATED');
+                }
+            }
+
+            // Update visible count (accounting for active filters)
+            var visibleCount = $("#scansummary-content tbody tr:visible").length;
+            $(".stats-bar-left .stats-item:first-child .stats-value").text(visibleCount);
         }
 
         // Page title mappings
@@ -1307,7 +1373,7 @@
                 var knownStickyBar = document.getElementById('assets-known-sticky-bar');
                 if (knownStickyBar) {
                     var barHeight = knownStickyBar.offsetHeight;
-                    $('#known-assets-table thead th').css('top', barHeight + 'px');
+                    document.getElementById('known-assets-table').style.setProperty('--sticky-offset', barHeight + 'px');
                 }
             });
         }
@@ -1641,7 +1707,7 @@
                 var stickyBar = document.getElementById('assets-sticky-bar');
                 if (stickyBar) {
                     var barHeight = stickyBar.offsetHeight;
-                    $('#potential-matches-table thead th').css('top', barHeight + 'px');
+                    document.getElementById('potential-matches-table').style.setProperty('--sticky-offset', barHeight + 'px');
                 }
             });
         }
@@ -5532,6 +5598,12 @@
                                 var impBtnText = clientFilterState.imported ? 'HIDING ' + stats.imported + ' IMPORTED' : 'HIDE ' + stats.imported + ' IMPORTED';
                                 statsBar += "<button class='" + impBtnClass + "' data-show-text='HIDE " + stats.imported + " IMPORTED' data-hiding-text='HIDING " + stats.imported + " IMPORTED' onclick=\"toggleClientFilter('imported')\">";
                                 statsBar += impBtnText + "</button>";
+                            }
+
+                            // Select Known Assets button
+                            if (stats.knownAsset > 0) {
+                                statsBar += "<button class='filter-btn filter-btn-known-asset' onclick='selectKnownAssets()'>";
+                                statsBar += "SELECT " + stats.knownAsset + " KNOWN</button>";
                             }
 
                             statsBar += "</div>";
