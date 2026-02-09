@@ -7070,7 +7070,6 @@ i.glyphicon-white,
   white-space: normal !important;
   word-break: break-all !important;
   overflow-wrap: anywhere !important;
-  max-width: 0;
 }
 
 /* Wrapper inside td handles relative positioning (td can't do it reliably) */
