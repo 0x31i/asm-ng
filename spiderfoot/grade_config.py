@@ -44,12 +44,12 @@ DEFAULT_GRADE_CATEGORIES = {
     },
     'General Health': {
         'weight': 0.8,
-        'color': '#eab308',
+        'color': '#3b82f6',
         'description': 'SSL certificates, code repos, coordinates, app stores',
     },
     'External Account Exposure': {
         'weight': 0.7,
-        'color': '#22c55e',
+        'color': '#06b6d4',
         'description': 'External accounts, social media, target accounts',
     },
     'DNS Health': {
