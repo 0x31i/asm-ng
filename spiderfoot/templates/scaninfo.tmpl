@@ -5592,6 +5592,30 @@
 
         var _dataListRawData = []; // Store raw data for re-sorting
         var _dataListSort = 'group'; // Current sort mode
+        var _dataListCategoryFilter = {}; // true = active (shown), false = hidden
+
+        // Initialize all categories as active
+        function dataListInitFilters() {
+            for (var i = 0; i < categoryOrder.length; i++) {
+                _dataListCategoryFilter[categoryOrder[i]] = true;
+            }
+        }
+        dataListInitFilters();
+
+        // Toggle a category filter on/off
+        function toggleCategoryFilter(catName) {
+            _dataListCategoryFilter[catName] = !_dataListCategoryFilter[catName];
+            // Update tile visual state
+            var tile = document.getElementById('data-legend-' + catName.replace(/[\s\/]/g, '-'));
+            if (tile) {
+                if (_dataListCategoryFilter[catName]) {
+                    tile.classList.remove('data-legend-inactive');
+                } else {
+                    tile.classList.add('data-legend-inactive');
+                }
+            }
+            dataListApplySort(_dataListSort);
+        }
 
         function dataListApplySort(sortMode) {
             _dataListSort = sortMode;
@@ -5599,31 +5623,39 @@
             $('.data-sort-btn').removeClass('data-sort-active');
             $('#data-sort-' + sortMode).addClass('data-sort-active');
 
-            var sorted = _dataListRawData.slice(); // shallow copy
+            // Filter by active categories
+            var filtered = [];
+            for (var i = 0; i < _dataListRawData.length; i++) {
+                var cat = _dataListRawData[i][6] || 'Information / Reference';
+                if (_dataListCategoryFilter[cat] !== false) {
+                    filtered.push(_dataListRawData[i]);
+                }
+            }
+
             if (sortMode === 'alpha') {
-                sorted.sort(function(a, b) { return a[1].localeCompare(b[1]); });
+                filtered.sort(function(a, b) { return a[1].localeCompare(b[1]); });
             } else if (sortMode === 'group') {
-                sorted.sort(function(a, b) {
+                filtered.sort(function(a, b) {
                     var ai = categoryOrder.indexOf(a[6]); if (ai < 0) ai = 99;
                     var bi = categoryOrder.indexOf(b[6]); if (bi < 0) bi = 99;
                     if (ai !== bi) return ai - bi;
                     return a[1].localeCompare(b[1]);
                 });
             } else if (sortMode === 'severity') {
-                sorted.sort(function(a, b) {
+                filtered.sort(function(a, b) {
                     // rank ascending (1=most important), then weight desc, then alpha
                     if (a[8] !== b[8]) return a[8] - b[8];
                     if (a[9] !== b[9]) return b[9] - a[9];
                     return a[1].localeCompare(b[1]);
                 });
             } else if (sortMode === 'count') {
-                sorted.sort(function(a, b) {
+                filtered.sort(function(a, b) {
                     // Total count descending
                     if (b[3] !== a[3]) return b[3] - a[3];
                     return a[1].localeCompare(b[1]);
                 });
             }
-            dataListRenderTable(sorted);
+            dataListRenderTable(filtered);
         }
 
         function dataListRenderTable(data) {
@@ -5703,24 +5735,26 @@
                             toolbar += "</div>";
                             toolbar += "</div>";
 
-                            // --- Category legend ---
+                            // --- Category filter tiles ---
+                            dataListInitFilters();
                             var legend = "<div class='data-list-legend'>";
                             for (var ci = 0; ci < categoryOrder.length; ci++) {
                                 var catName = categoryOrder[ci];
-                                // Find color from data or use defaults
                                 var catColor = '#6b7280';
                                 for (var di = 0; di < data.length; di++) {
                                     if (data[di][6] === catName) { catColor = data[di][7]; break; }
                                 }
-                                // Count types in this category
                                 var catCount = 0;
                                 for (var di = 0; di < data.length; di++) {
                                     if (data[di][6] === catName) catCount++;
                                 }
                                 if (catCount > 0) {
-                                    legend += "<span class='data-legend-item' style='border-color: " + catColor + "; color: " + catColor + ";'>";
+                                    var tileId = 'data-legend-' + catName.replace(/[\s\/]/g, '-');
+                                    legend += "<button id='" + tileId + "' class='data-legend-tile' style='--tile-color: " + catColor + ";' onclick='toggleCategoryFilter(\"" + catName + "\")'>";
                                     legend += "<span class='data-legend-dot' style='background: " + catColor + ";'></span>";
-                                    legend += catName + " <span class='data-legend-count'>" + catCount + "</span></span>";
+                                    legend += "<span class='data-legend-tile-name'>" + catName + "</span>";
+                                    legend += "<span class='data-legend-count'>" + catCount + "</span>";
+                                    legend += "</button>";
                                 }
                             }
                             legend += "</div>";
