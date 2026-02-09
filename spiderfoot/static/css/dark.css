@@ -6147,8 +6147,8 @@ button[data-target="#createWorkspaceModal"]:hover,
 }
 
 .assets-match-stat-pending .assets-match-stat-num {
-  color: #fbbf24;
-  text-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+  color: var(--text-muted, #94a3b8);
+  text-shadow: none;
 }
 .assets-match-stat-verified .assets-match-stat-num {
   color: var(--accent-green);
@@ -6419,10 +6419,17 @@ button[data-target="#createWorkspaceModal"]:hover,
   box-shadow: 0 0 8px rgba(234, 88, 12, 0.3) !important;
 }
 
+/* Bulk button group - keeps all 3 buttons on one line */
+.assets-bulk-group {
+  display: inline-flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .assets-bulk-reset-btn {
-  background: rgba(251, 191, 36, 0.15) !important;
-  color: #fbbf24 !important;
-  border: 1px solid rgba(251, 191, 36, 0.3) !important;
+  background: rgba(148, 163, 184, 0.15) !important;
+  color: var(--text-muted, #94a3b8) !important;
+  border: 1px solid rgba(148, 163, 184, 0.3) !important;
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
@@ -6433,22 +6440,22 @@ button[data-target="#createWorkspaceModal"]:hover,
 }
 
 .assets-bulk-reset-btn:not(.assets-bulk-inactive) {
-  background: rgba(251, 191, 36, 0.25) !important;
-  color: #fbbf24 !important;
-  border: 1px solid rgba(251, 191, 36, 0.4) !important;
-  box-shadow: 0 0 8px rgba(251, 191, 36, 0.3) !important;
+  background: rgba(148, 163, 184, 0.25) !important;
+  color: #cbd5e1 !important;
+  border: 1px solid rgba(148, 163, 184, 0.5) !important;
+  box-shadow: 0 0 6px rgba(148, 163, 184, 0.2) !important;
 }
 
 /* Per-row reset icon button */
 .assets-reset-action.assets-icon-btn {
-  background: rgba(251, 191, 36, 0.2) !important;
-  color: #fbbf24 !important;
-  border: 1px solid rgba(251, 191, 36, 0.4) !important;
+  background: rgba(148, 163, 184, 0.2) !important;
+  color: var(--text-muted, #94a3b8) !important;
+  border: 1px solid rgba(148, 163, 184, 0.4) !important;
 }
 
 .assets-reset-action.assets-icon-btn:hover {
-  background: rgba(251, 191, 36, 0.35) !important;
-  box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+  background: rgba(148, 163, 184, 0.35) !important;
+  box-shadow: 0 0 6px rgba(148, 163, 184, 0.3);
 }
 
 /* Detail row (expandable) */

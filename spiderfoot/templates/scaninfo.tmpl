@@ -936,6 +936,7 @@
         // =====================================================================
         var currentAssetsView = 'overview';
         var assetsTarget = '${seedtarget}';
+        var assetsInstanceId = null;
 
         function viewAssets(instanceId) {
             $("#scansummary-content").remove();
@@ -1345,6 +1346,7 @@
         }
 
         function assetsShowPotential(instanceId) {
+            assetsInstanceId = instanceId;
             assetsSetActiveBtn('potential');
             $("#assets-content").html("<div class='assets-loader'><img src='${docroot}/static/img/loader.gif'></div>");
 
@@ -1374,12 +1376,14 @@
                 html += (assetsHideResolved ? "SHOW" : "HIDE") + " VERIFIED (" + resolvedCount + ")</button>";
 
                 // Bulk actions - inactive by default, activated via assetsUpdateBulkButtons()
+                html += "<div class='assets-bulk-group'>";
                 html += "<button class='btn assets-bulk-verify-btn assets-bulk-inactive' id='assets-bulk-verify' onclick='assetsBulkAction(\"" + instanceId + "\", \"verify\")' disabled>";
-                html += "<i class='glyphicon glyphicon-ok-circle'></i>&nbsp;&nbsp;VERIFY SELECTED</button>";
+                html += "<i class='glyphicon glyphicon-ok-circle'></i>&nbsp;&nbsp;VERIFIED</button>";
                 html += "<button class='btn assets-bulk-fp-btn assets-bulk-inactive' id='assets-bulk-fp' onclick='assetsBulkAction(\"" + instanceId + "\", \"fp\")' disabled>";
-                html += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;MARK FALSE POSITIVE</button>";
+                html += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;FALSE POSITIVE</button>";
                 html += "<button class='btn assets-bulk-reset-btn assets-bulk-inactive' id='assets-bulk-reset' onclick='assetsBulkAction(\"" + instanceId + "\", \"reset\")' disabled>";
-                html += "<i class='glyphicon glyphicon-repeat'></i>&nbsp;&nbsp;RESET TO PENDING</button>";
+                html += "<i class='glyphicon glyphicon-repeat'></i>&nbsp;&nbsp;PENDING</button>";
+                html += "</div>";
                 html += "</div>";
 
                 if (matches.length === 0) {
@@ -1555,13 +1559,64 @@
             assetsUpdateBulkButtons();
         }
 
+        // Update a single row in-place after an action
+        function assetsUpdateRowInPlace(hash, action) {
+            var $row = $("tr.assets-match-row[data-hash='" + hash + "']");
+            if (!$row.length) return;
+            var $statusCell = $row.find('.assets-col-status-cell');
+            var $actionCell = $row.find('.assets-action-cell');
+            var iid = assetsInstanceId;
+
+            if (action === 'verify') {
+                $statusCell.html("<span class='status-validated'>VERIFIED</span>");
+                $row.removeClass('assets-row-pending assets-row-fp').addClass('assets-row-verified assets-row-resolved');
+                $actionCell.html("<button class='btn btn-xs assets-icon-btn assets-reset-action' onclick='event.stopPropagation();assetsSingleAction(\"" + iid + "\", \"" + hash + "\", \"reset\")' title='RESET TO PENDING'><i class='glyphicon glyphicon-repeat'></i></button>");
+                if (assetsHideResolved) { $row.hide(); $row.next('.assets-detail-row').hide(); }
+            } else if (action === 'fp') {
+                $statusCell.html("<span class='status-fp'>FALSE POSITIVE</span>");
+                $row.removeClass('assets-row-pending assets-row-verified').addClass('assets-row-fp assets-row-resolved');
+                $actionCell.html("<button class='btn btn-xs assets-icon-btn assets-reset-action' onclick='event.stopPropagation();assetsSingleAction(\"" + iid + "\", \"" + hash + "\", \"reset\")' title='RESET TO PENDING'><i class='glyphicon glyphicon-repeat'></i></button>");
+                if (assetsHideResolved) { $row.hide(); $row.next('.assets-detail-row').hide(); }
+            } else if (action === 'reset') {
+                $statusCell.html("<span class='status-unvalidated'>PENDING</span>");
+                $row.removeClass('assets-row-verified assets-row-fp assets-row-resolved').addClass('assets-row-pending');
+                $actionCell.html(
+                    "<button class='btn btn-xs assets-icon-btn assets-verify-action' onclick='event.stopPropagation();assetsSingleAction(\"" + iid + "\", \"" + hash + "\", \"verify\")' title='VERIFY'><i class='glyphicon glyphicon-ok'></i></button>" +
+                    "<button class='btn btn-xs assets-icon-btn assets-fp-action' onclick='event.stopPropagation();assetsSingleAction(\"" + iid + "\", \"" + hash + "\", \"fp\")' title='FALSE POSITIVE'><i class='glyphicon glyphicon-remove'></i></button>"
+                );
+                $row.show();
+            }
+            // Uncheck the row
+            $row.find('.match-cb').prop('checked', false);
+        }
+
+        // Recalculate stats from DOM and update the sticky bar counters
+        function assetsRecalcStats() {
+            var total = $("tr.assets-match-row").length;
+            var verified = $("tr.assets-row-verified").length;
+            var fps = $("tr.assets-row-fp").length;
+            var pending = total - verified - fps;
+            $(".assets-match-stats .assets-match-stat:eq(0) .assets-match-stat-num").text(total);
+            $(".assets-match-stat-pending .assets-match-stat-num").text(pending);
+            $(".assets-match-stat-verified .assets-match-stat-num").text(verified);
+            $(".assets-match-stat-fp .assets-match-stat-num").text(fps);
+            // Update toggle button count
+            var resolvedCount = verified + fps;
+            $(".assets-toggle-resolved-btn").html(
+                "<i class='glyphicon glyphicon-eye-" + (assetsHideResolved ? "close" : "open") + "'></i>&nbsp;&nbsp;" +
+                (assetsHideResolved ? "SHOW" : "HIDE") + " VERIFIED (" + resolvedCount + ")"
+            );
+        }
+
         function assetsSingleAction(instanceId, hash, action) {
             sf.fetchData('${docroot}/knownassetverifymatch', {
                 id: instanceId, result_hash: hash, action: action
             }, function(ret) {
                 if (ret[0] === "SUCCESS") {
                     alertify.success(ret[1]);
-                    assetsShowPotential(instanceId);
+                    assetsUpdateRowInPlace(hash, action);
+                    assetsRecalcStats();
+                    assetsUpdateBulkButtons();
                 } else {
                     alertify.error("ERROR: " + ret[1]);
                 }
@@ -1580,7 +1635,12 @@
             }, function(ret) {
                 if (ret[0] === "SUCCESS") {
                     alertify.success(ret[1]);
-                    assetsShowPotential(instanceId);
+                    for (var i = 0; i < hashes.length; i++) {
+                        assetsUpdateRowInPlace(hashes[i], action);
+                    }
+                    assetsRecalcStats();
+                    $("#matches-select-all").prop("checked", false);
+                    assetsUpdateBulkButtons();
                 } else {
                     alertify.error("ERROR: " + ret[1]);
                 }
