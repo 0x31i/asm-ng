@@ -59,7 +59,7 @@ mp.set_start_method("spawn", force=True)
 class SpiderFootWebUi:
     """SpiderFoot web interface."""
 
-    lookup = TemplateLookup(directories=[''])
+    lookup = TemplateLookup(directories=[''], filesystem_checks=True, collection_size=0)
     defaultConfig = dict()
     config = dict()
     token = None
