@@ -1,6 +1,7 @@
 # Positive Findings Review Instructions 
-For each item, there are specific target areas to review.  Overall, a review of any internal processes that impact the target area needs to be done.  Are there changes that can prevent issues or unintentional exposure of data?
-
+- For each item, there are specific target areas to review.  Overall, a review of any internal processes that impact the target area needs to be done.  Are there changes that can prevent issues or unintentional exposure of data?
+  
+```
 EXTERNAL_VULNERABILITIES
 •	Confirm all targeted assets are valid and in scope.
 •	Review past vulnerability tickets for recurring themes (ex: unpatched third-party libraries).
@@ -245,3 +246,4 @@ MALICIOUS_SUBNET
 •	Remediate any underlying compromise (ex: spam relay, malware infection).
 •	Submit delisting requests once issues are resolved.
 •	Monitor continuously for reappearance.
+```
