@@ -385,6 +385,29 @@
             updateFilterButtonStates();
         }
 
+        // Initialize expandable pre cells — mark overflowing cells and bind click
+        function initExpandableCells() {
+            $("#scansummary-content td.pre-expandable.pre-collapsed").each(function() {
+                var pre = this.querySelector('pre');
+                if (pre && pre.scrollHeight > 96) {
+                    this.classList.add('pre-has-overflow');
+                } else {
+                    this.classList.remove('pre-collapsed');
+                }
+            });
+            $("#scansummary-content").on('click', 'td.pre-expandable.pre-has-overflow', function(e) {
+                if ($(e.target).is('a') || $(e.target).closest('a').length) return;
+                e.stopPropagation();
+                if (this.classList.contains('pre-collapsed')) {
+                    this.classList.remove('pre-collapsed');
+                    this.classList.add('pre-expanded');
+                } else {
+                    this.classList.remove('pre-expanded');
+                    this.classList.add('pre-collapsed');
+                }
+            });
+        }
+
         // Apply client-side filters by showing/hiding rows
         function applyClientSideFilters() {
             var visibleCount = 0;
@@ -1889,12 +1912,13 @@
                                     if (typeName == null) {
                                         table += "<td><pre class='table-border-bg-inherit'>" + data[i][8] + "</pre></td>";
                                     }
-                                    table += "<td><pre class='table-border-bg-inherit'>";
+                                    table += "<td class='pre-expandable pre-collapsed'><pre class='table-border-bg-inherit'>";
                                     table += sf.replace_sfurltag(data[i][1]);
-                                    // for debug
-                                    table += "</pre></td><td><pre class='table-border-bg-inherit'>";
+                                    table += "</pre><div class='pre-expand-hint'></div></td>";
+                                    table += "<td class='pre-expandable pre-collapsed'><pre class='table-border-bg-inherit'>";
                                     table += sf.replace_sfurltag(data[i][2]);
-                                    table += "</pre></td><td><pre class='table-border-bg-inherit'>" + data[i][3];
+                                    table += "</pre><div class='pre-expand-hint'></div></td>";
+                                    table += "<td><pre class='table-border-bg-inherit'>" + data[i][3];
                                     table += "</pre></td><td><pre class='table-border-bg-inherit'>" + data[i][0];
                                     table += "</pre></td>";
                                     table += "</tr>";
@@ -1905,6 +1929,7 @@
                             $("#loader").fadeOut(500);
                             $("#mainbody").append(table);
                             $("#scansummary-content").tablesorter();
+                            initExpandableCells();
             });
         }
 
@@ -6869,12 +6894,13 @@
                                 }
                                 table += "</td>";
 
-                                table += "<td><pre class='table-border-bg-inherit'>";
-                                //table += "<a href='${docroot}/entityinfo?id=" + data[i][7] + "'>" + data[i][1] + "</a>";
+                                table += "<td class='pre-expandable pre-collapsed'><pre class='table-border-bg-inherit'>";
                                 table += sf.replace_sfurltag(data[i][1]);
-                                table += "</pre></td><td><pre class='table-border-bg-inherit'>";
+                                table += "</pre><div class='pre-expand-hint'></div></td>";
+                                table += "<td class='pre-expandable pre-collapsed'><pre class='table-border-bg-inherit'>";
                                 table += sf.replace_sfurltag(data[i][2]);
-                                table += "</pre></td><td><pre class='table-border-bg-inherit'>" + data[i][3];
+                                table += "</pre><div class='pre-expand-hint'></div></td>";
+                                table += "<td><pre class='table-border-bg-inherit'>" + data[i][3];
                                 table += "</pre></td><td><pre class='table-border-bg-inherit'>" + data[i][0];
                                 table += "</pre></td>";
                                 table += "</tr>";
@@ -6896,6 +6922,9 @@
                             }
 
                             $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false }, 1: { sorter: false } } });
+
+                            // Initialize expandable pre cells
+                            initExpandableCells();
 
                             // Apply any active client-side filters after table render
                             if (clientFilterState.fp || clientFilterState.validated || clientFilterState.imported) {
@@ -7045,7 +7074,7 @@
                     // Build table header with dynamic node columns
                     var thStyle = "class='data-sticky-th' style='position: sticky; position: -webkit-sticky; top: 50px; z-index: 100;'";
 
-                    var table = "<table id='scansummary-content' class='table table-bordered table-striped small tablesorter'>";
+                    var table = "<table id='scansummary-content' class='table table-bordered table-striped small tablesorter discovery-path-table'>";
                     table += "<thead><tr>";
                     table += "<th class='text-center' " + thStyle + "><input id='checkall' type='checkbox' onClick='switchSelectAll()'></th>";
                     table += "<th class='text-center validation-status' " + thStyle + ">Status</th>";
@@ -7101,7 +7130,6 @@
                             html += "<div class='dp-type'><strong>TYPE:</strong> <span class='dp-value'>" + type + "</span></div>";
                             html += "<div class='dp-module'><strong>SOURCE MODULE:</strong> <span class='dp-value'>" + module + "</span></div>";
                             html += "<div class='dp-data'><strong>DATA:</strong> <span class='dp-value dp-data-value'>" + data + "</span></div>";
-                            html += "<div class='dp-expand-toggle'></div>";
                             html += "</div>";
                             html += "</td>";
                             return html;
@@ -7130,30 +7158,26 @@
                     $("#mainbody").append(statsBar + table);
                     $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false }, 1: { sorter: false } } });
 
-                    // Show expand toggle only on cells that are actually truncated
-                    $("#scansummary-content .discovery-path-cell").each(function() {
-                        var cell = $(this);
-                        var hasOverflow = false;
-                        cell.find('.dp-type, .dp-module, .dp-data').each(function() {
-                            if (this.scrollWidth > this.clientWidth) {
-                                hasOverflow = true;
-                            }
-                        });
-                        if (!hasOverflow) {
-                            cell.find('.dp-expand-toggle').remove();
-                            cell.removeClass('dp-collapsed');
+                    // Mark cells that have overflow (content taller than collapsed max-height)
+                    $("#scansummary-content .discovery-path-cell.dp-collapsed").each(function() {
+                        var wrap = this.querySelector('.dp-cell-wrap');
+                        if (wrap && wrap.scrollHeight > 96) {
+                            this.classList.add('dp-has-overflow');
+                        } else {
+                            this.classList.remove('dp-collapsed');
                         }
                     });
 
-                    // Click handler for expand/collapse toggle
-                    $("#scansummary-content").on('click', '.dp-expand-toggle', function(e) {
+                    // Click anywhere on cell to expand/collapse
+                    $("#scansummary-content").on('click', '.discovery-path-cell.dp-has-overflow', function(e) {
+                        if ($(e.target).is('a') || $(e.target).closest('a').length) return;
                         e.stopPropagation();
-                        e.preventDefault();
-                        var cell = $(this).closest('.discovery-path-cell');
-                        if (cell.hasClass('dp-collapsed')) {
-                            cell.removeClass('dp-collapsed').addClass('dp-expanded');
+                        if (this.classList.contains('dp-collapsed')) {
+                            this.classList.remove('dp-collapsed');
+                            this.classList.add('dp-expanded');
                         } else {
-                            cell.removeClass('dp-expanded').addClass('dp-collapsed');
+                            this.classList.remove('dp-expanded');
+                            this.classList.add('dp-collapsed');
                         }
                     });
 
