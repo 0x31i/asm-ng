@@ -1318,7 +1318,7 @@
         // ---- POTENTIAL MATCHES VIEW ----
         var assetsHideResolved = true; // default: resolved rows hidden
 
-        // Break text into segments at . - @ delimiters for wrapping and highlight
+        // Break text into segments at . - @ : / delimiters for wrapping and highlight
         function assetsRenderWrappable(text) {
             var html = '';
             var seg = '';
@@ -1351,7 +1351,7 @@
             sf.fetchData('${docroot}/knownassetmatches', {id: instanceId}, function(matches) {
                 var html = "";
 
-                // Stats bar
+                // Stats bar - sticky
                 var pending = 0, verified = 0, fps = 0;
                 for (var i = 0; i < matches.length; i++) {
                     var m = matches[i];
@@ -1360,25 +1360,24 @@
                     else pending++;
                 }
 
-                html += "<div class='assets-match-stats'>";
+                html += "<div class='assets-match-stats assets-sticky-bar' id='assets-sticky-bar'>";
                 html += "<div class='assets-match-stat'><span class='assets-match-stat-num'>" + matches.length + "</span><span class='assets-match-stat-label'>TOTAL MATCHES</span></div>";
                 html += "<div class='assets-match-stat assets-match-stat-pending'><span class='assets-match-stat-num'>" + pending + "</span><span class='assets-match-stat-label'>PENDING</span></div>";
                 html += "<div class='assets-match-stat assets-match-stat-verified'><span class='assets-match-stat-num'>" + verified + "</span><span class='assets-match-stat-label'>VERIFIED</span></div>";
                 html += "<div class='assets-match-stat assets-match-stat-fp'><span class='assets-match-stat-num'>" + fps + "</span><span class='assets-match-stat-label'>FALSE POSITIVE</span></div>";
                 html += "<div style='flex:1;'></div>";
 
-                // Toggle resolved visibility
+                // Toggle resolved
                 var resolvedCount = verified + fps;
                 html += "<button class='btn assets-toggle-resolved-btn" + (assetsHideResolved ? "" : " active") + "' onclick='assetsToggleResolved(\"" + instanceId + "\")'>";
                 html += "<i class='glyphicon glyphicon-eye-" + (assetsHideResolved ? "close" : "open") + "'></i>&nbsp;&nbsp;";
                 html += (assetsHideResolved ? "SHOW" : "HIDE") + " RESOLVED (" + resolvedCount + ")</button>";
 
-                if (pending > 0) {
-                    html += "<button class='btn assets-bulk-verify-btn' onclick='assetsBulkAction(\"" + instanceId + "\", \"verify\")'>";
-                    html += "<i class='glyphicon glyphicon-ok-circle'></i>&nbsp;&nbsp;VERIFY SELECTED</button>";
-                    html += "<button class='btn assets-bulk-fp-btn' onclick='assetsBulkAction(\"" + instanceId + "\", \"fp\")'>";
-                    html += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;FP SELECTED</button>";
-                }
+                // Bulk actions - inactive by default, activated via assetsUpdateBulkButtons()
+                html += "<button class='btn assets-bulk-verify-btn assets-bulk-inactive' id='assets-bulk-verify' onclick='assetsBulkAction(\"" + instanceId + "\", \"verify\")' disabled>";
+                html += "<i class='glyphicon glyphicon-ok-circle'></i>&nbsp;&nbsp;VERIFY SELECTED</button>";
+                html += "<button class='btn assets-bulk-fp-btn assets-bulk-inactive' id='assets-bulk-fp' onclick='assetsBulkAction(\"" + instanceId + "\", \"fp\")' disabled>";
+                html += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;MARK FALSE POSITIVE</button>";
                 html += "</div>";
 
                 if (matches.length === 0) {
@@ -1390,8 +1389,8 @@
                     html += "<thead><tr>";
                     html += "<th class='assets-col-select'><input type='checkbox' id='matches-select-all' onchange='matchesToggleSelectAll()'></th>";
                     html += "<th class='assets-col-status'>STATUS</th>";
-                    html += "<th class='assets-col-known'>KNOWN ASSET</th>";
-                    html += "<th class='assets-col-data'>DATA ELEMENT</th>";
+                    html += "<th>KNOWN ASSET</th>";
+                    html += "<th>DATA ELEMENT</th>";
                     html += "<th class='assets-col-actions'></th>";
                     html += "</tr></thead><tbody>";
 
@@ -1418,12 +1417,12 @@
                         var knownWrapped = assetsRenderWrappable(m.matched_asset);
                         var dataWrapped = assetsRenderWrappable(m.data);
 
-                        // Main row - compact with wrappable segments
+                        // Main row - clicking status/known/data cells toggles detail
                         html += "<tr class='assets-match-row " + rowClass + "' data-hash='" + m.hash + "'" + hideStyle + ">";
                         html += "<td class='assets-cell-select' onclick='assetsToggleCb(this, event)'><input type='checkbox' class='match-cb' value='" + m.hash + "'></td>";
-                        html += "<td class='assets-col-status-cell text-center'>" + statusBadge + "</td>";
-                        html += "<td class='assets-matched-asset assets-hl-cell'>" + knownWrapped + "</td>";
-                        html += "<td class='assets-value-cell assets-hl-cell'>" + dataWrapped + "</td>";
+                        html += "<td class='assets-col-status-cell text-center assets-expandable' onclick='assetsToggleDetailByRow(this)'>" + statusBadge + "</td>";
+                        html += "<td class='assets-matched-asset assets-hl-cell assets-expandable' onclick='assetsToggleDetailByRow(this)'>" + knownWrapped + "</td>";
+                        html += "<td class='assets-value-cell assets-hl-cell assets-expandable' onclick='assetsToggleDetailByRow(this)'>" + dataWrapped + "</td>";
                         html += "<td class='assets-action-cell'>";
                         if (!isResolved) {
                             html += "<button class='btn btn-xs assets-icon-btn assets-verify-action' onclick='event.stopPropagation();assetsSingleAction(\"" + instanceId + "\", \"" + m.hash + "\", \"verify\")' title='VERIFY'>";
@@ -1433,20 +1432,18 @@
                         } else {
                             html += "<span class='assets-resolved-icon'><i class='glyphicon glyphicon-lock'></i></span>";
                         }
-                        html += "<button class='btn btn-xs assets-icon-btn assets-expand-btn' onclick='event.stopPropagation();assetsToggleDetail(this)' title='DETAILS'>";
-                        html += "<i class='glyphicon glyphicon-chevron-down'></i></button>";
                         html += "</td></tr>";
 
-                        // Expandable detail row
+                        // Expandable detail row - styled as distinct cards
                         var detailResClass = (isResolved ? " assets-row-resolved" : "");
                         html += "<tr class='assets-detail-row" + detailResClass + "' data-parent='" + m.hash + "' style='display:none;'>";
                         html += "<td colspan='5'>";
                         html += "<div class='assets-detail-grid'>";
-                        html += "<div class='assets-detail-item'><span class='assets-detail-label'>MATCH TYPE</span><span class='assets-match-type-badge'>" + matchLabel + "</span></div>";
-                        html += "<div class='assets-detail-item'><span class='assets-detail-label'>EVENT TYPE</span><span class='assets-detail-value'>" + m.type + "</span></div>";
-                        html += "<div class='assets-detail-item'><span class='assets-detail-label'>SOURCE MODULE</span><span class='assets-detail-value'>" + m.module + "</span></div>";
+                        html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>MATCH TYPE</div><div class='assets-detail-card-value'><span class='assets-match-type-badge'>" + matchLabel + "</span></div></div>";
+                        html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>EVENT TYPE</div><div class='assets-detail-card-value'>" + m.type + "</div></div>";
+                        html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>SOURCE MODULE</div><div class='assets-detail-card-value'>" + m.module + "</div></div>";
                         if (m.confidence) {
-                            html += "<div class='assets-detail-item'><span class='assets-detail-label'>CONFIDENCE</span><span class='assets-detail-value'>" + m.confidence + "</span></div>";
+                            html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>CONFIDENCE</div><div class='assets-detail-card-value assets-confidence-val'>" + m.confidence + "</div></div>";
                         }
                         html += "</div></td></tr>";
                     }
@@ -1456,26 +1453,25 @@
                 $("#assets-content").html(html);
                 $("#loader").hide();
                 assetsInitSegmentHighlight();
+                assetsInitSelectionTracking();
             });
         }
 
-        // Toggle resolved rows visibility
+        // Toggle resolved rows
         function assetsToggleResolved(instanceId) {
             assetsHideResolved = !assetsHideResolved;
             assetsShowPotential(instanceId);
         }
 
-        // Expand/collapse detail row
-        function assetsToggleDetail(btn) {
-            var $row = $(btn).closest('tr');
+        // Click on status/known/data cell toggles detail row
+        function assetsToggleDetailByRow(td) {
+            var $row = $(td).closest('tr');
             var $detail = $row.next('.assets-detail-row');
             if ($detail.is(':visible')) {
                 $detail.hide();
-                $(btn).find('i').removeClass('glyphicon-chevron-up').addClass('glyphicon-chevron-down');
                 $row.removeClass('assets-row-expanded');
             } else {
                 $detail.show();
-                $(btn).find('i').removeClass('glyphicon-chevron-down').addClass('glyphicon-chevron-up');
                 $row.addClass('assets-row-expanded');
             }
         }
@@ -1485,10 +1481,30 @@
             if (event.target.type === 'checkbox') return;
             var cb = $(td).find('input[type=checkbox]');
             cb.prop('checked', !cb.prop('checked'));
+            assetsUpdateBulkButtons();
         }
 
-        // Segment-based hover highlight: hovering a segment (between . - @ : /)
-        // highlights that segment AND cross-highlights matching segment in paired cell
+        // Track checkbox changes to enable/disable bulk buttons
+        function assetsInitSelectionTracking() {
+            $(document).off('change.assetscb').on('change.assetscb', '.match-cb, #matches-select-all', function() {
+                assetsUpdateBulkButtons();
+            });
+        }
+
+        function assetsUpdateBulkButtons() {
+            var count = $(".match-cb:checked").length;
+            var $verify = $("#assets-bulk-verify");
+            var $fp = $("#assets-bulk-fp");
+            if (count > 0) {
+                $verify.removeClass('assets-bulk-inactive').prop('disabled', false);
+                $fp.removeClass('assets-bulk-inactive').prop('disabled', false);
+            } else {
+                $verify.addClass('assets-bulk-inactive').prop('disabled', true);
+                $fp.addClass('assets-bulk-inactive').prop('disabled', true);
+            }
+        }
+
+        // Segment-based hover highlight
         function assetsInitSegmentHighlight() {
             var $table = $('#potential-matches-table');
             if (!$table.length) return;
@@ -1500,10 +1516,8 @@
                 var $cell = $seg.closest('.assets-hl-cell');
                 var $row = $cell.closest('tr');
 
-                // Highlight this segment
                 $seg.addClass('assets-hl-active');
 
-                // Find and highlight matching segments in paired cell
                 var $paired = $cell.hasClass('assets-matched-asset')
                     ? $row.find('.assets-value-cell')
                     : $row.find('.assets-matched-asset');
@@ -1525,6 +1539,7 @@
         function matchesToggleSelectAll() {
             var checked = $("#matches-select-all").is(":checked");
             $(".assets-match-row:visible .match-cb").prop("checked", checked);
+            assetsUpdateBulkButtons();
         }
 
         function assetsSingleAction(instanceId, hash, action) {
