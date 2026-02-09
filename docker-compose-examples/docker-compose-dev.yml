@@ -1,0 +1,14 @@
+services:
+  asm-ng:
+    build:
+      context: .
+    volumes:
+      - asm-ng-data:/var/lib/spiderfoot
+    image: asm-ng
+    container_name: asm-ng
+    ports:
+      - "5001:5001"
+    restart: unless-stopped
+
+volumes:
+  asm-ng-data:

@@ -1,0 +1,20 @@
+# SpiderFoot Enterprise Dependencies
+# Install with: pip install -r enterprise/requirements-enterprise.txt
+
+# --- AI Threat Intelligence Engine ---
+numpy>=1.21.0
+scikit-learn>=1.0.0
+pandas>=1.3.0
+nltk>=3.6.0
+
+# --- Security Hardening Engine ---
+cffi>=1.15.0
+cryptography>=38.0.0
+PyJWT>=2.4.0
+pyotp>=2.7.0
+
+# --- ElasticSearch Storage ---
+elasticsearch>=8.0.0
+
+# --- PostgreSQL Backend ---
+psycopg2-binary>=2.9.0
