@@ -6148,6 +6148,15 @@ i.glyphicon-white,
 .assets-toggle-resolved-btn:hover { color: #1e293b !important; border-color: #64748b !important; }
 .assets-toggle-resolved-btn.active { color: #15803d !important; border-color: rgba(34,197,94,0.5) !important; background: rgba(34,197,94,0.08) !important; }
 
+.assets-toggle-fps-btn {
+  background: #e2e8f0 !important; color: #334155 !important; border: 1px solid #94a3b8 !important;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; padding: 4px 12px; margin-right: 8px;
+}
+.assets-toggle-fps-btn:hover { color: #1e293b !important; border-color: #64748b !important; }
+.assets-toggle-fps-btn.active { color: #c2410c !important; border-color: rgba(234,88,12,0.5) !important; background: rgba(234,88,12,0.08) !important; }
+
 .assets-row-verified { opacity: 0.7; }
 .assets-row-fp { opacity: 0.6; }
 .assets-row-resolved { background: #f8fafc; }
