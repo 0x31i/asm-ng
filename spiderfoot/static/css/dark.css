@@ -6419,6 +6419,38 @@ button[data-target="#createWorkspaceModal"]:hover,
   box-shadow: 0 0 8px rgba(234, 88, 12, 0.3) !important;
 }
 
+.assets-bulk-reset-btn {
+  background: rgba(251, 191, 36, 0.15) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(251, 191, 36, 0.3) !important;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 6px 14px;
+  border-radius: 0;
+}
+
+.assets-bulk-reset-btn:not(.assets-bulk-inactive) {
+  background: rgba(251, 191, 36, 0.25) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(251, 191, 36, 0.4) !important;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.3) !important;
+}
+
+/* Per-row reset icon button */
+.assets-reset-action.assets-icon-btn {
+  background: rgba(251, 191, 36, 0.2) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(251, 191, 36, 0.4) !important;
+}
+
+.assets-reset-action.assets-icon-btn:hover {
+  background: rgba(251, 191, 36, 0.35) !important;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+}
+
 /* Detail row (expandable) */
 .assets-detail-row {
   background: var(--bg-tertiary, #1e293b) !important;

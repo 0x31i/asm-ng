@@ -1378,6 +1378,8 @@
                 html += "<i class='glyphicon glyphicon-ok-circle'></i>&nbsp;&nbsp;VERIFY SELECTED</button>";
                 html += "<button class='btn assets-bulk-fp-btn assets-bulk-inactive' id='assets-bulk-fp' onclick='assetsBulkAction(\"" + instanceId + "\", \"fp\")' disabled>";
                 html += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;MARK FALSE POSITIVE</button>";
+                html += "<button class='btn assets-bulk-reset-btn assets-bulk-inactive' id='assets-bulk-reset' onclick='assetsBulkAction(\"" + instanceId + "\", \"reset\")' disabled>";
+                html += "<i class='glyphicon glyphicon-repeat'></i>&nbsp;&nbsp;RESET TO PENDING</button>";
                 html += "</div>";
 
                 if (matches.length === 0) {
@@ -1430,7 +1432,8 @@
                             html += "<button class='btn btn-xs assets-icon-btn assets-fp-action' onclick='event.stopPropagation();assetsSingleAction(\"" + instanceId + "\", \"" + m.hash + "\", \"fp\")' title='FALSE POSITIVE'>";
                             html += "<i class='glyphicon glyphicon-remove'></i></button>";
                         } else {
-                            html += "<span class='assets-resolved-icon assets-verified-check'><i class='glyphicon glyphicon-ok'></i></span>";
+                            html += "<button class='btn btn-xs assets-icon-btn assets-reset-action' onclick='event.stopPropagation();assetsSingleAction(\"" + instanceId + "\", \"" + m.hash + "\", \"reset\")' title='RESET TO PENDING'>";
+                            html += "<i class='glyphicon glyphicon-repeat'></i></button>";
                         }
                         html += "</td></tr>";
 
@@ -1502,12 +1505,15 @@
             var count = $(".match-cb:checked").length;
             var $verify = $("#assets-bulk-verify");
             var $fp = $("#assets-bulk-fp");
+            var $reset = $("#assets-bulk-reset");
             if (count > 0) {
                 $verify.removeClass('assets-bulk-inactive').prop('disabled', false);
                 $fp.removeClass('assets-bulk-inactive').prop('disabled', false);
+                $reset.removeClass('assets-bulk-inactive').prop('disabled', false);
             } else {
                 $verify.addClass('assets-bulk-inactive').prop('disabled', true);
                 $fp.addClass('assets-bulk-inactive').prop('disabled', true);
+                $reset.addClass('assets-bulk-inactive').prop('disabled', true);
             }
         }
 
