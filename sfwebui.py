@@ -4290,7 +4290,7 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
-    def modules(self: 'SpiderFootWebUi') -> list:
+    def modules(self: 'SpiderFootWebUi', **kwargs) -> list:
         """List all available modules.
 
         Returns:
