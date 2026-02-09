@@ -5927,8 +5927,18 @@ i.glyphicon-white,
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
   flex-wrap: wrap;
+  padding: 10px 0;
+}
+
+/* Sticky filter bar for known assets */
+.assets-known-sticky-bar {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: #ffffff !important;
+  border-bottom: 1px solid #cbd5e1;
   padding: 10px 0;
 }
 .assets-known-filter-group {
@@ -5978,7 +5988,7 @@ i.glyphicon-white,
 .assets-known-remove-sel-btn:hover { background: rgba(239,68,68,0.2) !important; }
 
 /* Known assets compact table */
-.assets-known-compact { table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0; }
+.assets-known-compact { table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0; position: relative; z-index: 1; }
 .assets-known-compact thead th {
   position: sticky;
   top: 0;

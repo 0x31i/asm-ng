@@ -6598,8 +6598,18 @@ button[data-target="#createWorkspaceModal"]:hover,
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
   flex-wrap: wrap;
+  padding: 10px 0;
+}
+
+/* Sticky filter bar for known assets */
+.assets-known-sticky-bar {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: var(--bg-primary, #0a0f1a) !important;
+  border-bottom: 1px solid var(--glass-border, rgba(255,255,255,0.08));
   padding: 10px 0;
 }
 
@@ -6713,6 +6723,8 @@ button[data-target="#createWorkspaceModal"]:hover,
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .assets-known-compact thead th {
@@ -6721,6 +6733,7 @@ button[data-target="#createWorkspaceModal"]:hover,
   z-index: 99;
   background: var(--bg-primary, #0a0f1a);
   box-shadow: 0 1px 0 var(--glass-border, rgba(255,255,255,0.08));
+  font-weight: 700;
 }
 
 .assets-known-col-select { width: 36px; text-align: center; vertical-align: middle; }

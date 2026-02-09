@@ -1215,7 +1215,7 @@
                 }
 
                 // Filter bar - larger buttons, type filters and source filters
-                html += "<div class='assets-known-filter-bar'>";
+                html += "<div class='assets-known-filter-bar assets-known-sticky-bar' id='assets-known-sticky-bar'>";
                 html += "<div class='assets-known-filter-group'>";
                 html += "<span class='assets-known-filter-label'>TYPE</span>";
                 html += "<button class='assets-known-filter-btn" + (knownActiveFilters.type === 'all' ? " assets-known-filter-active" : "") + "' onclick='knownFilterType(\"all\", this)'>";
@@ -1302,6 +1302,13 @@
                 $("#assets-content").html(html);
                 $("#loader").hide();
                 knownInitSelectionTracking();
+
+                // Dynamically set thead sticky offset based on actual sticky bar height
+                var knownStickyBar = document.getElementById('assets-known-sticky-bar');
+                if (knownStickyBar) {
+                    var barHeight = knownStickyBar.offsetHeight;
+                    $('#known-assets-table thead th').css('top', barHeight + 'px');
+                }
             });
         }
 
