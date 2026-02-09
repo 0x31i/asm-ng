@@ -5731,7 +5731,7 @@
 
                 html += "<tr>";
                 html += "<td>";
-                html += "<a class='data-type-btn link' style='border-left: 3px solid " + color + "; padding: 4px 10px; display: inline-block; background: " + color + "18; color: var(--text-primary); cursor: pointer; font-family: var(--font-mono); font-size: 12px;' ";
+                html += "<a class='data-type-btn' style='border-left: 3px solid " + color + "; padding: 4px 10px; display: inline-block; background: " + color + "18; cursor: pointer;' ";
                 html += "onClick='dataEventData(\"${id}\", \"" + escape(row[1]) + "\", \"" + row[0] + "\", \"full\");'>";
                 html += row[1] + "</a></td>";
                 html += "<td>" + row[4] + "</td>";
@@ -6025,17 +6025,15 @@
                             $("#loader").fadeOut(500);
                             $("#mainbody").append(statsBar + table);
 
-                            // Set sticky headers with inline !important to override global CSS rule
+                            // Set sticky headers below stats bar
                             var dataStatsBar = document.getElementById('stats-bar');
                             if (dataStatsBar) {
                                 var barHeight = dataStatsBar.offsetHeight;
-                                var isDarkMode = localStorage.getItem("theme") === "dark-theme";
-                                var thBg = isDarkMode ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 255, 255, 0.85)";
                                 $('#scansummary-content thead th').each(function() {
                                     this.style.setProperty('position', 'sticky', 'important');
                                     this.style.setProperty('top', barHeight + 'px', 'important');
                                     this.style.setProperty('z-index', '100', 'important');
-                                    this.style.setProperty('background', thBg, 'important');
+                                    $(this).addClass('data-sticky-th');
                                 });
                             }
 
@@ -6187,10 +6185,7 @@
                     statsBar += "</div></div>";
 
                     // Build table header with dynamic node columns
-                    var isDarkMode = localStorage.getItem("theme") === "dark-theme";
-                    var thBg = isDarkMode ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 255, 255, 0.85)";
-                    var thColor = isDarkMode ? "#ffffff" : "#1f2937";
-                    var thStyle = "style='position: sticky; position: -webkit-sticky; top: 50px; z-index: 100; background: " + thBg + "; color: " + thColor + ";'";
+                    var thStyle = "class='data-sticky-th' style='position: sticky; position: -webkit-sticky; top: 50px; z-index: 100;'";
 
                     var table = "<table id='scansummary-content' class='table table-bordered table-striped small tablesorter'>";
                     table += "<thead><tr>";
