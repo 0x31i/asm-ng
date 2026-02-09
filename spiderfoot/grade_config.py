@@ -1032,6 +1032,9 @@ def calculate_category_score(event_type_counts: dict, grading_rules: dict,
         if rule.get('category') != category_name:
             continue
 
+        # Check if this event type has ANY results in the scan
+        # (the key existing in event_type_counts means rows were found)
+        type_present_in_scan = event_type in event_type_counts
         counts = event_type_counts.get(event_type, {'total': 0, 'unique': 0})
         total = counts['total']
         unique = counts['unique']
@@ -1046,17 +1049,17 @@ def calculate_category_score(event_type_counts: dict, grading_rules: dict,
                 points_applied = rule.get('points', 0)
 
         elif logic == 'zero_entries_fail':
-            existed = counts.get('existed', False)
-            all_total = counts.get('all_total', 0)
-            # Also check all_total as a fallback for existed flag
-            type_was_found = existed or all_total > 0
-            if unique == 0 and not type_was_found:
-                # No results ever found — apply fail penalty
+            # The definitive check: was this type found in the scan AT ALL?
+            # If the type is a key in event_type_counts, the SQL returned rows
+            # for it (even if all are validated/FP, meaning unique=0).
+            # Only apply fail penalty if the type was NEVER found.
+            if not type_present_in_scan:
+                # No results ever found for this type — apply fail penalty
                 points_applied = rule.get('fail_points', -50)
             elif unique > 0:
                 # Unvalidated items remain — apply standard points
                 points_applied = rule.get('points', 0)
-            # else: unique == 0 but type was found (all validated/FP) — no penalty
+            # else: type found but unique==0 (all validated/FP) — no penalty
 
         elif logic == 'crit_high_med':
             # For aggregate vulnerability types, we need severity sub-counts.
@@ -1078,8 +1081,7 @@ def calculate_category_score(event_type_counts: dict, grading_rules: dict,
 
         raw_score += points_applied
 
-        existed = counts.get('existed', False)
-        if points_applied != 0 or unique > 0 or existed:
+        if points_applied != 0 or unique > 0 or type_present_in_scan:
             details.append({
                 'type': event_type,
                 'count': unique,
@@ -1087,6 +1089,7 @@ def calculate_category_score(event_type_counts: dict, grading_rules: dict,
                 'points': points_applied,
                 'logic': logic,
                 'rank': rule.get('rank', 5),
+                'found': type_present_in_scan,
             })
 
     # Sort details by points (worst first), then by rank

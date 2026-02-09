@@ -2092,9 +2092,7 @@ pre.table-border-bg-inherit {
   overflow-y: auto;
 }
 
-.info-panel-wrapper.info-panel-hidden {
-  display: none;
-}
+/* info-panel-wrapper visibility controlled by inline style */
 
 .info-panel {
   border: 1px solid #e2e8f0;
