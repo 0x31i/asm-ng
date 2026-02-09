@@ -6238,21 +6238,23 @@ button[data-target="#createWorkspaceModal"]:hover,
   padding: 4px 6px !important;
 }
 
-/* Sticky stats/action bar */
+/* Sticky stats/action bar - z-index must be higher than table stacking context */
 .assets-sticky-bar {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 200;
   background: var(--bg-primary, #0a0f1a) !important;
   border-bottom: 1px solid var(--glass-border, rgba(255,255,255,0.08));
 }
 
-/* Compact matches table */
+/* Compact matches table - position:relative + z-index creates stacking context below action bar */
 .assets-matches-compact {
   table-layout: fixed;
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
+  position: relative;
+  z-index: 1;
 }
 
 /* Sticky table header - stacks below the action bar */
@@ -6384,10 +6386,14 @@ button[data-target="#createWorkspaceModal"]:hover,
   box-shadow: 0 0 8px rgba(234, 88, 12, 0.5);
 }
 
-/* Resolved lock icon */
+/* Resolved icon */
 .assets-resolved-icon {
   color: var(--text-muted, #64748b);
   font-size: 12px;
+}
+
+.assets-verified-check {
+  color: var(--accent-green, #22c55e) !important;
 }
 
 /* Bulk action buttons - inactive state */
@@ -6411,6 +6417,38 @@ button[data-target="#createWorkspaceModal"]:hover,
   color: #fb923c !important;
   border: 1px solid rgba(234, 88, 12, 0.4) !important;
   box-shadow: 0 0 8px rgba(234, 88, 12, 0.3) !important;
+}
+
+.assets-bulk-reset-btn {
+  background: rgba(251, 191, 36, 0.15) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(251, 191, 36, 0.3) !important;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 6px 14px;
+  border-radius: 0;
+}
+
+.assets-bulk-reset-btn:not(.assets-bulk-inactive) {
+  background: rgba(251, 191, 36, 0.25) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(251, 191, 36, 0.4) !important;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.3) !important;
+}
+
+/* Per-row reset icon button */
+.assets-reset-action.assets-icon-btn {
+  background: rgba(251, 191, 36, 0.2) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(251, 191, 36, 0.4) !important;
+}
+
+.assets-reset-action.assets-icon-btn:hover {
+  background: rgba(251, 191, 36, 0.35) !important;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
 }
 
 /* Detail row (expandable) */

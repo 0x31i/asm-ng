@@ -4142,7 +4142,7 @@ class SpiderFootWebUi:
             id: scan instance ID
             result_hash: single result hash
             result_hashes: JSON array of hashes
-            action: 'verify', 'fp', or 'dismiss'
+            action: 'verify', 'fp', 'reset', or 'dismiss'
 
         Returns:
             str: JSON status
@@ -4223,6 +4223,40 @@ class SpiderFootWebUi:
                         dbh.syncFalsePositiveAcrossScans(target, ev[4], ev[1], ev[2], 1)
 
                 return json.dumps(["SUCCESS", f"Marked {len(hashes)} as false positive."]).encode('utf-8')
+
+            elif action == 'reset':
+                # Reset to pending (FP=0) in scan with children
+                childs = dbh.scanElementChildrenAll(id, hashes)
+                allIds = hashes + childs
+                dbh.scanResultsUpdateFP(id, allIds, 0)
+
+                for h in allIds:
+                    if h in eventMap:
+                        ev = eventMap[h]
+                        event_type = ev[4]
+                        event_data = ev[1]
+                        source_data = ev[2]
+                        # Remove from both target-level tables
+                        dbh.targetValidatedRemove(target, event_type, event_data, source_data)
+                        dbh.targetFalsePositiveRemove(target, event_type, event_data, source_data)
+                        # Sync FP=0 across scans
+                        dbh.syncFalsePositiveAcrossScans(target, event_type, event_data, source_data, 0)
+
+                # Remove ANALYST_CONFIRMED known assets for directly matched items
+                for h in hashes:
+                    if h in eventMap:
+                        ev = eventMap[h]
+                        event_type = ev[4]
+                        event_data = ev[1]
+                        asset_type = 'domain'
+                        if event_type in ('IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'):
+                            asset_type = 'ip'
+                        elif event_type in ('HUMAN_NAME', 'USERNAME', 'EMAILADDR',
+                                            'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'):
+                            asset_type = 'employee'
+                        dbh.knownAssetRemove(target=target, assetType=asset_type, assetValue=event_data)
+
+                return json.dumps(["SUCCESS", f"Reset {len(hashes)} items to pending."]).encode('utf-8')
 
             elif action == 'dismiss':
                 return json.dumps(["SUCCESS", "Dismissed."]).encode('utf-8')
