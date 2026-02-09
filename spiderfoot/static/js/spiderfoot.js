@@ -94,6 +94,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
 var sf = {};
 
+// CRITICAL FIX: alertifyjs v1.x does NOT have alertify.log().
+// Older code or cached templates may call alertify.log() which crashes
+// with "TypeError: alertify.log is not a function". Define a safe polyfill.
+if (typeof alertify !== 'undefined' && typeof alertify.log !== 'function') {
+  alertify.log = function(msg) {
+    if (typeof alertify.message === 'function') return alertify.message(msg);
+    console.log("[alertify.log polyfill] " + msg);
+  };
+}
+
 sf.replace_sfurltag = function (data) {
   if (data.toLowerCase().indexOf("&lt;sfurl&gt;") >= 0) {
     data = data.replace(

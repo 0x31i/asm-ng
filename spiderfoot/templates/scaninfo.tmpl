@@ -209,8 +209,20 @@
     <script src="${docroot}/static/node_modules/sigma/build/plugins/sigma.layout.forceAtlas2.min.js"></script>
     <script src="${docroot}/static/node_modules/sigma/build/plugins/sigma.renderers.snapshot.min.js"></script>
     <script type='text/javascript'>
-        // === TEMPLATE VERSION v3-2026-02-09 ===
-        console.log("[SCANINFO] Template v3-2026-02-09 loaded");
+        // === TEMPLATE VERSION v4-fix-alertify-log ===
+        console.log("[SCANINFO] Template v4-fix-alertify-log loaded at " + new Date().toISOString());
+
+        // CRITICAL FIX: alertify.log does not exist in alertifyjs v1.x
+        // Some code paths call alertify.log() which crashes with TypeError.
+        // Define it as a safe fallback → alertify.message().
+        if (typeof alertify !== 'undefined' && typeof alertify.log !== 'function') {
+            alertify.log = function(msg) {
+                if (typeof alertify.message === 'function') {
+                    return alertify.message(msg);
+                }
+                console.log("[alertify.log fallback] " + msg);
+            };
+        }
 
         // HTML escape utility
         if (typeof sf !== 'undefined' && !sf.escapeHtml) {
@@ -1609,17 +1621,16 @@
         }
 
         function openInfoPanel(mode, contentHtml, titleText, iconClass) {
-            alertify.success("openInfoPanel called (mode: " + mode + ")");
             var wrapper = document.getElementById("info-panel-wrapper");
             var content = document.getElementById("info-panel-content");
             var titleEl = document.getElementById("info-panel-title-text");
             var iconEl = document.getElementById("info-panel-icon");
 
             if (!wrapper) {
-                alertify.error("BUG: info-panel-wrapper NOT FOUND in DOM!");
+                console.error("[v4] info-panel-wrapper not found in DOM");
                 return;
             }
-            alertify.success("Panel wrapper found, display=" + wrapper.style.display);
+            console.log("[v4] openInfoPanel mode=" + mode + " display=" + wrapper.style.display);
 
             // If same mode is open, close it (toggle)
             if (_infoPanelOpen && _infoPanelMode === mode) {
@@ -1640,7 +1651,7 @@
             _infoPanelOpen = true;
             _infoPanelMode = mode;
             updatePanelButtonStates(mode);
-            alertify.success("Panel display set to 'block'. Should be visible now.");
+            console.log("[v4] Panel opened, display=" + wrapper.style.display);
         }
 
         function updatePanelButtonStates(mode) {
@@ -1700,38 +1711,34 @@
         }
 
         function showModuleInfo() {
-            console.log("[v3] showModuleInfo() called, currentType=" + currentType);
-            alertify.success("showModuleInfo called (type: " + currentType + ")");
-            if (!currentType || currentType === "ALL") {
-                alertify.error("Cannot show module info: no data type selected.");
-                return;
-            }
+            try {
+                console.log("[v4] showModuleInfo called, currentType=" + currentType);
+                if (!currentType || currentType === "ALL") return;
 
-            // If cache exists, render immediately
-            if (_modulesCache) {
-                alertify.success("Using cached modules data");
-                renderModuleInfo(_modulesCache);
-                return;
-            }
-
-            // Fetch modules from API via GET
-            alertify.success("Fetching /modules ...");
-            $.ajax({
-                type: "GET",
-                url: docroot + "/modules",
-                cache: false,
-                dataType: "json"
-            }).done(function(data) {
-                alertify.success("Got modules: " + (data ? data.length : 'null') + " items");
-                if (data && typeof data.length !== 'undefined') {
-                    _modulesCache = data;
-                    renderModuleInfo(data);
-                } else {
-                    alertify.error("Module info: unexpected response format");
+                if (_modulesCache) {
+                    renderModuleInfo(_modulesCache);
+                    return;
                 }
-            }).fail(function(xhr, status, err) {
-                alertify.error("Module info request failed: " + status + " " + err);
-            });
+
+                $.ajax({
+                    type: "GET",
+                    url: docroot + "/modules",
+                    cache: false,
+                    dataType: "json"
+                }).done(function(data) {
+                    if (data && typeof data.length !== 'undefined') {
+                        _modulesCache = data;
+                        renderModuleInfo(data);
+                    } else {
+                        alertify.error("Module info: unexpected response format");
+                    }
+                }).fail(function(xhr, status, err) {
+                    alertify.error("Module info request failed: " + status + " " + err);
+                });
+            } catch(e) {
+                console.error("showModuleInfo error:", e);
+                alertify.error("Module info error: " + e.message);
+            }
         }
 
         function renderModuleInfo(allModules) {
@@ -1756,20 +1763,20 @@
         }
 
         function showInstructions() {
-            console.log("[v3] showInstructions() called, currentType=" + currentType);
-            alertify.success("showInstructions called (type: " + currentType + ")");
-            if (!currentType || currentType === "ALL") {
-                alertify.error("Cannot show instructions: no data type selected.");
-                return;
+            try {
+                console.log("[v4] showInstructions called, currentType=" + currentType);
+                if (!currentType || currentType === "ALL") return;
+                var data = _instructionsMap[currentType];
+                if (!data) {
+                    alertify.error("No review instructions available for " + currentType);
+                    return;
+                }
+                var html = buildInstructionsHtml(data);
+                openInfoPanel('instructions', html, 'REVIEW INSTRUCTIONS \u2014 ' + currentType, 'glyphicon-education');
+            } catch(e) {
+                console.error("showInstructions error:", e);
+                alertify.error("Instructions error: " + e.message);
             }
-            var data = _instructionsMap[currentType];
-            if (!data) {
-                alertify.error("No review instructions mapped for: " + currentType);
-                return;
-            }
-            alertify.success("Instructions found, calling openInfoPanel...");
-            var html = buildInstructionsHtml(data);
-            openInfoPanel('instructions', html, 'REVIEW INSTRUCTIONS \u2014 ' + currentType, 'glyphicon-education');
         }
 
         // Update button disabled states based on current type
