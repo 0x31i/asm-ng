@@ -4039,6 +4039,96 @@ class SpiderFootWebUi:
             return json.dumps([]).encode('utf-8')
 
     @cherrypy.expose
+    def knownassetsyncverified(self: 'SpiderFootWebUi', id: str = None) -> str:
+        """Sync existing validated (FP=2) scan results into known assets.
+
+        Scans tbl_scan_results for all entries with false_positive=2 and
+        adds them to tbl_known_assets as ANALYST_CONFIRMED. This back-fills
+        known assets from verified rows that existed before the assets feature.
+
+        Args:
+            id: scan instance ID
+
+        Returns:
+            str: JSON status with count
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not id:
+            return json.dumps(["ERROR", "scan id is required."]).encode('utf-8')
+
+        dbh = SpiderFootDb(self.config)
+        current_user = cherrypy.session.get('user', 'anonymous')
+
+        try:
+            scan_info = dbh.scanInstanceGet(id)
+            if not scan_info:
+                return json.dumps(["ERROR", "Scan not found."]).encode('utf-8')
+            target = scan_info[1]
+
+            # Get all validated entries from this scan
+            events = dbh.scanResultEvent(id)
+            count = 0
+            ip_types = {'IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'}
+            domain_types = {'DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
+                            'CO_HOSTED_SITE', 'SIMILARDOMAIN', 'INTERNET_NAME_UNRESOLVED'}
+            employee_types = {'HUMAN_NAME', 'USERNAME', 'EMAILADDR',
+                              'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'}
+
+            for ev in events:
+                fp_flag = ev[13]  # false_positive column
+                if fp_flag != 2:
+                    continue
+                event_type = ev[4]
+                event_data = ev[1]
+                if not event_data:
+                    continue
+
+                # Determine asset type
+                asset_type = None
+                if event_type in ip_types:
+                    asset_type = 'ip'
+                elif event_type in domain_types:
+                    asset_type = 'domain'
+                elif event_type in employee_types:
+                    asset_type = 'employee'
+
+                if asset_type:
+                    try:
+                        dbh.knownAssetAdd(target, asset_type, event_data,
+                                          source='ANALYST_CONFIRMED', addedBy=current_user)
+                        count += 1
+                    except Exception:
+                        pass  # Duplicate - already exists
+
+            # Also sync from target-level validated entries
+            try:
+                targetValidated = dbh.targetValidatedForTarget(target)
+                for (evt, evd, esd) in targetValidated:
+                    if not evd:
+                        continue
+                    asset_type = None
+                    if evt in ip_types:
+                        asset_type = 'ip'
+                    elif evt in domain_types:
+                        asset_type = 'domain'
+                    elif evt in employee_types:
+                        asset_type = 'employee'
+                    if asset_type:
+                        try:
+                            dbh.knownAssetAdd(target, asset_type, evd,
+                                              source='ANALYST_CONFIRMED', addedBy=current_user)
+                            count += 1
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+            return json.dumps(["SUCCESS", f"Synced {count} verified entries to known assets."]).encode('utf-8')
+        except Exception as e:
+            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+
+    @cherrypy.expose
     def knownassetverifymatch(self: 'SpiderFootWebUi', id: str = None,
                               result_hash: str = None, result_hashes: str = None,
                               action: str = 'verify') -> str:

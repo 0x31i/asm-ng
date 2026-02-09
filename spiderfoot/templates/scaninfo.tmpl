@@ -962,20 +962,22 @@
             grid += "<div class='assets-view-bar'>";
             grid += "<div class='assets-view-buttons'>";
             grid += "<button id='assets-btn-overview' class='assets-view-btn assets-view-btn-active' onclick='assetsShowOverview(\"" + instanceId + "\")'>";
-            grid += "<i class='glyphicon glyphicon-dashboard'></i> Overview</button>";
+            grid += "<i class='glyphicon glyphicon-dashboard'></i>&nbsp;&nbsp;OVERVIEW</button>";
             grid += "<button id='assets-btn-known' class='assets-view-btn' onclick='assetsShowKnown(\"" + instanceId + "\")'>";
-            grid += "<i class='glyphicon glyphicon-list'></i> Known Assets</button>";
+            grid += "<i class='glyphicon glyphicon-list'></i>&nbsp;&nbsp;KNOWN ASSETS</button>";
             grid += "<button id='assets-btn-potential' class='assets-view-btn' onclick='assetsShowPotential(\"" + instanceId + "\")'>";
-            grid += "<i class='glyphicon glyphicon-search'></i> Potential Matches</button>";
+            grid += "<i class='glyphicon glyphicon-search'></i>&nbsp;&nbsp;POTENTIAL MATCHES</button>";
             grid += "</div>";
             // Action buttons
             grid += "<div class='assets-action-buttons'>";
+            grid += "<button class='btn btn-sm assets-sync-btn' onclick='assetsSyncVerified(\"" + instanceId + "\")'>";
+            grid += "<i class='glyphicon glyphicon-refresh'></i>&nbsp;&nbsp;SYNC VERIFIED</button>";
             grid += "<button class='btn btn-sm assets-import-btn' onclick='assetsShowImportModal()'>";
-            grid += "<i class='glyphicon glyphicon-upload'></i> Import List</button>";
+            grid += "<i class='glyphicon glyphicon-upload'></i>&nbsp;&nbsp;IMPORT LIST</button>";
             grid += "<button class='btn btn-sm assets-add-btn' onclick='assetsShowAddModal()'>";
-            grid += "<i class='glyphicon glyphicon-plus'></i> Add Asset</button>";
+            grid += "<i class='glyphicon glyphicon-plus'></i>&nbsp;&nbsp;ADD ASSET</button>";
             grid += "<a class='btn btn-sm assets-export-btn' href='${docroot}/knownassetexport?target=" + encodeURIComponent(assetsTarget) + "&format=excel'>";
-            grid += "<i class='glyphicon glyphicon-download-alt'></i> Export</a>";
+            grid += "<i class='glyphicon glyphicon-download-alt'></i>&nbsp;&nbsp;EXPORT</a>";
             grid += "</div>";
             grid += "</div>";
 
@@ -987,52 +989,52 @@
             grid += "<div id='assets-import-modal' class='assets-modal-overlay' style='display:none;'>";
             grid += "<div class='assets-modal'>";
             grid += "<div class='assets-modal-header'>";
-            grid += "<h4>Import Known Assets</h4>";
+            grid += "<span class='assets-modal-title'>IMPORT KNOWN ASSETS</span>";
             grid += "<button class='close-btn' onclick='assetsCloseModals()'>&times;</button>";
             grid += "</div>";
             grid += "<div class='assets-modal-body'>";
-            grid += "<div class='form-group'><label>Asset Type</label>";
+            grid += "<div class='form-group'><label class='assets-label'>ASSET TYPE</label>";
             grid += "<select id='import-asset-type' class='form-control assets-input'>";
-            grid += "<option value='ip'>IP Addresses</option>";
-            grid += "<option value='domain'>Domains / Subdomains</option>";
-            grid += "<option value='employee'>Employee Names</option>";
+            grid += "<option value='ip'>IP ADDRESSES</option>";
+            grid += "<option value='domain'>DOMAINS / SUBDOMAINS</option>";
+            grid += "<option value='employee'>EMPLOYEE NAMES</option>";
             grid += "</select></div>";
-            grid += "<div class='form-group'><label>File (.txt, .csv, .xlsx)</label>";
+            grid += "<div class='form-group'><label class='assets-label'>FILE (.TXT, .CSV, .XLSX)</label>";
             grid += "<input type='file' id='import-asset-file' class='form-control assets-input' accept='.txt,.csv,.xlsx,.xls'></div>";
-            grid += "<p class='assets-hint'>TXT: one value per line. CSV/XLSX: first column used. Header rows auto-detected.</p>";
+            grid += "<p class='assets-hint'>TXT: ONE VALUE PER LINE. CSV/XLSX: FIRST COLUMN USED. HEADER ROWS AUTO-DETECTED.</p>";
             grid += "</div>";
             grid += "<div class='assets-modal-footer'>";
-            grid += "<button class='btn assets-btn-cancel' onclick='assetsCloseModals()'>Cancel</button>";
-            grid += "<button class='btn assets-btn-confirm' onclick='assetsDoImport(\"" + instanceId + "\")'>Import</button>";
+            grid += "<button class='btn assets-btn-cancel' onclick='assetsCloseModals()'>CANCEL</button>";
+            grid += "<button class='btn assets-btn-confirm' onclick='assetsDoImport(\"" + instanceId + "\")'>IMPORT</button>";
             grid += "</div></div></div>";
 
             // Add Single Asset Modal
             grid += "<div id='assets-add-modal' class='assets-modal-overlay' style='display:none;'>";
             grid += "<div class='assets-modal'>";
             grid += "<div class='assets-modal-header'>";
-            grid += "<h4>Add Known Asset</h4>";
+            grid += "<span class='assets-modal-title'>ADD KNOWN ASSET</span>";
             grid += "<button class='close-btn' onclick='assetsCloseModals()'>&times;</button>";
             grid += "</div>";
             grid += "<div class='assets-modal-body'>";
-            grid += "<div class='form-group'><label>Asset Type</label>";
+            grid += "<div class='form-group'><label class='assets-label'>ASSET TYPE</label>";
             grid += "<select id='add-asset-type' class='form-control assets-input'>";
-            grid += "<option value='ip'>IP Address</option>";
-            grid += "<option value='domain'>Domain / Subdomain</option>";
-            grid += "<option value='employee'>Employee Name</option>";
+            grid += "<option value='ip'>IP ADDRESS</option>";
+            grid += "<option value='domain'>DOMAIN / SUBDOMAIN</option>";
+            grid += "<option value='employee'>EMPLOYEE NAME</option>";
             grid += "</select></div>";
-            grid += "<div class='form-group'><label>Value</label>";
+            grid += "<div class='form-group'><label class='assets-label'>VALUE</label>";
             grid += "<input type='text' id='add-asset-value' class='form-control assets-input' placeholder='e.g. 192.168.1.1 or corp.example.com'></div>";
-            grid += "<div class='form-group'><label>Source</label>";
+            grid += "<div class='form-group'><label class='assets-label'>SOURCE</label>";
             grid += "<select id='add-asset-source' class='form-control assets-input'>";
-            grid += "<option value='CLIENT_PROVIDED'>Client Provided</option>";
-            grid += "<option value='ANALYST_CONFIRMED'>Analyst Confirmed</option>";
+            grid += "<option value='CLIENT_PROVIDED'>CLIENT PROVIDED</option>";
+            grid += "<option value='ANALYST_CONFIRMED'>ANALYST CONFIRMED</option>";
             grid += "</select></div>";
-            grid += "<div class='form-group'><label>Notes (optional)</label>";
+            grid += "<div class='form-group'><label class='assets-label'>NOTES (OPTIONAL)</label>";
             grid += "<input type='text' id='add-asset-notes' class='form-control assets-input' placeholder='Optional notes'></div>";
             grid += "</div>";
             grid += "<div class='assets-modal-footer'>";
-            grid += "<button class='btn assets-btn-cancel' onclick='assetsCloseModals()'>Cancel</button>";
-            grid += "<button class='btn assets-btn-confirm' onclick='assetsDoAdd(\"" + instanceId + "\")'>Add Asset</button>";
+            grid += "<button class='btn assets-btn-cancel' onclick='assetsCloseModals()'>CANCEL</button>";
+            grid += "<button class='btn assets-btn-confirm' onclick='assetsDoAdd(\"" + instanceId + "\")'>ADD ASSET</button>";
             grid += "</div></div></div>";
 
             $("#mainbody").append(grid);
@@ -1051,141 +1053,156 @@
         function assetsShowAddModal() { $("#assets-add-modal").show(); }
         function assetsCloseModals() { $(".assets-modal-overlay").hide(); }
 
+        // ---- SYNC VERIFIED → KNOWN ASSETS ----
+        function assetsSyncVerified(instanceId) {
+            alertify.success("SYNCING VERIFIED ENTRIES...");
+            sf.fetchData('${docroot}/knownassetsyncverified', {id: instanceId}, function(ret) {
+                if (ret[0] === "SUCCESS") {
+                    alertify.success(ret[1]);
+                    if (currentAssetsView === 'overview') assetsShowOverview(instanceId);
+                    else if (currentAssetsView === 'known') assetsShowKnown(instanceId);
+                    else if (currentAssetsView === 'potential') assetsShowPotential(instanceId);
+                } else {
+                    alertify.error("SYNC FAILED: " + ret[1]);
+                }
+            });
+        }
+
         // ---- OVERVIEW VIEW ----
         function assetsShowOverview(instanceId) {
             assetsSetActiveBtn('overview');
-            $("#assets-content").html("<div style='text-align:center; padding:30px;'><img src='${docroot}/static/img/loader.gif'></div>");
+            $("#assets-content").html("<div class='assets-loader'><img src='${docroot}/static/img/loader.gif'></div>");
 
             // Fetch counts and matches in parallel
             var countsLoaded = false, matchesLoaded = false;
             var counts = {total:0, client_provided:0, analyst_confirmed:0, by_type:{ip:0, domain:0, employee:0}};
-            var matchCount = 0;
+            var matchData = [];
 
             sf.fetchData('${docroot}/knownassetcount', {target: assetsTarget}, function(data) {
                 counts = data;
                 countsLoaded = true;
-                if (matchesLoaded) renderOverview(instanceId, counts, matchCount);
+                if (matchesLoaded) renderOverview(instanceId, counts, matchData);
             });
 
             sf.fetchData('${docroot}/knownassetmatches', {id: instanceId}, function(data) {
-                matchCount = data.length;
+                matchData = data;
                 matchesLoaded = true;
-                if (countsLoaded) renderOverview(instanceId, counts, matchCount);
+                if (countsLoaded) renderOverview(instanceId, counts, matchData);
             });
         }
 
-        function renderOverview(instanceId, counts, matchCount) {
+        function renderOverview(instanceId, counts, matches) {
             var pendingMatches = 0;
-            // Count matches that are still unvalidated
-            sf.fetchData('${docroot}/knownassetmatches', {id: instanceId}, function(matches) {
-                for (var i = 0; i < matches.length; i++) {
-                    if (matches[i].false_positive == 0 && !matches[i].isTargetFp && !matches[i].isTargetValidated) {
-                        pendingMatches++;
-                    }
+            for (var i = 0; i < matches.length; i++) {
+                if (matches[i].false_positive == 0 && !matches[i].isTargetFp && !matches[i].isTargetValidated) {
+                    pendingMatches++;
                 }
+            }
 
-                var html = "<div class='assets-overview-grid'>";
+            var html = "<div class='assets-overview-grid'>";
 
-                // Summary Cards Row
-                html += "<div class='assets-cards-row'>";
-                html += "<div class='assets-card assets-card-total'>";
-                html += "<div class='assets-card-icon'><i class='glyphicon glyphicon-hdd'></i></div>";
-                html += "<div class='assets-card-info'><span class='assets-card-number'>" + counts.total + "</span>";
-                html += "<span class='assets-card-label'>TOTAL KNOWN ASSETS</span></div></div>";
+            // Summary Cards Row
+            html += "<div class='assets-cards-row'>";
+            html += "<div class='assets-card assets-card-total'>";
+            html += "<div class='assets-card-icon'><i class='glyphicon glyphicon-hdd'></i></div>";
+            html += "<div class='assets-card-info'><span class='assets-card-number'>" + counts.total + "</span>";
+            html += "<span class='assets-card-label'>TOTAL KNOWN ASSETS</span></div></div>";
 
-                html += "<div class='assets-card assets-card-client'>";
-                html += "<div class='assets-card-icon'><i class='glyphicon glyphicon-briefcase'></i></div>";
-                html += "<div class='assets-card-info'><span class='assets-card-number'>" + counts.client_provided + "</span>";
-                html += "<span class='assets-card-label'>CLIENT PROVIDED</span></div></div>";
+            html += "<div class='assets-card assets-card-client'>";
+            html += "<div class='assets-card-icon'><i class='glyphicon glyphicon-briefcase'></i></div>";
+            html += "<div class='assets-card-info'><span class='assets-card-number'>" + counts.client_provided + "</span>";
+            html += "<span class='assets-card-label'>CLIENT PROVIDED</span></div></div>";
 
-                html += "<div class='assets-card assets-card-analyst'>";
-                html += "<div class='assets-card-icon'><i class='glyphicon glyphicon-ok-sign'></i></div>";
-                html += "<div class='assets-card-info'><span class='assets-card-number'>" + counts.analyst_confirmed + "</span>";
-                html += "<span class='assets-card-label'>ANALYST CONFIRMED</span></div></div>";
+            html += "<div class='assets-card assets-card-analyst'>";
+            html += "<div class='assets-card-icon'><i class='glyphicon glyphicon-ok-sign'></i></div>";
+            html += "<div class='assets-card-info'><span class='assets-card-number'>" + counts.analyst_confirmed + "</span>";
+            html += "<span class='assets-card-label'>ANALYST CONFIRMED</span></div></div>";
 
-                html += "<div class='assets-card assets-card-pending'>";
-                html += "<div class='assets-card-icon'><i class='glyphicon glyphicon-search'></i></div>";
-                html += "<div class='assets-card-info'><span class='assets-card-number'>" + pendingMatches + "</span>";
-                html += "<span class='assets-card-label'>PENDING MATCHES</span></div></div>";
+            html += "<div class='assets-card assets-card-pending'>";
+            html += "<div class='assets-card-icon'><i class='glyphicon glyphicon-search'></i></div>";
+            html += "<div class='assets-card-info'><span class='assets-card-number'>" + pendingMatches + "</span>";
+            html += "<span class='assets-card-label'>PENDING MATCHES</span></div></div>";
+            html += "</div>";
+
+            // Type Breakdown Row
+            html += "<div class='assets-breakdown-row'>";
+            html += "<div class='assets-breakdown-card'>";
+            html += "<i class='glyphicon glyphicon-map-marker'></i>";
+            html += "<span class='assets-breakdown-count'>" + (counts.by_type.ip || 0) + "</span>";
+            html += "<span class='assets-breakdown-label'>IP ADDRESSES</span></div>";
+
+            html += "<div class='assets-breakdown-card'>";
+            html += "<i class='glyphicon glyphicon-globe'></i>";
+            html += "<span class='assets-breakdown-count'>" + (counts.by_type.domain || 0) + "</span>";
+            html += "<span class='assets-breakdown-label'>DOMAINS</span></div>";
+
+            html += "<div class='assets-breakdown-card'>";
+            html += "<i class='glyphicon glyphicon-user'></i>";
+            html += "<span class='assets-breakdown-count'>" + (counts.by_type.employee || 0) + "</span>";
+            html += "<span class='assets-breakdown-label'>EMPLOYEES</span></div>";
+
+            html += "<div class='assets-breakdown-card'>";
+            html += "<i class='glyphicon glyphicon-warning-sign'></i>";
+            html += "<span class='assets-breakdown-count'>" + matches.length + "</span>";
+            html += "<span class='assets-breakdown-label'>SCAN MATCHES</span></div>";
+            html += "</div>";
+
+            // Quick action callout
+            if (pendingMatches > 0) {
+                html += "<div class='assets-callout'>";
+                html += "<i class='glyphicon glyphicon-bell'></i>&nbsp;&nbsp;";
+                html += "<strong>" + pendingMatches + " POTENTIAL MATCHES</strong> NEED REVIEW.&nbsp;&nbsp;";
+                html += "<a class='link assets-callout-link' onclick='assetsShowPotential(\"" + instanceId + "\")'>REVIEW NOW</a>";
                 html += "</div>";
-
-                // Type Breakdown Row
-                html += "<div class='assets-breakdown-row'>";
-                html += "<div class='assets-breakdown-card'>";
-                html += "<i class='glyphicon glyphicon-map-marker' style='color:#3b82f6;'></i>";
-                html += "<span class='assets-breakdown-count'>" + (counts.by_type.ip || 0) + "</span>";
-                html += "<span class='assets-breakdown-label'>IP Addresses</span></div>";
-
-                html += "<div class='assets-breakdown-card'>";
-                html += "<i class='glyphicon glyphicon-globe' style='color:#8b5cf6;'></i>";
-                html += "<span class='assets-breakdown-count'>" + (counts.by_type.domain || 0) + "</span>";
-                html += "<span class='assets-breakdown-label'>Domains</span></div>";
-
-                html += "<div class='assets-breakdown-card'>";
-                html += "<i class='glyphicon glyphicon-user' style='color:#f59e0b;'></i>";
-                html += "<span class='assets-breakdown-count'>" + (counts.by_type.employee || 0) + "</span>";
-                html += "<span class='assets-breakdown-label'>Employees</span></div>";
-
-                // Coverage metric
-                var scanTotal = 0;
-                var shadowIT = 0;
-                html += "<div class='assets-breakdown-card'>";
-                html += "<i class='glyphicon glyphicon-warning-sign' style='color:#ef4444;'></i>";
-                html += "<span class='assets-breakdown-count'>" + matchCount + "</span>";
-                html += "<span class='assets-breakdown-label'>Scan Matches</span></div>";
+            } else if (counts.total === 0) {
+                html += "<div class='assets-callout assets-callout-info'>";
+                html += "<i class='glyphicon glyphicon-info-sign'></i>&nbsp;&nbsp;";
+                html += "NO KNOWN ASSETS YET. USE <strong>IMPORT LIST</strong> TO UPLOAD CLIENT ASSETS, ";
+                html += "OR <strong>SYNC VERIFIED</strong> TO PULL IN EXISTING VALIDATED ENTRIES.";
                 html += "</div>";
+            }
 
-                // Quick action callout
-                if (pendingMatches > 0) {
-                    html += "<div class='assets-callout'>";
-                    html += "<i class='glyphicon glyphicon-bell'></i> ";
-                    html += "<strong>" + pendingMatches + " potential matches</strong> need review. ";
-                    html += "<a class='link assets-callout-link' onclick='assetsShowPotential(\"" + instanceId + "\")'>Review Now</a>";
-                    html += "</div>";
+            // Import History
+            html += "<div class='assets-section-header'><i class='glyphicon glyphicon-time'></i>&nbsp;&nbsp;IMPORT HISTORY</div>";
+            html += "<div id='assets-import-history'><span class='assets-loader-text'>LOADING...</span></div>";
+
+            html += "</div>";
+            $("#assets-content").html(html);
+            $("#loader").hide();
+
+            // Load import history
+            sf.fetchData('${docroot}/knownassetimporthistory', {target: assetsTarget}, function(history) {
+                if (history.length === 0) {
+                    $("#assets-import-history").html("<p class='assets-empty-text'>NO IMPORTS YET. USE THE IMPORT LIST BUTTON TO GET STARTED.</p>");
+                    return;
                 }
-
-                // Import History
-                html += "<div class='assets-section-header'>Import History</div>";
-                html += "<div id='assets-import-history'><em style='color:var(--text-muted);'>Loading...</em></div>";
-
-                html += "</div>";
-                $("#assets-content").html(html);
-                $("#loader").hide();
-
-                // Load import history
-                sf.fetchData('${docroot}/knownassetimporthistory', {target: assetsTarget}, function(history) {
-                    if (history.length === 0) {
-                        $("#assets-import-history").html("<p style='color:var(--text-muted); font-size:13px;'>No imports yet. Use the Import List button to get started.</p>");
-                        return;
-                    }
-                    var tbl = "<table class='table table-bordered table-striped assets-table'>";
-                    tbl += "<thead><tr><th>Date</th><th>Type</th><th>File</th><th>Items</th><th>By</th></tr></thead><tbody>";
-                    for (var i = 0; i < history.length; i++) {
-                        var h = history[i];
-                        var d = new Date(h.date_imported * 1000);
-                        tbl += "<tr><td>" + d.toLocaleString() + "</td>";
-                        tbl += "<td><span class='assets-type-badge assets-type-" + h.asset_type + "'>" + h.asset_type.toUpperCase() + "</span></td>";
-                        tbl += "<td>" + (h.file_name || '-') + "</td>";
-                        tbl += "<td>" + h.item_count + "</td>";
-                        tbl += "<td>" + (h.imported_by || '-') + "</td></tr>";
-                    }
-                    tbl += "</tbody></table>";
-                    $("#assets-import-history").html(tbl);
-                });
+                var tbl = "<table class='table table-bordered table-striped assets-table'>";
+                tbl += "<thead><tr><th>DATE</th><th>TYPE</th><th>FILE</th><th>ITEMS</th><th>BY</th></tr></thead><tbody>";
+                for (var i = 0; i < history.length; i++) {
+                    var h = history[i];
+                    var d = new Date(h.date_imported * 1000);
+                    tbl += "<tr><td>" + d.toLocaleString() + "</td>";
+                    tbl += "<td><span class='assets-type-badge assets-type-" + h.asset_type + "'>" + h.asset_type.toUpperCase() + "</span></td>";
+                    tbl += "<td>" + (h.file_name || '-') + "</td>";
+                    tbl += "<td>" + h.item_count + "</td>";
+                    tbl += "<td>" + (h.imported_by || '-') + "</td></tr>";
+                }
+                tbl += "</tbody></table>";
+                $("#assets-import-history").html(tbl);
             });
         }
 
         // ---- KNOWN ASSETS VIEW ----
         function assetsShowKnown(instanceId) {
             assetsSetActiveBtn('known');
-            $("#assets-content").html("<div style='text-align:center; padding:30px;'><img src='${docroot}/static/img/loader.gif'></div>");
+            $("#assets-content").html("<div class='assets-loader'><img src='${docroot}/static/img/loader.gif'></div>");
 
             sf.fetchData('${docroot}/knownassetlist', {target: assetsTarget}, function(data) {
                 var html = "";
 
                 // Filter bar
                 html += "<div class='assets-filter-bar'>";
-                html += "<button class='assets-filter-btn assets-filter-active' onclick='assetsFilterKnown(\"all\", this)'>All (" + data.length + ")</button>";
+                html += "<button class='assets-filter-btn assets-filter-active' onclick='assetsFilterKnown(\"all\", this)'>ALL (" + data.length + ")</button>";
                 var ipCount = 0, domainCount = 0, empCount = 0, clientCount = 0, analystCount = 0;
                 for (var i = 0; i < data.length; i++) {
                     if (data[i].asset_type === 'ip') ipCount++;
@@ -1194,25 +1211,25 @@
                     if (data[i].source === 'CLIENT_PROVIDED') clientCount++;
                     if (data[i].source === 'ANALYST_CONFIRMED') analystCount++;
                 }
-                html += "<button class='assets-filter-btn' onclick='assetsFilterKnown(\"ip\", this)'>IPs (" + ipCount + ")</button>";
-                html += "<button class='assets-filter-btn' onclick='assetsFilterKnown(\"domain\", this)'>Domains (" + domainCount + ")</button>";
-                html += "<button class='assets-filter-btn' onclick='assetsFilterKnown(\"employee\", this)'>Employees (" + empCount + ")</button>";
+                html += "<button class='assets-filter-btn' onclick='assetsFilterKnown(\"ip\", this)'>IPS (" + ipCount + ")</button>";
+                html += "<button class='assets-filter-btn' onclick='assetsFilterKnown(\"domain\", this)'>DOMAINS (" + domainCount + ")</button>";
+                html += "<button class='assets-filter-btn' onclick='assetsFilterKnown(\"employee\", this)'>EMPLOYEES (" + empCount + ")</button>";
                 html += "<span class='assets-filter-separator'>|</span>";
-                html += "<button class='assets-filter-btn' onclick='assetsFilterKnown(\"CLIENT_PROVIDED\", this)'>Client (" + clientCount + ")</button>";
-                html += "<button class='assets-filter-btn' onclick='assetsFilterKnown(\"ANALYST_CONFIRMED\", this)'>Analyst (" + analystCount + ")</button>";
+                html += "<button class='assets-filter-btn' onclick='assetsFilterKnown(\"CLIENT_PROVIDED\", this)'>CLIENT (" + clientCount + ")</button>";
+                html += "<button class='assets-filter-btn' onclick='assetsFilterKnown(\"ANALYST_CONFIRMED\", this)'>ANALYST (" + analystCount + ")</button>";
                 html += "<div style='flex:1;'></div>";
                 html += "<button class='btn btn-sm assets-remove-selected-btn' onclick='assetsRemoveSelected(\"" + instanceId + "\")' style='display:none;' id='assets-remove-sel-btn'>";
-                html += "<i class='glyphicon glyphicon-trash'></i> Remove Selected</button>";
+                html += "<i class='glyphicon glyphicon-trash'></i>&nbsp;&nbsp;REMOVE SELECTED</button>";
                 html += "</div>";
 
                 if (data.length === 0) {
                     html += "<div class='assets-empty'>";
-                    html += "<i class='glyphicon glyphicon-inbox' style='font-size:36px; color:var(--text-muted); margin-bottom:10px;'></i>";
-                    html += "<p>No known assets yet. Import a list or add assets individually.</p></div>";
+                    html += "<i class='glyphicon glyphicon-inbox'></i>";
+                    html += "<p>NO KNOWN ASSETS YET. IMPORT A LIST OR ADD ASSETS INDIVIDUALLY.</p></div>";
                 } else {
                     html += "<table class='table table-bordered table-striped assets-table' id='known-assets-table'>";
                     html += "<thead><tr><th style='width:30px;'><input type='checkbox' id='assets-select-all' onchange='assetsToggleSelectAll()'></th>";
-                    html += "<th>Type</th><th>Value</th><th>Source</th><th>Date Added</th><th>Added By</th><th>Notes</th><th style='width:60px;'>Actions</th></tr></thead><tbody>";
+                    html += "<th>TYPE</th><th>VALUE</th><th>SOURCE</th><th>DATE ADDED</th><th>ADDED BY</th><th>NOTES</th><th style='width:60px;'>ACTIONS</th></tr></thead><tbody>";
                     for (var i = 0; i < data.length; i++) {
                         var a = data[i];
                         var d = new Date(a.date_added * 1000);
@@ -1265,7 +1282,7 @@
         function assetsUpdateSelection() {
             var count = $(".asset-cb:checked").length;
             if (count > 0) {
-                $("#assets-remove-sel-btn").show().text("Remove Selected (" + count + ")");
+                $("#assets-remove-sel-btn").show().html("<i class='glyphicon glyphicon-trash'></i>&nbsp;&nbsp;REMOVE SELECTED (" + count + ")");
             } else {
                 $("#assets-remove-sel-btn").hide();
             }
@@ -1275,10 +1292,10 @@
             if (!confirm("Remove this asset from known assets?")) return;
             sf.fetchData('${docroot}/knownassetremove', {id: assetId}, function(ret) {
                 if (ret[0] === "SUCCESS") {
-                    alertify.success("Asset removed.");
+                    alertify.success("ASSET REMOVED");
                     assetsShowKnown(instanceId);
                 } else {
-                    alertify.error("Error: " + ret[1]);
+                    alertify.error("ERROR: " + ret[1]);
                 }
             });
         }
@@ -1293,7 +1310,7 @@
                     alertify.success(ret[1]);
                     assetsShowKnown(instanceId);
                 } else {
-                    alertify.error("Error: " + ret[1]);
+                    alertify.error("ERROR: " + ret[1]);
                 }
             });
         }
@@ -1301,7 +1318,7 @@
         // ---- POTENTIAL MATCHES VIEW ----
         function assetsShowPotential(instanceId) {
             assetsSetActiveBtn('potential');
-            $("#assets-content").html("<div style='text-align:center; padding:30px;'><img src='${docroot}/static/img/loader.gif'></div>");
+            $("#assets-content").html("<div class='assets-loader'><img src='${docroot}/static/img/loader.gif'></div>");
 
             sf.fetchData('${docroot}/knownassetmatches', {id: instanceId}, function(matches) {
                 var html = "";
@@ -1323,21 +1340,21 @@
                 html += "<div style='flex:1;'></div>";
                 if (pending > 0) {
                     html += "<button class='btn assets-bulk-verify-btn' onclick='assetsBulkAction(\"" + instanceId + "\", \"verify\")'>";
-                    html += "<i class='glyphicon glyphicon-ok-circle'></i> Verify Selected</button>";
+                    html += "<i class='glyphicon glyphicon-ok-circle'></i>&nbsp;&nbsp;VERIFY SELECTED</button>";
                     html += "<button class='btn assets-bulk-fp-btn' onclick='assetsBulkAction(\"" + instanceId + "\", \"fp\")'>";
-                    html += "<i class='glyphicon glyphicon-ban-circle'></i> FP Selected</button>";
+                    html += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;FP SELECTED</button>";
                 }
                 html += "</div>";
 
                 if (matches.length === 0) {
                     html += "<div class='assets-empty'>";
-                    html += "<i class='glyphicon glyphicon-ok-sign' style='font-size:36px; color:#4ade80; margin-bottom:10px;'></i>";
-                    html += "<p>No matches found. Import known assets to start matching against scan data.</p></div>";
+                    html += "<i class='glyphicon glyphicon-ok-sign'></i>";
+                    html += "<p>NO MATCHES FOUND. IMPORT KNOWN ASSETS OR USE SYNC VERIFIED TO START MATCHING AGAINST SCAN DATA.</p></div>";
                 } else {
                     html += "<table class='table table-bordered table-striped assets-table' id='potential-matches-table'>";
                     html += "<thead><tr>";
                     html += "<th style='width:30px;'><input type='checkbox' id='matches-select-all' onchange='matchesToggleSelectAll()'></th>";
-                    html += "<th>Status</th><th>Match Type</th><th>Known Asset</th><th>Data Element</th><th>Event Type</th><th>Source Module</th><th style='width:180px;'>Actions</th>";
+                    html += "<th>STATUS</th><th>MATCH TYPE</th><th>KNOWN ASSET</th><th>DATA ELEMENT</th><th>EVENT TYPE</th><th>SOURCE MODULE</th><th style='width:180px;'>ACTIONS</th>";
                     html += "</tr></thead><tbody>";
                     for (var i = 0; i < matches.length; i++) {
                         var m = matches[i];
@@ -1354,24 +1371,24 @@
                             rowClass = "assets-row-pending";
                         }
 
-                        var matchLabel = m.match_type.replace('_', ' ').replace('ip ', 'IP ').replace('domain ', 'Domain ').replace('employee ', 'Employee ');
+                        var matchLabel = m.match_type.replace(/_/g, ' ').toUpperCase();
 
                         html += "<tr class='" + rowClass + "' data-hash='" + m.hash + "'>";
                         html += "<td><input type='checkbox' class='match-cb' value='" + m.hash + "'></td>";
                         html += "<td class='text-center'>" + statusBadge + "</td>";
                         html += "<td><span class='assets-match-type-badge'>" + matchLabel + "</span></td>";
                         html += "<td class='assets-matched-asset'>" + $('<span>').text(m.matched_asset).html() + "</td>";
-                        html += "<td>" + $('<span>').text(m.data).html() + "</td>";
+                        html += "<td class='assets-value-cell'>" + $('<span>').text(m.data).html() + "</td>";
                         html += "<td>" + m.type + "</td>";
                         html += "<td>" + m.module + "</td>";
                         html += "<td class='assets-action-cell'>";
                         if (m.false_positive == 0 && !m.isTargetFp && !m.isTargetValidated) {
                             html += "<button class='btn btn-xs assets-verify-action' onclick='assetsSingleAction(\"" + instanceId + "\", \"" + m.hash + "\", \"verify\")'>";
-                            html += "<i class='glyphicon glyphicon-ok'></i> Verify</button> ";
+                            html += "<i class='glyphicon glyphicon-ok'></i>&nbsp;VERIFY</button> ";
                             html += "<button class='btn btn-xs assets-fp-action' onclick='assetsSingleAction(\"" + instanceId + "\", \"" + m.hash + "\", \"fp\")'>";
-                            html += "<i class='glyphicon glyphicon-remove'></i> FP</button>";
+                            html += "<i class='glyphicon glyphicon-remove'></i>&nbsp;FP</button>";
                         } else {
-                            html += "<span style='color:var(--text-muted); font-size:11px;'>Resolved</span>";
+                            html += "<span class='assets-resolved-text'>RESOLVED</span>";
                         }
                         html += "</td></tr>";
                     }
@@ -1399,7 +1416,7 @@
                     alertify.success(ret[1]);
                     assetsShowPotential(instanceId);
                 } else {
-                    alertify.error("Error: " + ret[1]);
+                    alertify.error("ERROR: " + ret[1]);
                 }
             });
         }
@@ -1408,7 +1425,7 @@
             var hashes = [];
             $(".match-cb:checked").each(function() { hashes.push($(this).val()); });
             if (hashes.length === 0) {
-                alertify.error("Select at least one match.");
+                alertify.error("SELECT AT LEAST ONE MATCH.");
                 return;
             }
             sf.fetchData('${docroot}/knownassetverifymatch', {
@@ -1418,7 +1435,7 @@
                     alertify.success(ret[1]);
                     assetsShowPotential(instanceId);
                 } else {
-                    alertify.error("Error: " + ret[1]);
+                    alertify.error("ERROR: " + ret[1]);
                 }
             });
         }
@@ -1428,7 +1445,7 @@
             var fileInput = document.getElementById('import-asset-file');
             var assetType = document.getElementById('import-asset-type').value;
             if (!fileInput.files || fileInput.files.length === 0) {
-                alertify.error("Please select a file.");
+                alertify.error("PLEASE SELECT A FILE.");
                 return;
             }
             var formData = new FormData();
@@ -1447,15 +1464,14 @@
                     if (ret[0] === "SUCCESS") {
                         alertify.success(ret[1]);
                         assetsCloseModals();
-                        // Refresh current view
                         if (currentAssetsView === 'known') assetsShowKnown(instanceId);
                         else if (currentAssetsView === 'potential') assetsShowPotential(instanceId);
                         else assetsShowOverview(instanceId);
                     } else {
-                        alertify.error("Import failed: " + ret[1]);
+                        alertify.error("IMPORT FAILED: " + ret[1]);
                     }
                 },
-                error: function() { alertify.error("Import request failed."); }
+                error: function() { alertify.error("IMPORT REQUEST FAILED."); }
             });
         }
 
@@ -1465,7 +1481,7 @@
             var source = document.getElementById('add-asset-source').value;
             var notes = document.getElementById('add-asset-notes').value.trim();
             if (!assetValue) {
-                alertify.error("Please enter a value.");
+                alertify.error("PLEASE ENTER A VALUE.");
                 return;
             }
             sf.fetchData('${docroot}/knownassetadd', {
@@ -1473,14 +1489,14 @@
                 asset_value: assetValue, source: source, notes: notes || ''
             }, function(ret) {
                 if (ret[0] === "SUCCESS") {
-                    alertify.success("Asset added.");
+                    alertify.success("ASSET ADDED");
                     assetsCloseModals();
                     document.getElementById('add-asset-value').value = '';
                     document.getElementById('add-asset-notes').value = '';
                     if (currentAssetsView === 'known') assetsShowKnown(instanceId);
                     else assetsShowOverview(instanceId);
                 } else {
-                    alertify.error("Error: " + ret[1]);
+                    alertify.error("ERROR: " + ret[1]);
                 }
             });
         }
