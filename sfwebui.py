@@ -4303,12 +4303,16 @@ class SpiderFootWebUi:
             if "__" in mod:
                 continue
             
+            modinfo = self.config['__modules__'][mod]
             modlist.append({
                 'name': mod,
-                'descr': self.config['__modules__'][mod].get('descr', ''),
-                'provides': self.config['__modules__'][mod].get('provides', []),
-                'consumes': self.config['__modules__'][mod].get('consumes', []),
-                'group': self.config['__modules__'][mod].get('group', [])
+                'label': modinfo.get('name', mod),
+                'descr': modinfo.get('descr', ''),
+                'summary': modinfo.get('meta', {}).get('summary', ''),
+                'provides': modinfo.get('provides', []),
+                'consumes': modinfo.get('consumes', []),
+                'cats': modinfo.get('cats', []),
+                'group': modinfo.get('group', [])
             })
             
         return sorted(modlist, key=lambda x: x['name'])
