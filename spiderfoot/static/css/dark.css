@@ -8646,41 +8646,74 @@ i.glyphicon-white,
   padding: 4px 12px !important;
 }
 
-/* Category legend */
+/* Category filter tiles */
 .data-list-legend {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   margin-bottom: 12px;
   padding: 8px 0;
 }
 
-.data-legend-item {
-  display: inline-flex;
+.data-legend-tile {
+  display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  padding: 3px 8px;
-  border: 1px solid;
-  border-radius: 3px;
-  opacity: 0.85;
+  padding: 10px 14px;
+  border: 1px solid var(--tile-color, var(--glass-border));
+  border-left: 3px solid var(--tile-color, var(--glass-border));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--tile-color) 8%, transparent);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  line-height: 1.3;
+}
+
+.data-legend-tile:hover {
+  background: color-mix(in srgb, var(--tile-color) 18%, transparent);
+  border-color: var(--tile-color);
+}
+
+.data-legend-tile.data-legend-inactive {
+  opacity: 0.3;
+  background: transparent;
+  border-color: var(--glass-border);
+  border-left-color: var(--glass-border);
+}
+
+.data-legend-tile.data-legend-inactive:hover {
+  opacity: 0.5;
 }
 
 .data-legend-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
+.data-legend-inactive .data-legend-dot {
+  opacity: 0.4;
+}
+
+.data-legend-tile-name {
+  flex: 1;
+  min-width: 0;
+}
+
 .data-legend-count {
-  opacity: 0.6;
+  opacity: 0.5;
   font-weight: 400;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* Data list table */
