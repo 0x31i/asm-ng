@@ -1239,6 +1239,10 @@
                 html += "<div style='flex:1;'></div>";
                 html += "<button class='btn assets-known-remove-sel-btn' onclick='assetsRemoveSelected(\"" + instanceId + "\")' style='display:none;' id='assets-remove-sel-btn'>";
                 html += "<i class='glyphicon glyphicon-trash'></i>&nbsp;&nbsp;REMOVE SELECTED</button>";
+                html += "<button class='btn assets-known-bulk-fp-btn' onclick='knownBulkAction(\"" + instanceId + "\", \"fp\")' style='display:none;' id='assets-bulk-fp-btn'>";
+                html += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;FALSE POSITIVE</button>";
+                html += "<button class='btn assets-known-bulk-pending-btn' onclick='knownBulkAction(\"" + instanceId + "\", \"reset\")' style='display:none;' id='assets-bulk-pending-btn'>";
+                html += "<i class='glyphicon glyphicon-repeat'></i>&nbsp;&nbsp;PENDING</button>";
                 html += "</div>";
 
                 if (data.length === 0) {
@@ -1248,10 +1252,11 @@
                 } else {
                     html += "<table class='table table-bordered assets-table assets-known-compact' id='known-assets-table'>";
                     html += "<thead><tr>";
-                    html += "<th class='assets-col-select'><input type='checkbox' id='assets-select-all' onchange='assetsToggleSelectAll()'></th>";
+                    html += "<th class='assets-known-col-select'><input type='checkbox' id='assets-select-all' onchange='assetsToggleSelectAll()'></th>";
                     html += "<th class='assets-known-col-type'>TYPE</th>";
                     html += "<th>VALUE</th>";
-                    html += "<th class='assets-known-col-actions'></th>";
+                    html += "<th class='assets-known-col-source'>SOURCE</th>";
+                    html += "<th class='assets-known-col-actions'>ACTIONS</th>";
                     html += "</tr></thead><tbody>";
 
                     for (var i = 0; i < data.length; i++) {
@@ -1272,6 +1277,7 @@
                         html += "<td class='assets-cell-select' onclick='knownToggleCb(this, event)'><input type='checkbox' class='asset-cb' value='" + a.id + "' onchange='assetsUpdateSelection()'></td>";
                         html += "<td class='assets-known-type-cell assets-expandable' onclick='knownToggleDetail(this)'><span class='assets-type-badge assets-type-" + a.asset_type + "'>" + a.asset_type.toUpperCase() + "</span></td>";
                         html += "<td class='assets-known-value-cell assets-expandable' onclick='knownToggleDetail(this)'>" + valueWrapped + "</td>";
+                        html += "<td class='assets-known-source-cell assets-expandable' onclick='knownToggleDetail(this)'><span class='assets-source-badge " + sourceClass + "'>" + sourceLabel + "</span></td>";
                         html += "<td class='assets-known-action-cell'>";
                         html += "<button class='btn btn-xs assets-icon-btn assets-fp-action' onclick='event.stopPropagation();knownAssetAction(" + a.id + ", \"fp\")' title='FALSE POSITIVE'>";
                         html += "<i class='glyphicon glyphicon-ban-circle'></i></button>";
@@ -1281,7 +1287,7 @@
 
                         // Expandable detail row
                         html += "<tr class='assets-detail-row assets-known-detail' data-parent-asset='" + a.id + "' style='display:none;'>";
-                        html += "<td colspan='4'>";
+                        html += "<td colspan='5'>";
                         html += "<div class='assets-detail-grid'>";
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>SOURCE</div><div class='assets-detail-card-value'><span class='assets-source-badge " + sourceClass + "'>" + sourceLabel + "</span></div></div>";
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>DATE ADDED</div><div class='assets-detail-card-value'>" + d.toLocaleDateString() + "</div></div>";
@@ -1369,8 +1375,12 @@
             var count = $(".asset-cb:checked").length;
             if (count > 0) {
                 $("#assets-remove-sel-btn").show().html("<i class='glyphicon glyphicon-trash'></i>&nbsp;&nbsp;REMOVE SELECTED (" + count + ")");
+                $("#assets-bulk-fp-btn").show().html("<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;FALSE POSITIVE (" + count + ")");
+                $("#assets-bulk-pending-btn").show().html("<i class='glyphicon glyphicon-repeat'></i>&nbsp;&nbsp;PENDING (" + count + ")");
             } else {
                 $("#assets-remove-sel-btn").hide();
+                $("#assets-bulk-fp-btn").hide();
+                $("#assets-bulk-pending-btn").hide();
             }
         }
 
@@ -1430,6 +1440,19 @@
                 setTimeout(function() { $row.removeClass('assets-known-row-pending'); }, 600);
                 alertify.success("ASSET STATUS: PENDING");
             }
+        }
+
+        // Bulk action for known assets: mark selected as FP or reset
+        function knownBulkAction(instanceId, action) {
+            var ids = [];
+            $(".asset-cb:checked").each(function() { ids.push($(this).val()); });
+            if (ids.length === 0) return;
+            for (var i = 0; i < ids.length; i++) {
+                knownAssetAction(parseInt(ids[i]), action);
+            }
+            $("#assets-select-all").prop("checked", false);
+            $(".asset-cb").prop("checked", false);
+            assetsUpdateSelection();
         }
 
         function assetsRemoveSelected(instanceId) {

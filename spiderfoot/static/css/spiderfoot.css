@@ -5988,8 +5988,10 @@ i.glyphicon-white,
   border-bottom: 2px solid #94a3b8 !important;
   font-weight: 700;
 }
-.assets-known-col-type { width: 100px; }
-.assets-known-col-actions { width: 70px; text-align: right; }
+.assets-known-col-select { width: 36px; text-align: center; vertical-align: middle; }
+.assets-known-col-type { width: 90px; }
+.assets-known-col-source { width: 100px; }
+.assets-known-col-actions { width: 80px; text-align: center; }
 
 .assets-known-row { cursor: default; }
 .assets-known-row:hover { background: rgba(0,0,0,0.02) !important; }
@@ -6003,9 +6005,30 @@ i.glyphicon-white,
   line-height: 1.5; padding: 6px 10px !important;
   color: #1e293b;
 }
-.assets-known-action-cell { text-align: right; padding: 4px 8px !important; white-space: nowrap; vertical-align: middle; }
+.assets-known-source-cell { padding: 6px 10px !important; vertical-align: middle; text-align: center; }
+.assets-known-action-cell { text-align: center; padding: 4px 8px !important; white-space: nowrap; vertical-align: middle; }
 .assets-known-action-cell .assets-icon-btn { width: 28px !important; height: 28px !important; font-size: 13px !important; }
 .assets-known-action-cell .assets-icon-btn .glyphicon { font-size: 13px; }
+
+/* Bulk action buttons for known assets */
+.assets-known-bulk-fp-btn {
+  background: rgba(234,88,12,0.1) !important;
+  color: #ea580c !important;
+  border: 1px solid rgba(234,88,12,0.2) !important;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; padding: 7px 14px; border-radius: 4px;
+}
+.assets-known-bulk-fp-btn:hover { background: rgba(234,88,12,0.2) !important; }
+.assets-known-bulk-pending-btn {
+  background: rgba(100,116,139,0.1) !important;
+  color: #64748b !important;
+  border: 1px solid rgba(100,116,139,0.2) !important;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; padding: 7px 14px; border-radius: 4px;
+}
+.assets-known-bulk-pending-btn:hover { background: rgba(100,116,139,0.2) !important; }
 
 /* FP row styling */
 .assets-known-row-fp { opacity: 0.4; }
@@ -6020,19 +6043,19 @@ i.glyphicon-white,
 .assets-match-stats {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 12px 16px;
+  gap: 14px;
+  padding: 10px 16px;
   background: #f8fafc;
   border: 1px solid #cbd5e1;
   border-radius: 0;
   margin-bottom: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .assets-match-stat { display: flex; flex-direction: column; align-items: center; }
 .assets-match-stat-num {
   font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 700;
   color: #0f172a;
 }
@@ -6185,7 +6208,7 @@ i.glyphicon-white,
 .assets-bulk-fp-btn:not(.assets-bulk-inactive) { background: #fff7ed !important; color: #c2410c !important; border: 1px solid #ea580c !important; }
 
 /* Bulk button group - keeps all 3 buttons on one line */
-.assets-bulk-group { display: inline-flex; gap: 4px; flex-shrink: 0; }
+.assets-bulk-group { display: inline-flex; gap: 3px; flex-shrink: 0; }
 
 .assets-bulk-reset-btn {
   background: #f1f5f9 !important;
@@ -6238,7 +6261,7 @@ i.glyphicon-white,
   background: #e2e8f0 !important; color: #334155 !important; border: 1px solid #94a3b8 !important;
   font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
   font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.5px; padding: 4px 12px; margin-right: 8px;
+  letter-spacing: 0.5px; padding: 4px 10px; margin-right: 4px; white-space: nowrap;
 }
 .assets-toggle-resolved-btn:hover { color: #1e293b !important; border-color: #64748b !important; }
 .assets-toggle-resolved-btn.active { color: #15803d !important; border-color: rgba(34,197,94,0.5) !important; background: rgba(34,197,94,0.08) !important; }
@@ -6247,7 +6270,7 @@ i.glyphicon-white,
   background: #e2e8f0 !important; color: #334155 !important; border: 1px solid #94a3b8 !important;
   font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
   font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.5px; padding: 4px 12px; margin-right: 8px;
+  letter-spacing: 0.5px; padding: 4px 10px; margin-right: 4px; white-space: nowrap;
 }
 .assets-toggle-fps-btn:hover { color: #1e293b !important; border-color: #64748b !important; }
 .assets-toggle-fps-btn.active { color: #c2410c !important; border-color: rgba(234,88,12,0.5) !important; background: rgba(234,88,12,0.08) !important; }
