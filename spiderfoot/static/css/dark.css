@@ -1940,19 +1940,17 @@ pre.table-border-bg-inherit {
 
 /* Disabled state for info buttons */
 .btn-module-info.disabled,
-.btn-module-info:disabled {
+.btn-module-info[disabled] {
   opacity: 0.3;
   cursor: not-allowed;
-  pointer-events: none;
   text-shadow: none;
   box-shadow: none;
 }
 
 .btn-instructions.disabled,
-.btn-instructions:disabled {
+.btn-instructions[disabled] {
   opacity: 0.3;
   cursor: not-allowed;
-  pointer-events: none;
   text-shadow: none;
   box-shadow: none;
 }
@@ -1981,6 +1979,10 @@ pre.table-border-bg-inherit {
   margin: 0 0 16px 0;
   max-height: 600px;
   overflow-y: auto;
+}
+
+.info-panel-wrapper.info-panel-hidden {
+  display: none;
 }
 
 .info-panel {

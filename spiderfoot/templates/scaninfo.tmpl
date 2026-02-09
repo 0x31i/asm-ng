@@ -117,7 +117,7 @@
   </div>
 
   <!-- Expandable Info Panel for Module Info / Instructions -->
-  <div id="info-panel-wrapper" class="info-panel-wrapper" style="display:none;">
+  <div id="info-panel-wrapper" class="info-panel-wrapper info-panel-hidden">
     <div id="info-panel" class="info-panel">
       <div class="info-panel-header">
         <div class="info-panel-title">
@@ -1592,13 +1592,15 @@
 
         function closeInfoPanel() {
             var $wrapper = $("#info-panel-wrapper");
-            $wrapper.slideUp(350, function() {
-                $wrapper.removeClass('mode-module-info mode-instructions');
-            });
             _infoPanelOpen = false;
             _infoPanelMode = null;
             $("#btn-module-info").removeClass('active');
             $("#btn-instructions").removeClass('active');
+            $wrapper.stop(true, true);
+            $wrapper.slideUp(300, function() {
+                $wrapper.removeClass('mode-module-info mode-instructions');
+                $wrapper.addClass('info-panel-hidden');
+            });
         }
 
         function openInfoPanel(mode, contentHtml, titleText, iconClass) {
@@ -1606,6 +1608,11 @@
             var $content = $("#info-panel-content");
             var $titleEl = $("#info-panel-title-text");
             var $iconEl = $("#info-panel-icon");
+
+            if (!$wrapper.length) {
+                sf.log("ERROR: #info-panel-wrapper not found in DOM");
+                return;
+            }
 
             // If same mode is open, close it (toggle)
             if (_infoPanelOpen && _infoPanelMode === mode) {
@@ -1628,8 +1635,12 @@
                 return;
             }
 
-            // Open fresh with slide animation
-            $wrapper.slideDown(400);
+            // Stop any pending animations, then open
+            $wrapper.stop(true, true);
+            // Remove the hidden class so jQuery animation takes over
+            $wrapper.removeClass('info-panel-hidden');
+            // Force display:none for jQuery slideDown to animate from
+            $wrapper.css('display', 'none').slideDown(400);
             _infoPanelOpen = true;
             _infoPanelMode = mode;
             updatePanelButtonStates(mode);
@@ -1692,7 +1703,10 @@
         }
 
         function showModuleInfo() {
-            if (!currentType || currentType === "ALL") return;
+            if (!currentType || currentType === "ALL") {
+                sf.log("showModuleInfo: skipped, currentType=" + currentType);
+                return;
+            }
 
             // If cache exists, render immediately
             if (_modulesCache) {
@@ -1700,16 +1714,13 @@
                 return;
             }
 
-            // Fetch modules from API and cache
-            $.ajax({
-                url: '${docroot}/modules',
-                type: 'GET',
-                dataType: 'json',
-                success: function(data) {
+            // Fetch modules from API using POST (consistent with all other API calls)
+            sf.fetchData('${docroot}/modules', {}, function(data) {
+                if (data && data.length !== undefined) {
                     _modulesCache = data;
                     renderModuleInfo(data);
-                },
-                error: function() {
+                } else {
+                    sf.log("showModuleInfo: unexpected response format");
                     alertify.error("Failed to load module information.");
                 }
             });
@@ -1737,11 +1748,18 @@
         }
 
         function showInstructions() {
-            if (!currentType || currentType === "ALL") return;
+            if (!currentType || currentType === "ALL") {
+                sf.log("showInstructions: skipped, currentType=" + currentType);
+                return;
+            }
             var data = _instructionsMap[currentType];
-            if (!data) return; // button should be disabled, but guard anyway
+            if (!data) {
+                sf.log("showInstructions: no instructions mapped for " + currentType);
+                alertify.error("No review instructions available for " + currentType);
+                return;
+            }
             var html = buildInstructionsHtml(data);
-            openInfoPanel('instructions', html, 'REVIEW INSTRUCTIONS — ' + currentType, 'glyphicon-education');
+            openInfoPanel('instructions', html, 'REVIEW INSTRUCTIONS \u2014 ' + currentType, 'glyphicon-education');
         }
 
         // Update button disabled states based on current type
@@ -1750,23 +1768,23 @@
             if (_infoPanelOpen) {
                 _infoPanelOpen = false;
                 _infoPanelMode = null;
-                $("#info-panel-wrapper").hide().removeClass('mode-module-info mode-instructions');
+                $("#info-panel-wrapper").stop(true, true).hide().addClass('info-panel-hidden').removeClass('mode-module-info mode-instructions');
                 $("#btn-module-info").removeClass('active');
                 $("#btn-instructions").removeClass('active');
             }
             if (!currentType || currentType === "ALL") {
-                $("#btn-module-info").prop('disabled', true).addClass('disabled');
-                $("#btn-instructions").prop('disabled', true).addClass('disabled');
+                $("#btn-module-info").prop('disabled', true).attr('disabled', 'disabled').addClass('disabled');
+                $("#btn-instructions").prop('disabled', true).attr('disabled', 'disabled').addClass('disabled');
                 return;
             }
             // Module info is always available (every type has producing modules)
-            $("#btn-module-info").prop('disabled', false).removeClass('disabled');
+            $("#btn-module-info").prop('disabled', false).removeAttr('disabled').removeClass('disabled');
 
             // Instructions: only enable if mapping exists
             if (_instructionsMap[currentType]) {
-                $("#btn-instructions").prop('disabled', false).removeClass('disabled');
+                $("#btn-instructions").prop('disabled', false).removeAttr('disabled').removeClass('disabled');
             } else {
-                $("#btn-instructions").prop('disabled', true).addClass('disabled');
+                $("#btn-instructions").prop('disabled', true).attr('disabled', 'disabled').addClass('disabled');
             }
         }
 

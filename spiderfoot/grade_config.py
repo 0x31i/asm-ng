@@ -1047,13 +1047,16 @@ def calculate_category_score(event_type_counts: dict, grading_rules: dict,
 
         elif logic == 'zero_entries_fail':
             existed = counts.get('existed', False)
-            if unique == 0 and not existed:
+            all_total = counts.get('all_total', 0)
+            # Also check all_total as a fallback for existed flag
+            type_was_found = existed or all_total > 0
+            if unique == 0 and not type_was_found:
                 # No results ever found — apply fail penalty
                 points_applied = rule.get('fail_points', -50)
             elif unique > 0:
                 # Unvalidated items remain — apply standard points
                 points_applied = rule.get('points', 0)
-            # else: unique == 0 but existed (all validated) — no penalty
+            # else: unique == 0 but type was found (all validated/FP) — no penalty
 
         elif logic == 'crit_high_med':
             # For aggregate vulnerability types, we need severity sub-counts.
