@@ -1369,11 +1369,23 @@
                 $("#loader").hide();
                 knownInitSelectionTracking();
 
-                // Dynamically set thead sticky offset based on actual sticky bar height
+                // Make filter bar sticky with inline styles (ensures it works even if CSS fails)
                 var knownStickyBar = document.getElementById('assets-known-sticky-bar');
                 if (knownStickyBar) {
+                    var isDarkMode = localStorage.getItem("theme") === "dark-theme";
+                    knownStickyBar.style.setProperty('position', 'sticky', 'important');
+                    knownStickyBar.style.setProperty('top', '0', 'important');
+                    knownStickyBar.style.setProperty('z-index', '200', 'important');
+                    knownStickyBar.style.setProperty('background', isDarkMode ? '#0a0f1a' : '#ffffff', 'important');
+                    // Set thead sticky offset to bar height using inline !important to override global CSS
                     var barHeight = knownStickyBar.offsetHeight;
-                    document.getElementById('known-assets-table').style.setProperty('--sticky-offset', barHeight + 'px');
+                    var thBg = isDarkMode ? "rgba(0, 0, 0, 0.85)" : "#f1f5f9";
+                    $('#known-assets-table thead th').each(function() {
+                        this.style.setProperty('position', 'sticky', 'important');
+                        this.style.setProperty('top', barHeight + 'px', 'important');
+                        this.style.setProperty('z-index', '100', 'important');
+                        this.style.setProperty('background', thBg, 'important');
+                    });
                 }
             });
         }
@@ -1703,11 +1715,23 @@
                 assetsInitSegmentHighlight();
                 assetsInitSelectionTracking();
 
-                // Dynamically set thead sticky offset based on actual sticky bar height
+                // Make stats bar sticky with inline styles (ensures it works even if CSS fails)
                 var stickyBar = document.getElementById('assets-sticky-bar');
                 if (stickyBar) {
+                    var isDarkMode = localStorage.getItem("theme") === "dark-theme";
+                    stickyBar.style.setProperty('position', 'sticky', 'important');
+                    stickyBar.style.setProperty('top', '0', 'important');
+                    stickyBar.style.setProperty('z-index', '200', 'important');
+                    stickyBar.style.setProperty('background', isDarkMode ? '#0a0f1a' : '#f8fafc', 'important');
+                    // Set thead sticky offset to bar height using inline !important to override global CSS
                     var barHeight = stickyBar.offsetHeight;
-                    document.getElementById('potential-matches-table').style.setProperty('--sticky-offset', barHeight + 'px');
+                    var thBg = isDarkMode ? "rgba(0, 0, 0, 0.85)" : "#f1f5f9";
+                    $('#potential-matches-table thead th').each(function() {
+                        this.style.setProperty('position', 'sticky', 'important');
+                        this.style.setProperty('top', barHeight + 'px', 'important');
+                        this.style.setProperty('z-index', '100', 'important');
+                        this.style.setProperty('background', thBg, 'important');
+                    });
                 }
             });
         }
@@ -5610,12 +5634,7 @@
                             statsBar += "</div>";
 
                             var table = "<table id='scansummary-content' class='table table-bordered table-striped small tablesorter'>";
-                            // Inline sticky styles on th elements ensure headers stick below stats bar
-                            // Theme-aware glass blur effect - backdrop-filter applied via CSS
-                            var isDarkMode = localStorage.getItem("theme") === "dark-theme";
-                            var thBg = isDarkMode ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 255, 255, 0.85)";
-                            var thColor = isDarkMode ? "#ffffff" : "#1f2937";
-                            var thStyle = "style='position: sticky; position: -webkit-sticky; top: 50px; z-index: 100; background: " + thBg + "; color: " + thColor + ";'";
+                            var thStyle = "";
                             table += "<thead><tr>";
                             table += "<th class='text-center' " + thStyle + "><input id='checkall' type='checkbox' onClick='switchSelectAll()'></th>";
                             table += "<th class='text-center validation-status' " + thStyle + ">Status</th>";
@@ -5674,6 +5693,21 @@
                             table += "</tbody></table>"
                             $("#loader").fadeOut(500);
                             $("#mainbody").append(statsBar + table);
+
+                            // Set sticky headers with inline !important to override global CSS rule
+                            var dataStatsBar = document.getElementById('stats-bar');
+                            if (dataStatsBar) {
+                                var barHeight = dataStatsBar.offsetHeight;
+                                var isDarkMode = localStorage.getItem("theme") === "dark-theme";
+                                var thBg = isDarkMode ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 255, 255, 0.85)";
+                                $('#scansummary-content thead th').each(function() {
+                                    this.style.setProperty('position', 'sticky', 'important');
+                                    this.style.setProperty('top', barHeight + 'px', 'important');
+                                    this.style.setProperty('z-index', '100', 'important');
+                                    this.style.setProperty('background', thBg, 'important');
+                                });
+                            }
+
                             $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false }, 1: { sorter: false } } });
 
                             // Apply any active client-side filters after table render
