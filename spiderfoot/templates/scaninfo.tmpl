@@ -108,7 +108,13 @@
   </div>
 
   <!-- Page Title -->
-  <div id="page-title" class="page-title">SUMMARY</div>
+  <div id="page-title" class="page-title">
+    <span id="page-title-text" class="page-title-text">SUMMARY</span>
+    <div id="page-title-actions" class="page-title-actions">
+      <button class="btn-module-info" id="btn-module-info" onclick="showModuleInfo()"><i class="glyphicon glyphicon-info-sign"></i>&nbsp;&nbsp;MODULE INFO</button>
+      <button class="btn-instructions" id="btn-instructions" onclick="showInstructions()"><i class="glyphicon glyphicon-education"></i>&nbsp;&nbsp;INSTRUCTIONS</button>
+    </div>
+  </div>
 
   <!-- Floating Selection Toolbar - Modern horizontal design -->
   <div id="selection-toolbar" class="toolbar-bottom toolbar-hidden">
@@ -941,12 +947,24 @@
         function updatePageTitle(subDirectory) {
             var baseTitle = pageTitles[currentSection] || currentSection.replace("btn-", "").toUpperCase();
             if (subDirectory && subDirectory !== "All" && subDirectory !== "ALL") {
-                // Decode URL-encoded characters (e.g., %20 -> space)
                 var decodedSubDir = decodeURIComponent(subDirectory);
-                $("#page-title").text(baseTitle + " / " + decodedSubDir.toUpperCase());
+                $("#page-title-text").text(baseTitle + " / " + decodedSubDir.toUpperCase());
+                // Show action buttons on DATA type detail pages
+                if (currentSection === 'btn-data') {
+                    $("#page-title-actions").addClass('visible');
+                }
             } else {
-                $("#page-title").text(baseTitle);
+                $("#page-title-text").text(baseTitle);
+                $("#page-title-actions").removeClass('visible');
             }
+        }
+
+        // Placeholder handlers for the new buttons
+        function showModuleInfo() {
+            alertify.log("MODULE INFO - Coming soon");
+        }
+        function showInstructions() {
+            alertify.log("INSTRUCTIONS - Coming soon");
         }
 
         function navTo(target) {
