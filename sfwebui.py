@@ -49,6 +49,8 @@ from spiderfoot.event_type_mapping import translate_event_type
 from spiderfoot.grade_config import (
     calculate_full_grade,
     load_grade_config_overrides,
+    get_event_grading,
+    DEFAULT_GRADE_CATEGORIES,
 )
 
 mp.set_start_method("spawn", force=True)
@@ -4764,13 +4766,23 @@ class SpiderFootWebUi:
         except Exception:
             return retdata
 
+        config_overrides = load_grade_config_overrides(self.config)
+        overrides = config_overrides.get('event_overrides')
+
         for row in scandata:
             if row[0] == "ROOT":
                 continue
             lastseen = time.strftime(
                 "%Y-%m-%d %H:%M:%S", time.localtime(row[2]))
+            grading = get_event_grading(row[0], overrides)
+            category = grading.get('category', 'Information / Reference')
+            rank = grading.get('rank', 5)
+            cat_meta = DEFAULT_GRADE_CATEGORIES.get(category, {})
+            color = cat_meta.get('color', '#6b7280')
+            weight = cat_meta.get('weight', 0.0)
             retdata.append([row[0], row[1], lastseen,
-                           row[3], row[4], statusdata[5]])
+                           row[3], row[4], statusdata[5],
+                           category, color, rank, weight])
 
         return retdata
 
