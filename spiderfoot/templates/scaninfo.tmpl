@@ -1723,7 +1723,6 @@
                 $.ajax({
                     type: "GET",
                     url: docroot + "/modules",
-                    cache: false,
                     dataType: "json"
                 }).done(function(data) {
                     if (data && typeof data.length !== 'undefined') {
@@ -4947,7 +4946,7 @@
             h += "<div style='margin-top:12px;color:var(--text-secondary);font-size:13px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 10px rgba(255,255,255,0.4);'>OVERALL SECURITY RATING</div>";
             h += "<div style='color:var(--text-muted);font-size:11px;margin-top:2px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;'>ONLY UNVALIDATED ITEMS COUNT &mdash; VALIDATED &amp; FALSE POSITIVES ARE EXCLUDED</div>";
             h += "<div style='color:var(--accent-blue, #3b82f6);font-size:9px;margin-top:4px;font-family:var(--font-mono);letter-spacing:0.5px;'>GRADE ENGINE v3-2026-02-09</div>";
-            if (scanStatus && scanStatus != 'FINISHED' && scanStatus != 'ABORTED' && scanStatus.indexOf('FAILED') < 0) {
+            if (typeof scanStatus !== 'undefined' && scanStatus && scanStatus != 'FINISHED' && scanStatus != 'ABORTED' && scanStatus.indexOf('FAILED') < 0) {
                 h += "<div style='display:inline-block;margin-top:8px;font-size:10px;color:var(--accent-yellow);background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);border-radius:4px;padding:3px 10px;'>";
                 h += "<i class='glyphicon glyphicon-exclamation-sign'></i> SCAN IN PROGRESS &mdash; GRADE MAY CHANGE</div>";
             }
