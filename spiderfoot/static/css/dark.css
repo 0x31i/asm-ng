@@ -1900,16 +1900,18 @@ pre.table-border-bg-inherit {
   border: 1px solid #8b5cf6;
   border-radius: 4px;
   background: rgba(139, 92, 246, 0.15);
-  color: #ffffff;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6), 0 0 16px rgba(139, 92, 246, 0.4);
+  color: #e2d9ff;
+  text-shadow: 0 0 4px rgba(139, 92, 246, 0.4);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
 }
 
 .btn-module-info:hover {
-  background: rgba(139, 92, 246, 0.3);
-  border-color: #a78bfa;
-  box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
+  background: rgba(139, 92, 246, 0.35);
+  border-color: #c4b5fd;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.5), 0 0 4px rgba(255, 255, 255, 0.15);
+  text-shadow: 0 0 6px rgba(255, 255, 255, 1), 0 0 14px rgba(139, 92, 246, 0.8), 0 0 24px rgba(139, 92, 246, 0.4);
 }
 
 .btn-instructions {
@@ -1922,16 +1924,18 @@ pre.table-border-bg-inherit {
   border: 1px solid #0ea5e9;
   border-radius: 4px;
   background: rgba(14, 165, 233, 0.15);
-  color: #ffffff;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6), 0 0 16px rgba(14, 165, 233, 0.4);
+  color: #bae6fd;
+  text-shadow: 0 0 4px rgba(14, 165, 233, 0.4);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
 }
 
 .btn-instructions:hover {
-  background: rgba(14, 165, 233, 0.3);
-  border-color: #38bdf8;
-  box-shadow: 0 0 12px rgba(14, 165, 233, 0.4);
+  background: rgba(14, 165, 233, 0.35);
+  border-color: #7dd3fc;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(14, 165, 233, 0.5), 0 0 4px rgba(255, 255, 255, 0.15);
+  text-shadow: 0 0 6px rgba(255, 255, 255, 1), 0 0 14px rgba(14, 165, 233, 0.8), 0 0 24px rgba(14, 165, 233, 0.4);
 }
 
 /* Disabled state for info buttons */
@@ -1956,14 +1960,18 @@ pre.table-border-bg-inherit {
 /* Active state (panel open) */
 .btn-module-info.active {
   background: rgba(139, 92, 246, 0.35);
-  border-color: #a78bfa;
-  box-shadow: 0 0 16px rgba(139, 92, 246, 0.5), 0 0 4px rgba(139, 92, 246, 0.3);
+  border-color: #c4b5fd;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.5), 0 0 4px rgba(255, 255, 255, 0.15);
+  text-shadow: 0 0 6px rgba(255, 255, 255, 1), 0 0 14px rgba(139, 92, 246, 0.6);
 }
 
 .btn-instructions.active {
   background: rgba(14, 165, 233, 0.35);
-  border-color: #38bdf8;
-  box-shadow: 0 0 16px rgba(14, 165, 233, 0.5), 0 0 4px rgba(14, 165, 233, 0.3);
+  border-color: #7dd3fc;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(14, 165, 233, 0.5), 0 0 4px rgba(255, 255, 255, 0.15);
+  text-shadow: 0 0 6px rgba(255, 255, 255, 1), 0 0 14px rgba(14, 165, 233, 0.6);
 }
 
 /* ============================================
