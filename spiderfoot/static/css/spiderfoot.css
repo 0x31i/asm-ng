@@ -7057,6 +7057,11 @@ i.glyphicon-white,
   overflow: hidden;
 }
 
+/* All cells in discovery path table get vertical-align: top */
+table.discovery-path-table td {
+  vertical-align: top !important;
+}
+
 /* Discovery path table cell styling */
 .discovery-path-cell {
   padding: 6px 10px !important;
@@ -7066,7 +7071,6 @@ i.glyphicon-white,
   line-height: 1.6;
   cursor: pointer;
   position: relative;
-  overflow: hidden !important;
   white-space: normal !important;
   word-break: break-all !important;
   overflow-wrap: anywhere !important;
@@ -7099,8 +7103,8 @@ i.glyphicon-white,
 
 /* Collapsed state: limit height to ~8 lines (8 * 11px * 1.6 ≈ 141px) */
 .discovery-path-cell.dp-collapsed .dp-cell-wrap {
-  max-height: 141px;
-  overflow: hidden;
+  max-height: 141px !important;
+  overflow: hidden !important;
 }
 
 /* Fade overlay on collapsed cells that have overflow */
@@ -7176,7 +7180,7 @@ table.discovery-path-table th:first-child {
 }
 
 table.discovery-path-table th:nth-child(2) {
-  width: 110px;
+  width: 120px;
 }
 
 /* Expand/collapse toggle — hidden, entire cell is clickable now */
