@@ -6476,8 +6476,9 @@ i.glyphicon-white,
 .stats-bar-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   padding: 8px 12px;
+  flex-wrap: nowrap;
 }
 
 /* Stats item - clean cells */
@@ -6539,7 +6540,7 @@ i.glyphicon-white,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 16px;
+  padding: 8px 12px;
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
   font-size: 11px;
   font-weight: 700;
@@ -6551,6 +6552,7 @@ i.glyphicon-white,
   color: #4b5563;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .stats-bar-fullwidth .filter-btn:hover {
@@ -6583,6 +6585,19 @@ i.glyphicon-white,
 .stats-bar-fullwidth .filter-btn-validated.filter-btn-active:hover {
   background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
   box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
+}
+
+/* Select Known Assets button (Green) */
+.stats-bar-fullwidth .filter-btn-known-asset {
+  border-color: #22c55e;
+  color: #16a34a;
+  background: #f0fdf4;
+}
+
+.stats-bar-fullwidth .filter-btn-known-asset:hover {
+  background: #dcfce7;
+  border-color: #16a34a;
+  color: #15803d;
 }
 
 /* Simple stats bar variant (for unique view) */
