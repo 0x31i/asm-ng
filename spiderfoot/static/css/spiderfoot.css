@@ -6020,11 +6020,11 @@ i.glyphicon-white,
 }
 .assets-action-cell { white-space: nowrap; text-align: right; width: 60px; padding: 4px 6px !important; }
 
-/* Sticky stats bar */
-.assets-sticky-bar { position: sticky; top: 0; z-index: 100; background: #ffffff !important; border-bottom: 1px solid #e2e8f0; }
+/* Sticky stats bar - z-index must be higher than table stacking context */
+.assets-sticky-bar { position: sticky; top: 0; z-index: 200; background: #ffffff !important; border-bottom: 1px solid #e2e8f0; }
 
-/* Compact matches table */
-.assets-matches-compact { table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0; }
+/* Compact matches table - position:relative + z-index creates stacking context below action bar */
+.assets-matches-compact { table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0; position: relative; z-index: 1; }
 
 /* Sticky table header - stacks below the action bar */
 .assets-matches-compact thead th {
@@ -6080,9 +6080,10 @@ i.glyphicon-white,
 .assets-fp-action.assets-icon-btn:hover { background: rgba(234,88,12,0.25) !important; }
 
 .assets-resolved-icon { color: #94a3b8; font-size: 12px; }
+.assets-verified-check { color: #16a34a !important; }
 
 /* Bulk buttons inactive state */
-.assets-bulk-inactive { opacity: 0.3 !important; cursor: not-allowed !important; background: #f1f5f9 !important; color: #94a3b8 !important; border: 1px solid #e2e8f0 !important; }
+.assets-bulk-inactive { opacity: 1 !important; cursor: not-allowed !important; background: #f1f5f9 !important; color: #94a3b8 !important; border: 1px solid #cbd5e1 !important; }
 .assets-bulk-verify-btn:not(.assets-bulk-inactive) { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important; color: white !important; }
 .assets-bulk-fp-btn:not(.assets-bulk-inactive) { background: rgba(234,88,12,0.15) !important; color: #ea580c !important; border: 1px solid rgba(234,88,12,0.3) !important; }
 

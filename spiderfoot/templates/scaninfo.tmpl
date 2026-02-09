@@ -1371,7 +1371,7 @@
                 var resolvedCount = verified + fps;
                 html += "<button class='btn assets-toggle-resolved-btn" + (assetsHideResolved ? "" : " active") + "' onclick='assetsToggleResolved(\"" + instanceId + "\")'>";
                 html += "<i class='glyphicon glyphicon-eye-" + (assetsHideResolved ? "close" : "open") + "'></i>&nbsp;&nbsp;";
-                html += (assetsHideResolved ? "SHOW" : "HIDE") + " RESOLVED (" + resolvedCount + ")</button>";
+                html += (assetsHideResolved ? "SHOW" : "HIDE") + " VERIFIED (" + resolvedCount + ")</button>";
 
                 // Bulk actions - inactive by default, activated via assetsUpdateBulkButtons()
                 html += "<button class='btn assets-bulk-verify-btn assets-bulk-inactive' id='assets-bulk-verify' onclick='assetsBulkAction(\"" + instanceId + "\", \"verify\")' disabled>";
@@ -1430,7 +1430,7 @@
                             html += "<button class='btn btn-xs assets-icon-btn assets-fp-action' onclick='event.stopPropagation();assetsSingleAction(\"" + instanceId + "\", \"" + m.hash + "\", \"fp\")' title='FALSE POSITIVE'>";
                             html += "<i class='glyphicon glyphicon-remove'></i></button>";
                         } else {
-                            html += "<span class='assets-resolved-icon'><i class='glyphicon glyphicon-lock'></i></span>";
+                            html += "<span class='assets-resolved-icon assets-verified-check'><i class='glyphicon glyphicon-ok'></i></span>";
                         }
                         html += "</td></tr>";
 
