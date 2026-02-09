@@ -107,12 +107,15 @@
     </div>
   </div>
 
+  <!-- TEMPLATE VERSION CHECK: v3-2026-02-09 -->
+  <div id="tmpl-version" style="display:none;" data-version="v3-2026-02-09"></div>
+
   <!-- Page Title -->
   <div id="page-title" class="page-title">
     <span id="page-title-text" class="page-title-text">SUMMARY</span>
     <div id="page-title-actions" class="page-title-actions">
-      <button class="btn-module-info" id="btn-module-info" onclick="showModuleInfo()"><i class="glyphicon glyphicon-info-sign"></i>&nbsp;&nbsp;MODULE INFO</button>
-      <button class="btn-instructions" id="btn-instructions" onclick="showInstructions()"><i class="glyphicon glyphicon-education"></i>&nbsp;&nbsp;INSTRUCTIONS</button>
+      <button class="btn-module-info" id="btn-module-info" onclick="try{showModuleInfo();}catch(e){alert('MODULE INFO error: '+e.message);}"><i class="glyphicon glyphicon-info-sign"></i>&nbsp;&nbsp;MODULE INFO</button>
+      <button class="btn-instructions" id="btn-instructions" onclick="try{showInstructions();}catch(e){alert('INSTRUCTIONS error: '+e.message);}"><i class="glyphicon glyphicon-education"></i>&nbsp;&nbsp;INSTRUCTIONS</button>
     </div>
   </div>
 
@@ -206,6 +209,9 @@
     <script src="${docroot}/static/node_modules/sigma/build/plugins/sigma.layout.forceAtlas2.min.js"></script>
     <script src="${docroot}/static/node_modules/sigma/build/plugins/sigma.renderers.snapshot.min.js"></script>
     <script type='text/javascript'>
+        // === TEMPLATE VERSION v3-2026-02-09 ===
+        console.log("[SCANINFO] Template v3-2026-02-09 loaded");
+
         // HTML escape utility
         if (typeof sf !== 'undefined' && !sf.escapeHtml) {
             sf.escapeHtml = function(str) {
@@ -1603,15 +1609,17 @@
         }
 
         function openInfoPanel(mode, contentHtml, titleText, iconClass) {
+            alertify.success("openInfoPanel called (mode: " + mode + ")");
             var wrapper = document.getElementById("info-panel-wrapper");
             var content = document.getElementById("info-panel-content");
             var titleEl = document.getElementById("info-panel-title-text");
             var iconEl = document.getElementById("info-panel-icon");
 
             if (!wrapper) {
-                alertify.error("BUG: info-panel-wrapper not found in DOM");
+                alertify.error("BUG: info-panel-wrapper NOT FOUND in DOM!");
                 return;
             }
+            alertify.success("Panel wrapper found, display=" + wrapper.style.display);
 
             // If same mode is open, close it (toggle)
             if (_infoPanelOpen && _infoPanelMode === mode) {
@@ -1632,6 +1640,7 @@
             _infoPanelOpen = true;
             _infoPanelMode = mode;
             updatePanelButtonStates(mode);
+            alertify.success("Panel display set to 'block'. Should be visible now.");
         }
 
         function updatePanelButtonStates(mode) {
@@ -1691,7 +1700,8 @@
         }
 
         function showModuleInfo() {
-            sf.log("showModuleInfo() called, currentType=" + currentType);
+            console.log("[v3] showModuleInfo() called, currentType=" + currentType);
+            alertify.success("showModuleInfo called (type: " + currentType + ")");
             if (!currentType || currentType === "ALL") {
                 alertify.error("Cannot show module info: no data type selected.");
                 return;
@@ -1699,17 +1709,20 @@
 
             // If cache exists, render immediately
             if (_modulesCache) {
+                alertify.success("Using cached modules data");
                 renderModuleInfo(_modulesCache);
                 return;
             }
 
             // Fetch modules from API via GET
+            alertify.success("Fetching /modules ...");
             $.ajax({
                 type: "GET",
                 url: docroot + "/modules",
                 cache: false,
                 dataType: "json"
             }).done(function(data) {
+                alertify.success("Got modules: " + (data ? data.length : 'null') + " items");
                 if (data && typeof data.length !== 'undefined') {
                     _modulesCache = data;
                     renderModuleInfo(data);
@@ -1718,7 +1731,6 @@
                 }
             }).fail(function(xhr, status, err) {
                 alertify.error("Module info request failed: " + status + " " + err);
-                sf.log("showModuleInfo AJAX failed: " + status + " " + err);
             });
         }
 
@@ -1744,7 +1756,8 @@
         }
 
         function showInstructions() {
-            sf.log("showInstructions() called, currentType=" + currentType);
+            console.log("[v3] showInstructions() called, currentType=" + currentType);
+            alertify.success("showInstructions called (type: " + currentType + ")");
             if (!currentType || currentType === "ALL") {
                 alertify.error("Cannot show instructions: no data type selected.");
                 return;
@@ -1754,6 +1767,7 @@
                 alertify.error("No review instructions mapped for: " + currentType);
                 return;
             }
+            alertify.success("Instructions found, calling openInfoPanel...");
             var html = buildInstructionsHtml(data);
             openInfoPanel('instructions', html, 'REVIEW INSTRUCTIONS \u2014 ' + currentType, 'glyphicon-education');
         }
@@ -4925,6 +4939,7 @@
             // Subtitle
             h += "<div style='margin-top:12px;color:var(--text-secondary);font-size:13px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 10px rgba(255,255,255,0.4);'>OVERALL SECURITY RATING</div>";
             h += "<div style='color:var(--text-muted);font-size:11px;margin-top:2px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;'>ONLY UNVALIDATED ITEMS COUNT &mdash; VALIDATED &amp; FALSE POSITIVES ARE EXCLUDED</div>";
+            h += "<div style='color:var(--accent-blue, #3b82f6);font-size:9px;margin-top:4px;font-family:var(--font-mono);letter-spacing:0.5px;'>GRADE ENGINE v3-2026-02-09</div>";
             if (scanStatus && scanStatus != 'FINISHED' && scanStatus != 'ABORTED' && scanStatus.indexOf('FAILED') < 0) {
                 h += "<div style='display:inline-block;margin-top:8px;font-size:10px;color:var(--accent-yellow);background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);border-radius:4px;padding:3px 10px;'>";
                 h += "<i class='glyphicon glyphicon-exclamation-sign'></i> SCAN IN PROGRESS &mdash; GRADE MAY CHANGE</div>";
@@ -5008,6 +5023,26 @@
             }
 
             h += "</div>"; // end padding wrapper
+
+            // Debug: show raw grade data for DNS Health types
+            var debugTypes = ['DNS_SPF', 'DNS_TEXT'];
+            var debugInfo = [];
+            for (var ci2 = 0; ci2 < catOrder.length; ci2++) {
+                var cat2 = categories[catOrder[ci2]];
+                if (cat2 && cat2.details) {
+                    for (var di2 = 0; di2 < cat2.details.length; di2++) {
+                        var dd = cat2.details[di2];
+                        if (debugTypes.indexOf(dd.type) !== -1) {
+                            debugInfo.push(dd.type + ': unval=' + dd.count + ' pts=' + dd.points + ' found=' + dd.found + ' logic=' + dd.logic);
+                        }
+                    }
+                }
+            }
+            if (debugInfo.length > 0) {
+                h += "<div style='font-size:9px;color:var(--text-muted);padding:4px 16px;font-family:var(--font-mono);opacity:0.6;'>";
+                h += "[DEBUG v3] " + debugInfo.join(' | ');
+                h += "</div>";
+            }
 
             panel.html(h);
 
