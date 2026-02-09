@@ -7155,7 +7155,7 @@
                     table += "</tbody></table>";
 
                     $("#loader").fadeOut(500);
-                    $("#mainbody").append(statsBar + table);
+                    $("#mainbody").append(statsBar + "<div class='discovery-path-wrapper'>" + table + "</div>");
                     $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false }, 1: { sorter: false } } });
 
                     // Mark cells that have overflow (content taller than collapsed max-height of 141px)

@@ -7051,6 +7051,12 @@ i.glyphicon-white,
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+/* Container constrains the table within the viewport */
+.discovery-path-wrapper {
+  width: 100%;
+  overflow: hidden;
+}
+
 /* Discovery path table cell styling */
 .discovery-path-cell {
   padding: 6px 10px !important;
@@ -7061,6 +7067,7 @@ i.glyphicon-white,
   cursor: pointer;
   position: relative;
   overflow: hidden !important;
+  white-space: normal !important;
   word-break: break-all !important;
   overflow-wrap: anywhere !important;
   max-width: 0;
@@ -7070,14 +7077,25 @@ i.glyphicon-white,
 .dp-cell-wrap {
   position: relative;
   width: 100%;
+  max-width: 100%;
+  white-space: normal;
   word-break: break-all;
   overflow-wrap: anywhere;
 }
 
-/* Inner values must also break */
+/* Inner divs and values must also break */
+.discovery-path-cell .dp-type,
+.discovery-path-cell .dp-module,
+.discovery-path-cell .dp-data {
+  white-space: normal;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
 .discovery-path-cell .dp-value {
   word-break: break-all;
   overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 /* Collapsed state: limit height to ~8 lines (8 * 11px * 1.6 ≈ 141px) */
