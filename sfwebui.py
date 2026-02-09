@@ -4808,20 +4808,20 @@ class SpiderFootWebUi:
             return {'enabled': False, 'overall_grade': '-', 'overall_score': 0, 'categories': {}}
 
         try:
-            # Count UNVALIDATED items for grading penalties, but include ALL
-            # rows (unvalidated, FP, validated) to track existence.
-            # Status codes: 0 = unvalidated, 1 = false positive, 2 = validated.
-            # Only unvalidated (0) items count toward penalties.
-            # Existence of ANY row (0, 1, or 2) means the type was found.
-            qry = """SELECT r.type, e.event_descr,
+            # Query scan results directly (no JOIN with tbl_event_types to avoid
+            # silently dropping types not in that table).
+            # Count by FP status: 0=unvalidated, 1=false positive, 2=validated.
+            # Only unvalidated (0) items count toward grade penalties.
+            # Existence of ANY row means the type was found (important for
+            # zero_entries_fail logic: all-validated should NOT trigger fail penalty).
+            qry = """SELECT r.type,
                 count(CASE WHEN CAST(r.false_positive AS INTEGER) = 0 THEN 1 END) AS unval_total,
                 count(DISTINCT CASE WHEN CAST(r.false_positive AS INTEGER) = 0 THEN r.data END) AS unval_unique,
                 count(*) AS all_total,
                 count(DISTINCT r.data) AS all_unique
-                FROM tbl_scan_results r, tbl_event_types e
-                WHERE e.event = r.type
-                AND r.scan_instance_id = ?
-                GROUP BY r.type ORDER BY e.event_descr"""
+                FROM tbl_scan_results r
+                WHERE r.scan_instance_id = ?
+                GROUP BY r.type ORDER BY r.type"""
 
             with dbh.dbhLock:
                 dbh.dbh.execute(qry, [scan_id])
@@ -4839,12 +4839,13 @@ class SpiderFootWebUi:
             event_type = row[0]
             if event_type == 'ROOT':
                 continue
+            all_total = row[3]
             event_type_counts[event_type] = {
-                'total': row[2],       # unvalidated total
-                'unique': row[3],      # unvalidated unique
-                'all_total': row[4],   # total including validated
-                'all_unique': row[5],  # unique including validated
-                'existed': row[4] > 0, # True if any results exist (validated or not)
+                'total': row[1],       # unvalidated total
+                'unique': row[2],      # unvalidated unique
+                'all_total': all_total,  # total including validated/FP
+                'all_unique': row[4],  # unique including validated/FP
+                'existed': all_total > 0,  # True if any results exist at all
             }
 
         # EXTERNAL_VULNERABILITIES: Read from tbl_scan_nessus_results (Nessus imports)
@@ -4890,6 +4891,14 @@ class SpiderFootWebUi:
                 }
         except Exception as e:
             self.log.warning(f"Grade: failed to read Burp results: {e}")
+
+        # Log key event type counts for debugging grade issues
+        for etype in ['DNS_SPF', 'DNS_TEXT']:
+            if etype in event_type_counts:
+                ec = event_type_counts[etype]
+                self.log.debug(f"Grade debug: {etype} unique={ec['unique']} all_total={ec['all_total']} existed={ec['existed']}")
+            else:
+                self.log.debug(f"Grade debug: {etype} NOT in event_type_counts (will use default)")
 
         # Load config overrides from settings
         config_overrides = load_grade_config_overrides(self.config)
