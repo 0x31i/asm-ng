@@ -117,7 +117,20 @@
   </div>
 
   <!-- Expandable Info Panel for Module Info / Instructions -->
-  <div id="info-panel-anchor"></div>
+  <div id="info-panel-wrapper" class="info-panel-wrapper" style="display:none;">
+    <div id="info-panel" class="info-panel">
+      <div class="info-panel-header">
+        <div class="info-panel-title">
+          <i id="info-panel-icon" class="glyphicon glyphicon-info-sign"></i>
+          <span id="info-panel-title-text">MODULE INFO</span>
+        </div>
+        <button class="info-panel-close" onclick="closeInfoPanel()" title="Close">
+          <i class="glyphicon glyphicon-remove"></i>
+        </button>
+      </div>
+      <div id="info-panel-content" class="info-panel-content"></div>
+    </div>
+  </div>
 
   <!-- Floating Selection Toolbar - Modern horizontal design -->
   <div id="selection-toolbar" class="toolbar-bottom toolbar-hidden">
@@ -1577,52 +1590,11 @@
             }
         };
 
-        function ensureInfoPanel() {
-            // Dynamically create the info panel if it doesn't exist yet
-            var wrapper = document.getElementById('info-panel-wrapper');
-            if (wrapper) return wrapper;
-
-            // Build the panel HTML
-            var panelHtml = '<div id="info-panel-wrapper" class="info-panel-wrapper">' +
-                '<div id="info-panel" class="info-panel">' +
-                '<div class="info-panel-header">' +
-                '<div class="info-panel-title">' +
-                '<i id="info-panel-icon" class="glyphicon glyphicon-info-sign"></i>' +
-                '<span id="info-panel-title-text">MODULE INFO</span>' +
-                '</div>' +
-                '<button class="info-panel-close" onclick="closeInfoPanel()" title="Close">' +
-                '<i class="glyphicon glyphicon-remove"></i>' +
-                '</button>' +
-                '</div>' +
-                '<div id="info-panel-content" class="info-panel-content"></div>' +
-                '</div></div>';
-
-            // Insert right before #stats-bar, or right after #page-title
-            var statsBar = document.getElementById('stats-bar');
-            if (statsBar) {
-                $(panelHtml).insertBefore(statsBar);
-            } else {
-                var pageTitle = document.getElementById('page-title');
-                if (pageTitle) {
-                    $(panelHtml).insertAfter(pageTitle);
-                } else {
-                    $("#mainbody").prepend(panelHtml);
-                }
-            }
-            return document.getElementById('info-panel-wrapper');
-        }
-
         function closeInfoPanel() {
-            var wrapper = document.getElementById('info-panel-wrapper');
-            if (wrapper) {
-                wrapper.className = 'info-panel-wrapper';
-                // Remove after transition completes to keep DOM clean
-                setTimeout(function() {
-                    if (!_infoPanelOpen && wrapper.parentNode) {
-                        wrapper.parentNode.removeChild(wrapper);
-                    }
-                }, 500);
-            }
+            var $wrapper = $("#info-panel-wrapper");
+            $wrapper.slideUp(350, function() {
+                $wrapper.removeClass('mode-module-info mode-instructions');
+            });
             _infoPanelOpen = false;
             _infoPanelMode = null;
             $("#btn-module-info").removeClass('active');
@@ -1630,48 +1602,34 @@
         }
 
         function openInfoPanel(mode, contentHtml, titleText, iconClass) {
+            var $wrapper = $("#info-panel-wrapper");
+            var $content = $("#info-panel-content");
+            var $titleEl = $("#info-panel-title-text");
+            var $iconEl = $("#info-panel-icon");
+
             // If same mode is open, close it (toggle)
             if (_infoPanelOpen && _infoPanelMode === mode) {
                 closeInfoPanel();
                 return;
             }
 
-            // If different mode is open, swap content
-            if (_infoPanelOpen && _infoPanelMode !== mode) {
-                var content = document.getElementById('info-panel-content');
-                var titleEl = document.getElementById('info-panel-title-text');
-                var iconEl = document.getElementById('info-panel-icon');
-                var wrapper = document.getElementById('info-panel-wrapper');
-                if (content && titleEl && iconEl && wrapper) {
-                    content.style.opacity = '0';
-                    setTimeout(function() {
-                        titleEl.textContent = titleText;
-                        iconEl.className = 'glyphicon ' + iconClass;
-                        content.innerHTML = contentHtml;
-                        wrapper.className = 'info-panel-wrapper open mode-' + mode;
-                        content.style.opacity = '1';
-                        _infoPanelMode = mode;
-                        updatePanelButtonStates(mode);
-                    }, 200);
-                }
+            // Set content, title, and icon
+            $titleEl.text(titleText);
+            $iconEl.attr('class', 'glyphicon ' + iconClass);
+            $content.html(contentHtml);
+
+            // Set mode class for styling
+            $wrapper.removeClass('mode-module-info mode-instructions').addClass('mode-' + mode);
+
+            // If already open with different mode, just swap (no animation needed)
+            if (_infoPanelOpen) {
+                _infoPanelMode = mode;
+                updatePanelButtonStates(mode);
                 return;
             }
 
-            // Open fresh — create panel and insert into correct DOM position
-            var wrapper = ensureInfoPanel();
-            var content = document.getElementById('info-panel-content');
-            var titleEl = document.getElementById('info-panel-title-text');
-            var iconEl = document.getElementById('info-panel-icon');
-
-            titleEl.textContent = titleText;
-            iconEl.className = 'glyphicon ' + iconClass;
-            content.innerHTML = contentHtml;
-            content.style.opacity = '0';
-
-            // Force layout recalc, then animate open
-            wrapper.offsetHeight; // trigger reflow
-            wrapper.className = 'info-panel-wrapper open mode-' + mode;
-            content.style.opacity = '1';
+            // Open fresh with slide animation
+            $wrapper.slideDown(400);
             _infoPanelOpen = true;
             _infoPanelMode = mode;
             updatePanelButtonStates(mode);
@@ -1788,14 +1746,11 @@
 
         // Update button disabled states based on current type
         function updateInfoButtonStates() {
-            // Remove panel immediately when switching types
+            // Hide panel immediately when switching types
             if (_infoPanelOpen) {
                 _infoPanelOpen = false;
                 _infoPanelMode = null;
-                var wrapper = document.getElementById('info-panel-wrapper');
-                if (wrapper && wrapper.parentNode) {
-                    wrapper.parentNode.removeChild(wrapper);
-                }
+                $("#info-panel-wrapper").hide().removeClass('mode-module-info mode-instructions');
                 $("#btn-module-info").removeClass('active');
                 $("#btn-instructions").removeClass('active');
             }
