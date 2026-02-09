@@ -8206,15 +8206,26 @@ i.glyphicon-white,
 }
 
 /* Type button styling */
-.data-type-btn {
-  color: var(--text-primary) !important;
+a.data-type-btn,
+a.data-type-btn:link,
+a.data-type-btn:visited {
+  color: #1f2937 !important;
   text-decoration: none !important;
   transition: all 0.15s ease;
   border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
-.data-type-btn:hover {
+a.data-type-btn:hover {
+  color: #111827 !important;
   filter: brightness(0.92);
   text-decoration: none !important;
+}
+
+/* Sticky table headers - theme-aware background */
+.data-sticky-th {
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: #1f2937 !important;
 }
 
