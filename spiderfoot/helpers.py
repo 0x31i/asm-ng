@@ -246,14 +246,27 @@ class SpiderFootHelpers():
                         # Ensure the class has __name__ attribute
                         if not hasattr(mod_class, '__name__'):
                             setattr(mod_class, '__name__', module_name)
-                            
+
+                        # Get provides/consumes from instance methods if available
+                        provides = []
+                        consumes = []
+                        try:
+                            inst = mod_class.__new__(mod_class)
+                            if hasattr(inst, 'producedEvents'):
+                                provides = inst.producedEvents()
+                            if hasattr(inst, 'watchedEvents'):
+                                consumes = inst.watchedEvents()
+                        except Exception:
+                            provides = getattr(mod_class, 'meta', {}).get('provides', [])
+                            consumes = getattr(mod_class, 'meta', {}).get('consumes', [])
+
                         modules[module_name] = {
                             'name': getattr(mod_class, 'meta', {}).get('name', module_name),
                             'descr': getattr(mod_class, '__doc__', ''),
                             'cats': getattr(mod_class, 'meta', {}).get('categories', []),
                             'labels': getattr(mod_class, 'meta', {}).get('flags', []),
-                            'provides': getattr(mod_class, 'meta', {}).get('provides', []),
-                            'consumes': getattr(mod_class, 'meta', {}).get('consumes', []),
+                            'provides': provides,
+                            'consumes': consumes,
                             'opts': getattr(mod_class, 'opts', {}),
                             'optdescs': getattr(mod_class, 'optdescs', {}),
                             'meta': getattr(mod_class, 'meta', {}),
