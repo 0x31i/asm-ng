@@ -116,6 +116,24 @@
     </div>
   </div>
 
+  <!-- Expandable Info Panel for Module Info / Instructions -->
+  <div id="info-panel-wrapper" class="info-panel-wrapper">
+    <div id="info-panel" class="info-panel">
+      <div class="info-panel-header">
+        <div class="info-panel-title">
+          <i id="info-panel-icon" class="glyphicon glyphicon-info-sign"></i>
+          <span id="info-panel-title-text">MODULE INFO</span>
+        </div>
+        <button class="info-panel-close" onclick="closeInfoPanel()" title="Close">
+          <i class="glyphicon glyphicon-remove"></i>
+        </button>
+      </div>
+      <div id="info-panel-content" class="info-panel-content">
+        <!-- Content injected dynamically -->
+      </div>
+    </div>
+  </div>
+
   <!-- Floating Selection Toolbar - Modern horizontal design -->
   <div id="selection-toolbar" class="toolbar-bottom toolbar-hidden">
     <!-- Left snap button (horizontal mode only) -->
@@ -190,6 +208,16 @@
     <script src="${docroot}/static/node_modules/sigma/build/plugins/sigma.layout.forceAtlas2.min.js"></script>
     <script src="${docroot}/static/node_modules/sigma/build/plugins/sigma.renderers.snapshot.min.js"></script>
     <script type='text/javascript'>
+        // HTML escape utility
+        if (typeof sf !== 'undefined' && !sf.escapeHtml) {
+            sf.escapeHtml = function(str) {
+                if (!str) return '';
+                var div = document.createElement('div');
+                div.appendChild(document.createTextNode(str));
+                return div.innerHTML;
+            };
+        }
+
         var currentType = "ALL";
         var currentTypeName = "All";
         var currentSection = "btn-data";
@@ -952,19 +980,310 @@
                 // Show action buttons on DATA type detail pages
                 if (currentSection === 'btn-data') {
                     $("#page-title-actions").addClass('visible');
+                    updateInfoButtonStates();
                 }
             } else {
                 $("#page-title-text").text(baseTitle);
                 $("#page-title-actions").removeClass('visible');
+                if (_infoPanelOpen) closeInfoPanel();
             }
         }
 
-        // Placeholder handlers for the new buttons
-        function showModuleInfo() {
-            alertify.log("MODULE INFO - Coming soon");
+        // ---- INFO PANEL: MODULE INFO & INSTRUCTIONS ----
+        var _infoPanelOpen = false;
+        var _infoPanelMode = null; // 'module-info' or 'instructions'
+        var _modulesCache = null;  // cached /modules API response
+
+        // Instructions mapping: eventType -> { title, intro, items[] }
+        var _instructionsMap = {
+            "VULNERABILITY_CVE_CRITICAL": {
+                title: "External Vulnerabilities",
+                intro: "For each item, there are specific target areas to review. Overall, a review of any internal processes that impact the target area needs to be done. Are there changes that can prevent issues or unintentional exposure of data?",
+                items: [
+                    "Confirm all targeted assets are valid and in scope.",
+                    "Review past vulnerability tickets for recurring themes (ex: unpatched third-party libraries).",
+                    "Ensure patching and remediation processes are timely and consistently applied.",
+                    "Track metrics to identify systemic issues requiring process changes."
+                ]
+            },
+            "VULNERABILITY_CVE_HIGH": {
+                title: "External Vulnerabilities",
+                intro: "For each item, there are specific target areas to review. Overall, a review of any internal processes that impact the target area needs to be done. Are there changes that can prevent issues or unintentional exposure of data?",
+                items: [
+                    "Confirm all targeted assets are valid and in scope.",
+                    "Review past vulnerability tickets for recurring themes (ex: unpatched third-party libraries).",
+                    "Ensure patching and remediation processes are timely and consistently applied.",
+                    "Track metrics to identify systemic issues requiring process changes."
+                ]
+            },
+            "VULNERABILITY_CVE_MEDIUM": {
+                title: "External Vulnerabilities",
+                intro: "For each item, there are specific target areas to review. Overall, a review of any internal processes that impact the target area needs to be done. Are there changes that can prevent issues or unintentional exposure of data?",
+                items: [
+                    "Confirm all targeted assets are valid and in scope.",
+                    "Review past vulnerability tickets for recurring themes (ex: unpatched third-party libraries).",
+                    "Ensure patching and remediation processes are timely and consistently applied.",
+                    "Track metrics to identify systemic issues requiring process changes."
+                ]
+            },
+            "VULNERABILITY_CVE_LOW": {
+                title: "External Vulnerabilities",
+                intro: "For each item, there are specific target areas to review. Overall, a review of any internal processes that impact the target area needs to be done. Are there changes that can prevent issues or unintentional exposure of data?",
+                items: [
+                    "Confirm all targeted assets are valid and in scope.",
+                    "Review past vulnerability tickets for recurring themes (ex: unpatched third-party libraries).",
+                    "Ensure patching and remediation processes are timely and consistently applied.",
+                    "Track metrics to identify systemic issues requiring process changes."
+                ]
+            },
+            "VULNERABILITY_GENERAL": {
+                title: "External Vulnerabilities",
+                intro: "For each item, there are specific target areas to review. Overall, a review of any internal processes that impact the target area needs to be done. Are there changes that can prevent issues or unintentional exposure of data?",
+                items: [
+                    "Confirm all targeted assets are valid and in scope.",
+                    "Review past vulnerability tickets for recurring themes (ex: unpatched third-party libraries).",
+                    "Ensure patching and remediation processes are timely and consistently applied.",
+                    "Track metrics to identify systemic issues requiring process changes."
+                ]
+            },
+            "VULNERABILITY_DISCLOSURE": {
+                title: "External Vulnerabilities",
+                intro: "For each item, there are specific target areas to review. Overall, a review of any internal processes that impact the target area needs to be done. Are there changes that can prevent issues or unintentional exposure of data?",
+                items: [
+                    "Confirm all targeted assets are valid and in scope.",
+                    "Review past vulnerability tickets for recurring themes (ex: unpatched third-party libraries).",
+                    "Ensure patching and remediation processes are timely and consistently applied.",
+                    "Track metrics to identify systemic issues requiring process changes."
+                ]
+            },
+            "INTERNAL_IP_ADDRESS": {
+                title: "Internal IP Address",
+                intro: "For each item, there are specific target areas to review. Overall, a review of any internal processes that impact the target area needs to be done. Are there changes that can prevent issues or unintentional exposure of data?",
+                items: [
+                    "Validate that internal IP addresses listed are accurate and currently in use.",
+                    "Remove or update obsolete or invalid addresses.",
+                    "Investigate any exposures of internal IPs to the public and close unnecessary paths.",
+                    "Implement controls to reduce accidental external exposure of internal networks."
+                ]
+            },
+            "IP_ADDRESS": {
+                title: "IP Address",
+                intro: "For each item, there are specific target areas to review. Overall, a review of any internal processes that impact the target area needs to be done. Are there changes that can prevent issues or unintentional exposure of data?",
+                items: [
+                    "Confirm listed IP addresses are valid and required for business operations.",
+                    "Remove or decommission unused or invalid IP addresses.",
+                    "Review whether all public IPs are necessary, consolidating where possible.",
+                    "Document ownership and purpose for each exposed IP to support ongoing management."
+                ]
+            },
+            "TCP_PORT_OPEN": {
+                title: "TCP Port Open",
+                intro: "For each item, there are specific target areas to review. Overall, a review of any internal processes that impact the target area needs to be done. Are there changes that can prevent issues or unintentional exposure of data?",
+                items: [
+                    "Validate that the listed open ports are accurate and required.",
+                    "Close or block unused or unauthorized ports.",
+                    "Confirm that exposed services are hardened and updated.",
+                    "Monitor regularly for unexpected changes in open ports."
+                ]
+            },
+            "TCP_PORT_OPEN_BANNER": {
+                title: "TCP Port Open Banner",
+                intro: "For each item, there are specific target areas to review. Overall, a review of any internal processes that impact the target area needs to be done. Are there changes that can prevent issues or unintentional exposure of data?",
+                items: [
+                    "Validate that the listed open ports are accurate and required.",
+                    "Close or block unused or unauthorized ports.",
+                    "Confirm that exposed services are hardened and updated.",
+                    "Monitor regularly for unexpected changes in open ports."
+                ]
+            },
+            "IPV6_ADDRESS": {
+                title: "IPv6 Address",
+                intro: "For each item, there are specific target areas to review. Overall, a review of any internal processes that impact the target area needs to be done. Are there changes that can prevent issues or unintentional exposure of data?",
+                items: [
+                    "Confirm listed IPv6 addresses are valid and assigned to correct assets.",
+                    "Remove or update unused or invalid IPv6 addresses.",
+                    "Review exposure of IPv6 services to ensure they are intentional.",
+                    "Apply consistent firewall and monitoring policies across IPv4 and IPv6."
+                ]
+            }
+        };
+
+        function closeInfoPanel() {
+            var wrapper = document.getElementById('info-panel-wrapper');
+            wrapper.className = 'info-panel-wrapper';
+            _infoPanelOpen = false;
+            _infoPanelMode = null;
+            $("#btn-module-info").removeClass('active');
+            $("#btn-instructions").removeClass('active');
         }
+
+        function openInfoPanel(mode, contentHtml, titleText, iconClass) {
+            var wrapper = document.getElementById('info-panel-wrapper');
+            var content = document.getElementById('info-panel-content');
+            var titleEl = document.getElementById('info-panel-title-text');
+            var iconEl = document.getElementById('info-panel-icon');
+
+            // If same mode is open, close it (toggle)
+            if (_infoPanelOpen && _infoPanelMode === mode) {
+                closeInfoPanel();
+                return;
+            }
+
+            // If different mode is open, swap content with brief animation
+            if (_infoPanelOpen && _infoPanelMode !== mode) {
+                content.style.opacity = '0';
+                setTimeout(function() {
+                    titleEl.textContent = titleText;
+                    iconEl.className = 'glyphicon ' + iconClass;
+                    content.innerHTML = contentHtml;
+                    wrapper.className = 'info-panel-wrapper open mode-' + mode;
+                    content.style.opacity = '1';
+                    _infoPanelMode = mode;
+                    updatePanelButtonStates(mode);
+                }, 200);
+                return;
+            }
+
+            // Open fresh
+            titleEl.textContent = titleText;
+            iconEl.className = 'glyphicon ' + iconClass;
+            content.innerHTML = contentHtml;
+            content.style.opacity = '1';
+            wrapper.className = 'info-panel-wrapper open mode-' + mode;
+            _infoPanelOpen = true;
+            _infoPanelMode = mode;
+            updatePanelButtonStates(mode);
+        }
+
+        function updatePanelButtonStates(mode) {
+            if (mode === 'module-info') {
+                $("#btn-module-info").addClass('active');
+                $("#btn-instructions").removeClass('active');
+            } else {
+                $("#btn-instructions").addClass('active');
+                $("#btn-module-info").removeClass('active');
+            }
+        }
+
+        function buildModuleInfoHtml(modules) {
+            if (!modules || modules.length === 0) {
+                return '<div class="info-panel-empty"><i class="glyphicon glyphicon-exclamation-sign"></i> No module information available for this data type.</div>';
+            }
+            var html = '<div class="module-info-grid">';
+            for (var i = 0; i < modules.length; i++) {
+                var mod = modules[i];
+                var catBadges = '';
+                if (mod.cats && mod.cats.length) {
+                    for (var j = 0; j < mod.cats.length; j++) {
+                        catBadges += '<span class="module-cat-badge">' + sf.escapeHtml(mod.cats[j]) + '</span>';
+                    }
+                }
+                html += '<div class="module-info-card">';
+                html += '<div class="module-info-card-header">';
+                html += '<span class="module-info-name">' + sf.escapeHtml(mod.name) + '</span>';
+                html += '<span class="module-info-id">' + sf.escapeHtml(mod.module) + '</span>';
+                html += '</div>';
+                if (mod.summary) {
+                    html += '<div class="module-info-summary">' + sf.escapeHtml(mod.summary) + '</div>';
+                }
+                if (catBadges) {
+                    html += '<div class="module-info-cats">' + catBadges + '</div>';
+                }
+                html += '</div>';
+            }
+            html += '</div>';
+            return html;
+        }
+
+        function buildInstructionsHtml(data) {
+            var html = '<div class="instructions-content">';
+            html += '<h3 class="instructions-heading">' + sf.escapeHtml(data.title) + '</h3>';
+            html += '<p class="instructions-intro">' + sf.escapeHtml(data.intro) + '</p>';
+            html += '<ul class="instructions-list">';
+            for (var i = 0; i < data.items.length; i++) {
+                html += '<li class="instructions-item">';
+                html += '<span class="instructions-bullet">' + (i + 1) + '</span>';
+                html += '<span class="instructions-text">' + sf.escapeHtml(data.items[i]) + '</span>';
+                html += '</li>';
+            }
+            html += '</ul>';
+            html += '</div>';
+            return html;
+        }
+
+        function showModuleInfo() {
+            if (!currentType || currentType === "ALL") return;
+
+            // If cache exists, render immediately
+            if (_modulesCache) {
+                renderModuleInfo(_modulesCache);
+                return;
+            }
+
+            // Fetch modules from API and cache
+            $.ajax({
+                url: '${docroot}/modules',
+                type: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    _modulesCache = data;
+                    renderModuleInfo(data);
+                },
+                error: function() {
+                    alertify.error("Failed to load module information.");
+                }
+            });
+        }
+
+        function renderModuleInfo(allModules) {
+            // Filter modules that produce the current type
+            var relevant = [];
+            for (var i = 0; i < allModules.length; i++) {
+                var mod = allModules[i];
+                if (mod.provides && mod.provides.indexOf(currentType) !== -1) {
+                    relevant.push({
+                        module: mod.name,
+                        name: mod.label || mod.name,
+                        summary: mod.summary || mod.descr || '',
+                        cats: mod.cats || mod.group || []
+                    });
+                }
+            }
+            // Sort by name
+            relevant.sort(function(a, b) { return a.name.localeCompare(b.name); });
+            var html = buildModuleInfoHtml(relevant);
+            var count = relevant.length;
+            openInfoPanel('module-info', html, 'MODULE INFO — ' + count + ' MODULE' + (count !== 1 ? 'S' : '') + ' PRODUCE ' + currentType, 'glyphicon-info-sign');
+        }
+
         function showInstructions() {
-            alertify.log("INSTRUCTIONS - Coming soon");
+            if (!currentType || currentType === "ALL") return;
+            var data = _instructionsMap[currentType];
+            if (!data) return; // button should be disabled, but guard anyway
+            var html = buildInstructionsHtml(data);
+            openInfoPanel('instructions', html, 'REVIEW INSTRUCTIONS — ' + currentType, 'glyphicon-education');
+        }
+
+        // Update button disabled states based on current type
+        function updateInfoButtonStates() {
+            // Close panel when switching types
+            if (_infoPanelOpen) {
+                closeInfoPanel();
+            }
+            if (!currentType || currentType === "ALL") {
+                $("#btn-module-info").prop('disabled', true).addClass('disabled');
+                $("#btn-instructions").prop('disabled', true).addClass('disabled');
+                return;
+            }
+            // Module info is always available (every type has producing modules)
+            $("#btn-module-info").prop('disabled', false).removeClass('disabled');
+
+            // Instructions: only enable if mapping exists
+            if (_instructionsMap[currentType]) {
+                $("#btn-instructions").prop('disabled', false).removeClass('disabled');
+            } else {
+                $("#btn-instructions").prop('disabled', true).addClass('disabled');
+            }
         }
 
         function navTo(target) {

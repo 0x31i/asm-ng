@@ -2057,6 +2057,307 @@ pre.table-border-bg-inherit {
   box-shadow: 0 1px 4px rgba(2, 132, 199, 0.3);
 }
 
+/* Disabled state for info buttons */
+.btn-module-info.disabled,
+.btn-module-info:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-instructions.disabled,
+.btn-instructions:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Active state (panel open) */
+.btn-module-info.active {
+  background: rgba(124, 58, 237, 0.25);
+  color: #4c1d95;
+  box-shadow: 0 1px 6px rgba(124, 58, 237, 0.4);
+}
+
+.btn-instructions.active {
+  background: rgba(2, 132, 199, 0.25);
+  color: #0c4a6e;
+  box-shadow: 0 1px 6px rgba(2, 132, 199, 0.4);
+}
+
+/* ============================================
+   Expandable Info Panel
+   ============================================ */
+.info-panel-wrapper {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              margin 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  margin: 0;
+  will-change: max-height, opacity;
+}
+
+.info-panel-wrapper.open {
+  max-height: 600px;
+  opacity: 1;
+  margin: 0 0 16px 0;
+  overflow-y: auto;
+}
+
+.info-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fefefe 0%, #f8fafc 100%);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Purple accent for module info */
+.info-panel-wrapper.mode-module-info .info-panel {
+  border-color: rgba(124, 58, 237, 0.25);
+  border-left: 3px solid #7c3aed;
+}
+
+/* Blue accent for instructions */
+.info-panel-wrapper.mode-instructions .info-panel {
+  border-color: rgba(2, 132, 199, 0.25);
+  border-left: 3px solid #0284c7;
+}
+
+.info-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: rgba(248, 250, 252, 0.8);
+  border-radius: 8px 8px 0 0;
+}
+
+.info-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.mode-module-info .info-panel-title {
+  color: #5b21b6;
+}
+
+.mode-instructions .info-panel-title {
+  color: #075985;
+}
+
+.info-panel-close {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 14px;
+  transition: all 0.15s ease;
+}
+
+.info-panel-close:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.info-panel-content {
+  padding: 16px;
+  transition: opacity 0.2s ease;
+}
+
+/* Empty state */
+.info-panel-empty {
+  text-align: center;
+  padding: 24px;
+  color: #94a3b8;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+.info-panel-empty .glyphicon {
+  margin-right: 8px;
+  font-size: 14px;
+}
+
+/* ---- Module Info Cards ---- */
+.module-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.module-info-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 12px 14px;
+  transition: all 0.2s ease;
+}
+
+.module-info-card:hover {
+  border-color: rgba(124, 58, 237, 0.3);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.1);
+  transform: translateY(-1px);
+}
+
+.module-info-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.module-info-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: 0.3px;
+}
+
+.module-info-id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+}
+
+.module-info-summary {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.module-info-cats {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.module-cat-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(124, 58, 237, 0.08);
+  color: #7c3aed;
+  border: 1px solid rgba(124, 58, 237, 0.15);
+}
+
+/* ---- Instructions Content ---- */
+.instructions-content {
+  padding: 4px 8px;
+}
+
+.instructions-heading {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #0c4a6e;
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(2, 132, 199, 0.15);
+}
+
+.instructions-intro {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  color: #475569;
+  margin: 0 0 16px 0;
+  padding: 10px 14px;
+  background: rgba(2, 132, 199, 0.04);
+  border-radius: 6px;
+  border-left: 2px solid rgba(2, 132, 199, 0.3);
+}
+
+.instructions-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.instructions-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.instructions-item:hover {
+  border-color: rgba(2, 132, 199, 0.3);
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);
+}
+
+.instructions-bullet {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.instructions-text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: #334155;
+  padding-top: 2px;
+}
+
+/* Scrollbar for info panel */
+.info-panel-wrapper.open::-webkit-scrollbar {
+  width: 6px;
+}
+
+.info-panel-wrapper.open::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.info-panel-wrapper.open::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.info-panel-wrapper.open::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
 /* ============================================
    Scan Detail Navigation Tabs - Modern Toolbar Style
    ============================================ */

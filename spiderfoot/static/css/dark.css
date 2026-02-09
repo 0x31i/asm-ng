@@ -1934,6 +1934,318 @@ pre.table-border-bg-inherit {
   box-shadow: 0 0 12px rgba(14, 165, 233, 0.4);
 }
 
+/* Disabled state for info buttons */
+.btn-module-info.disabled,
+.btn-module-info:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+  text-shadow: none;
+  box-shadow: none;
+}
+
+.btn-instructions.disabled,
+.btn-instructions:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+  text-shadow: none;
+  box-shadow: none;
+}
+
+/* Active state (panel open) */
+.btn-module-info.active {
+  background: rgba(139, 92, 246, 0.35);
+  border-color: #a78bfa;
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.5), 0 0 4px rgba(139, 92, 246, 0.3);
+}
+
+.btn-instructions.active {
+  background: rgba(14, 165, 233, 0.35);
+  border-color: #38bdf8;
+  box-shadow: 0 0 16px rgba(14, 165, 233, 0.5), 0 0 4px rgba(14, 165, 233, 0.3);
+}
+
+/* ============================================
+   Expandable Info Panel - Dark Theme
+   ============================================ */
+.info-panel-wrapper {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              margin 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  margin: 0;
+  will-change: max-height, opacity;
+}
+
+.info-panel-wrapper.open {
+  max-height: 600px;
+  opacity: 1;
+  margin: 0 0 16px 0;
+  overflow-y: auto;
+}
+
+.info-panel {
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* Purple glow accent for module info */
+.info-panel-wrapper.mode-module-info .info-panel {
+  border-color: rgba(139, 92, 246, 0.25);
+  border-left: 3px solid var(--accent-purple);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(139, 92, 246, 0.08);
+}
+
+/* Blue glow accent for instructions */
+.info-panel-wrapper.mode-instructions .info-panel {
+  border-color: rgba(14, 165, 233, 0.25);
+  border-left: 3px solid var(--accent-blue);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(59, 130, 246, 0.08);
+}
+
+.info-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(21, 21, 21, 0.8);
+  border-radius: 8px 8px 0 0;
+}
+
+.info-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.mode-module-info .info-panel-title {
+  color: var(--accent-purple-light);
+  text-shadow: 0 0 10px rgba(139, 92, 246, 0.4);
+}
+
+.mode-instructions .info-panel-title {
+  color: var(--accent-blue-light);
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.info-panel-close {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 14px;
+  transition: all 0.15s ease;
+}
+
+.info-panel-close:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--accent-red);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+}
+
+.info-panel-content {
+  padding: 16px;
+  transition: opacity 0.2s ease;
+}
+
+/* Empty state */
+.info-panel-empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+.info-panel-empty .glyphicon {
+  margin-right: 8px;
+  font-size: 14px;
+}
+
+/* ---- Module Info Cards (Dark) ---- */
+.module-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.module-info-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  transition: all 0.2s ease;
+}
+
+.module-info-card:hover {
+  border-color: rgba(139, 92, 246, 0.35);
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.12), 0 2px 8px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+.module-info-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.module-info-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.3px;
+}
+
+.module-info-id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+.module-info-summary {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.module-info-cats {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.module-cat-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(139, 92, 246, 0.12);
+  color: var(--accent-purple-light);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+/* ---- Instructions Content (Dark) ---- */
+.instructions-content {
+  padding: 4px 8px;
+}
+
+.instructions-heading {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--accent-blue-light);
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.15);
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+}
+
+.instructions-intro {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  margin: 0 0 16px 0;
+  padding: 10px 14px;
+  background: rgba(59, 130, 246, 0.05);
+  border-radius: 6px;
+  border-left: 2px solid rgba(59, 130, 246, 0.3);
+}
+
+.instructions-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.instructions-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-primary);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.instructions-item:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.08), 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.instructions-bullet {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-blue), #0369a1);
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+}
+
+.instructions-text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  padding-top: 2px;
+}
+
+/* Scrollbar for info panel */
+.info-panel-wrapper.open::-webkit-scrollbar {
+  width: 6px;
+}
+
+.info-panel-wrapper.open::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.info-panel-wrapper.open::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.info-panel-wrapper.open::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
 /* ============================================
    Scan Detail Navigation Tabs - Modern Toolbar Style
    ============================================ */
