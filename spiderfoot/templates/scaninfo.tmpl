@@ -5593,27 +5593,62 @@
         var _dataListRawData = []; // Store raw data for re-sorting
         var _dataListSort = 'group'; // Current sort mode
         var _dataListCategoryFilter = {}; // true = active (shown), false = hidden
+        var _dataListFilterMode = 'all'; // 'all' = everything shown, 'selective' = user picked specific ones
 
         // Initialize all categories as active
         function dataListInitFilters() {
+            _dataListFilterMode = 'all';
             for (var i = 0; i < categoryOrder.length; i++) {
                 _dataListCategoryFilter[categoryOrder[i]] = true;
             }
         }
         dataListInitFilters();
 
-        // Toggle a category filter on/off
-        function toggleCategoryFilter(catName) {
-            _dataListCategoryFilter[catName] = !_dataListCategoryFilter[catName];
-            // Update tile visual state
-            var tile = document.getElementById('data-legend-' + catName.replace(/[\s\/]/g, '-'));
-            if (tile) {
-                if (_dataListCategoryFilter[catName]) {
+        function updateAllTileVisuals() {
+            for (var i = 0; i < categoryOrder.length; i++) {
+                var cat = categoryOrder[i];
+                var tile = document.getElementById('data-legend-' + cat.replace(/[\s\/]/g, '-'));
+                if (!tile) continue;
+                if (_dataListCategoryFilter[cat]) {
                     tile.classList.remove('data-legend-inactive');
                 } else {
                     tile.classList.add('data-legend-inactive');
                 }
             }
+        }
+
+        // Toggle a category filter on/off
+        function toggleCategoryFilter(catName) {
+            if (_dataListFilterMode === 'all') {
+                // First click from "all shown": only show the clicked category
+                _dataListFilterMode = 'selective';
+                for (var i = 0; i < categoryOrder.length; i++) {
+                    _dataListCategoryFilter[categoryOrder[i]] = false;
+                }
+                _dataListCategoryFilter[catName] = true;
+            } else {
+                // Already in selective mode
+                if (_dataListCategoryFilter[catName]) {
+                    // Turning off an active one - check if it's the last
+                    var activeCount = 0;
+                    for (var i = 0; i < categoryOrder.length; i++) {
+                        if (_dataListCategoryFilter[categoryOrder[i]]) activeCount++;
+                    }
+                    if (activeCount <= 1) {
+                        // Last active clicked off -> reset to all
+                        _dataListFilterMode = 'all';
+                        for (var i = 0; i < categoryOrder.length; i++) {
+                            _dataListCategoryFilter[categoryOrder[i]] = true;
+                        }
+                    } else {
+                        _dataListCategoryFilter[catName] = false;
+                    }
+                } else {
+                    // Adding another category
+                    _dataListCategoryFilter[catName] = true;
+                }
+            }
+            updateAllTileVisuals();
             dataListApplySort(_dataListSort);
         }
 
