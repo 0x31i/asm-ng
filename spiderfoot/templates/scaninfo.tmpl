@@ -7155,13 +7155,13 @@
                     table += "</tbody></table>";
 
                     $("#loader").fadeOut(500);
-                    $("#mainbody").append(statsBar + table);
+                    $("#mainbody").append(statsBar + "<div class='discovery-path-wrapper'>" + table + "</div>");
                     $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false }, 1: { sorter: false } } });
 
-                    // Mark cells that have overflow (content taller than collapsed max-height)
+                    // Mark cells that have overflow (content taller than collapsed max-height of 141px)
                     $("#scansummary-content .discovery-path-cell.dp-collapsed").each(function() {
                         var wrap = this.querySelector('.dp-cell-wrap');
-                        if (wrap && wrap.scrollHeight > 130) {
+                        if (wrap && wrap.scrollHeight > 141) {
                             this.classList.add('dp-has-overflow');
                         } else {
                             this.classList.remove('dp-collapsed');
