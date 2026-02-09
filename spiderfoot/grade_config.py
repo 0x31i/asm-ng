@@ -1018,7 +1018,7 @@ def calculate_category_score(event_type_counts: dict, grading_rules: dict,
     """Calculate the score for a single grade category.
 
     Args:
-        event_type_counts: Dict of {event_type: {'total': N, 'unique': N}}
+        event_type_counts: Dict of {event_type: {'total': N, 'unique': N, 'existed': bool}}
         grading_rules: Dict of grading rules per event type
         category_name: The category being calculated
 
@@ -1046,10 +1046,14 @@ def calculate_category_score(event_type_counts: dict, grading_rules: dict,
                 points_applied = rule.get('points', 0)
 
         elif logic == 'zero_entries_fail':
-            if unique == 0:
+            existed = counts.get('existed', False)
+            if unique == 0 and not existed:
+                # No results ever found — apply fail penalty
                 points_applied = rule.get('fail_points', -50)
-            else:
+            elif unique > 0:
+                # Unvalidated items remain — apply standard points
                 points_applied = rule.get('points', 0)
+            # else: unique == 0 but existed (all validated) — no penalty
 
         elif logic == 'crit_high_med':
             # For aggregate vulnerability types, we need severity sub-counts.
@@ -1071,7 +1075,8 @@ def calculate_category_score(event_type_counts: dict, grading_rules: dict,
 
         raw_score += points_applied
 
-        if points_applied != 0 or unique > 0:
+        existed = counts.get('existed', False)
+        if points_applied != 0 or unique > 0 or existed:
             details.append({
                 'type': event_type,
                 'count': unique,

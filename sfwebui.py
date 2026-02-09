@@ -4808,15 +4808,20 @@ class SpiderFootWebUi:
             return {'enabled': False, 'overall_grade': '-', 'overall_score': 0, 'categories': {}}
 
         try:
-            # Custom query: only count UNVALIDATED items (false_positive = 0).
-            # Excludes: 1 = false positive, 2 = validated (acknowledged/being addressed).
+            # Custom query: count UNVALIDATED items for grading, but also count
+            # validated items to distinguish "never existed" from "all validated".
+            # Status codes: 0 = unvalidated, 1 = false positive, 2 = validated.
+            # False positives (1) are always excluded from all counts.
             # CAST ensures correct comparison even if column stored mixed types.
             qry = """SELECT r.type, e.event_descr,
-                count(*) AS total, count(DISTINCT r.data) as utotal
+                count(CASE WHEN CAST(r.false_positive AS INTEGER) = 0 THEN 1 END) AS unval_total,
+                count(DISTINCT CASE WHEN CAST(r.false_positive AS INTEGER) = 0 THEN r.data END) AS unval_unique,
+                count(*) AS all_total,
+                count(DISTINCT r.data) AS all_unique
                 FROM tbl_scan_results r, tbl_event_types e
                 WHERE e.event = r.type
                 AND r.scan_instance_id = ?
-                AND CAST(r.false_positive AS INTEGER) = 0
+                AND CAST(r.false_positive AS INTEGER) IN (0, 2)
                 GROUP BY r.type ORDER BY e.event_descr"""
 
             with dbh.dbhLock:
@@ -4827,17 +4832,20 @@ class SpiderFootWebUi:
             return {'enabled': True, 'overall_grade': '-', 'overall_score': 0, 'categories': {},
                     'error': 'Failed to retrieve scan results'}
 
-        # Build event type count dict: {type_code: {total, unique}}
+        # Build event type count dict: {type_code: {total, unique, existed}}
+        # 'total'/'unique' = unvalidated counts (used for grading penalties)
+        # 'existed' = True if any non-FP results exist (validated or not)
         event_type_counts = {}
         for row in scan_data:
             event_type = row[0]
             if event_type == 'ROOT':
                 continue
-            total_count = row[2]
-            unique_count = row[3]
             event_type_counts[event_type] = {
-                'total': total_count,
-                'unique': unique_count,
+                'total': row[2],       # unvalidated total
+                'unique': row[3],      # unvalidated unique
+                'all_total': row[4],   # total including validated
+                'all_unique': row[5],  # unique including validated
+                'existed': row[4] > 0, # True if any results exist (validated or not)
             }
 
         # EXTERNAL_VULNERABILITIES: Read from tbl_scan_nessus_results (Nessus imports)
