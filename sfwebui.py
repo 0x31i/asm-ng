@@ -4808,11 +4808,11 @@ class SpiderFootWebUi:
             return {'enabled': False, 'overall_grade': '-', 'overall_score': 0, 'categories': {}}
 
         try:
-            # Custom query: count UNVALIDATED items for grading, but also count
-            # validated items to distinguish "never existed" from "all validated".
+            # Count UNVALIDATED items for grading penalties, but include ALL
+            # rows (unvalidated, FP, validated) to track existence.
             # Status codes: 0 = unvalidated, 1 = false positive, 2 = validated.
-            # False positives (1) are always excluded from all counts.
-            # CAST ensures correct comparison even if column stored mixed types.
+            # Only unvalidated (0) items count toward penalties.
+            # Existence of ANY row (0, 1, or 2) means the type was found.
             qry = """SELECT r.type, e.event_descr,
                 count(CASE WHEN CAST(r.false_positive AS INTEGER) = 0 THEN 1 END) AS unval_total,
                 count(DISTINCT CASE WHEN CAST(r.false_positive AS INTEGER) = 0 THEN r.data END) AS unval_unique,
@@ -4821,7 +4821,6 @@ class SpiderFootWebUi:
                 FROM tbl_scan_results r, tbl_event_types e
                 WHERE e.event = r.type
                 AND r.scan_instance_id = ?
-                AND CAST(r.false_positive AS INTEGER) IN (0, 2)
                 GROUP BY r.type ORDER BY e.event_descr"""
 
             with dbh.dbhLock:
@@ -4833,8 +4832,8 @@ class SpiderFootWebUi:
                     'error': 'Failed to retrieve scan results'}
 
         # Build event type count dict: {type_code: {total, unique, existed}}
-        # 'total'/'unique' = unvalidated counts (used for grading penalties)
-        # 'existed' = True if any non-FP results exist (validated or not)
+        # 'total'/'unique' = unvalidated counts only (used for grading penalties)
+        # 'existed' = True if ANY results exist (unvalidated, FP, or validated)
         event_type_counts = {}
         for row in scan_data:
             event_type = row[0]
@@ -4849,7 +4848,9 @@ class SpiderFootWebUi:
             }
 
         # EXTERNAL_VULNERABILITIES: Read from tbl_scan_nessus_results (Nessus imports)
-        # Only count OPEN items (tracking = 0). Nessus severities are title case.
+        # Only OPEN items (tracking = 0) count toward penalty.
+        # But if any results exist at all, set existed=True so closing all
+        # vulns removes the penalty rather than being treated as "never found".
         # Row format: [0]=id, [1]=severity, ..., [18]=tracking
         try:
             nessus_results = dbh.scanNessusList(scan_id)
@@ -4857,19 +4858,20 @@ class SpiderFootWebUi:
                 ne_crit = sum(1 for r in nessus_results if r[1] == 'Critical' and (not r[18] or r[18] == 0))
                 ne_high = sum(1 for r in nessus_results if r[1] == 'High' and (not r[18] or r[18] == 0))
                 ne_med = sum(1 for r in nessus_results if r[1] == 'Medium' and (not r[18] or r[18] == 0))
-                if ne_crit or ne_high or ne_med:
-                    event_type_counts['EXTERNAL_VULNERABILITIES'] = {
-                        'total': ne_crit + ne_high + ne_med,
-                        'unique': ne_crit + ne_high + ne_med,
-                        'crit': ne_crit,
-                        'high': ne_high,
-                        'med': ne_med,
-                    }
+                open_total = ne_crit + ne_high + ne_med
+                event_type_counts['EXTERNAL_VULNERABILITIES'] = {
+                    'total': open_total,
+                    'unique': open_total,
+                    'crit': ne_crit,
+                    'high': ne_high,
+                    'med': ne_med,
+                    'existed': True,
+                }
         except Exception as e:
             self.log.warning(f"Grade: failed to read Nessus results: {e}")
 
         # WEBAPP_VULNERABILITIES: Read from tbl_scan_burp_results (Burp imports)
-        # Only count OPEN items (tracking = 0). Burp severities are title case.
+        # Same logic: only OPEN items count, but existence is always tracked.
         # Row format: [0]=id, [1]=severity, ..., [18]=tracking
         try:
             burp_results = dbh.scanBurpList(scan_id)
@@ -4877,14 +4879,15 @@ class SpiderFootWebUi:
                 wa_high = sum(1 for r in burp_results if r[1] == 'High' and (not r[18] or r[18] == 0))
                 wa_med = sum(1 for r in burp_results if r[1] == 'Medium' and (not r[18] or r[18] == 0))
                 wa_low = sum(1 for r in burp_results if r[1] == 'Low' and (not r[18] or r[18] == 0))
-                if wa_high or wa_med or wa_low:
-                    event_type_counts['WEBAPP_VULNERABILITIES'] = {
-                        'total': wa_high + wa_med + wa_low,
-                        'unique': wa_high + wa_med + wa_low,
-                        'crit': 0,
-                        'high': wa_high,
-                        'med': wa_med,
-                    }
+                open_total = wa_high + wa_med + wa_low
+                event_type_counts['WEBAPP_VULNERABILITIES'] = {
+                    'total': open_total,
+                    'unique': open_total,
+                    'crit': 0,
+                    'high': wa_high,
+                    'med': wa_med,
+                    'existed': True,
+                }
         except Exception as e:
             self.log.warning(f"Grade: failed to read Burp results: {e}")
 
