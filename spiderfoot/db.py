@@ -4216,10 +4216,10 @@ class SpiderFootDb:
                 raise IOError("SQL error encountered when importing entries") from e
 
     def deduplicateScanResults(self, instanceId: str) -> dict:
-        """Remove duplicate events based on (data, source_data, module) match.
+        """Remove duplicate events based on (data, source_data, module, type) match.
 
         For each group of duplicates that share the same Data Element,
-        Source Data Element, and Source Module:
+        Source Data Element, Source Module, and Event Type:
         - Keeps the OLDEST event (lowest generated timestamp)
         - Deletes all newer duplicates
         - If ANY duplicate had false_positive=1, the kept row inherits it
@@ -4248,7 +4248,8 @@ class SpiderFootDb:
                 qry = """
                     SELECT r.hash, r.data, r.module, r.generated,
                            r.false_positive, r.source_event_hash,
-                           COALESCE(sr.data, 'ROOT') as source_data
+                           COALESCE(sr.data, 'ROOT') as source_data,
+                           r.type
                     FROM tbl_scan_results r
                     LEFT JOIN tbl_scan_results sr
                         ON sr.scan_instance_id = r.scan_instance_id
@@ -4263,7 +4264,10 @@ class SpiderFootDb:
                 if not all_events:
                     return {'removed': 0, 'fp_preserved': 0}
 
-                # Group by (data, source_data, module)
+                # Group by (data, source_data, module, type)
+                # Including type ensures different event types for the same
+                # data/source/module are NOT treated as duplicates, preserving
+                # the event type diversity needed for correlation analysis.
                 groups = {}
                 for event in all_events:
                     event_hash = event[0]
@@ -4272,8 +4276,9 @@ class SpiderFootDb:
                     generated = event[3]
                     fp = event[4]
                     source_data = (event[6] or 'ROOT').strip()
+                    event_type = (event[7] or '').strip()
 
-                    key = (data, source_data, module)
+                    key = (data, source_data, module, event_type)
                     if key not in groups:
                         groups[key] = []
                     groups[key].append({

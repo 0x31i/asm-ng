@@ -5885,8 +5885,7 @@ class SpiderFootWebUi:
         # Deduplicate before running correlations to avoid inflated results
         try:
             dedup = dbh.deduplicateScanResults(id)
-            if dedup['removed'] > 0:
-                self.log.info(f"Pre-correlation dedup removed {dedup['removed']} duplicate(s)")
+            self.log.info(f"Pre-correlation dedup: removed={dedup.get('removed', 0)}, fp_preserved={dedup.get('fp_preserved', 0)}")
         except Exception as e:
             self.log.warning(f"Pre-correlation dedup failed (continuing anyway): {e}")
 
@@ -5935,21 +5934,45 @@ class SpiderFootWebUi:
         loader = RuleLoader(correlations_dir)
         rules = loader.load_rules()
         if not rules:
+            self.log.warning("No correlation rules loaded")
             return
+
+        load_errors = loader.get_errors()
+        if load_errors:
+            for fname, err in load_errors:
+                self.log.warning(f"Failed to load rule {fname}: {err}")
+
+        self.log.info(f"Loaded {len(rules)} correlation rules for re-run")
 
         # Delete old rule-based correlations for this scan before re-running
         for rule in rules:
             rule_id = rule.get('id', '')
             if rule_id:
                 try:
-                    dbh.deleteCorrelationsByRule(scanId, rule_id)
-                except Exception:
-                    pass
+                    deleted = dbh.deleteCorrelationsByRule(scanId, rule_id)
+                    if deleted > 0:
+                        self.log.debug(f"Deleted {deleted} old correlations for rule {rule_id}")
+                except Exception as e:
+                    self.log.warning(f"Failed to delete old correlations for rule {rule_id}: {e}")
 
         # Run rule-based correlation engine
         executor = RuleExecutor(dbh, rules, scan_ids=[scanId])
         results = executor.run()
-        self.log.info(f"Re-ran rule-based correlations for scan {scanId}: {len(results)} rules evaluated")
+
+        # Log details about rule execution results
+        rules_matched = sum(1 for r in results.values() if r.get('matched'))
+        total_corrs = sum(r.get('correlations_created', 0) for r in results.values())
+        self.log.info(
+            f"Re-ran rule-based correlations for scan {scanId}: "
+            f"{len(results)} rules evaluated, {rules_matched} matched, "
+            f"{total_corrs} correlations created"
+        )
+        for rule_id, result in results.items():
+            if result.get('correlations_created', 0) > 0:
+                self.log.info(
+                    f"  Rule '{rule_id}': {result['correlations_created']} correlation(s), "
+                    f"risk={result.get('meta', {}).get('risk', 'unknown')}"
+                )
 
     @staticmethod
     def _classifyEventTypeRisk(event_type_code: str) -> int:
@@ -6086,6 +6109,7 @@ class SpiderFootWebUi:
             all_events = dbh.dbh.fetchall()
 
         if not all_events:
+            self.log.info("Single-scan correlation: no events found in scan")
             return {
                 'success': True,
                 'mode': 'single',
@@ -6093,6 +6117,13 @@ class SpiderFootWebUi:
                 'correlations_found': 0,
                 'total_events': 0
             }
+
+        self.log.info(f"Single-scan correlation: {len(all_events)} events to analyze")
+
+        # Count malicious event types for debugging
+        malicious_count = sum(1 for e in all_events if 'MALICIOUS' in (e[3] or '').upper())
+        blacklisted_count = sum(1 for e in all_events if 'BLACKLISTED' in (e[3] or '').upper())
+        self.log.info(f"Single-scan correlation: {malicious_count} MALICIOUS events, {blacklisted_count} BLACKLISTED events")
 
         # Group events by data value
         # ioc_data -> [{module, event_type, timestamp, confidence, risk, hash}]
@@ -6112,7 +6143,10 @@ class SpiderFootWebUi:
                 'hash': event[6],
             })
 
+        self.log.info(f"Single-scan correlation: {len(ioc_map)} unique IOCs")
+
         correlations_found = 0
+        skipped_below_threshold = 0
 
         for ioc_data, occurrences in ioc_map.items():
             modules = set(o['module'] for o in occurrences)
@@ -6122,6 +6156,14 @@ class SpiderFootWebUi:
             # Only flag if the same data was found by multiple modules
             # OR appeared in multiple event types OR appeared many times
             if len(modules) < 2 and len(event_types) < 2 and total < 3:
+                # Log skipped high-risk IOCs for debugging
+                has_malicious = any('MALICIOUS' in et.upper() or 'BLACKLIST' in et.upper() for et in event_types)
+                if has_malicious:
+                    skipped_below_threshold += 1
+                    self.log.debug(
+                        f"Skipped malicious IOC below threshold: data={ioc_data[:60]}, "
+                        f"modules={len(modules)}, types={len(event_types)} ({','.join(event_types)}), total={total}"
+                    )
                 continue
 
             event_hashes = [o['hash'] for o in occurrences]
@@ -6171,10 +6213,17 @@ class SpiderFootWebUi:
                     eventHashes=event_hashes
                 )
                 correlations_found += 1
+                if risk_level in ('CRITICAL', 'HIGH'):
+                    self.log.info(
+                        f"Created {risk_level} correlation: {headline[:100]} "
+                        f"(modules={len(modules)}, types={len(event_types)}, total={total})"
+                    )
             except Exception as e:
                 self.log.warning(f"Failed to store AI correlation: {e}")
                 continue
 
+        if skipped_below_threshold > 0:
+            self.log.info(f"Single-scan correlation: {skipped_below_threshold} malicious IOC(s) skipped (below threshold)")
         self.log.info(f"Single-scan correlation complete. Found {correlations_found} correlated IOCs.")
 
         return {
