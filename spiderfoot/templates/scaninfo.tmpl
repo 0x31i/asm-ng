@@ -4576,7 +4576,7 @@
 
             // Table
             html += "<div class='findings-table-wrapper'>";
-            html += "<table id='correlations-panel-table' class='table findings-table tablesorter small'>";
+            html += "<table id='correlations-panel-table' class='table findings-table small'>";
             html += "<colgroup>";
             html += "<col class='col-priority'>";
             html += "<col class='col-corr-name'>";
@@ -4597,7 +4597,7 @@
             // Render table rows progressively in chunks to keep browser responsive.
             // Each chunk appends a batch of groups to the tbody, then yields to the
             // browser via setTimeout so Chrome never considers the page unresponsive.
-            var CHUNK_SIZE = 30;
+            var CHUNK_SIZE = 5;
             var chunkStart = 0;
 
             function renderNextChunk() {
@@ -4682,22 +4682,12 @@
                     // More chunks to render — yield to browser then continue
                     setTimeout(renderNextChunk, 0);
                 } else {
-                    // All rows rendered — initialize table sorting on next tick
+                    // All rows rendered — update tooltips on next tick
+                    // Note: tablesorter is intentionally skipped here because:
+                    // 1. Rows are already sorted by risk priority (groupOrder.sort)
+                    // 2. Tablesorter on ~2000 rows with cssChildRow blocks for seconds
+                    // 3. Re-sorting a grouped table breaks parent-child row associations
                     setTimeout(function() {
-                        $.tablesorter.addParser({
-                            id: 'correlationPanelCriticality',
-                            is: function(s) { return false; },
-                            format: function(s) {
-                                return s.toLowerCase().replace(/critical/,0).replace(/high/,1).replace(/medium/,2).replace(/low/,3).replace(/info/,4);
-                            },
-                            type: 'numeric'
-                        });
-
-                        $("#correlations-panel-table").tablesorter({
-                            headers: { 0: { sorter: 'correlationPanelCriticality' } },
-                            cssChildRow: 'corr-group-member',
-                            sortList: [[0, 0]]
-                        });
                         sf.updateTooltips();
                     }, 0);
                 }
