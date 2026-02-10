@@ -6094,9 +6094,17 @@ class SpiderFootWebUi:
         for row in dbh.eventTypes():
             type_descr[row[1]] = row[0]  # event_code -> description
 
+        # Join with source event to get the actual IOC value.
+        # For MALICIOUS_*/BLACKLISTED_* events, the data field contains
+        # a module-specific description (e.g., "Spamhaus [1.2.3.4]") while
+        # the source event's data holds the actual IOC (e.g., "1.2.3.4").
         qry = """SELECT r.generated, r.data, r.module, r.type,
-                        r.confidence, r.risk, r.hash
+                        r.confidence, r.risk, r.hash,
+                        COALESCE(sr.data, r.data) as source_data
                  FROM tbl_scan_results r
+                 LEFT JOIN tbl_scan_results sr
+                     ON sr.scan_instance_id = r.scan_instance_id
+                     AND sr.hash = r.source_event_hash
                  WHERE r.scan_instance_id = ?
                    AND r.type != 'ROOT'
                    AND r.type != 'AI_SINGLE_SCAN_CORRELATION'
@@ -6125,19 +6133,31 @@ class SpiderFootWebUi:
         blacklisted_count = sum(1 for e in all_events if 'BLACKLISTED' in (e[3] or '').upper())
         self.log.info(f"Single-scan correlation: {malicious_count} MALICIOUS events, {blacklisted_count} BLACKLISTED events")
 
-        # Group events by data value
-        # ioc_data -> [{module, event_type, timestamp, confidence, risk, hash}]
+        # Group events by IOC value.
+        # For MALICIOUS_*/BLACKLISTED_* events, use the source event's data
+        # (the actual IP/domain/subnet) as the grouping key so that the same
+        # IOC flagged by different modules is properly correlated.
+        # For all other event types, group by the event's own data.
         ioc_map = {}
         for event in all_events:
             data = event[1]
+            event_type = event[3] or ''
+            source_data = event[7]  # from JOIN: COALESCE(sr.data, r.data)
             if not data:
                 continue
-            if data not in ioc_map:
-                ioc_map[data] = []
-            ioc_map[data].append({
+
+            if event_type.startswith('MALICIOUS_') or event_type.startswith('BLACKLISTED_'):
+                group_key = source_data if source_data else data
+            else:
+                group_key = data
+
+            if group_key not in ioc_map:
+                ioc_map[group_key] = []
+            ioc_map[group_key].append({
                 'timestamp': event[0],
+                'data': data,
                 'module': event[2],
-                'event_type': event[3],
+                'event_type': event_type,
                 'confidence': event[4],
                 'risk': event[5],
                 'hash': event[6],
