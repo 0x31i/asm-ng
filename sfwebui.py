@@ -5900,13 +5900,56 @@ class SpiderFootWebUi:
 
         try:
             if mode == 'single':
-                return self._runSingleScanCorrelation(dbh, id, target)
+                ai_result = self._runSingleScanCorrelation(dbh, id, target)
             else:
-                return self._runCrossScanCorrelation(dbh, id, target)
+                ai_result = self._runCrossScanCorrelation(dbh, id, target)
 
         except Exception as e:
             self.log.error(f"Error running AI correlation: {e}", exc_info=True)
             return {'success': False, 'error': f'Error running correlation: {str(e)}'}
+
+        # Also re-run rule-based correlations so they survive deduplication
+        try:
+            self._rerunRuleCorrelations(dbh, id)
+        except Exception as e:
+            self.log.warning(f"Failed to re-run rule-based correlations: {e}")
+
+        return ai_result
+
+    def _rerunRuleCorrelations(self: 'SpiderFootWebUi', dbh, scanId: str) -> None:
+        """Re-run rule-based correlations for a scan.
+
+        This ensures rule-based correlations (e.g. MALICIOUS_SUBNET,
+        MALICIOUS_AFFILIATE) survive event deduplication by recreating
+        them from the current scan data.
+        """
+        import os
+        from spiderfoot.correlation.rule_loader import RuleLoader
+        from spiderfoot.correlation.rule_executor import RuleExecutor
+
+        correlations_dir = os.path.join(os.path.dirname(__file__), 'correlations')
+        if not os.path.exists(correlations_dir):
+            self.log.warning("Correlations directory not found, skipping rule-based correlations")
+            return
+
+        loader = RuleLoader(correlations_dir)
+        rules = loader.load_rules()
+        if not rules:
+            return
+
+        # Delete old rule-based correlations for this scan before re-running
+        for rule in rules:
+            rule_id = rule.get('id', '')
+            if rule_id:
+                try:
+                    dbh.deleteCorrelationsByRule(scanId, rule_id)
+                except Exception:
+                    pass
+
+        # Run rule-based correlation engine
+        executor = RuleExecutor(dbh, rules, scan_ids=[scanId])
+        results = executor.run()
+        self.log.info(f"Re-ran rule-based correlations for scan {scanId}: {len(results)} rules evaluated")
 
     @staticmethod
     def _classifyEventTypeRisk(event_type_code: str) -> int:
