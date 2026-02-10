@@ -7079,7 +7079,7 @@
                     // Colgroup forces column widths (highest priority in table layout algorithm)
                     table += "<colgroup>";
                     table += "<col style='width: 40px;'>";
-                    table += "<col style='width: 120px;'>";
+                    table += "<col style='width: 150px;'>";
                     for (var d = 0; d < maxDepth; d++) {
                         table += "<col>";
                     }
@@ -7141,6 +7141,7 @@
                             html += "<div class='dp-module'><strong>SOURCE MODULE:</strong> <span class='dp-value'>" + module + "</span></div>";
                             html += "<div class='dp-data'><strong>DATA:</strong> <span class='dp-value dp-data-value'>" + data + "</span></div>";
                             html += "</div>";
+                            html += "<button class='dp-expand-toggle' tabindex='0'><svg class='dp-chevron' viewBox='0 0 10 10' fill='none' stroke='currentColor' stroke-width='1.5'><path d='M2 4 L5 7 L8 4'/></svg><span class='dp-toggle-text'>EXPAND</span></button>";
                             html += "</td>";
                             return html;
                         }
@@ -7170,7 +7171,7 @@
 
                     // Collapse mechanism using inline styles (bypasses all CSS specificity).
                     // overflow:hidden is ALWAYS on .dp-cell-wrap via CSS — only toggle maxHeight.
-                    var DP_MAX_H = 141; // ~8 lines at 11px * 1.6
+                    var DP_MAX_H = 120; // ~6 lines at 11.5px * 1.7
 
                     // Force reflow so scrollHeight is computed
                     $("#scansummary-content")[0].offsetHeight;
@@ -7186,20 +7187,23 @@
                         }
                     });
 
-                    // Click any cell to expand/collapse its entire row
+                    // Click the expand/collapse toggle or the cell itself
                     $("#scansummary-content").on('click', '.discovery-path-cell[data-dp-state]', function(e) {
                         if ($(e.target).is('a') || $(e.target).closest('a').length) return;
                         e.stopPropagation();
                         var expanding = this.getAttribute('data-dp-state') === 'collapsed';
                         $(this).closest('tr').find('.discovery-path-cell[data-dp-state]').each(function() {
                             var w = this.querySelector('.dp-cell-wrap');
+                            var toggleText = this.querySelector('.dp-toggle-text');
                             if (!w) return;
                             if (expanding) {
                                 w.style.maxHeight = 'none';
                                 this.setAttribute('data-dp-state', 'expanded');
+                                if (toggleText) toggleText.textContent = 'COLLAPSE';
                             } else {
                                 w.style.maxHeight = DP_MAX_H + 'px';
                                 this.setAttribute('data-dp-state', 'collapsed');
+                                if (toggleText) toggleText.textContent = 'EXPAND';
                             }
                         });
                     });
