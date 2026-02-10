@@ -111,6 +111,7 @@ class SpiderFootDb:
         "CREATE INDEX idx_scan_logs ON tbl_scan_log (scan_instance_id)",
         "CREATE INDEX idx_scan_correlation ON tbl_scan_correlation_results (scan_instance_id, id)",
         "CREATE INDEX idx_scan_correlation_events ON tbl_scan_correlation_results_events (correlation_id)",
+        "CREATE INDEX idx_scan_correlation_events_hash ON tbl_scan_correlation_results_events (event_hash)",
         "CREATE TABLE tbl_scan_findings ( \
             id                  INTEGER PRIMARY KEY AUTOINCREMENT, \
             scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
@@ -315,6 +316,7 @@ class SpiderFootDb:
         "CREATE INDEX IF NOT EXISTS idx_scan_logs ON tbl_scan_log (scan_instance_id)",
         "CREATE INDEX IF NOT EXISTS idx_scan_correlation ON tbl_scan_correlation_results (scan_instance_id, id)",
         "CREATE INDEX IF NOT EXISTS idx_scan_correlation_events ON tbl_scan_correlation_results_events (correlation_id)",
+        "CREATE INDEX IF NOT EXISTS idx_scan_correlation_events_hash ON tbl_scan_correlation_results_events (event_hash)",
         "CREATE TABLE IF NOT EXISTS tbl_scan_findings ( \
             id                  SERIAL PRIMARY KEY, \
             scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
@@ -744,6 +746,15 @@ class SpiderFootDb:
                         raise IOError("Looks like you are running a pre-4.0 database. Unfortunately "
                                       "SpiderFoot wasn't able to migrate you, so you'll need to delete "
                                       "your SpiderFoot database in order to proceed.") from None
+
+                # Add event_hash index for faster correlation loading
+                try:
+                    self.dbh.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_scan_correlation_events_hash "
+                        "ON tbl_scan_correlation_results_events (event_hash)")
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass  # Index may already exist or table missing
 
                 # Add target false positives table if it doesn't exist (migration)
                 try:
@@ -1904,30 +1915,28 @@ class SpiderFootDb:
             raise TypeError(
                 f"instanceId is {type(instanceId)}; expected str()") from None
 
-        if self.db_type == 'postgresql':
-            qry = "SELECT c.id, c.title, c.rule_id, c.rule_risk, c.rule_name, \
-                c.rule_descr, c.rule_logic, \
-                count(DISTINCT CASE WHEN r.hash IS NOT NULL THEN e.event_hash END) AS event_count, \
-                STRING_AGG(DISTINCT r.type, ',') AS event_types \
-                FROM tbl_scan_correlation_results c \
-                LEFT JOIN tbl_scan_correlation_results_events e ON c.id = e.correlation_id \
-                LEFT JOIN tbl_scan_results r ON e.event_hash = r.hash \
-                    AND r.scan_instance_id = c.scan_instance_id \
-                WHERE c.scan_instance_id = %s \
-                GROUP BY c.id ORDER BY c.title, c.rule_risk"
-        else:
-            qry = "SELECT c.id, c.title, c.rule_id, c.rule_risk, c.rule_name, \
-                c.rule_descr, c.rule_logic, \
-                count(DISTINCT CASE WHEN r.hash IS NOT NULL THEN e.event_hash END) AS event_count, \
-                GROUP_CONCAT(DISTINCT r.type) AS event_types \
-                FROM tbl_scan_correlation_results c \
-                LEFT JOIN tbl_scan_correlation_results_events e ON c.id = e.correlation_id \
-                LEFT JOIN tbl_scan_results r ON e.event_hash = r.hash \
-                    AND r.scan_instance_id = c.scan_instance_id \
-                WHERE c.scan_instance_id = ? \
-                GROUP BY c.id ORDER BY c.title, c.rule_risk"
+        # Use correlated subqueries instead of a 3-way JOIN + GROUP BY.
+        # The old query joined correlation_results × correlation_results_events
+        # × scan_results in one pass, which was extremely slow on large scans.
+        # Subqueries let the DB process each correlation independently using
+        # existing indexes on correlation_id and (scan_instance_id, hash).
+        placeholder = '%s' if self.db_type == 'postgresql' else '?'
+        agg_fn = 'STRING_AGG(DISTINCT r.type, \',\')' if self.db_type == 'postgresql' else 'GROUP_CONCAT(DISTINCT r.type)'
 
-        qvars = [instanceId]
+        qry = f"""SELECT c.id, c.title, c.rule_id, c.rule_risk, c.rule_name,
+                c.rule_descr, c.rule_logic,
+                (SELECT COUNT(*) FROM tbl_scan_correlation_results_events e
+                 WHERE e.correlation_id = c.id) AS event_count,
+                (SELECT {agg_fn}
+                 FROM tbl_scan_correlation_results_events e
+                 JOIN tbl_scan_results r ON e.event_hash = r.hash
+                    AND r.scan_instance_id = {placeholder}
+                 WHERE e.correlation_id = c.id) AS event_types
+                FROM tbl_scan_correlation_results c
+                WHERE c.scan_instance_id = {placeholder}
+                ORDER BY c.title, c.rule_risk"""
+
+        qvars = [instanceId, instanceId]
 
         with self.dbhLock:
             try:
