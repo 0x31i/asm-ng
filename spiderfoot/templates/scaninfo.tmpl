@@ -4345,8 +4345,11 @@
                     var title = data[i][1] || '';
                     var prefixMatch = title.match(aiTitlePrefixRe);
                     if (prefixMatch) {
-                        groupKey = 'ai_' + prefixMatch[1];
-                        groupName = prefixMatch[1];
+                        var prefix = prefixMatch[1];
+                        // Normalize the count number so "detected 3 times" and "detected 4 times" merge
+                        var normalized = prefix.replace(/\b\d+\b(?= (?:modules|event types|times|historical scan))/, 'N');
+                        groupKey = 'ai_' + normalized;
+                        groupName = normalized;
                     } else {
                         // Fallback: each unmatched AI correlation is its own row
                         groupKey = 'ai_' + data[i][0];

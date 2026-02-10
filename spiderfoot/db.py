@@ -4326,13 +4326,16 @@ class SpiderFootDb:
 
                     removed += len(batch)
 
-                # Clean up any correlation results that now have zero events
+                # Clean up any AI correlation results that now have zero events.
+                # Only delete AI-generated correlations; rule-based correlations
+                # must be preserved even if their events were deduplicated.
                 cleanup_qry = """DELETE FROM tbl_scan_correlation_results
                     WHERE scan_instance_id = ?
                       AND id NOT IN (
                           SELECT DISTINCT correlation_id
                           FROM tbl_scan_correlation_results_events
-                      )"""
+                      )
+                      AND rule_id IN ('ai_single_scan_correlation', 'ai_cross_scan_correlation')"""
                 self.dbh.execute(cleanup_qry, [instanceId])
 
                 self.conn.commit()
