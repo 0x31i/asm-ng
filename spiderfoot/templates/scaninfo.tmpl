@@ -7169,20 +7169,19 @@
                     $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false }, 1: { sorter: false } } });
 
                     // Collapse mechanism using inline styles (bypasses all CSS specificity).
-                    // Cells start unconstrained so scrollHeight is accurate.
+                    // overflow:hidden is ALWAYS on .dp-cell-wrap via CSS — only toggle maxHeight.
                     var DP_MAX_H = 141; // ~8 lines at 11px * 1.6
 
                     // Force reflow so scrollHeight is computed
                     $("#scansummary-content")[0].offsetHeight;
 
-                    // Measure each cell and collapse overflowing ones via inline style
+                    // Measure each cell and collapse overflowing ones via inline maxHeight
                     $("#scansummary-content .discovery-path-cell").each(function() {
                         var wrap = this.querySelector('.dp-cell-wrap');
                         if (!wrap) return;
 
                         if (wrap.scrollHeight > DP_MAX_H) {
                             wrap.style.maxHeight = DP_MAX_H + 'px';
-                            wrap.style.overflow = 'hidden';
                             this.setAttribute('data-dp-state', 'collapsed');
                         }
                     });
@@ -7197,11 +7196,9 @@
                             if (!w) return;
                             if (expanding) {
                                 w.style.maxHeight = 'none';
-                                w.style.overflow = 'visible';
                                 this.setAttribute('data-dp-state', 'expanded');
                             } else {
                                 w.style.maxHeight = DP_MAX_H + 'px';
-                                w.style.overflow = 'hidden';
                                 this.setAttribute('data-dp-state', 'collapsed');
                             }
                         });
