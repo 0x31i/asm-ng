@@ -7051,22 +7051,85 @@ i.glyphicon-white,
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-/* Container constrains the table within the viewport */
+/* ============================================
+   Discovery Path Table - Modern Design
+   ============================================ */
+
+/* Wrapper constrains table and adds card-like container */
 .discovery-path-wrapper {
   width: 100%;
   overflow: hidden;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.1));
 }
 
-/* All cells in discovery path table get vertical-align: top */
-table.discovery-path-table td {
+/* Table layout */
+table.discovery-path-table {
+  table-layout: fixed !important;
+  width: 100% !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  margin-bottom: 0 !important;
+  border: none !important;
+}
+
+/* Column widths */
+table.discovery-path-table th:first-child { width: 36px; }
+table.discovery-path-table th:nth-child(2) { width: 120px; }
+
+/* Header - glass effect */
+table.discovery-path-table > thead > tr > th {
+  background: rgba(10, 10, 10, 0.92) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  color: var(--text-secondary, #a3a3a3) !important;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1.5px !important;
+  padding: 12px 10px !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* All table cells - clean separation */
+table.discovery-path-table > tbody > tr > td {
   vertical-align: top !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.03) !important;
+  padding: 12px 10px !important;
+  background: transparent !important;
 }
 
-/* Discovery path table cell styling */
+table.discovery-path-table > tbody > tr > td:last-child {
+  border-right: none !important;
+}
+
+/* Row hover effect */
+table.discovery-path-table > tbody > tr:hover > td {
+  background: rgba(255, 255, 255, 0.02) !important;
+}
+
+/* Checkbox cell */
+table.discovery-path-table > tbody > tr > td:first-child {
+  padding: 14px 0 !important;
+  text-align: center;
+}
+
+/* Status cell - proper alignment */
+table.discovery-path-table td.validation-status {
+  vertical-align: top !important;
+  padding: 10px 6px !important;
+  text-align: center !important;
+}
+
+/* Discovery path data cells */
 .discovery-path-cell {
-  padding: 6px 10px !important;
+  padding: 10px 12px !important;
   vertical-align: top !important;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
   font-size: 11px;
   line-height: 1.6;
   cursor: pointer;
@@ -7074,108 +7137,110 @@ table.discovery-path-table td {
   white-space: normal !important;
   word-break: break-all !important;
   overflow-wrap: anywhere !important;
+  transition: background var(--transition-fast, 0.15s ease);
 }
 
-/* Wrapper inside td handles relative positioning (td can't do it reliably) */
+/* Wrapper - ALWAYS overflow:hidden to prevent horizontal bleed */
 .dp-cell-wrap {
   position: relative;
   width: 100%;
   max-width: 100%;
+  overflow: hidden;
   white-space: normal;
   word-break: break-all;
   overflow-wrap: anywhere;
 }
 
-/* Inner divs and values must also break */
+/* Inner divs */
 .discovery-path-cell .dp-type,
 .discovery-path-cell .dp-module,
 .discovery-path-cell .dp-data {
   white-space: normal;
   word-break: break-all;
   overflow-wrap: anywhere;
-}
-
-.discovery-path-cell .dp-value {
-  word-break: break-all;
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-
-/* Fade overlay on collapsed cells (inline styles handle max-height/overflow) */
-.discovery-path-cell[data-dp-state="collapsed"] .dp-cell-wrap::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 32px;
-  background: linear-gradient(to bottom, transparent, #141422);
-  pointer-events: none;
-}
-
-/* Expand hint on collapsed cells */
-.discovery-path-cell[data-dp-state="collapsed"]::after {
-  content: 'CLICK TO EXPAND';
-  display: block;
-  text-align: center;
-  font-size: 9px;
-  letter-spacing: 1px;
-  color: rgba(74, 222, 128, 0.6);
-  margin-top: 2px;
-  cursor: pointer;
-}
-
-/* Collapse hint on expanded cells */
-.discovery-path-cell[data-dp-state="expanded"]::after {
-  content: 'CLICK TO COLLAPSE';
-  display: block;
-  text-align: center;
-  font-size: 9px;
-  letter-spacing: 1px;
-  color: rgba(156, 163, 175, 0.5);
-  margin-top: 4px;
-  cursor: pointer;
+  margin-bottom: 1px;
 }
 
 /* Labels (TYPE:, SOURCE MODULE:, DATA:) */
 .discovery-path-cell .dp-type strong,
 .discovery-path-cell .dp-module strong,
 .discovery-path-cell .dp-data strong {
-  color: #9ca3af;
+  color: rgba(255, 255, 255, 0.3);
   font-weight: 600;
   text-transform: uppercase;
-  font-size: 10px;
+  font-size: 9px;
+  letter-spacing: 0.5px;
 }
 
-/* Values - stand out from labels */
+/* Values */
 .discovery-path-cell .dp-value {
-  color: #111827;
+  color: var(--text-primary, #e5e7eb);
   font-weight: 500;
+  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
-/* DATA values in green for quick identification */
+/* DATA values in green */
 .discovery-path-cell .dp-data-value {
-  color: #16a34a;
+  color: #4ade80;
   font-weight: 600;
 }
 
-/* Discovery path table layout */
-table.discovery-path-table {
-  table-layout: fixed !important;
-  width: 100% !important;
+/* Fade overlay on collapsed cells */
+.discovery-path-cell[data-dp-state="collapsed"] .dp-cell-wrap::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  background: linear-gradient(to bottom, transparent, rgba(12, 12, 12, 0.95));
+  pointer-events: none;
 }
 
-table.discovery-path-table th:first-child {
-  width: 40px;
+/* Expand hint */
+.discovery-path-cell[data-dp-state="collapsed"]::after {
+  content: 'EXPAND';
+  display: block;
+  text-align: center;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: rgba(74, 222, 128, 0.5);
+  margin-top: 6px;
+  padding: 3px 0;
+  cursor: pointer;
+  transition: color var(--transition-fast, 0.15s ease);
 }
 
-table.discovery-path-table th:nth-child(2) {
-  width: 120px;
+.discovery-path-cell[data-dp-state="collapsed"]:hover::after {
+  color: rgba(74, 222, 128, 0.8);
 }
 
-/* Expand/collapse toggle — hidden, entire cell is clickable now */
-.dp-expand-toggle {
-  display: none;
+/* Collapse hint */
+.discovery-path-cell[data-dp-state="expanded"]::after {
+  content: 'COLLAPSE';
+  display: block;
+  text-align: center;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: rgba(156, 163, 175, 0.35);
+  margin-top: 6px;
+  padding: 3px 0;
+  cursor: pointer;
+  transition: color var(--transition-fast, 0.15s ease);
+}
+
+.discovery-path-cell[data-dp-state="expanded"]:hover::after {
+  color: rgba(156, 163, 175, 0.6);
+}
+
+/* Hover highlight on expandable cells */
+.discovery-path-cell[data-dp-state]:hover {
+  background: rgba(255, 255, 255, 0.02) !important;
 }
 
 /* Responsive adjustments */
