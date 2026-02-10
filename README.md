@@ -4,7 +4,6 @@
 [![Python Version](https://img.shields.io/badge/python-3.9+-green)](https://www.python.org)
 [![Stable Release](https://img.shields.io/badge/version-5.2.9-blue.svg)](https://github.com/0x31i/asm-ng/releases/tag/v5.2.9)
 [![Production Grade](https://img.shields.io/badge/Production-Grade-blue.svg)](https://github.com/0x31i/asm-ng)
-[![AI Enhanced](https://img.shields.io/badge/AI-Enhanced-orange.svg)](https://github.com/0x31i/asm-ng)
 [![CI status](https://github.com/0x31i/asm-ng/workflows/Tests/badge.svg)](https://github.com/0x31i/asm-ng/actions?query=workflow%3A"Tests")
 [![Docker CI Build](https://github.com/0x31i/asm-ng/workflows/Docker%20Image%20CI/badge.svg)](https://github.com/0x31i/asm-ng/actions?query=workflow%3A"Docker%20Image%20CI")
 [![Code QL](https://github.com/0x31i/asm-ng/workflows/CodeQL/badge.svg)](https://github.com/0x31i/asm-ng/actions?query=workflow%3A"CodeQL")
@@ -12,7 +11,7 @@
 [![Discord](https://img.shields.io/discord/770524432464216074)](https://discord.gg/vyvztrG)
 ![Active Development](https://img.shields.io/badge/Maintenance%20Level-Actively%20Developed-brightgreen.svg)
 
-**ASM-NG** is a production-ready, enterprise-grade attack surface management and OSINT platform. Built on a battle-tested scanning engine with 200+ modules, it extends far beyond traditional OSINT with **workspace management**, **security grading**, **false positive tracking**, **known asset management**, **external vulnerability tool integration** (Burp Suite Pro, Nessus Pro, Nuclei), **AI-powered analysis**, and **cross-scan correlation** — making intelligence data truly navigable and actionable.
+**ASM-NG** is a production-ready, enterprise-grade attack surface management and OSINT platform. Built on a battle-tested scanning engine with 200+ modules, it extends far beyond traditional OSINT with **workspace management**, **security grading**, **false positive tracking**, **known asset management**, **external vulnerability tool integration** (Burp Suite Pro, Nessus Pro, Nuclei), and **multi-layered cross-scan correlation** — making intelligence data truly navigable and actionable.
 
 ASM-NG features an embedded web server with a clean, modern interface and can also be used entirely via the command line. Written in **Python 3** and **MIT-licensed**.
 
@@ -37,13 +36,12 @@ ASM-NG is a ground-up transformation of SpiderFoot into a full attack surface ma
 | **Bulk Operations** | None | Bulk status editing, select-all, cascade to children |
 | **Authentication** | Basic HTTP auth | Full user accounts with sessions, login page, user management |
 | **Audit Logging** | None | Comprehensive audit trail with username, action, IP, timestamp |
-| **AI Analysis** | None | AI threat intel, AI scan summaries, MCP CTI report generation |
-| **Correlation Engine** | Basic YAML rules | YAML rules + single-scan IOC correlation + cross-scan historical correlation |
+| **Correlation Engine** | Basic YAML rules | YAML rules + single-scan IOC correlation + cross-scan historical correlation + CTI report generation |
 | **Data Import** | None | Legacy CSV, Scan Backup, Nessus XML, Burp XML/HTML, Excel findings |
 | **Export** | CSV/JSON | CSV/JSON/XLSX/GEXF with multi-scan export, vulnerability export, asset export |
 | **Database** | SQLite only | SQLite + PostgreSQL with 9 new tables and auto-migration |
-| **Modules** | ~200 | 274 modules including security hardening and AI modules |
-| **Correlation Rules** | 37 YAML rules | 51 YAML rules + AI-driven single and cross-scan correlation |
+| **Modules** | ~200 | 274 modules including security hardening and threat intel modules |
+| **Correlation Rules** | 37 YAML rules | 51 YAML rules + automated single-scan and cross-scan correlation |
 
 ---
 
@@ -64,7 +62,7 @@ Workspaces let you organize targets, scans, and results into logical groups for 
 - **Summary dashboard** — at-a-glance statistics on targets, scans, events, and correlations
 - **Cross-workspace search** — search events across all scans in a workspace
 - **Timing configuration** — set timezone, business hours, scheduling preferences, and retention policies
-- **MCP CTI reports** — generate threat assessment, infrastructure analysis, or attack surface reports for the entire workspace
+- **CTI report generation** — generate threat assessment, infrastructure analysis, or attack surface reports for the entire workspace
 - **Dedicated workspace views** — full UI for workspace list and workspace detail pages
 
 ```mermaid
@@ -258,40 +256,44 @@ Comprehensive audit trail for compliance and forensic analysis.
 
 ---
 
-### AI-Powered Analysis
+### Advanced Correlation Engine
 
-Automated intelligence analysis powered by AI and Model Context Protocol (MCP) integration.
+Multi-layered correlation analysis that surfaces patterns across modules, event types, and historical scans — no black boxes, just deterministic logic you can inspect and customize.
 
-- **AI Threat Intel** (`sfp__ai_threat_intel`) — cross-scan IOC analysis, loading IOCs from previous scans against the same target for historical threat pattern detection
-- **AI Scan Summaries** (`sfp_ai_summary`) — automated summarization of scan results
-- **MCP CTI Reports** — generate structured Cyber Threat Intelligence reports for workspaces:
+**Three correlation layers:**
+
+1. **YAML Rule-Based Correlation** — 51 pre-defined rules in `/correlations/` that match patterns across event types using declarative, auditable YAML definitions
+2. **Single-Scan IOC Correlation** — groups IOCs by data value and flags when the same indicator is found by multiple modules or across multiple event types, boosting confidence through multi-source corroboration
+3. **Cross-Scan Historical Correlation** — matches IOCs across native scan data and imported historical data, identifying persistent indicators that recur across scans over time
+
+**Risk classification:**
+- 5-tier risk: `CRITICAL` / `HIGH` / `MEDIUM` / `LOW` / `INFO`
+- Risk derived from event type intrinsic risk + multi-module corroboration boost + occurrence count boost
+- Each of 130+ event types has an intrinsic risk score (0-100) based on severity (e.g., `MALICIOUS_*` = 90, `VULNERABILITY_CVE_HIGH` = 70, `TCP_PORT_OPEN` = 50)
+- Multi-module detection boosts: 2 modules +10, 3 modules +15, 4+ modules +20
+- High occurrence boosts: 5+ occurrences +5, 10+ occurrences +10
+
+**Features:**
+- **Async processing** — correlations run in the background with polling for status
+- **Expandable detail rows** — each correlation links to all associated events with full provenance
+- **Export** — CSV export of correlation results
+- **Per-correlation risk** — individual risk level per correlation with color coding
+- **Meaningful headlines** — auto-generated descriptions like "Malicious IP corroborated by 3 modules" or "DNS record persists across 4 historical scans"
+
+---
+
+### Automated Threat Analysis & CTI Reporting
+
+Structured analysis modules and report generation built on the correlation engine.
+
+- **Cross-scan threat intel** (`sfp__ai_threat_intel`) — loads IOCs from previous scans against the same target, compares against current findings to detect historical threat patterns and persistent indicators
+- **Scan result summarization** (`sfp_ai_summary`) — automated summarization of scan results into structured overviews
+- **CTI report generation** — generate structured Cyber Threat Intelligence reports for workspaces via MCP integration:
   - **Threat Assessment** — executive summary, threat landscape, IOCs, risk assessment, recommendations
   - **Infrastructure Analysis** — infrastructure overview, exposed services, vulnerabilities, misconfigurations
   - **Attack Surface Report** — external exposure, data leakage, third-party risks, mitigation strategies
 - **Traffic Light Protocol** — TLP level support (white, green, amber, red) for report classification
 - **Multiple output formats** — JSON, Markdown, PDF, HTML
-
----
-
-### Advanced Correlation Engine
-
-Multi-layered correlation analysis that surfaces patterns across modules, event types, and historical scans.
-
-**Three correlation layers:**
-
-1. **YAML Rule-Based Correlation** — 51 pre-defined rules in `/correlations/` that match patterns across event types
-2. **Single-Scan IOC Correlation** — groups IOCs by data value and flags when the same indicator is found by multiple modules or across multiple event types
-3. **Cross-Scan Historical Correlation** — matches IOCs across native scan data and imported historical data, identifying persistent indicators worth investigation
-
-**Risk classification:**
-- 5-tier risk: `CRITICAL` / `HIGH` / `MEDIUM` / `LOW` / `INFO`
-- Risk derived from event type intrinsic risk + multi-module corroboration boost + occurrence count boost
-
-**Features:**
-- **Async processing** — correlations run in the background with polling for status
-- **Expandable detail rows** — each correlation links to all associated events
-- **Export** — CSV export of correlation results
-- **Per-correlation risk** — individual risk level per correlation with color coding
 
 ---
 
@@ -361,7 +363,7 @@ graph TD;
     C --> I[External Data Sources];
     E --> J[SIEM/SOAR/Integrations];
     F --> K[Multi-Target Scans];
-    H --> L[YAML Rules + AI Correlation];
+    H --> L[YAML Rules + Cross-Scan Correlation];
     B --> M[External Tool Import - Burp/Nessus/Nuclei];
     B --> N[Asset Manager];
     B --> O[Auth & Audit];
@@ -522,7 +524,7 @@ Module categories include:
 - **OSINT Collection** — DNS, WHOIS, web scraping, port scanning, social media enumeration
 - **Threat Intelligence** — SHODAN, HaveIBeenPwned, GreyNoise, AlienVault, SecurityTrails, and more
 - **Vulnerability Scanning** — Nuclei, Nmap, CMSeeK, Whatweb, DNSTwist
-- **AI Analysis** — AI Threat Intel, AI Scan Summaries
+- **Threat Analysis** — cross-scan threat intel, scan summarization
 - **Security Hardening** — built-in hardening configuration module
 - **Data Storage** — database, stdout, and custom storage backends
 
@@ -532,7 +534,7 @@ See the [Module Guide](documentation/modules.md) for the full list.
 
 ## Correlation Rules
 
-ASM-NG includes **51 YAML correlation rules** plus AI-driven single-scan and cross-scan correlation.
+ASM-NG includes **51 YAML correlation rules** plus automated single-scan and cross-scan correlation engines.
 
 See the [Correlation Rules Reference](/correlations/README.md) and the [template.yaml](/correlations/template.yaml) for writing custom rules.
 
