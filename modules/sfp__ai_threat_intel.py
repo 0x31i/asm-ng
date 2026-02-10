@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # -------------------------------------------------------------------------------
 # Name:         sfp_ai_threat_intel
-# Purpose:      AI-Powered Threat Intelligence Engine
+# Purpose:      Threat Intelligence Engine
 #
 # Author:       Enhancement Team
 # Created:      2025-06-20
@@ -10,14 +10,14 @@
 # -------------------------------------------------------------------------------
 
 """
-AI-Powered Threat Intelligence Engine
+Threat Intelligence Engine
 
-This module implements advanced AI/ML capabilities:
-- Smart pattern recognition for sophisticated attack detection
-- Predictive analytics for threat forecasting
+This module implements threat intelligence capabilities:
+- Pattern recognition for attack detection
+- Trend analysis for threat forecasting
 - Automated IOC correlation across data sources
-- Dynamic threat scoring using machine learning
-- Natural language processing for unstructured data analysis
+- Heuristic-based threat scoring
+- Text processing for unstructured data analysis
 """
 
 import os
@@ -144,7 +144,7 @@ class CrossScanCorrelation:
 
 
 class PatternRecognitionEngine:
-    """Advanced pattern recognition using machine learning."""
+    """Pattern recognition for attack detection."""
     
     def __init__(self):
         self.models = {}
@@ -770,7 +770,7 @@ class IOCCorrelationEngine:
 
 
 class ThreatScoringEngine:
-    """Dynamic threat scoring using machine learning."""
+    """Heuristic-based threat scoring."""
     
     def __init__(self):
         self.scoring_models = {}
@@ -1052,12 +1052,12 @@ class NLPThreatAnalyzer:
 
 
 class sfp__ai_threat_intel(SpiderFootPlugin):
-    """AI-Powered Threat Intelligence Engine."""
+    """Threat Intelligence Engine."""
 
     meta = {
-        'name': "AI Threat Intelligence Engine",
-        'summary': "Advanced AI/ML-powered threat intelligence with pattern recognition, predictive analytics, and automated IOC correlation.",
-        'flags': ["enterprise", "ai", "ml"]
+        'name': "Threat Intelligence Engine",
+        'summary': "Threat intelligence with pattern recognition, trend analysis, and automated IOC correlation.",
+        'flags': ["enterprise"]
     }
 
     _priority = 1  # High priority for threat intelligence
@@ -1081,11 +1081,11 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
 
     # Option descriptions
     optdescs = {
-        'enable_pattern_recognition': "Enable AI-powered attack pattern recognition",
+        'enable_pattern_recognition': "Enable attack pattern recognition",
         'enable_predictive_analytics': "Enable predictive threat analytics",
         'enable_ioc_correlation': "Enable automated IOC correlation",
-        'enable_threat_scoring': "Enable dynamic ML-based threat scoring",
-        'enable_nlp_analysis': "Enable natural language processing for threat analysis",
+        'enable_threat_scoring': "Enable heuristic-based threat scoring",
+        'enable_nlp_analysis': "Enable text processing for threat analysis",
         'enable_cross_scan_correlation': "Enable correlation with historical scan data for the same target",
         'max_historical_scans': "Maximum number of historical scans to include (0 = unlimited)",
         'historical_lookback_days': "Only include scans from the last N days",
@@ -1097,7 +1097,7 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
     }
 
     def setup(self, sfc, userOpts=dict()):
-        """Set up the AI threat intelligence module."""
+        """Set up the threat intelligence module."""
         self.sf = sfc
         self.errorState = False
         self._historical_data_loaded = False  # Flag for lazy loading of historical data
@@ -1111,7 +1111,7 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
             self.errorState = True
             return
 
-        # Initialize AI engines
+        # Initialize engines
         try:
             if self.opts['enable_pattern_recognition']:
                 self.pattern_engine = PatternRecognitionEngine()
@@ -1128,15 +1128,15 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
             if self.opts['enable_nlp_analysis']:
                 self.nlp_analyzer = NLPThreatAnalyzer()
 
-            self.debug("AI Threat Intelligence Engine initialized successfully")
+            self.debug("Threat Intelligence Engine initialized successfully")
 
         except Exception as e:
-            self.error(f"Failed to initialize AI engines: {e}")
+            self.error(f"Failed to initialize engines: {e}")
             self.errorState = True
 
     def watchedEvents(self):
         """Define the events this module is interested in."""
-        return ["*"]  # Process all events for comprehensive AI analysis
+        return ["*"]  # Process all events for comprehensive analysis
 
     def producedEvents(self):
         """Define the events this module produces."""
@@ -1151,7 +1151,7 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
         ]
 
     def handleEvent(self, sfEvent):
-        """Handle events with AI-powered analysis."""
+        """Handle events with threat analysis."""
         if self.errorState:
             return
 
@@ -1174,11 +1174,11 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
             'module': sfEvent.module
         }
 
-        # Perform AI analysis
+        # Perform analysis
         self._analyze_event(sfEvent, event_data)
 
     def _analyze_event(self, sfEvent, event_data):
-        """Perform comprehensive AI analysis on the event."""
+        """Perform comprehensive analysis on the event."""
         
         # 1. Pattern Recognition
         if hasattr(self, 'pattern_engine') and self.opts['enable_pattern_recognition']:
@@ -1309,7 +1309,7 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
                 self.error(f"Cross-scan correlation failed: {e}")
 
     def _load_historical_data(self):
-        """Pre-populate AI engines with historical scan data for the same target.
+        """Pre-populate engines with historical scan data for the same target.
 
         This method queries the database for previous scans against the same target
         and loads their IOCs into the correlation engine for cross-scan analysis.
@@ -1414,7 +1414,7 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
         return historical_scans
 
     def _populate_engines_from_scan(self, scan_id: str, scan_name: str, scan_started: str) -> int:
-        """Load events from a historical scan into AI engines.
+        """Load events from a historical scan into engines.
 
         Args:
             scan_id: Historical scan instance ID
@@ -1696,4 +1696,4 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
 
         return " ".join(analysis_parts)
 
-# End of AI Threat Intelligence Engine
+# End of Threat Intelligence Engine
