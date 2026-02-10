@@ -7123,16 +7123,17 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   background: var(--bg-tertiary) !important;
 }
 
-/* Checkbox cell */
+/* Checkbox cell - vertically centered */
 table.discovery-path-table > tbody > tr > td:first-child {
   padding: 16px 0 !important;
   text-align: center;
+  vertical-align: middle !important;
   width: 40px !important;
 }
 
-/* Status cell - generous width, no overflow */
+/* Status cell - vertically centered, generous width, no overflow */
 table.discovery-path-table td.validation-status {
-  vertical-align: top !important;
+  vertical-align: middle !important;
   padding: 12px 10px !important;
   text-align: center !important;
   width: 150px !important;
@@ -7209,17 +7210,11 @@ table.discovery-path-table td.validation-status {
   font-weight: 600;
 }
 
-/* Fade overlay - uses bg-primary for clean fade */
-.discovery-path-cell[data-dp-state="collapsed"] .dp-cell-wrap::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 40px;
-  background: linear-gradient(to bottom, transparent, var(--bg-primary));
-  pointer-events: none;
-  z-index: 1;
+/* Collapsed indicator - subtle dashed bottom border instead of gradient
+   (gradient overlays don't adapt to hover/zebra backgrounds) */
+.discovery-path-cell[data-dp-state="collapsed"] .dp-cell-wrap {
+  border-bottom: 1px dashed var(--glass-border);
+  padding-bottom: 4px;
 }
 
 /* Expand/collapse toggle button */
