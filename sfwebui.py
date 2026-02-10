@@ -5092,7 +5092,7 @@ class SpiderFootWebUi:
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def scancorrelations(self: 'SpiderFootWebUi', id: str) -> list:
-        """Correlation results from a scan.
+        """Correlation results from a scan (synchronous, kept for backward compat).
 
         Args:
             id (str): scan ID
@@ -5139,6 +5139,114 @@ class SpiderFootWebUi:
             # Return empty list on error
 
         return retdata
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scancorrelationsAsync(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Start loading correlation results in a background thread.
+
+        Returns a job_id immediately. Poll correlationLoadStatus for progress.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: {success, job_id}
+        """
+        self._cleanupOldCorrelationJobs()
+
+        job_id = str(uuid.uuid4())
+        with self._correlation_jobs_lock:
+            self._correlation_jobs[job_id] = {
+                'status': 'running',
+                'progress': 0,
+                'step': 'Warming up the correlation engine...',
+                'result': None,
+                'completed_at': 0,
+            }
+
+        worker = threading.Thread(
+            target=self._loadCorrelationsWorker,
+            args=(job_id, id),
+            daemon=True
+        )
+        worker.start()
+
+        return {'success': True, 'job_id': job_id}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def correlationLoadStatus(self: 'SpiderFootWebUi', job_id: str) -> dict:
+        """Check status of an async correlation load job.
+
+        Args:
+            job_id (str): job ID from scancorrelationsAsync
+
+        Returns:
+            dict: {success, status, progress, step, data}
+        """
+        with self._correlation_jobs_lock:
+            job = self._correlation_jobs.get(job_id)
+        if not job:
+            return {'success': False, 'error': 'Job not found'}
+        resp = {
+            'success': True,
+            'status': job['status'],
+            'progress': job['progress'],
+            'step': job['step'],
+        }
+        if job['status'] in ('complete', 'error'):
+            resp['data'] = job.get('result')
+        return resp
+
+    def _loadCorrelationsWorker(self, job_id: str, scan_id: str) -> None:
+        """Background worker that loads correlation data from the database."""
+        try:
+            self._updateCorrelationJob(job_id, progress=10, step='Querying the database...')
+
+            dbh = SpiderFootDb(self.config)
+            corrdata = dbh.scanCorrelationList(scan_id)
+
+            self._updateCorrelationJob(job_id, progress=60, step='Processing results...')
+
+            retdata = []
+            if corrdata:
+                for row in corrdata:
+                    if len(row) < 6:
+                        continue
+                    correlation_id = row[0]
+                    correlation = row[1]
+                    rule_name = row[2]
+                    rule_risk = row[3]
+                    rule_id = row[4]
+                    rule_description = row[5]
+                    events = row[6] if len(row) > 6 else ""
+                    created = row[7] if len(row) > 7 else ""
+                    event_types = row[8] if len(row) > 8 else ""
+                    retdata.append([correlation_id, correlation, rule_name, rule_risk,
+                                   rule_id, rule_description, events, created, event_types])
+
+            self._updateCorrelationJob(job_id, progress=90, step='Preparing display...')
+
+            self._updateCorrelationJob(
+                job_id,
+                status='complete',
+                progress=100,
+                step='Complete',
+                result=retdata,
+                completed_at=time.time()
+            )
+
+        except Exception as e:
+            self.log.error(f"Correlation load worker error: {e}", exc_info=True)
+            self._updateCorrelationJob(
+                job_id,
+                status='error',
+                progress=100,
+                step='Error',
+                result=[],
+                completed_at=time.time()
+            )
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
