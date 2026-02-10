@@ -5142,10 +5142,12 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
+    @cherrypy.config(**{'tools.sessions.on': False, 'tools.auth_check.on': False})
     def scancorrelationsAsync(self: 'SpiderFootWebUi', id: str) -> dict:
         """Start loading correlation results in a background thread.
 
         Returns a job_id immediately. Poll correlationLoadStatus for progress.
+        Sessions disabled to avoid FileSession lock contention with concurrent polls.
 
         Args:
             id (str): scan ID
@@ -5176,8 +5178,11 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
+    @cherrypy.config(**{'tools.sessions.on': False, 'tools.auth_check.on': False})
     def correlationLoadStatus(self: 'SpiderFootWebUi', job_id: str) -> dict:
         """Check status of an async correlation load job.
+
+        Sessions disabled to avoid FileSession lock contention during polling.
 
         Args:
             job_id (str): job ID from scancorrelationsAsync
@@ -5978,8 +5983,11 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
+    @cherrypy.config(**{'tools.sessions.on': False, 'tools.auth_check.on': False})
     def correlationStatus(self: 'SpiderFootWebUi', job_id: str) -> dict:
         """Check the status of a running correlation job.
+
+        Sessions disabled to avoid FileSession lock contention during polling.
 
         Args:
             job_id (str): correlation job ID returned by runAiCorrelation

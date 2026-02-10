@@ -4303,34 +4303,10 @@
             var panel = $('#findings-correlations-content');
             showCorrelationLoadingUI(panel);
 
-            // Step 1: Quick check via scanstatus (returns fast)
-            $.ajax({
-                type: "POST",
-                url: '${docroot}/scanstatus',
-                data: {'id': instanceId},
-                dataType: "json",
-                timeout: 10000,
-                success: function(statusData) {
-                    var counts = (statusData && statusData[6]) ? statusData[6] : null;
-                    var hasCorrelations = counts && (
-                        (counts['CRITICAL'] || 0) > 0 ||
-                        (counts['HIGH'] || 0) > 0 ||
-                        (counts['MEDIUM'] || 0) > 0 ||
-                        (counts['LOW'] || 0) > 0 ||
-                        (counts['INFO'] || 0) > 0
-                    );
-                    if (!hasCorrelations && counts !== null) {
-                        renderCorrelationsPanelEmpty(instanceId);
-                        return;
-                    }
-                    // Step 2: Start async load and poll
-                    startAsyncCorrelationLoad(instanceId, counts);
-                },
-                error: function() {
-                    // If status check fails, try loading anyway
-                    startAsyncCorrelationLoad(instanceId, null);
-                }
-            });
+            // Go straight to async load — skip the scanstatus pre-check
+            // because scanstatus queries the DB and can hold the CherryPy
+            // session lock while waiting on SQLite, blocking all subsequent polls.
+            startAsyncCorrelationLoad(instanceId, null);
         }
 
         function startAsyncCorrelationLoad(instanceId, counts) {
