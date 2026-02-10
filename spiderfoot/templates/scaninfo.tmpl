@@ -4286,12 +4286,7 @@
             "The data is being extra dramatic today..."
         ];
 
-        var _corrLoadingInterval = null;
-
-        function startCorrelationLoadingAnimation(panel) {
-            var msgIndex = 0;
-            var progress = 0;
-
+        function showCorrelationLoadingUI(panel) {
             panel.html(
                 "<div style='text-align: center; padding: 40px 30px;'>" +
                 "  <i class='glyphicon glyphicon-refresh spinning' style='font-size: 28px; color: #38bdf8; display: block; margin-bottom: 15px;'></i>" +
@@ -4301,61 +4296,112 @@
                 "  </div>" +
                 "</div>"
             );
-
-            _corrLoadingInterval = setInterval(function() {
-                msgIndex = (msgIndex + 1) % corrLoadingMessages.length;
-                // Logarithmic progress: fast at start, slows down, never hits 100
-                progress = Math.min(92, progress + (95 - progress) * 0.12);
-                var pct = Math.round(progress);
-                $('#corr-loading-msg').text(corrLoadingMessages[msgIndex]);
-                $('#corr-loading-bar').css('width', pct + '%').text(pct + '%');
-            }, 2200);
         }
 
-        function stopCorrelationLoadingAnimation() {
-            if (_corrLoadingInterval) {
-                clearInterval(_corrLoadingInterval);
-                _corrLoadingInterval = null;
-            }
-        }
-
-        // Load correlations data into the correlations tab panel
+        // Load correlations data using async polling (prevents browser "page unresponsive")
         function loadCorrelationsIntoPanel(instanceId) {
             var panel = $('#findings-correlations-content');
-            startCorrelationLoadingAnimation(panel);
+            showCorrelationLoadingUI(panel);
 
-            sf.fetchData('${docroot}/scanstatus', {'id': instanceId},
-                function(statusData) {
-                    if (statusData && statusData[6] && (
-                        (statusData[6]['CRITICAL'] || 0) > 0 ||
-                        statusData[6]['HIGH'] > 0 ||
-                        statusData[6]['MEDIUM'] > 0 ||
-                        statusData[6]['LOW'] > 0 ||
-                        statusData[6]['INFO'] > 0
-                    )) {
-                        sf.fetchData('${docroot}/scancorrelations', {'id': instanceId},
-                            function(data) {
-                                renderCorrelationsPanel(instanceId, data, statusData[6]);
-                            },
-                            function() {
-                                renderCorrelationsPanelEmpty(instanceId);
-                            }
-                        );
+            // Step 1: Quick check via scanstatus (returns fast)
+            $.ajax({
+                type: "POST",
+                url: '${docroot}/scanstatus',
+                data: {'id': instanceId},
+                dataType: "json",
+                timeout: 10000,
+                success: function(statusData) {
+                    var counts = (statusData && statusData[6]) ? statusData[6] : null;
+                    var hasCorrelations = counts && (
+                        (counts['CRITICAL'] || 0) > 0 ||
+                        (counts['HIGH'] || 0) > 0 ||
+                        (counts['MEDIUM'] || 0) > 0 ||
+                        (counts['LOW'] || 0) > 0 ||
+                        (counts['INFO'] || 0) > 0
+                    );
+                    if (!hasCorrelations && counts !== null) {
+                        renderCorrelationsPanelEmpty(instanceId);
+                        return;
+                    }
+                    // Step 2: Start async load and poll
+                    startAsyncCorrelationLoad(instanceId, counts);
+                },
+                error: function() {
+                    // If status check fails, try loading anyway
+                    startAsyncCorrelationLoad(instanceId, null);
+                }
+            });
+        }
+
+        function startAsyncCorrelationLoad(instanceId, counts) {
+            // Fire the async load request (returns immediately with a job_id)
+            $.ajax({
+                type: "POST",
+                url: '${docroot}/scancorrelationsAsync',
+                data: {'id': instanceId},
+                dataType: "json",
+                timeout: 10000,
+                success: function(resp) {
+                    if (resp.success && resp.job_id) {
+                        pollCorrelationLoad(resp.job_id, instanceId, counts, 0);
                     } else {
                         renderCorrelationsPanelEmpty(instanceId);
                     }
                 },
-                function() {
-                    sf.fetchData('${docroot}/scancorrelations', {'id': instanceId},
-                        function(data) {
-                            renderCorrelationsPanel(instanceId, data);
-                        },
-                        function() {
+                error: function() {
+                    renderCorrelationsPanelEmpty(instanceId);
+                }
+            });
+        }
+
+        function pollCorrelationLoad(jobId, instanceId, counts, msgIndex) {
+            // Each poll is a short request (~50ms) that keeps the browser alive
+            $.ajax({
+                type: "GET",
+                url: '${docroot}/correlationLoadStatus',
+                data: {'job_id': jobId},
+                dataType: "json",
+                timeout: 10000,
+                success: function(resp) {
+                    if (!resp.success) {
+                        renderCorrelationsPanelEmpty(instanceId);
+                        return;
+                    }
+
+                    // Update progress bar and fun message from server progress
+                    var pct = Math.min(95, resp.progress || 0);
+                    msgIndex = (msgIndex + 1) % corrLoadingMessages.length;
+                    var msg = resp.step || corrLoadingMessages[msgIndex];
+                    // Use fun messages for the "querying" phase (the long part)
+                    if (resp.progress <= 60) {
+                        msg = corrLoadingMessages[msgIndex];
+                    }
+                    $('#corr-loading-msg').text(msg);
+                    $('#corr-loading-bar').css('width', pct + '%').text(pct + '%');
+
+                    if (resp.status === 'complete') {
+                        var data = resp.data || [];
+                        if (data.length > 0) {
+                            renderCorrelationsPanel(instanceId, data, counts);
+                        } else {
                             renderCorrelationsPanelEmpty(instanceId);
                         }
-                    );
+                    } else if (resp.status === 'error') {
+                        renderCorrelationsPanelEmpty(instanceId);
+                    } else {
+                        // Still running — poll again in 2 seconds
+                        setTimeout(function() {
+                            pollCorrelationLoad(jobId, instanceId, counts, msgIndex);
+                        }, 2000);
+                    }
+                },
+                error: function() {
+                    // Network blip — retry once more after a delay
+                    setTimeout(function() {
+                        pollCorrelationLoad(jobId, instanceId, counts, msgIndex);
+                    }, 3000);
                 }
-            );
+            });
         }
 
         function buildAiCorrelationBar(instanceId) {
@@ -4378,7 +4424,6 @@
         }
 
         function renderCorrelationsPanel(instanceId, data, counts) {
-            stopCorrelationLoadingAnimation();
             var panel = $('#findings-correlations-content');
 
             if (!data || data.length == 0) {
@@ -4661,7 +4706,6 @@
         }
 
         function renderCorrelationsPanelEmpty(instanceId) {
-            stopCorrelationLoadingAnimation();
             var panel = $('#findings-correlations-content');
             var html = "<div class='findings-toolbar'>";
             html += "<div class='findings-toolbar-left'>";
