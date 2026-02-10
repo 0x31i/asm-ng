@@ -4389,6 +4389,28 @@
                 return (groups[a].ruleName || '').localeCompare(groups[b].ruleName || '');
             });
 
+            // For AI groups with normalized "N", resolve to actual count or range
+            var countBeforeSuffixRe = /\bN\b(?= (?:modules|event types|times|historical scan))/;
+            for (var g = 0; g < groupOrder.length; g++) {
+                var grp = groups[groupOrder[g]];
+                if (grp.ruleName && grp.ruleName.match(countBeforeSuffixRe) && grp.items.length > 0) {
+                    var counts = {};
+                    for (var j = 0; j < grp.items.length; j++) {
+                        var m = grp.items[j][1].match(aiTitlePrefixRe);
+                        if (m) {
+                            var numMatch = m[1].match(/\b(\d+)\b(?= (?:modules|event types|times|historical scan))/);
+                            if (numMatch) counts[numMatch[1]] = true;
+                        }
+                    }
+                    var unique = Object.keys(counts).sort(function(a, b) { return a - b; });
+                    if (unique.length === 1) {
+                        grp.ruleName = grp.ruleName.replace(countBeforeSuffixRe, unique[0]);
+                    } else if (unique.length > 1) {
+                        grp.ruleName = grp.ruleName.replace(countBeforeSuffixRe, unique[0] + '-' + unique[unique.length - 1]);
+                    }
+                }
+            }
+
             // Store group data for filter/count functions
             window.correlationsGroupData = { groups: groups, groupOrder: groupOrder };
 
