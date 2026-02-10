@@ -8147,6 +8147,57 @@ table.discovery-path-table td.validation-status {
 .findings-table .col-corr-type { width: 25%; }
 .findings-table .col-corr-elements { width: 150px; }
 
+/* Correlation group rows - grouped/condensed view */
+.corr-group-row {
+  cursor: pointer;
+}
+
+.corr-group-row > td:nth-child(2) {
+  font-weight: 600;
+}
+
+.corr-group-count {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+  background: rgba(100, 116, 139, 0.1);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  border-radius: 10px;
+  padding: 1px 8px;
+  margin-left: 8px;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+
+.corr-group-child td:first-child {
+  padding-left: 28px;
+}
+
+.corr-group-child td:nth-child(2) {
+  padding-left: 16px;
+}
+
+.corr-group-row.finding-expanded .finding-expand-icon {
+  transform: rotate(90deg);
+}
+
+.corr-group-child {
+  background: rgba(0, 0, 0, 0.015);
+}
+
+.corr-group-child:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.findings-count-detail {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #64748b;
+  letter-spacing: 0.3px;
+}
+
 /* Correlation description panel - centered and wide */
 .corr-description-wrapper {
   display: flex;
