@@ -4588,102 +4588,123 @@
             html += "<th>Correlation</th>";
             html += "<th>Type</th>";
             html += "<th>Data Elements</th>";
-            html += "</tr></thead><tbody>";
+            html += "</tr></thead><tbody id='corr-panel-tbody'></tbody></table></div>";
 
-            // Render grouped correlations
-            for (var g = 0; g < groupOrder.length; g++) {
-                var ruleId = groupOrder[g];
-                var group = groups[ruleId];
-                var items = group.items;
-                var risk = group.risk;
-                var riskLower = risk.toLowerCase();
-                var badgeClass = corrBadgeClass(risk);
-                var groupId = ruleId.replace(/[^a-zA-Z0-9_-]/g, '_');
+            // Insert toolbar + empty table immediately (fast, small DOM)
+            panel.html(html);
+            initAiCorrelationButtons(instanceId);
 
-                if (items.length === 1) {
-                    // Single-item group: render as individual row (no extra grouping click needed)
-                    var item = items[0];
-                    var corrId = item[0];
-                    var eventTypes = item[8] || '';
+            // Render table rows progressively in chunks to keep browser responsive.
+            // Each chunk appends a batch of groups to the tbody, then yields to the
+            // browser via setTimeout so Chrome never considers the page unresponsive.
+            var CHUNK_SIZE = 30;
+            var chunkStart = 0;
 
-                    html += "<tr class='finding-row finding-" + riskLower + " corr-row' data-corr-id='" + corrId + "' data-group-id='" + groupId + "' onclick='toggleCorrelation(\"" + instanceId + "\",\"" + corrId + "\")'>";
-                    html += "<td><span class='badge " + badgeClass + "'>" + risk + "</span>";
-                    html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='corr-icon-" + corrId + "'></i>";
-                    html += "</td>";
-                    html += "<td><div class='cell-clamp'>" + item[1] + "</div></td>";
-                    html += "<td><div class='cell-clamp'>" + corrTypeLinks(eventTypes, instanceId) + "</div></td>";
-                    html += "<td><div class='cell-clamp'>" + item[7] + "</div></td>";
-                    html += "</tr>";
+            function renderNextChunk() {
+                var end = Math.min(chunkStart + CHUNK_SIZE, groupOrder.length);
+                var chunkHtml = '';
 
-                    html += corrDetailHtml(item, riskLower, 'corr-group-member', " data-group-id='" + groupId + "'", false);
+                for (var g = chunkStart; g < end; g++) {
+                    var ruleId = groupOrder[g];
+                    var group = groups[ruleId];
+                    var items = group.items;
+                    var risk = group.risk;
+                    var riskLower = risk.toLowerCase();
+                    var badgeClass = corrBadgeClass(risk);
+                    var groupId = ruleId.replace(/[^a-zA-Z0-9_-]/g, '_');
 
-                } else {
-                    // Multi-item group: render group header + hidden children
-                    var totalElements = 0;
-                    var allTypes = {};
-                    for (var j = 0; j < items.length; j++) {
-                        totalElements += parseInt(items[j][7]) || 0;
-                        var types = (items[j][8] || '').split(',');
-                        for (var t = 0; t < types.length; t++) {
-                            var typ = types[t].trim();
-                            if (typ) allTypes[typ] = true;
-                        }
-                    }
-                    var aggregatedTypes = Object.keys(allTypes).join(',');
-
-                    // Group header row
-                    html += "<tr class='finding-row finding-" + riskLower + " corr-group-row' data-group-id='" + groupId + "' onclick='toggleCorrelationGroup(\"" + instanceId + "\",\"" + groupId + "\")'>";
-                    html += "<td><span class='badge " + badgeClass + "'>" + risk + "</span>";
-                    html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='corrgroup-icon-" + groupId + "'></i>";
-                    html += "</td>";
-                    html += "<td><div class='cell-clamp'>" + group.ruleName + " <span class='corr-group-count'>" + items.length + " findings</span></div></td>";
-                    html += "<td><div class='cell-clamp'>" + corrTypeLinks(aggregatedTypes, instanceId) + "</div></td>";
-                    html += "<td><div class='cell-clamp'>" + totalElements + "</div></td>";
-                    html += "</tr>";
-
-                    // Child rows (hidden by default)
-                    for (var j = 0; j < items.length; j++) {
-                        var item = items[j];
+                    if (items.length === 1) {
+                        // Single-item group: render as individual row
+                        var item = items[0];
                         var corrId = item[0];
                         var eventTypes = item[8] || '';
 
-                        // Individual correlation row
-                        html += "<tr class='finding-row finding-" + riskLower + " corr-row corr-group-child corr-group-member' data-group-id='" + groupId + "' data-corr-id='" + corrId + "' onclick='event.stopPropagation(); toggleCorrelation(\"" + instanceId + "\",\"" + corrId + "\")' style='display:none'>";
-                        html += "<td>";
-                        html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='corr-icon-" + corrId + "'></i>";
-                        html += "</td>";
-                        html += "<td><div class='cell-clamp'>" + item[1] + "</div></td>";
-                        html += "<td><div class='cell-clamp'>" + corrTypeLinks(eventTypes, instanceId) + "</div></td>";
-                        html += "<td><div class='cell-clamp'>" + item[7] + "</div></td>";
-                        html += "</tr>";
+                        chunkHtml += "<tr class='finding-row finding-" + riskLower + " corr-row' data-corr-id='" + corrId + "' data-group-id='" + groupId + "' onclick='toggleCorrelation(\"" + instanceId + "\",\"" + corrId + "\")'>";
+                        chunkHtml += "<td><span class='badge " + badgeClass + "'>" + risk + "</span>";
+                        chunkHtml += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='corr-icon-" + corrId + "'></i>";
+                        chunkHtml += "</td>";
+                        chunkHtml += "<td><div class='cell-clamp'>" + item[1] + "</div></td>";
+                        chunkHtml += "<td><div class='cell-clamp'>" + corrTypeLinks(eventTypes, instanceId) + "</div></td>";
+                        chunkHtml += "<td><div class='cell-clamp'>" + item[7] + "</div></td>";
+                        chunkHtml += "</tr>";
 
-                        // Detail row (hidden)
-                        html += corrDetailHtml(item, riskLower, 'corr-group-child-detail corr-group-member', " data-group-id='" + groupId + "'", true);
+                        chunkHtml += corrDetailHtml(item, riskLower, 'corr-group-member', " data-group-id='" + groupId + "'", false);
+
+                    } else {
+                        // Multi-item group: render group header + hidden children
+                        var totalElements = 0;
+                        var allTypes = {};
+                        for (var j = 0; j < items.length; j++) {
+                            totalElements += parseInt(items[j][7]) || 0;
+                            var types = (items[j][8] || '').split(',');
+                            for (var t = 0; t < types.length; t++) {
+                                var typ = types[t].trim();
+                                if (typ) allTypes[typ] = true;
+                            }
+                        }
+                        var aggregatedTypes = Object.keys(allTypes).join(',');
+
+                        // Group header row
+                        chunkHtml += "<tr class='finding-row finding-" + riskLower + " corr-group-row' data-group-id='" + groupId + "' onclick='toggleCorrelationGroup(\"" + instanceId + "\",\"" + groupId + "\")'>";
+                        chunkHtml += "<td><span class='badge " + badgeClass + "'>" + risk + "</span>";
+                        chunkHtml += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='corrgroup-icon-" + groupId + "'></i>";
+                        chunkHtml += "</td>";
+                        chunkHtml += "<td><div class='cell-clamp'>" + group.ruleName + " <span class='corr-group-count'>" + items.length + " findings</span></div></td>";
+                        chunkHtml += "<td><div class='cell-clamp'>" + corrTypeLinks(aggregatedTypes, instanceId) + "</div></td>";
+                        chunkHtml += "<td><div class='cell-clamp'>" + totalElements + "</div></td>";
+                        chunkHtml += "</tr>";
+
+                        // Child rows (hidden by default)
+                        for (var j = 0; j < items.length; j++) {
+                            var item = items[j];
+                            var corrId = item[0];
+                            var eventTypes = item[8] || '';
+
+                            chunkHtml += "<tr class='finding-row finding-" + riskLower + " corr-row corr-group-child corr-group-member' data-group-id='" + groupId + "' data-corr-id='" + corrId + "' onclick='event.stopPropagation(); toggleCorrelation(\"" + instanceId + "\",\"" + corrId + "\")' style='display:none'>";
+                            chunkHtml += "<td>";
+                            chunkHtml += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='corr-icon-" + corrId + "'></i>";
+                            chunkHtml += "</td>";
+                            chunkHtml += "<td><div class='cell-clamp'>" + item[1] + "</div></td>";
+                            chunkHtml += "<td><div class='cell-clamp'>" + corrTypeLinks(eventTypes, instanceId) + "</div></td>";
+                            chunkHtml += "<td><div class='cell-clamp'>" + item[7] + "</div></td>";
+                            chunkHtml += "</tr>";
+
+                            chunkHtml += corrDetailHtml(item, riskLower, 'corr-group-child-detail corr-group-member', " data-group-id='" + groupId + "'", true);
+                        }
                     }
+                }
+
+                // Append this chunk's rows to the tbody (fast incremental insert)
+                document.getElementById('corr-panel-tbody').insertAdjacentHTML('beforeend', chunkHtml);
+                chunkStart = end;
+
+                if (chunkStart < groupOrder.length) {
+                    // More chunks to render — yield to browser then continue
+                    setTimeout(renderNextChunk, 0);
+                } else {
+                    // All rows rendered — initialize table sorting on next tick
+                    setTimeout(function() {
+                        $.tablesorter.addParser({
+                            id: 'correlationPanelCriticality',
+                            is: function(s) { return false; },
+                            format: function(s) {
+                                return s.toLowerCase().replace(/critical/,0).replace(/high/,1).replace(/medium/,2).replace(/low/,3).replace(/info/,4);
+                            },
+                            type: 'numeric'
+                        });
+
+                        $("#correlations-panel-table").tablesorter({
+                            headers: { 0: { sorter: 'correlationPanelCriticality' } },
+                            cssChildRow: 'corr-group-member',
+                            sortList: [[0, 0]]
+                        });
+                        sf.updateTooltips();
+                    }, 0);
                 }
             }
 
-            html += "</tbody></table></div>";
-            panel.html(html);
-
-            initAiCorrelationButtons(instanceId);
-
-            // Enable table sorting matching findings style
-            $.tablesorter.addParser({
-                id: 'correlationPanelCriticality',
-                is: function(s) { return false; },
-                format: function(s) {
-                    return s.toLowerCase().replace(/critical/,0).replace(/high/,1).replace(/medium/,2).replace(/low/,3).replace(/info/,4);
-                },
-                type: 'numeric'
-            });
-
-            $("#correlations-panel-table").tablesorter({
-                headers: { 0: { sorter: 'correlationPanelCriticality' } },
-                cssChildRow: 'corr-group-member',
-                sortList: [[0, 0]]
-            });
-            sf.updateTooltips();
+            // Start chunked rendering on next frame
+            setTimeout(renderNextChunk, 0);
         }
 
         function renderCorrelationsPanelEmpty(instanceId) {
