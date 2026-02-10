@@ -4309,7 +4309,7 @@
                     if (data.success) {
                         if (!data.single_scan_available) {
                             $("#btn-panel-rescan").prop('disabled', true).addClass('disabled')
-                                .attr('title', 'No scan data available for AI analysis.');
+                                .attr('title', 'No scan data available for analysis.');
                         }
                     }
                 },
@@ -4474,7 +4474,7 @@
             var html = "<div class='findings-toolbar'>";
             html += "<div class='findings-toolbar-left'>";
             html += "<button id='btn-panel-rescan' class='btn btn-sm btn-cyan' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
-            html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;AI RESCAN</button>&nbsp;";
+            html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;COMPILE</button>&nbsp;";
             html += "<span class='findings-count' id='correlations-count'>" + totalGroups + " CORRELATIONS</span>";
             html += "&nbsp;<span class='findings-count-detail' id='correlations-total-count'>(" + data.length + " total findings)</span>";
             html += "</div>";
@@ -4604,7 +4604,7 @@
             var html = "<div class='findings-toolbar'>";
             html += "<div class='findings-toolbar-left'>";
             html += "<button id='btn-panel-rescan' class='btn btn-sm btn-cyan' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
-            html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;AI SCAN</button>&nbsp;";
+            html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;COMPILE</button>&nbsp;";
             html += "<span class='findings-count'>0 CORRELATIONS</span>";
             html += "</div>";
             html += "<div class='findings-toolbar-right'>";
@@ -6531,12 +6531,12 @@
             sf.updateTooltips();
         }
 
-        // Add AI correlation section with mode selection
+        // Add correlation section with mode selection
         function addAiCorrelationSection(instanceId) {
             var aiSection = "<div id='ai-correlation-section' class='panel panel-default' style='margin-top: 20px;'>";
-            aiSection += "<div class='panel-heading'><i class='glyphicon glyphicon-flash'></i>&nbsp;&nbsp;AI Correlation Analysis</div>";
+            aiSection += "<div class='panel-heading'><i class='glyphicon glyphicon-flash'></i>&nbsp;&nbsp;Correlation Analysis</div>";
             aiSection += "<div class='panel-body'>";
-            aiSection += "<p>Run AI-powered analysis to identify significant and recurring indicators in scan data.</p>";
+            aiSection += "<p>Run correlation analysis to identify significant and recurring indicators in scan data.</p>";
 
             // Mode selection buttons
             aiSection += "<div id='ai-correlation-mode-select' style='margin-bottom: 15px;'>";
@@ -6577,12 +6577,12 @@
 
         }
 
-        // Run AI correlation analysis on current scan data
+        // Run correlation analysis on current scan data
         // Uses $.ajax directly (not sf.fetchData) for proper error/timeout handling
         function runAiCorrelation(instanceId, mode) {
             var btnId = '#btn-panel-rescan';
             var resetBtn = function() {
-                $(btnId).prop('disabled', false).html("<i class='glyphicon glyphicon-flash'></i>&nbsp;AI RESCAN");
+                $(btnId).prop('disabled', false).html("<i class='glyphicon glyphicon-flash'></i>&nbsp;COMPILE");
             };
 
             $(btnId).prop('disabled', true).html("<i class='glyphicon glyphicon-refresh spinning'></i>&nbsp;Analyzing...");

@@ -5810,7 +5810,7 @@ class SpiderFootWebUi:
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def checkAiCorrelationModes(self: 'SpiderFootWebUi', id: str) -> dict:
-        """Check which AI correlation modes are available for a scan.
+        """Check which correlation modes are available for a scan.
 
         Returns whether the scan has imported data (enabling cross-scan mode).
 
@@ -5859,7 +5859,7 @@ class SpiderFootWebUi:
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def runAiCorrelation(self: 'SpiderFootWebUi', id: str, mode: str = 'cross') -> dict:
-        """Run AI correlation analysis on a scan.
+        """Run correlation analysis on a scan.
 
         Args:
             id (str): scan ID
@@ -5880,7 +5880,7 @@ class SpiderFootWebUi:
             return {'success': False, 'error': 'Scan not found'}
 
         target = scanInfo[1]
-        self.log.info(f"Running AI {mode} correlation analysis for scan {id} (target: {target})")
+        self.log.info(f"Running {mode} correlation analysis for scan {id} (target: {target})")
 
         # Deduplicate before running correlations to avoid inflated results
         try:
@@ -5889,13 +5889,13 @@ class SpiderFootWebUi:
         except Exception as e:
             self.log.warning(f"Pre-correlation dedup failed (continuing anyway): {e}")
 
-        # Delete previous AI correlations for this scan to avoid duplicates on rescan
+        # Delete previous correlations for this scan to avoid duplicates on rescan
         ruleId = 'ai_single_scan_correlation' if mode == 'single' else 'ai_cross_scan_correlation'
         try:
             dbh.deleteCorrelationsByRule(id, ruleId)
             self.log.info(f"Cleared previous {ruleId} correlations for scan {id}")
         except Exception as e:
-            self.log.warning(f"Failed to clear old AI correlations (continuing anyway): {e}")
+            self.log.warning(f"Failed to clear old correlations (continuing anyway): {e}")
 
         try:
             if mode == 'single':
@@ -5904,7 +5904,7 @@ class SpiderFootWebUi:
                 ai_result = self._runCrossScanCorrelation(dbh, id, target)
 
         except Exception as e:
-            self.log.error(f"Error running AI correlation: {e}", exc_info=True)
+            self.log.error(f"Error running correlation: {e}", exc_info=True)
             return {'success': False, 'error': f'Error running correlation: {str(e)}'}
 
         # Also re-run rule-based correlations so they survive deduplication
@@ -6225,7 +6225,7 @@ class SpiderFootWebUi:
                     instanceId=id,
                     event_hash=event_hashes[0],
                     ruleId="ai_single_scan_correlation",
-                    ruleName="AI Single Scan Correlation",
+                    ruleName="Single Scan Correlation",
                     ruleDescr=description,
                     ruleRisk=risk_level,
                     ruleYaml="",
@@ -6239,7 +6239,7 @@ class SpiderFootWebUi:
                         f"(modules={len(modules)}, types={len(event_types)}, total={total})"
                     )
             except Exception as e:
-                self.log.warning(f"Failed to store AI correlation: {e}")
+                self.log.warning(f"Failed to store correlation: {e}")
                 continue
 
         if skipped_below_threshold > 0:
@@ -6397,7 +6397,7 @@ class SpiderFootWebUi:
                     instanceId=id,
                     event_hash=event_hashes[0],
                     ruleId="ai_cross_scan_correlation",
-                    ruleName="AI Cross-Scan Correlation",
+                    ruleName="Cross-Scan Correlation",
                     ruleDescr=description,
                     ruleRisk=risk_level,
                     ruleYaml="",
