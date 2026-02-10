@@ -7589,12 +7589,12 @@ button[data-target="#createWorkspaceModal"]:hover,
 }
 
 /* Dark mode: fade overlay matches dark background */
-.discovery-path-cell.dp-collapsed.dp-has-overflow .dp-cell-wrap::after {
+.discovery-path-cell[data-dp-state="collapsed"] .dp-cell-wrap::after {
   background: linear-gradient(to bottom, transparent, #141422);
 }
 
 /* Dark mode: hover highlight on expandable cells */
-.discovery-path-cell.dp-has-overflow:hover {
+.discovery-path-cell[data-dp-state]:hover {
   background: rgba(255, 255, 255, 0.03);
 }
 
