@@ -6064,11 +6064,6 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   color: var(--accent-green-light);
 }
 
-/* Dark mode fade overlay */
-.discovery-path-cell[data-dp-state="collapsed"] .dp-cell-wrap::after {
-  background: linear-gradient(to bottom, transparent, var(--bg-secondary));
-}
-
 /* Dark mode expand toggle */
 .discovery-path-cell[data-dp-state="collapsed"] .dp-expand-toggle {
   color: var(--accent-green-light);
