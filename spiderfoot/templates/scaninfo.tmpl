@@ -4259,10 +4259,70 @@
             $('#correlations-total-count').text("(" + totalFindings + " total findings)");
         }
 
+        // Fun loading messages that rotate while correlations load
+        var corrLoadingMessages = [
+            "Warming up the correlation engine...",
+            "Crunching numbers...",
+            "Joining data across dimensions...",
+            "SQL'ing the SQL...",
+            "Interrogating the database...",
+            "Herding data packets...",
+            "Untangling the web of connections...",
+            "Teaching bits to cooperate...",
+            "Convincing electrons to align...",
+            "Cross-referencing all the things...",
+            "Connecting the dots...",
+            "Asking the database nicely...",
+            "Performing digital archaeology...",
+            "Shaking the data tree...",
+            "Reading between the packets...",
+            "Doing the correlation dance...",
+            "Sorting through the digital haystack...",
+            "Consulting the cyber oracle...",
+            "Triangulating indicators...",
+            "Wrangling rogue correlations...",
+            "Almost there... probably...",
+            "Still going... patience is a virtue...",
+            "The data is being extra dramatic today..."
+        ];
+
+        var _corrLoadingInterval = null;
+
+        function startCorrelationLoadingAnimation(panel) {
+            var msgIndex = 0;
+            var progress = 0;
+
+            panel.html(
+                "<div style='text-align: center; padding: 40px 30px;'>" +
+                "  <i class='glyphicon glyphicon-refresh spinning' style='font-size: 28px; color: #38bdf8; display: block; margin-bottom: 15px;'></i>" +
+                "  <p id='corr-loading-msg' style='font-family: \"JetBrains Mono\", \"Fira Code\", \"SF Mono\", monospace; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; min-height: 20px; margin-bottom: 18px;'>" + corrLoadingMessages[0] + "</p>" +
+                "  <div class='progress' style='height: 18px; margin: 0 auto; max-width: 400px; border-radius: 4px;'>" +
+                "    <div id='corr-loading-bar' class='progress-bar progress-bar-striped active' role='progressbar' style='width: 5%; min-width: 2em; transition: width 0.8s ease; font-weight: 600; font-size: 11px; line-height: 18px;'>5%</div>" +
+                "  </div>" +
+                "</div>"
+            );
+
+            _corrLoadingInterval = setInterval(function() {
+                msgIndex = (msgIndex + 1) % corrLoadingMessages.length;
+                // Logarithmic progress: fast at start, slows down, never hits 100
+                progress = Math.min(92, progress + (95 - progress) * 0.12);
+                var pct = Math.round(progress);
+                $('#corr-loading-msg').text(corrLoadingMessages[msgIndex]);
+                $('#corr-loading-bar').css('width', pct + '%').text(pct + '%');
+            }, 2200);
+        }
+
+        function stopCorrelationLoadingAnimation() {
+            if (_corrLoadingInterval) {
+                clearInterval(_corrLoadingInterval);
+                _corrLoadingInterval = null;
+            }
+        }
+
         // Load correlations data into the correlations tab panel
         function loadCorrelationsIntoPanel(instanceId) {
             var panel = $('#findings-correlations-content');
-            panel.html("<div class='vuln-placeholder'><i class='glyphicon glyphicon-refresh spinning' style='font-size: 24px;'></i><p>Loading correlations...</p></div>");
+            startCorrelationLoadingAnimation(panel);
 
             sf.fetchData('${docroot}/scanstatus', {'id': instanceId},
                 function(statusData) {
@@ -4318,6 +4378,7 @@
         }
 
         function renderCorrelationsPanel(instanceId, data, counts) {
+            stopCorrelationLoadingAnimation();
             var panel = $('#findings-correlations-content');
 
             if (!data || data.length == 0) {
@@ -4600,6 +4661,7 @@
         }
 
         function renderCorrelationsPanelEmpty(instanceId) {
+            stopCorrelationLoadingAnimation();
             var panel = $('#findings-correlations-content');
             var html = "<div class='findings-toolbar'>";
             html += "<div class='findings-toolbar-left'>";
