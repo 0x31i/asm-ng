@@ -7570,33 +7570,7 @@ button[data-target="#createWorkspaceModal"]:hover,
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Discovery path table cell styling */
-.discovery-path-cell .dp-type strong,
-.discovery-path-cell .dp-module strong,
-.discovery-path-cell .dp-data strong {
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.discovery-path-cell .dp-value {
-  color: #e5e7eb;
-  font-weight: 500;
-}
-
-/* DATA values in green for quick identification (dark mode) */
-.discovery-path-cell .dp-data-value {
-  color: #4ade80;
-  font-weight: 600;
-}
-
-/* Dark mode: fade overlay matches dark background */
-.discovery-path-cell[data-dp-state="collapsed"] .dp-cell-wrap::after {
-  background: linear-gradient(to bottom, transparent, #141422);
-}
-
-/* Dark mode: hover highlight on expandable cells */
-.discovery-path-cell[data-dp-state]:hover {
-  background: rgba(255, 255, 255, 0.03);
-}
+/* Discovery path - dark mode is the primary theme, styles are in spiderfoot.css */
 
 /* Dark mode: expandable pre cells in data tables */
 td.pre-expandable.pre-collapsed.pre-has-overflow::after {
