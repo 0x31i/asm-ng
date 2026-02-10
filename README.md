@@ -12,7 +12,7 @@
 [![Discord](https://img.shields.io/discord/770524432464216074)](https://discord.gg/vyvztrG)
 ![Active Development](https://img.shields.io/badge/Maintenance%20Level-Actively%20Developed-brightgreen.svg)
 
-**ASM-NG** is a production-ready, enterprise-grade open source intelligence (OSINT) and attack surface management platform. Built on a battle-tested scanning engine with 200+ modules, it integrates advanced storage capabilities, AI-powered threat intelligence, and comprehensive security hardening to make intelligence data easily navigable and actionable.
+**ASM-NG** is a production-ready, enterprise-grade open source intelligence (OSINT) and attack surface management platform. Built on a battle-tested scanning engine with 200+ modules, it integrates advanced storage capabilities, threat intelligence, and comprehensive security hardening to make intelligence data easily navigable and actionable.
 
 ASM-NG features an embedded web server providing a clean, modern web-based interface, and can also be used entirely via the command line. It's written in **Python 3** and **MIT-licensed**.
 
@@ -43,7 +43,7 @@ graph TD;
 This platform includes production-ready enterprise features beyond the original engine:
 
 - **Advanced Storage Engine**: High-performance data storage with optimized querying and reporting
-- **AI-Powered Threat Intelligence**: Automated threat analysis and intelligent pattern recognition
+- **Threat Intelligence**: Automated threat analysis and pattern recognition
 - **Security Hardening**: Enhanced security controls, input validation, and secure configurations
 - **Comprehensive Reporting**: Advanced analytics and customizable report generation
 - **Performance Optimization**: Scalable architecture for enterprise workloads
@@ -91,12 +91,12 @@ graph LR;
 
 ## Enterprise Capabilities
 
-### AI-Powered Intelligence
+### Threat Intelligence
 
-- **Automated Threat Analysis**: Machine learning algorithms analyze patterns and identify threats
-- **Intelligent Pattern Recognition**: AI-powered correlation of indicators across data sources
-- **Predictive Analytics**: Threat trend analysis and risk prediction capabilities
-- **Natural Language Processing**: Automated analysis of text-based intelligence sources
+- **Automated Threat Analysis**: Rule-based algorithms analyze patterns and identify threats
+- **Pattern Recognition**: Correlation of indicators across data sources
+- **Cross-Scan Analysis**: Threat trend analysis and risk assessment across historical scans
+- **Text Analysis**: Automated analysis of text-based intelligence sources
 
 ### Security & Compliance
 

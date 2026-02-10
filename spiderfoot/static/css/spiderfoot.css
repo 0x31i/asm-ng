@@ -8109,7 +8109,7 @@ table.discovery-path-table td.validation-status {
   transform: rotate(90deg);
 }
 
-/* Compact AI Correlation panel for correlations tab */
+/* Compact correlation panel for correlations tab */
 .ai-correlation-compact {
   padding: 10px 16px;
   margin-bottom: 12px;

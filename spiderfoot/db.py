@@ -642,9 +642,9 @@ class SpiderFootDb:
         ['WIFI_ACCESS_POINT', 'WiFi Access Point Nearby', 0, 'ENTITY'],
         ['WIKIPEDIA_PAGE_EDIT', 'Wikipedia Page Edit', 0, 'DESCRIPTOR'],
         ['AI_SINGLE_SCAN_CORRELATION',
-            'AI Correlation - Single Scan', 0, 'DESCRIPTOR'],
+            'Correlation - Single Scan', 0, 'DESCRIPTOR'],
         ['AI_CROSS_SCAN_CORRELATION',
-            'AI Correlation - Cross Scan', 0, 'DESCRIPTOR'],
+            'Correlation - Cross Scan', 0, 'DESCRIPTOR'],
     ]
 
     def __init__(self, opts: dict, init: bool = False) -> None:
@@ -845,7 +845,7 @@ class SpiderFootDb:
                     except sqlite3.Error:
                         pass
 
-                # Migration: Ensure AI correlation event types exist
+                # Migration: Ensure correlation event types exist
                 for ai_type in ('AI_SINGLE_SCAN_CORRELATION', 'AI_CROSS_SCAN_CORRELATION'):
                     try:
                         self.dbh.execute("SELECT event FROM tbl_event_types WHERE event = ?", (ai_type,))
@@ -1004,7 +1004,7 @@ class SpiderFootDb:
                             continue
                     self.conn.commit()
 
-                # Migration: Ensure AI correlation event types exist
+                # Migration: Ensure correlation event types exist
                 for ai_type in ('AI_SINGLE_SCAN_CORRELATION', 'AI_CROSS_SCAN_CORRELATION'):
                     try:
                         self.dbh.execute("SELECT event FROM tbl_event_types WHERE event = %s", (ai_type,))
@@ -4324,8 +4324,8 @@ class SpiderFootDb:
                     placeholders = ','.join(['?'] * len(batch))
 
                     # Remove correlation event references pointing to deleted hashes,
-                    # but only for AI correlations. Rule-based correlation references
-                    # are preserved so those correlations remain visible.
+                    # but only for compiled correlations. Rule-based correlation
+                    # references are preserved so those correlations remain visible.
                     del_corr_qry = f"""DELETE FROM tbl_scan_correlation_results_events
                         WHERE event_hash IN ({placeholders})
                         AND correlation_id IN (
@@ -4341,8 +4341,8 @@ class SpiderFootDb:
 
                     removed += len(batch)
 
-                # Clean up any AI correlation results that now have zero events.
-                # Only delete AI-generated correlations; rule-based correlations
+                # Clean up any compiled correlation results that now have zero events.
+                # Only delete compiled correlations; rule-based correlations
                 # must be preserved even if their events were deduplicated.
                 cleanup_qry = """DELETE FROM tbl_scan_correlation_results
                     WHERE scan_instance_id = ?

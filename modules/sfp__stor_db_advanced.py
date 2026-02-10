@@ -17,7 +17,7 @@ This module implements advanced enterprise features:
 - Connection load balancing across multiple databases
 - Automated scaling with connection pooling
 - Integration testing and monitoring
-- Performance analytics and AI-powered optimization
+- Performance analytics and query optimization
 """
 
 import os
@@ -156,7 +156,7 @@ class ConnectionLoadBalancer:
 
 
 class QueryOptimizer:
-    """Advanced query optimizer with prepared statements and AI-powered optimization."""
+    """Advanced query optimizer with prepared statements and heuristic optimization."""
     
     def __init__(self):
         self.query_profiles = {}
@@ -165,7 +165,7 @@ class QueryOptimizer:
         self.optimization_rules = self._load_optimization_rules()
         
     def _load_optimization_rules(self) -> Dict[str, Any]:
-        """Load AI-powered optimization rules."""
+        """Load optimization rules."""
         return {
             'bulk_insert': {
                 'threshold': 100,
@@ -223,7 +223,7 @@ class QueryOptimizer:
             return 'OTHER'
     
     def _apply_optimization(self, profile: QueryProfile, query: str):
-        """Apply AI-powered optimization to query."""
+        """Apply optimization to query."""
         for rule_name, rule in self.optimization_rules.items():
             if profile.execution_count >= rule['threshold']:
                 if rule['optimization'] == 'prepared_statement' and not profile.prepared_statement:
@@ -517,7 +517,7 @@ class sfp__stor_db_advanced(SpiderFootPlugin):
         '_store': "Store scan results in the database backend",
         'enable_load_balancing': "Enable connection load balancing across multiple databases",
         'enable_auto_scaling': "Enable automatic scaling of database connections",
-        'enable_query_optimization': "Enable AI-powered query optimization",
+        'enable_query_optimization': "Enable query optimization",
         'enable_performance_monitoring': "Enable real-time performance monitoring",
         'bulk_insert_threshold': "Number of events to batch before bulk insert",
         'connection_pool_size': "Initial size of connection pools",
