@@ -7079,7 +7079,7 @@
                     // Colgroup forces column widths (highest priority in table layout algorithm)
                     table += "<colgroup>";
                     table += "<col style='width: 40px;'>";
-                    table += "<col style='width: 110px;'>";
+                    table += "<col style='width: 120px;'>";
                     for (var d = 0; d < maxDepth; d++) {
                         table += "<col>";
                     }
@@ -7168,14 +7168,31 @@
                     $("#mainbody").append(statsBar + "<div class='discovery-path-wrapper'>" + table + "</div>");
                     $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false }, 1: { sorter: false } } });
 
-                    // Mark cells that have overflow (content taller than collapsed max-height of 141px)
-                    $("#scansummary-content .discovery-path-cell.dp-collapsed").each(function() {
+                    // Set up expand/collapse for discovery path cells.
+                    // Remove constraint first so scrollHeight returns true content height,
+                    // then re-add constraint for cells that exceed the 8-line limit.
+                    $("#scansummary-content .discovery-path-cell").each(function() {
                         var wrap = this.querySelector('.dp-cell-wrap');
-                        if (wrap && wrap.scrollHeight > 141) {
+                        if (!wrap) return;
+
+                        // Remove any constraint so we measure true content height
+                        this.classList.remove('dp-collapsed');
+                        this.classList.remove('dp-expanded');
+                        this.classList.remove('dp-has-overflow');
+                    });
+
+                    // Force a layout reflow so measurements are accurate
+                    $("#scansummary-content")[0].offsetHeight;
+
+                    $("#scansummary-content .discovery-path-cell").each(function() {
+                        var wrap = this.querySelector('.dp-cell-wrap');
+                        if (!wrap) return;
+
+                        if (wrap.scrollHeight > 141) {
+                            this.classList.add('dp-collapsed');
                             this.classList.add('dp-has-overflow');
-                        } else {
-                            this.classList.remove('dp-collapsed');
                         }
+                        // Cells that fit within 141px stay unconstrained
                     });
 
                     // Click anywhere on cell to expand/collapse entire row
