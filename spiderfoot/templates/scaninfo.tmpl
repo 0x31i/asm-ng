@@ -4356,12 +4356,17 @@
                     $('#corr-loading-bar').css('width', pct + '%').text(pct + '%');
 
                     if (resp.status === 'complete') {
+                        // Animate progress bar to 100% before rendering results
+                        $('#corr-loading-msg').text('Complete!');
+                        $('#corr-loading-bar').css('width', '100%').text('100%');
                         var data = resp.data || [];
-                        if (data.length > 0) {
-                            renderCorrelationsPanel(instanceId, data, counts);
-                        } else {
-                            renderCorrelationsPanelEmpty(instanceId);
-                        }
+                        setTimeout(function() {
+                            if (data.length > 0) {
+                                renderCorrelationsPanel(instanceId, data, counts);
+                            } else {
+                                renderCorrelationsPanelEmpty(instanceId);
+                            }
+                        }, 800);
                     } else if (resp.status === 'error') {
                         renderCorrelationsPanelEmpty(instanceId);
                     } else {
@@ -6736,19 +6741,23 @@
 
                         if (data.status === 'complete') {
                             clearInterval(pollInterval);
-                            resetBtn();
-                            hideCorrelationProgressModal();
-                            var result = data.result || {};
-                            if (result.success) {
-                                if (result.correlations_found > 0) {
-                                    $("#ai-correlation-results").html("<span class='text-success'><i class='glyphicon glyphicon-ok'></i>&nbsp;" + result.correlations_found + " new correlation(s) found.</span>");
-                                    setTimeout(function() { loadCorrelationsIntoPanel(instanceId); }, 1500);
+                            // Animate progress bar to 100% before showing results
+                            updateCorrelationProgress(100, 'Complete!');
+                            setTimeout(function() {
+                                resetBtn();
+                                hideCorrelationProgressModal();
+                                var result = data.result || {};
+                                if (result.success) {
+                                    if (result.correlations_found > 0) {
+                                        $("#ai-correlation-results").html("<span class='text-success'><i class='glyphicon glyphicon-ok'></i>&nbsp;" + result.correlations_found + " new correlation(s) found.</span>");
+                                        setTimeout(function() { loadCorrelationsIntoPanel(instanceId); }, 1500);
+                                    } else {
+                                        $("#ai-correlation-results").html("<span class='text-muted'><i class='glyphicon glyphicon-info-sign'></i>&nbsp;No new correlations found.</span>");
+                                    }
                                 } else {
-                                    $("#ai-correlation-results").html("<span class='text-muted'><i class='glyphicon glyphicon-info-sign'></i>&nbsp;No new correlations found.</span>");
+                                    $("#ai-correlation-results").html("<span class='text-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;" + (result.error || 'Error') + "</span>");
                                 }
-                            } else {
-                                $("#ai-correlation-results").html("<span class='text-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;" + (result.error || 'Error') + "</span>");
-                            }
+                            }, 800);
                         } else if (data.status === 'error') {
                             clearInterval(pollInterval);
                             resetBtn();
