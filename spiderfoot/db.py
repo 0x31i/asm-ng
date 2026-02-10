@@ -1906,21 +1906,25 @@ class SpiderFootDb:
 
         if self.db_type == 'postgresql':
             qry = "SELECT c.id, c.title, c.rule_id, c.rule_risk, c.rule_name, \
-                c.rule_descr, c.rule_logic, count(DISTINCT e.event_hash) AS event_count, \
-                STRING_AGG(DISTINCT r.type, ',') AS event_types FROM \
-                tbl_scan_correlation_results c, tbl_scan_correlation_results_events e, \
-                tbl_scan_results r \
-                WHERE c.scan_instance_id = %s AND c.id = e.correlation_id \
-                AND e.event_hash = r.hash AND r.scan_instance_id = c.scan_instance_id \
+                c.rule_descr, c.rule_logic, \
+                count(DISTINCT CASE WHEN r.hash IS NOT NULL THEN e.event_hash END) AS event_count, \
+                STRING_AGG(DISTINCT r.type, ',') AS event_types \
+                FROM tbl_scan_correlation_results c \
+                LEFT JOIN tbl_scan_correlation_results_events e ON c.id = e.correlation_id \
+                LEFT JOIN tbl_scan_results r ON e.event_hash = r.hash \
+                    AND r.scan_instance_id = c.scan_instance_id \
+                WHERE c.scan_instance_id = %s \
                 GROUP BY c.id ORDER BY c.title, c.rule_risk"
         else:
             qry = "SELECT c.id, c.title, c.rule_id, c.rule_risk, c.rule_name, \
-                c.rule_descr, c.rule_logic, count(DISTINCT e.event_hash) AS event_count, \
-                GROUP_CONCAT(DISTINCT r.type) AS event_types FROM \
-                tbl_scan_correlation_results c, tbl_scan_correlation_results_events e, \
-                tbl_scan_results r \
-                WHERE c.scan_instance_id = ? AND c.id = e.correlation_id \
-                AND e.event_hash = r.hash AND r.scan_instance_id = c.scan_instance_id \
+                c.rule_descr, c.rule_logic, \
+                count(DISTINCT CASE WHEN r.hash IS NOT NULL THEN e.event_hash END) AS event_count, \
+                GROUP_CONCAT(DISTINCT r.type) AS event_types \
+                FROM tbl_scan_correlation_results c \
+                LEFT JOIN tbl_scan_correlation_results_events e ON c.id = e.correlation_id \
+                LEFT JOIN tbl_scan_results r ON e.event_hash = r.hash \
+                    AND r.scan_instance_id = c.scan_instance_id \
+                WHERE c.scan_instance_id = ? \
                 GROUP BY c.id ORDER BY c.title, c.rule_risk"
 
         qvars = [instanceId]
@@ -4314,9 +4318,15 @@ class SpiderFootDb:
                     batch = hashes_to_delete[i:i + batch_size]
                     placeholders = ','.join(['?'] * len(batch))
 
-                    # Remove correlation event references pointing to deleted hashes
+                    # Remove correlation event references pointing to deleted hashes,
+                    # but only for AI correlations. Rule-based correlation references
+                    # are preserved so those correlations remain visible.
                     del_corr_qry = f"""DELETE FROM tbl_scan_correlation_results_events
-                        WHERE event_hash IN ({placeholders})"""
+                        WHERE event_hash IN ({placeholders})
+                        AND correlation_id IN (
+                            SELECT id FROM tbl_scan_correlation_results
+                            WHERE rule_id IN ('ai_single_scan_correlation', 'ai_cross_scan_correlation')
+                        )"""
                     self.dbh.execute(del_corr_qry, batch)
 
                     # Delete the duplicate scan results
