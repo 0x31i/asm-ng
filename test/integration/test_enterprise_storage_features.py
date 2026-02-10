@@ -12,7 +12,7 @@ implemented in SpiderFoot's storage modules:
 - Security features
 - Backup and recovery capabilities
 - Auto-scaling and monitoring
-- AI-powered optimization
+- Query optimization
 
 Author: SpiderFoot Enterprise Team
 Created: 2025-01-27

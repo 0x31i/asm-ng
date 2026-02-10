@@ -53,27 +53,27 @@ Adds monitoring, recovery, and optimization to the base storage module.
 ### Advanced Database Storage
 **Module:** `sfp__stor_db_advanced` | **Dependencies:** None (basic), `psycopg2` (full)
 
-Enterprise-grade storage with connection pooling, load balancing, auto-scaling, and AI-powered query optimization. Features are enabled by default in this module.
+Enterprise-grade storage with connection pooling, load balancing, auto-scaling, and query optimization. Features are enabled by default in this module.
 
-### AI Threat Intelligence Engine
+### Threat Intelligence Engine
 **Module:** `sfp__ai_threat_intel` | **Dependencies:** `numpy`, `scikit-learn`, `pandas`, `nltk`
 
 | Feature | What It Does |
 |---------|-------------|
-| Pattern Recognition | AI-powered attack pattern detection |
-| Predictive Analytics | Threat forecasting based on historical data |
+| Pattern Recognition | Rule-based attack pattern detection |
+| Trend Analysis | Threat forecasting based on historical data |
 | IOC Correlation | Automated indicator-of-compromise correlation |
-| Threat Scoring | Dynamic ML-based threat severity scoring |
-| NLP Analysis | Natural language processing for unstructured threat data |
+| Threat Scoring | Heuristic-based threat severity scoring |
+| Text Analysis | Processing of unstructured threat data |
 | **Cross-Scan Correlation** | Correlate IOCs with historical scans of the same target |
 
 #### Cross-Scan Correlation (NEW)
 
-When enabled, the AI module will automatically:
+When enabled, the module will automatically:
 1. Load IOCs from previous scans against the same target
 2. Correlate current scan findings with historical data
 3. Track IOC trends over time (increasing, decreasing, stable)
-4. Generate `AI_CROSS_SCAN_CORRELATION` events for repeated IOCs
+4. Generate correlation events for repeated IOCs
 
 This helps identify:
 - **Persistent threats** - IOCs that appear consistently across scans
@@ -136,7 +136,7 @@ bash enterprise/install-deps.sh --full
 Install only what you need:
 
 ```bash
-bash enterprise/install-deps.sh --ai             # AI Threat Intelligence
+bash enterprise/install-deps.sh --ai             # Threat Intelligence
 bash enterprise/install-deps.sh --security        # Security Hardening
 bash enterprise/install-deps.sh --elasticsearch   # ElasticSearch Storage
 bash enterprise/install-deps.sh --postgresql      # PostgreSQL Backend
@@ -209,7 +209,7 @@ Both config files include a "Part 2" section that turns ON useful features in mo
 After importing the config, check the Settings page. Navigate to each enterprise module tab:
 - **DATABASE STORAGE** - Enterprise options should show as enabled
 - **ADVANCED DATABASE STORAGE (ENTERPRISE)** - Features should be ON
-- **AI THREAT INTELLIGENCE ENGINE** - All 5 engines should be enabled
+- **THREAT INTELLIGENCE ENGINE** - All 5 engines should be enabled
 - **SECURITY HARDENING ENGINE** - Features should be enabled per your config
 - **4CHAN MONITOR** - Boards field should be populated
 
