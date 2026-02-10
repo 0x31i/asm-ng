@@ -4329,23 +4329,50 @@
             window.correlationsRawData = data;
 
             // Group correlations by rule_id (index [2] from DB query)
-            // AI correlations (ai_single_scan_correlation, ai_cross_scan_correlation)
-            // each get their own unique key since they are individually distinct findings
+            // AI correlations share a single rule_id, so group them by title prefix pattern instead.
+            // AI headlines follow: "{type_label} {verb phrase}: {ioc_data}"
+            // e.g. "Affiliate - IP Address corroborated by 2 modules: 23.210.216.135"
+            // Group key = prefix before the IOC data = "Affiliate - IP Address corroborated by 2 modules"
+            var aiTitlePrefixRe = /^(.+?(?:modules|event types|times|historical scan\(s\))): /;
             var groups = {};
             var groupOrder = [];
             for (var i = 0; i < data.length; i++) {
                 var ruleId = data[i][2] || 'unknown';
                 var isAiCorrelation = (ruleId === 'ai_single_scan_correlation' || ruleId === 'ai_cross_scan_correlation');
-                var groupKey = isAiCorrelation ? ruleId + '_' + data[i][0] : ruleId;
+                var groupKey, groupName;
+
+                if (isAiCorrelation) {
+                    var title = data[i][1] || '';
+                    var prefixMatch = title.match(aiTitlePrefixRe);
+                    if (prefixMatch) {
+                        groupKey = 'ai_' + prefixMatch[1];
+                        groupName = prefixMatch[1];
+                    } else {
+                        // Fallback: each unmatched AI correlation is its own row
+                        groupKey = 'ai_' + data[i][0];
+                        groupName = title;
+                    }
+                } else {
+                    groupKey = ruleId;
+                    groupName = data[i][4] || ruleId;
+                }
+
                 if (!groups[groupKey]) {
                     groups[groupKey] = {
                         ruleId: ruleId,
-                        ruleName: data[i][4] || ruleId,
+                        ruleName: groupName,
                         risk: data[i][3] || 'INFO',
                         description: data[i][5] || '',
                         items: []
                     };
                     groupOrder.push(groupKey);
+                } else if (isAiCorrelation) {
+                    // AI groups may mix risk levels; promote to highest severity
+                    var riskRank = { 'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'INFO': 4 };
+                    var curRisk = data[i][3] || 'INFO';
+                    if ((riskRank[curRisk] || 4) < (riskRank[groups[groupKey].risk] || 4)) {
+                        groups[groupKey].risk = curRisk;
+                    }
                 }
                 groups[groupKey].items.push(data[i]);
             }
