@@ -7101,26 +7101,20 @@ table.discovery-path-table td {
   white-space: normal;
 }
 
-/* Collapsed state: limit height to ~8 lines (8 * 11px * 1.6 ≈ 141px) */
-.discovery-path-cell.dp-collapsed .dp-cell-wrap {
-  max-height: 141px !important;
-  overflow: hidden !important;
-}
-
-/* Fade overlay on collapsed cells that have overflow */
-.discovery-path-cell.dp-collapsed.dp-has-overflow .dp-cell-wrap::after {
+/* Fade overlay on collapsed cells (inline styles handle max-height/overflow) */
+.discovery-path-cell[data-dp-state="collapsed"] .dp-cell-wrap::after {
   content: '';
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   height: 32px;
-  background: linear-gradient(to bottom, transparent, #fff);
+  background: linear-gradient(to bottom, transparent, #141422);
   pointer-events: none;
 }
 
 /* Expand hint on collapsed cells */
-.discovery-path-cell.dp-collapsed.dp-has-overflow::after {
+.discovery-path-cell[data-dp-state="collapsed"]::after {
   content: 'CLICK TO EXPAND';
   display: block;
   text-align: center;
@@ -7128,10 +7122,11 @@ table.discovery-path-table td {
   letter-spacing: 1px;
   color: rgba(74, 222, 128, 0.6);
   margin-top: 2px;
+  cursor: pointer;
 }
 
 /* Collapse hint on expanded cells */
-.discovery-path-cell.dp-expanded.dp-has-overflow::after {
+.discovery-path-cell[data-dp-state="expanded"]::after {
   content: 'CLICK TO COLLAPSE';
   display: block;
   text-align: center;
@@ -7139,12 +7134,7 @@ table.discovery-path-table td {
   letter-spacing: 1px;
   color: rgba(156, 163, 175, 0.5);
   margin-top: 4px;
-}
-
-/* Expanded state: show full content with word wrap */
-.discovery-path-cell.dp-expanded .dp-cell-wrap {
-  max-height: none;
-  overflow: visible;
+  cursor: pointer;
 }
 
 /* Labels (TYPE:, SOURCE MODULE:, DATA:) */
