@@ -85,7 +85,7 @@ class DefaultRuleExecutionStrategy(RuleExecutionStrategy):
     def _get_scan_events(self, dbh, scan_id, collect_rules):
         """Get events for a specific scan that match collection rules."""
         log = logging.getLogger("spiderfoot.correlation.collect")
-        
+
         try:
             # Check which table schema we're working with
             # Try the simplified test schema first
@@ -99,20 +99,28 @@ class DefaultRuleExecutionStrategy(RuleExecutionStrategy):
                     # For tests without lock
                     dbh.dbh.execute("SELECT scan_id, type, data FROM tbl_scan_results WHERE scan_id = ? LIMIT 1", [scan_id])
                     test_row = dbh.dbh.fetchone()
-                
+
                 # Use simplified schema for tests
-                base_query = "SELECT scan_id as hash, type, data, 'test_module' as module, 0 as created, 'ROOT' as source_event_hash FROM tbl_scan_results WHERE scan_id = ?"
+                base_query = "SELECT scan_id as hash, type, data, 'test_module' as module, 0 as created, 'ROOT' as source_event_hash, data as source_data FROM tbl_scan_results WHERE scan_id = ?"
                 query_params = [scan_id]
-                
+
             except Exception:
-                # Use full production schema
+                # Use full production schema with JOIN to resolve source event data.
+                # source_data is needed by rules that filter/aggregate on source.data
+                # (e.g. multiple_malicious groups by the actual IOC, not the
+                # module-specific description stored in the event's own data field).
                 base_query = """
-                    SELECT hash, type, data, module, generated, source_event_hash 
-                    FROM tbl_scan_results 
-                    WHERE scan_instance_id = ? AND false_positive = 0
+                    SELECT r.hash, r.type, r.data, r.module, r.generated,
+                           r.source_event_hash,
+                           COALESCE(sr.data, r.data) as source_data
+                    FROM tbl_scan_results r
+                    LEFT JOIN tbl_scan_results sr
+                        ON sr.scan_instance_id = r.scan_instance_id
+                        AND sr.hash = r.source_event_hash
+                    WHERE r.scan_instance_id = ? AND r.false_positive = 0
                 """
                 query_params = [scan_id]
-            
+
             # Execute query
             events = []
             if dbh_lock:
@@ -122,52 +130,84 @@ class DefaultRuleExecutionStrategy(RuleExecutionStrategy):
             else:
                 dbh.dbh.execute(base_query, query_params)
                 rows = dbh.dbh.fetchall()
-            
+
             # Convert to dict format for easier processing
             for row in rows:
                 event = {
                     'hash': row[0],
-                    'type': row[1], 
+                    'type': row[1],
                     'data': row[2],
                     'module': row[3],
                     'created': row[4],  # using generated column as created
                     'source_event_hash': row[5],
+                    'source_data': row[6],
                     'scan_id': scan_id
                 }
                 events.append(event)
-            
+
             log.debug(f"Retrieved {len(events)} base events for scan {scan_id}")
-            
+
             # Apply collection filters
             filtered_events = events
             for collect_rule in collect_rules:
                 filtered_events = self._apply_collection_filter(filtered_events, collect_rule)
                 log.debug(f"After filter {collect_rule}, {len(filtered_events)} events remain")
-            
+
             return filtered_events
-            
+
         except Exception as e:
             log.error(f"Error collecting events for scan {scan_id}: {e}")
             return []
     
     def _apply_collection_filter(self, events, collect_rule):
-        """Apply a single collection filter to events."""
+        """Apply a single collection filter to events.
+
+        Supports ``not`` prefix on regex patterns to negate the match.
+        When a list contains only negative patterns the event is kept
+        when it matches *none* of them.  When a list contains only
+        positive patterns the event is kept when it matches *any*.
+        Mixed lists require matching at least one positive pattern
+        and matching none of the negative patterns.
+        """
+        import re
         method = collect_rule.get('method', '')
         field = collect_rule.get('field', '')
         value = collect_rule.get('value', '')
-        
+
         if method == 'exact':
-            return [e for e in events if e.get(field) == value]
+            return [e for e in events if self._get_field_value(e, field) == value]
         elif method == 'regex':
-            import re
             patterns = value if isinstance(value, list) else [value]
+
+            # Separate positive and negative patterns
+            positive = []
+            negative = []
+            for p in patterns:
+                if isinstance(p, str) and p.startswith('not '):
+                    negative.append(p[4:])
+                else:
+                    positive.append(p)
+
             filtered = []
             for event in events:
-                event_value = str(event.get(field, ''))
-                for pattern in patterns:
-                    if re.search(pattern, event_value):
-                        filtered.append(event)
+                event_value = str(self._get_field_value(event, field))
+
+                # Check negative patterns: reject if any match
+                excluded = False
+                for neg in negative:
+                    if re.search(neg, event_value):
+                        excluded = True
                         break
+                if excluded:
+                    continue
+
+                # Check positive patterns: if any exist, at least one must match
+                if positive:
+                    matched = any(re.search(pos, event_value) for pos in positive)
+                    if not matched:
+                        continue
+
+                filtered.append(event)
             return filtered
         else:
             # Unknown method, return all events
@@ -190,14 +230,19 @@ class DefaultRuleExecutionStrategy(RuleExecutionStrategy):
         return dict(groups)
     
     def _get_field_value(self, event, field):
-        """Get field value from event, supporting nested references."""
+        """Get field value from event, supporting nested references.
+
+        Handles dotted field names such as ``source.data`` by looking
+        up the corresponding flattened key (``source_data``) which is
+        populated during event collection via a JOIN on the source event.
+        """
         if '.' in field:
-            # Handle nested fields like 'source.data'
             parts = field.split('.')
-            if parts[0] == 'source':
-                # For source fields, we'll use the event data as placeholder
-                return event.get('data', '')
-        
+            if parts[0] == 'source' and len(parts) > 1:
+                # e.g. source.data -> source_data
+                flat_key = f"source_{parts[1]}"
+                return event.get(flat_key, event.get(parts[1], ''))
+
         return event.get(field, '')
     
     def _analyze_groups(self, groups, analysis_rules, rule=None):
@@ -256,9 +301,14 @@ class DefaultRuleExecutionStrategy(RuleExecutionStrategy):
         log = logging.getLogger("spiderfoot.correlation.create")
         
         try:
-            # Generate correlation title using headline template
+            # Generate correlation title using headline template.
+            # Support dotted placeholders like {source.data} by replacing
+            # them before calling str.format() (Python format strings don't
+            # support dots in field names natively).
             headline = rule.get('headline', 'Correlation found')
-            correlation_title = headline.format(data=group_key)
+            import re as _re
+            headline = _re.sub(r'\{source\.(\w+)\}', r'{source_\1}', headline)
+            correlation_title = headline.format(data=group_key, source_data=group_key)
             
             # Use first scan ID as the primary scan
             scan_id = scan_ids[0] if scan_ids else 'unknown'
