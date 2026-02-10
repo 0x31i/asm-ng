@@ -21,6 +21,7 @@ import openpyxl
 import random
 import re
 import string
+import threading
 import time
 import os
 import uuid
@@ -64,6 +65,8 @@ class SpiderFootWebUi:
     config = dict()
     token = None
     docroot = ''
+    _correlation_jobs = {}
+    _correlation_jobs_lock = threading.Lock()
 
     def __init__(self: 'SpiderFootWebUi', web_config: dict, config: dict, loggingQueue: 'logging.handlers.QueueListener' = None) -> None:
         """Initialize web server.
@@ -5856,10 +5859,45 @@ class SpiderFootWebUi:
             self.log.error(f"Error checking correlation modes: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
 
+    def _cleanupOldCorrelationJobs(self) -> None:
+        """Remove completed correlation jobs older than 10 minutes."""
+        cutoff = time.time() - 600
+        with self._correlation_jobs_lock:
+            expired = [jid for jid, job in self._correlation_jobs.items()
+                       if job.get('completed_at', 0) and job['completed_at'] < cutoff]
+            for jid in expired:
+                del self._correlation_jobs[jid]
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def correlationStatus(self: 'SpiderFootWebUi', job_id: str) -> dict:
+        """Check the status of a running correlation job.
+
+        Args:
+            job_id (str): correlation job ID returned by runAiCorrelation
+
+        Returns:
+            dict: job status with progress percentage and current step
+        """
+        with self._correlation_jobs_lock:
+            job = self._correlation_jobs.get(job_id)
+        if not job:
+            return {'success': False, 'error': 'Job not found'}
+        return {
+            'success': True,
+            'status': job['status'],
+            'progress': job['progress'],
+            'step': job['step'],
+            'result': job.get('result')
+        }
+
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def runAiCorrelation(self: 'SpiderFootWebUi', id: str, mode: str = 'cross') -> dict:
-        """Run correlation analysis on a scan.
+        """Run correlation analysis on a scan (async with progress tracking).
+
+        Launches the correlation work in a background thread and returns
+        immediately with a job_id. Use correlationStatus to poll progress.
 
         Args:
             id (str): scan ID
@@ -5867,7 +5905,7 @@ class SpiderFootWebUi:
                          'single' for single-scan correlation (current scan only)
 
         Returns:
-            dict: analysis results with correlation count and status
+            dict: {success, job_id, status} for async polling
         """
         if mode not in ('cross', 'single'):
             return {'success': False, 'error': f'Invalid mode: {mode}'}
@@ -5879,41 +5917,117 @@ class SpiderFootWebUi:
         if not scanInfo:
             return {'success': False, 'error': 'Scan not found'}
 
+        # Clean up old completed jobs
+        self._cleanupOldCorrelationJobs()
+
+        # Create a new job
+        job_id = str(uuid.uuid4())
+        with self._correlation_jobs_lock:
+            self._correlation_jobs[job_id] = {
+                'status': 'running',
+                'progress': 0,
+                'step': 'Initializing...',
+                'result': None,
+                'completed_at': 0,
+            }
+
         target = scanInfo[1]
-        self.log.info(f"Running {mode} correlation analysis for scan {id} (target: {target})")
+        self.log.info(f"Running {mode} correlation analysis for scan {id} (target: {target}) [job {job_id}]")
 
-        # Deduplicate before running correlations to avoid inflated results
+        # Launch background worker thread
+        worker = threading.Thread(
+            target=self._correlationWorker,
+            args=(job_id, id, target, mode),
+            daemon=True
+        )
+        worker.start()
+
+        return {'success': True, 'job_id': job_id, 'status': 'running'}
+
+    def _updateCorrelationJob(self, job_id: str, **kwargs) -> None:
+        """Update a correlation job's state."""
+        with self._correlation_jobs_lock:
+            job = self._correlation_jobs.get(job_id)
+            if job:
+                job.update(kwargs)
+
+    def _correlationWorker(self, job_id: str, id: str, target: str, mode: str) -> None:
+        """Background worker that runs the full correlation pipeline.
+
+        Updates job progress at each stage so the frontend can poll.
+        """
         try:
-            dedup = dbh.deduplicateScanResults(id)
-            self.log.info(f"Pre-correlation dedup: removed={dedup.get('removed', 0)}, fp_preserved={dedup.get('fp_preserved', 0)}")
+            dbh = SpiderFootDb(self.config)
+
+            # Stage 1: Deduplication (0% -> 15%)
+            self._updateCorrelationJob(job_id, progress=5, step='Deduplicating events...')
+            try:
+                dedup = dbh.deduplicateScanResults(id)
+                self.log.info(f"Pre-correlation dedup: removed={dedup.get('removed', 0)}, fp_preserved={dedup.get('fp_preserved', 0)}")
+            except Exception as e:
+                self.log.warning(f"Pre-correlation dedup failed (continuing anyway): {e}")
+
+            self._updateCorrelationJob(job_id, progress=15, step='Deduplication complete')
+
+            # Stage 2: Clear old correlations (15% -> 20%)
+            ruleId = 'ai_single_scan_correlation' if mode == 'single' else 'ai_cross_scan_correlation'
+            try:
+                dbh.deleteCorrelationsByRule(id, ruleId)
+                self.log.info(f"Cleared previous {ruleId} correlations for scan {id}")
+            except Exception as e:
+                self.log.warning(f"Failed to clear old correlations (continuing anyway): {e}")
+
+            self._updateCorrelationJob(job_id, progress=20, step='Analyzing scan data...')
+
+            # Stage 3: Run AI correlation (20% -> 55%)
+            try:
+                if mode == 'single':
+                    ai_result = self._runSingleScanCorrelation(dbh, id, target)
+                else:
+                    ai_result = self._runCrossScanCorrelation(dbh, id, target)
+            except Exception as e:
+                self.log.error(f"Error running correlation: {e}", exc_info=True)
+                self._updateCorrelationJob(
+                    job_id,
+                    status='error',
+                    progress=100,
+                    step='Error',
+                    result={'success': False, 'error': f'Error running correlation: {str(e)}'},
+                    completed_at=time.time()
+                )
+                return
+
+            self._updateCorrelationJob(job_id, progress=55, step='Running correlation rules...')
+
+            # Stage 4: Rule-based correlations (55% -> 95%)
+            try:
+                self._rerunRuleCorrelations(dbh, id)
+            except Exception as e:
+                self.log.warning(f"Failed to re-run rule-based correlations: {e}")
+
+            self._updateCorrelationJob(job_id, progress=95, step='Finalizing results...')
+
+            # Done
+            self._updateCorrelationJob(
+                job_id,
+                status='complete',
+                progress=100,
+                step='Complete',
+                result=ai_result,
+                completed_at=time.time()
+            )
+            self.log.info(f"Correlation job {job_id} complete: {ai_result.get('correlations_found', 0)} correlations found")
+
         except Exception as e:
-            self.log.warning(f"Pre-correlation dedup failed (continuing anyway): {e}")
-
-        # Delete previous correlations for this scan to avoid duplicates on rescan
-        ruleId = 'ai_single_scan_correlation' if mode == 'single' else 'ai_cross_scan_correlation'
-        try:
-            dbh.deleteCorrelationsByRule(id, ruleId)
-            self.log.info(f"Cleared previous {ruleId} correlations for scan {id}")
-        except Exception as e:
-            self.log.warning(f"Failed to clear old correlations (continuing anyway): {e}")
-
-        try:
-            if mode == 'single':
-                ai_result = self._runSingleScanCorrelation(dbh, id, target)
-            else:
-                ai_result = self._runCrossScanCorrelation(dbh, id, target)
-
-        except Exception as e:
-            self.log.error(f"Error running correlation: {e}", exc_info=True)
-            return {'success': False, 'error': f'Error running correlation: {str(e)}'}
-
-        # Also re-run rule-based correlations so they survive deduplication
-        try:
-            self._rerunRuleCorrelations(dbh, id)
-        except Exception as e:
-            self.log.warning(f"Failed to re-run rule-based correlations: {e}")
-
-        return ai_result
+            self.log.error(f"Correlation worker error: {e}", exc_info=True)
+            self._updateCorrelationJob(
+                job_id,
+                status='error',
+                progress=100,
+                step='Error',
+                result={'success': False, 'error': str(e)},
+                completed_at=time.time()
+            )
 
     def _rerunRuleCorrelations(self: 'SpiderFootWebUi', dbh, scanId: str) -> None:
         """Re-run rule-based correlations for a scan.

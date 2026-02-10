@@ -6577,8 +6577,7 @@
 
         }
 
-        // Run correlation analysis on current scan data
-        // Uses $.ajax directly (not sf.fetchData) for proper error/timeout handling
+        // Run correlation analysis on current scan data (async with progress)
         function runAiCorrelation(instanceId, mode) {
             var btnId = '#btn-panel-rescan';
             var resetBtn = function() {
@@ -6588,31 +6587,99 @@
             $(btnId).prop('disabled', true).html("<i class='glyphicon glyphicon-refresh spinning'></i>&nbsp;Analyzing...");
             $("#ai-correlation-results").html("<span class='text-info'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;Running analysis...</span>");
 
+            // Show progress modal
+            showCorrelationProgressModal();
+
             $.ajax({
                 type: "POST",
                 url: '${docroot}/runAiCorrelation',
                 data: {'id': instanceId, 'mode': mode},
                 dataType: "json",
-                timeout: 300000,
+                timeout: 30000,
                 success: function(data) {
-                    resetBtn();
-                    if (data.success) {
-                        if (data.correlations_found > 0) {
-                            $("#ai-correlation-results").html("<span class='text-success'><i class='glyphicon glyphicon-ok'></i>&nbsp;" + data.correlations_found + " new correlation(s) found.</span>");
-                            setTimeout(function() { loadCorrelationsIntoPanel(instanceId); }, 1500);
-                        } else {
-                            $("#ai-correlation-results").html("<span class='text-muted'><i class='glyphicon glyphicon-info-sign'></i>&nbsp;No new correlations found.</span>");
-                        }
+                    if (data.success && data.job_id) {
+                        // Start polling for progress
+                        pollCorrelationStatus(data.job_id, instanceId, resetBtn);
                     } else {
+                        resetBtn();
+                        hideCorrelationProgressModal();
                         $("#ai-correlation-results").html("<span class='text-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;" + (data.error || 'Error') + "</span>");
                     }
                 },
                 error: function(xhr, textStatus, errorThrown) {
                     resetBtn();
+                    hideCorrelationProgressModal();
                     var msg = textStatus === 'timeout' ? 'Request timed out' : textStatus;
                     $("#ai-correlation-results").html("<span class='text-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Failed: " + msg + "</span>");
                 }
             });
+        }
+
+        function showCorrelationProgressModal() {
+            $("#correlation-progress-step").text("Initializing...");
+            $("#correlation-progress-bar").css("width", "0%").text("0%");
+            $("#correlation-progress-modal").show();
+        }
+
+        function hideCorrelationProgressModal() {
+            $("#correlation-progress-modal").hide();
+        }
+
+        function updateCorrelationProgress(progress, step) {
+            var pct = Math.min(100, Math.max(0, progress));
+            $("#correlation-progress-bar").css("width", pct + "%").text(pct + "%");
+            if (step) {
+                $("#correlation-progress-step").text(step);
+            }
+        }
+
+        function pollCorrelationStatus(jobId, instanceId, resetBtn) {
+            var pollInterval = setInterval(function() {
+                $.ajax({
+                    type: "GET",
+                    url: '${docroot}/correlationStatus',
+                    data: {'job_id': jobId},
+                    dataType: "json",
+                    timeout: 10000,
+                    success: function(data) {
+                        if (!data.success) {
+                            clearInterval(pollInterval);
+                            resetBtn();
+                            hideCorrelationProgressModal();
+                            $("#ai-correlation-results").html("<span class='text-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Job lost. Please retry.</span>");
+                            return;
+                        }
+
+                        updateCorrelationProgress(data.progress, data.step);
+
+                        if (data.status === 'complete') {
+                            clearInterval(pollInterval);
+                            resetBtn();
+                            hideCorrelationProgressModal();
+                            var result = data.result || {};
+                            if (result.success) {
+                                if (result.correlations_found > 0) {
+                                    $("#ai-correlation-results").html("<span class='text-success'><i class='glyphicon glyphicon-ok'></i>&nbsp;" + result.correlations_found + " new correlation(s) found.</span>");
+                                    setTimeout(function() { loadCorrelationsIntoPanel(instanceId); }, 1500);
+                                } else {
+                                    $("#ai-correlation-results").html("<span class='text-muted'><i class='glyphicon glyphicon-info-sign'></i>&nbsp;No new correlations found.</span>");
+                                }
+                            } else {
+                                $("#ai-correlation-results").html("<span class='text-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;" + (result.error || 'Error') + "</span>");
+                            }
+                        } else if (data.status === 'error') {
+                            clearInterval(pollInterval);
+                            resetBtn();
+                            hideCorrelationProgressModal();
+                            var result = data.result || {};
+                            $("#ai-correlation-results").html("<span class='text-danger'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;" + (result.error || 'Analysis failed') + "</span>");
+                        }
+                    },
+                    error: function() {
+                        // Network blip — keep polling, don't abort
+                    }
+                });
+            }, 2000);
         }
 
         // Run duplication check on scan results
@@ -7895,5 +7962,24 @@
         checkScanLatest();
 
     </script>
+<!-- Correlation Progress Modal -->
+<div id="correlation-progress-modal" class="assets-modal-overlay" style="display:none;">
+  <div class="assets-modal" style="width: 520px;">
+    <div class="assets-modal-header">
+      <span class="assets-modal-title">PROCESSING - PLEASE WAIT</span>
+    </div>
+    <div class="assets-modal-body" style="text-align: center; padding: 30px 20px;">
+      <i class="glyphicon glyphicon-flash" style="font-size: 28px; color: #38bdf8; margin-bottom: 15px; display: block;"></i>
+      <p id="correlation-progress-step" style="font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 20px;">Initializing...</p>
+      <div class="progress" style="height: 22px; margin-bottom: 10px; border-radius: 4px;">
+        <div id="correlation-progress-bar" class="progress-bar progress-bar-striped active" role="progressbar"
+             style="width: 0%; min-width: 2em; transition: width 0.5s ease; font-weight: 600; font-size: 11px; line-height: 22px;">
+          0%
+        </div>
+      </div>
+      <p style="font-size: 11px; color: #94a3b8; margin: 0;">Correlation analysis is running. This may take a few minutes for large scans.</p>
+    </div>
+  </div>
+</div>
 <iframe class="hidden" id='exportframe'></iframe>
 <%include file="FOOTER.tmpl"/>
