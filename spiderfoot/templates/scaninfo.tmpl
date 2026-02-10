@@ -4183,15 +4183,31 @@
         }
 
         function applyCorrelationsFilters() {
-            $('#correlations-panel-table tbody tr.corr-row').each(function() {
+            // Filter group header rows (multi-item groups)
+            $('#correlations-panel-table tbody tr.corr-group-row').each(function() {
                 var row = $(this);
                 var badge = row.find('.badge').text().toLowerCase();
-                var shouldHide = false;
-                if (correlationsFilterState.critical && badge === 'critical') shouldHide = true;
-                if (correlationsFilterState.high && badge === 'high') shouldHide = true;
-                if (correlationsFilterState.medium && badge === 'medium') shouldHide = true;
-                if (correlationsFilterState.low && badge === 'low') shouldHide = true;
-                if (correlationsFilterState.info && badge === 'info') shouldHide = true;
+                var shouldHide = correlationsFilterState[badge] || false;
+                var groupId = row.attr('data-group-id');
+                if (shouldHide) {
+                    row.hide();
+                    // Hide all children of this group
+                    $('tr.corr-group-member[data-group-id="' + groupId + '"]').hide();
+                    // Collapse the group
+                    row.removeClass('finding-expanded');
+                    $('tr.corr-group-child[data-group-id="' + groupId + '"]').removeClass('finding-expanded');
+                    $('tr.corr-group-child-detail[data-group-id="' + groupId + '"]').find('.finding-detail').stop(true, true).hide();
+                } else {
+                    row.show();
+                    // Don't auto-show children - they follow the group's expanded state
+                }
+            });
+
+            // Filter single-item rows (not part of a multi-item group)
+            $('#correlations-panel-table tbody tr.corr-row:not(.corr-group-child)').each(function() {
+                var row = $(this);
+                var badge = row.find('.badge').text().toLowerCase();
+                var shouldHide = correlationsFilterState[badge] || false;
                 if (shouldHide) {
                     row.hide();
                     row.next('.corr-detail-row').hide();
@@ -4199,20 +4215,26 @@
                     row.show();
                 }
             });
+
             updateCorrelationsFilterCounts();
         }
 
         function updateCorrelationsFilterCounts() {
-            var data = window.correlationsRawData || [];
+            var groupData = window.correlationsGroupData || { groups: {}, groupOrder: [] };
+            var groups = groupData.groups;
+            var groupOrder = groupData.groupOrder;
+
+            // Count at group level (matches what user sees as rows)
             var sevCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-            for (var i = 0; i < data.length; i++) {
-                var r = (data[i][3] || '').toUpperCase();
+            for (var g = 0; g < groupOrder.length; g++) {
+                var r = (groups[groupOrder[g]].risk || '').toUpperCase();
                 if (r === 'CRITICAL') sevCounts.critical++;
                 else if (r === 'HIGH') sevCounts.high++;
                 else if (r === 'MEDIUM') sevCounts.medium++;
                 else if (r === 'LOW') sevCounts.low++;
                 else if (r === 'INFO') sevCounts.info++;
             }
+
             var severities = ['critical', 'high', 'medium', 'low', 'info'];
             var labels = { critical: 'CRITICALS', high: 'HIGHS', medium: 'MEDIUMS', low: 'LOWS', info: 'INFOS' };
             for (var s = 0; s < severities.length; s++) {
@@ -4226,12 +4248,15 @@
                     btn.hide();
                 }
             }
+
             var hiddenCount = 0;
             for (var s = 0; s < severities.length; s++) {
                 if (correlationsFilterState[severities[s]]) hiddenCount += sevCounts[severities[s]];
             }
-            var visibleCount = data.length - hiddenCount;
+            var visibleCount = groupOrder.length - hiddenCount;
+            var totalFindings = (window.correlationsRawData || []).length;
             $('#correlations-count').text(visibleCount + " CORRELATIONS");
+            $('#correlations-total-count').text("(" + totalFindings + " total findings)");
         }
 
         // Load correlations data into the correlations tab panel
@@ -4303,34 +4328,110 @@
             // Store raw data for filtering
             window.correlationsRawData = data;
 
-            // Count risk levels
-            var corrSevCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-            for (var s = 0; s < data.length; s++) {
-                var r = (data[s][3] || '').toUpperCase();
-                if (r === 'CRITICAL') corrSevCounts.critical++;
-                else if (r === 'HIGH') corrSevCounts.high++;
-                else if (r === 'MEDIUM') corrSevCounts.medium++;
-                else if (r === 'LOW') corrSevCounts.low++;
-                else if (r === 'INFO') corrSevCounts.info++;
+            // Group correlations by rule_id (index [2] from DB query)
+            var groups = {};
+            var groupOrder = [];
+            for (var i = 0; i < data.length; i++) {
+                var ruleId = data[i][2] || 'unknown';
+                if (!groups[ruleId]) {
+                    groups[ruleId] = {
+                        ruleId: ruleId,
+                        ruleName: data[i][4] || ruleId,
+                        risk: data[i][3] || 'INFO',
+                        description: data[i][5] || '',
+                        items: []
+                    };
+                    groupOrder.push(ruleId);
+                }
+                groups[ruleId].items.push(data[i]);
             }
 
-            // Toolbar matching findings style - action buttons on left
+            // Sort groups by risk priority then by rule name
+            var riskPriority = { 'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'INFO': 4 };
+            groupOrder.sort(function(a, b) {
+                var riskA = riskPriority[groups[a].risk.toUpperCase()] !== undefined ? riskPriority[groups[a].risk.toUpperCase()] : 5;
+                var riskB = riskPriority[groups[b].risk.toUpperCase()] !== undefined ? riskPriority[groups[b].risk.toUpperCase()] : 5;
+                if (riskA !== riskB) return riskA - riskB;
+                return (groups[a].ruleName || '').localeCompare(groups[b].ruleName || '');
+            });
+
+            // Store group data for filter/count functions
+            window.correlationsGroupData = { groups: groups, groupOrder: groupOrder };
+
+            // Count risk levels at group level (for filter buttons)
+            var groupSevCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+            for (var g = 0; g < groupOrder.length; g++) {
+                var r = groups[groupOrder[g]].risk.toUpperCase();
+                if (r === 'CRITICAL') groupSevCounts.critical++;
+                else if (r === 'HIGH') groupSevCounts.high++;
+                else if (r === 'MEDIUM') groupSevCounts.medium++;
+                else if (r === 'LOW') groupSevCounts.low++;
+                else if (r === 'INFO') groupSevCounts.info++;
+            }
+
+            var totalGroups = groupOrder.length;
+
+            // Helper: badge class from risk level
+            function corrBadgeClass(risk) {
+                if (risk === 'CRITICAL') return 'alert-critical';
+                if (risk === 'HIGH') return 'alert-danger';
+                if (risk === 'MEDIUM') return 'alert-warning';
+                if (risk === 'LOW') return 'alert-info';
+                if (risk === 'INFO') return 'alert-success';
+                return '';
+            }
+
+            // Helper: render type links
+            function corrTypeLinks(eventTypes, instId) {
+                if (!eventTypes) return '';
+                var types = eventTypes.split(',');
+                var links = [];
+                for (var t = 0; t < types.length; t++) {
+                    var typ = types[t].trim();
+                    if (typ) {
+                        links.push("<a class='finding-type-link' onclick='event.stopPropagation(); dataEventData(\"" + instId + "\", \"" + typ.replace(/"/g, '&quot;') + "\", \"" + typ.replace(/"/g, '&quot;') + "\", \"full\");' title='View " + typ + " data'>" + typ + "</a>");
+                    }
+                }
+                return links.join(", ");
+            }
+
+            // Helper: render individual correlation detail row HTML
+            function corrDetailHtml(item, riskLower, extraClasses, extraAttrs, hiddenStyle) {
+                var corrId = item[0];
+                var desc = item[5] || '';
+                var h = "<tr class='finding-detail-row finding-" + riskLower + " corr-detail-row " + extraClasses + "' id='corrwell_tr_" + corrId + "'" + extraAttrs + (hiddenStyle ? " style='display:none'" : "") + ">";
+                h += "<td colspan='4'><div class='finding-detail' id='corr-detail-content-" + corrId + "'>";
+                if (desc) {
+                    h += "<div class='corr-description-wrapper'>";
+                    h += "<div class='finding-detail-section detail-description corr-description-wide'>";
+                    h += "<div class='finding-detail-label'>Description</div>";
+                    h += "<div class='finding-detail-text'>" + desc + "</div>";
+                    h += "</div>";
+                    h += "</div>";
+                }
+                h += "<div id='corrwell_td_" + corrId + "' class='corr-events-container'></div>";
+                h += "</div></td></tr>";
+                return h;
+            }
+
+            // Toolbar
             var html = "<div class='findings-toolbar'>";
             html += "<div class='findings-toolbar-left'>";
             html += "<button id='btn-panel-rescan' class='btn btn-sm btn-cyan' onclick='runAiCorrelation(\"" + instanceId + "\", \"single\")'>";
             html += "<i class='glyphicon glyphicon-flash'></i>&nbsp;AI RESCAN</button>&nbsp;";
-            html += "<span class='findings-count' id='correlations-count'>" + data.length + " CORRELATIONS</span>";
+            html += "<span class='findings-count' id='correlations-count'>" + totalGroups + " CORRELATIONS</span>";
+            html += "&nbsp;<span class='findings-count-detail' id='correlations-total-count'>(" + data.length + " total findings)</span>";
             html += "</div>";
             html += "<div class='findings-toolbar-right'>";
             html += "<span class='ai-correlation-compact-results' id='ai-correlation-results'></span>";
-            if (corrSevCounts.critical > 0) html += "<button class='filter-btn" + (correlationsFilterState.critical ? " filter-btn-active" : "") + "' id='corr-hide-critical' onclick='toggleCorrelationsFilter(\"critical\")'>" + (correlationsFilterState.critical ? "HIDING " : "HIDE ") + corrSevCounts.critical + " CRITICALS</button>&nbsp;";
-            if (corrSevCounts.high > 0) html += "<button class='filter-btn" + (correlationsFilterState.high ? " filter-btn-active" : "") + "' id='corr-hide-high' onclick='toggleCorrelationsFilter(\"high\")'>" + (correlationsFilterState.high ? "HIDING " : "HIDE ") + corrSevCounts.high + " HIGHS</button>&nbsp;";
-            if (corrSevCounts.medium > 0) html += "<button class='filter-btn" + (correlationsFilterState.medium ? " filter-btn-active" : "") + "' id='corr-hide-medium' onclick='toggleCorrelationsFilter(\"medium\")'>" + (correlationsFilterState.medium ? "HIDING " : "HIDE ") + corrSevCounts.medium + " MEDIUMS</button>&nbsp;";
-            if (corrSevCounts.low > 0) html += "<button class='filter-btn" + (correlationsFilterState.low ? " filter-btn-active" : "") + "' id='corr-hide-low' onclick='toggleCorrelationsFilter(\"low\")'>" + (correlationsFilterState.low ? "HIDING " : "HIDE ") + corrSevCounts.low + " LOWS</button>&nbsp;";
-            if (corrSevCounts.info > 0) html += "<button class='filter-btn" + (correlationsFilterState.info ? " filter-btn-active" : "") + "' id='corr-hide-info' onclick='toggleCorrelationsFilter(\"info\")'>" + (correlationsFilterState.info ? "HIDING " : "HIDE ") + corrSevCounts.info + " INFOS</button>";
+            if (groupSevCounts.critical > 0) html += "<button class='filter-btn" + (correlationsFilterState.critical ? " filter-btn-active" : "") + "' id='corr-hide-critical' onclick='toggleCorrelationsFilter(\"critical\")'>" + (correlationsFilterState.critical ? "HIDING " : "HIDE ") + groupSevCounts.critical + " CRITICALS</button>&nbsp;";
+            if (groupSevCounts.high > 0) html += "<button class='filter-btn" + (correlationsFilterState.high ? " filter-btn-active" : "") + "' id='corr-hide-high' onclick='toggleCorrelationsFilter(\"high\")'>" + (correlationsFilterState.high ? "HIDING " : "HIDE ") + groupSevCounts.high + " HIGHS</button>&nbsp;";
+            if (groupSevCounts.medium > 0) html += "<button class='filter-btn" + (correlationsFilterState.medium ? " filter-btn-active" : "") + "' id='corr-hide-medium' onclick='toggleCorrelationsFilter(\"medium\")'>" + (correlationsFilterState.medium ? "HIDING " : "HIDE ") + groupSevCounts.medium + " MEDIUMS</button>&nbsp;";
+            if (groupSevCounts.low > 0) html += "<button class='filter-btn" + (correlationsFilterState.low ? " filter-btn-active" : "") + "' id='corr-hide-low' onclick='toggleCorrelationsFilter(\"low\")'>" + (correlationsFilterState.low ? "HIDING " : "HIDE ") + groupSevCounts.low + " LOWS</button>&nbsp;";
+            if (groupSevCounts.info > 0) html += "<button class='filter-btn" + (correlationsFilterState.info ? " filter-btn-active" : "") + "' id='corr-hide-info' onclick='toggleCorrelationsFilter(\"info\")'>" + (correlationsFilterState.info ? "HIDING " : "HIDE ") + groupSevCounts.info + " INFOS</button>";
             html += "</div></div>";
 
-            // Table matching findings style: Risk | Correlation | Type | Data Elements
+            // Table
             html += "<div class='findings-table-wrapper'>";
             html += "<table id='correlations-panel-table' class='table findings-table tablesorter small'>";
             html += "<colgroup>";
@@ -4346,58 +4447,77 @@
             html += "<th>Data Elements</th>";
             html += "</tr></thead><tbody>";
 
-            for (var i = 0; i < data.length; i++) {
-                var risk = data[i][3];
+            // Render grouped correlations
+            for (var g = 0; g < groupOrder.length; g++) {
+                var ruleId = groupOrder[g];
+                var group = groups[ruleId];
+                var items = group.items;
+                var risk = group.risk;
                 var riskLower = risk.toLowerCase();
-                var badgeClass = '';
-                if (risk === 'CRITICAL') badgeClass = 'alert-critical';
-                else if (risk === 'HIGH') badgeClass = 'alert-danger';
-                else if (risk === 'MEDIUM') badgeClass = 'alert-warning';
-                else if (risk === 'LOW') badgeClass = 'alert-info';
-                else if (risk === 'INFO') badgeClass = 'alert-success';
+                var badgeClass = corrBadgeClass(risk);
+                var groupId = ruleId.replace(/[^a-zA-Z0-9_-]/g, '_');
 
-                var desc = data[i][5] || '';
-                var eventTypes = data[i][8] || '';
-                var corrId = data[i][0];
+                if (items.length === 1) {
+                    // Single-item group: render as individual row (no extra grouping click needed)
+                    var item = items[0];
+                    var corrId = item[0];
+                    var eventTypes = item[8] || '';
 
-                // Main row (clickable to expand)
-                html += "<tr class='finding-row finding-" + riskLower + " corr-row' data-corr-id='" + corrId + "' onclick='toggleCorrelation(\"" + instanceId + "\",\"" + corrId + "\")'>";
-                html += "<td><span class='badge " + badgeClass + "'>" + risk + "</span>";
-                html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='corr-icon-" + corrId + "'></i>";
-                html += "</td>";
-                html += "<td><div class='cell-clamp'>" + data[i][1] + "</div></td>";
+                    html += "<tr class='finding-row finding-" + riskLower + " corr-row' data-corr-id='" + corrId + "' data-group-id='" + groupId + "' onclick='toggleCorrelation(\"" + instanceId + "\",\"" + corrId + "\")'>";
+                    html += "<td><span class='badge " + badgeClass + "'>" + risk + "</span>";
+                    html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='corr-icon-" + corrId + "'></i>";
+                    html += "</td>";
+                    html += "<td><div class='cell-clamp'>" + item[1] + "</div></td>";
+                    html += "<td><div class='cell-clamp'>" + corrTypeLinks(eventTypes, instanceId) + "</div></td>";
+                    html += "<td><div class='cell-clamp'>" + item[7] + "</div></td>";
+                    html += "</tr>";
 
-                // Type column with clickable links to Data
-                if (eventTypes) {
-                    var types = eventTypes.split(',');
-                    var typeLinks = [];
-                    for (var t = 0; t < types.length; t++) {
-                        var typ = types[t].trim();
-                        if (typ) {
-                            typeLinks.push("<a class='finding-type-link' onclick='event.stopPropagation(); dataEventData(\"" + instanceId + "\", \"" + typ.replace(/"/g, '&quot;') + "\", \"" + typ.replace(/"/g, '&quot;') + "\", \"full\");' title='View " + typ + " data'>" + typ + "</a>");
+                    html += corrDetailHtml(item, riskLower, 'corr-group-member', " data-group-id='" + groupId + "'", false);
+
+                } else {
+                    // Multi-item group: render group header + hidden children
+                    var totalElements = 0;
+                    var allTypes = {};
+                    for (var j = 0; j < items.length; j++) {
+                        totalElements += parseInt(items[j][7]) || 0;
+                        var types = (items[j][8] || '').split(',');
+                        for (var t = 0; t < types.length; t++) {
+                            var typ = types[t].trim();
+                            if (typ) allTypes[typ] = true;
                         }
                     }
-                    html += "<td><div class='cell-clamp'>" + typeLinks.join(", ") + "</div></td>";
-                } else {
-                    html += "<td></td>";
-                }
+                    var aggregatedTypes = Object.keys(allTypes).join(',');
 
-                html += "<td><div class='cell-clamp'>" + data[i][7] + "</div></td>";
-                html += "</tr>";
+                    // Group header row
+                    html += "<tr class='finding-row finding-" + riskLower + " corr-group-row' data-group-id='" + groupId + "' onclick='toggleCorrelationGroup(\"" + instanceId + "\",\"" + groupId + "\")'>";
+                    html += "<td><span class='badge " + badgeClass + "'>" + risk + "</span>";
+                    html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='corrgroup-icon-" + groupId + "'></i>";
+                    html += "</td>";
+                    html += "<td><div class='cell-clamp'>" + group.ruleName + " <span class='corr-group-count'>" + items.length + " findings</span></div></td>";
+                    html += "<td><div class='cell-clamp'>" + corrTypeLinks(aggregatedTypes, instanceId) + "</div></td>";
+                    html += "<td><div class='cell-clamp'>" + totalElements + "</div></td>";
+                    html += "</tr>";
 
-                // Expandable detail row (description + events sub-table)
-                html += "<tr class='finding-detail-row finding-" + riskLower + " corr-detail-row' id='corrwell_tr_" + corrId + "'>";
-                html += "<td colspan='4'><div class='finding-detail' id='corr-detail-content-" + corrId + "'>";
-                if (desc) {
-                    html += "<div class='corr-description-wrapper'>";
-                    html += "<div class='finding-detail-section detail-description corr-description-wide'>";
-                    html += "<div class='finding-detail-label'>Description</div>";
-                    html += "<div class='finding-detail-text'>" + desc + "</div>";
-                    html += "</div>";
-                    html += "</div>";
+                    // Child rows (hidden by default)
+                    for (var j = 0; j < items.length; j++) {
+                        var item = items[j];
+                        var corrId = item[0];
+                        var eventTypes = item[8] || '';
+
+                        // Individual correlation row
+                        html += "<tr class='finding-row finding-" + riskLower + " corr-row corr-group-child corr-group-member' data-group-id='" + groupId + "' data-corr-id='" + corrId + "' onclick='event.stopPropagation(); toggleCorrelation(\"" + instanceId + "\",\"" + corrId + "\")' style='display:none'>";
+                        html += "<td>";
+                        html += " <i class='glyphicon glyphicon-chevron-right finding-expand-icon' id='corr-icon-" + corrId + "'></i>";
+                        html += "</td>";
+                        html += "<td><div class='cell-clamp'>" + item[1] + "</div></td>";
+                        html += "<td><div class='cell-clamp'>" + corrTypeLinks(eventTypes, instanceId) + "</div></td>";
+                        html += "<td><div class='cell-clamp'>" + item[7] + "</div></td>";
+                        html += "</tr>";
+
+                        // Detail row (hidden)
+                        html += corrDetailHtml(item, riskLower, 'corr-group-child-detail corr-group-member', " data-group-id='" + groupId + "'", true);
+                    }
                 }
-                html += "<div id='corrwell_td_" + corrId + "' class='corr-events-container'></div>";
-                html += "</div></td></tr>";
             }
 
             html += "</tbody></table></div>";
@@ -4417,7 +4537,7 @@
 
             $("#correlations-panel-table").tablesorter({
                 headers: { 0: { sorter: 'correlationPanelCriticality' } },
-                cssChildRow: 'corr-detail-row',
+                cssChildRow: 'corr-group-member',
                 sortList: [[0, 0]]
             });
             sf.updateTooltips();
@@ -6076,19 +6196,51 @@
             panel.html(h);
         }
 
+        // Expand/collapse a correlation group to show individual findings
+        function toggleCorrelationGroup(instanceId, groupId) {
+            var groupRow = $('tr.corr-group-row[data-group-id="' + groupId + '"]');
+            var childRows = $('tr.corr-group-child[data-group-id="' + groupId + '"]');
+            var childDetailRows = $('tr.corr-group-child-detail[data-group-id="' + groupId + '"]');
+
+            if (groupRow.hasClass('finding-expanded')) {
+                // Collapse group
+                groupRow.removeClass('finding-expanded');
+                childRows.slideUp(150);
+                childDetailRows.hide();
+                // Reset any expanded individual correlations within the group
+                childRows.removeClass('finding-expanded');
+                childDetailRows.find('.finding-detail').stop(true, true).hide();
+            } else {
+                // Expand group to show individual findings
+                groupRow.addClass('finding-expanded');
+                childRows.slideDown(150);
+                // Don't show detail rows - they appear only when individual correlations are expanded
+            }
+        }
+
         // Expand the correlation list to show the events associated
         function toggleCorrelation(instanceId, correlationId) {
             var row = $('tr[data-corr-id="' + correlationId + '"]');
+            var detailTr = $('#corrwell_tr_' + correlationId);
             var detail = $('#corr-detail-content-' + correlationId);
             var eventsContainer = $('#corrwell_td_' + correlationId);
 
             if (row.hasClass('finding-expanded')) {
                 row.removeClass('finding-expanded');
-                detail.slideUp(150);
+                detail.slideUp(150, function() {
+                    // For grouped children, hide the detail <tr> after animation completes
+                    if (detailTr.hasClass('corr-group-child-detail')) {
+                        detailTr.hide();
+                    }
+                });
                 return;
             }
 
             row.addClass('finding-expanded');
+            // For grouped children, show the detail <tr> before animating the inner content
+            if (detailTr.hasClass('corr-group-child-detail')) {
+                detailTr.show();
+            }
             detail.slideDown(150);
 
             // Only fetch events if not already loaded
