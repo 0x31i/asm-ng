@@ -4329,21 +4329,25 @@
             window.correlationsRawData = data;
 
             // Group correlations by rule_id (index [2] from DB query)
+            // AI correlations (ai_single_scan_correlation, ai_cross_scan_correlation)
+            // each get their own unique key since they are individually distinct findings
             var groups = {};
             var groupOrder = [];
             for (var i = 0; i < data.length; i++) {
                 var ruleId = data[i][2] || 'unknown';
-                if (!groups[ruleId]) {
-                    groups[ruleId] = {
+                var isAiCorrelation = (ruleId === 'ai_single_scan_correlation' || ruleId === 'ai_cross_scan_correlation');
+                var groupKey = isAiCorrelation ? ruleId + '_' + data[i][0] : ruleId;
+                if (!groups[groupKey]) {
+                    groups[groupKey] = {
                         ruleId: ruleId,
                         ruleName: data[i][4] || ruleId,
                         risk: data[i][3] || 'INFO',
                         description: data[i][5] || '',
                         items: []
                     };
-                    groupOrder.push(ruleId);
+                    groupOrder.push(groupKey);
                 }
-                groups[ruleId].items.push(data[i]);
+                groups[groupKey].items.push(data[i]);
             }
 
             // Sort groups by risk priority then by rule name
