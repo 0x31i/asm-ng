@@ -12,11 +12,337 @@
 [![Discord](https://img.shields.io/discord/770524432464216074)](https://discord.gg/vyvztrG)
 ![Active Development](https://img.shields.io/badge/Maintenance%20Level-Actively%20Developed-brightgreen.svg)
 
-**ASM-NG** is a production-ready, enterprise-grade open source intelligence (OSINT) and attack surface management platform. Built on a battle-tested scanning engine with 200+ modules, it integrates advanced storage capabilities, threat intelligence, and comprehensive security hardening to make intelligence data easily navigable and actionable.
+**ASM-NG** is a production-ready, enterprise-grade attack surface management and OSINT platform. Built on a battle-tested scanning engine with 200+ modules, it extends far beyond traditional OSINT with **workspace management**, **security grading**, **false positive tracking**, **known asset management**, **external vulnerability tool integration** (Burp Suite Pro, Nessus Pro, Nuclei), **AI-powered analysis**, and **cross-scan correlation** — making intelligence data truly navigable and actionable.
 
-ASM-NG features an embedded web server providing a clean, modern web-based interface, and can also be used entirely via the command line. It's written in **Python 3** and **MIT-licensed**.
+ASM-NG features an embedded web server with a clean, modern interface and can also be used entirely via the command line. Written in **Python 3** and **MIT-licensed**.
 
-> **Note:** ASM-NG is built on the SpiderFoot OSINT engine. The core scanning engine, modules, and internal class names retain their original naming for stability. All user-facing branding, documentation, and deployment tooling has been updated to ASM-NG.
+> **Note:** ASM-NG is built on the SpiderFoot OSINT engine. Core scanning modules retain their original naming for stability. All user-facing features, branding, and tooling have been updated to ASM-NG.
+
+![ASM-NG v5](./documentation/images/v5.png)
+
+---
+
+## What's New vs. SpiderFoot v4.0
+
+ASM-NG is a ground-up transformation of SpiderFoot into a full attack surface management platform. Here's what we've added:
+
+| Category | SpiderFoot v4.0 | ASM-NG |
+|---|---|---|
+| **Target Management** | Single target per scan | Workspaces with multi-target scanning |
+| **Security Grading** | None | Full A-F grading system with 7 categories, weighted scoring, and per-event breakdowns |
+| **False Positive Tracking** | Basic FP flag per result | Three-state system (Unvalidated/FP/Validated) with target-level persistence and cross-scan sync |
+| **Asset Management** | None | Known asset tracking with bulk import, matching, and export |
+| **External Vuln Tools** | None | Burp Suite Pro, Nessus Pro, Nuclei integration with import/export |
+| **Historical Data Sync** | None | Auto-import from previous scans, SYNC/RESYNC, deduplication |
+| **Bulk Operations** | None | Bulk status editing, select-all, cascade to children |
+| **Authentication** | Basic HTTP auth | Full user accounts with sessions, login page, user management |
+| **Audit Logging** | None | Comprehensive audit trail with username, action, IP, timestamp |
+| **AI Analysis** | None | AI threat intel, AI scan summaries, MCP CTI report generation |
+| **Correlation Engine** | Basic YAML rules | YAML rules + single-scan IOC correlation + cross-scan historical correlation |
+| **Data Import** | None | Legacy CSV, Scan Backup, Nessus XML, Burp XML/HTML, Excel findings |
+| **Export** | CSV/JSON | CSV/JSON/XLSX/GEXF with multi-scan export, vulnerability export, asset export |
+| **Database** | SQLite only | SQLite + PostgreSQL with 9 new tables and auto-migration |
+| **Modules** | ~200 | 274 modules including security hardening and AI modules |
+| **Correlation Rules** | 37 YAML rules | 51 YAML rules + AI-driven single and cross-scan correlation |
+
+---
+
+## Feature Deep-Dives
+
+### Workspace Management & Multi-Target Scanning
+
+Workspaces let you organize targets, scans, and results into logical groups for ongoing attack surface monitoring.
+
+**Capabilities:**
+- **Create and manage workspaces** with name, description, and multiple targets
+- **Multi-target scanning** — launch scans across all workspace targets simultaneously with one click
+- **Target management** — add/remove targets with auto-type detection (domain, IP, CIDR, email, etc.)
+- **Import existing scans** into workspaces to consolidate historical data
+- **Workspace cloning** — duplicate a workspace's target configuration for templating
+- **Workspace merging** — combine two workspaces, deduplicating targets and scans
+- **Workspace export** — export all workspace data as JSON including scan results
+- **Summary dashboard** — at-a-glance statistics on targets, scans, events, and correlations
+- **Cross-workspace search** — search events across all scans in a workspace
+- **Timing configuration** — set timezone, business hours, scheduling preferences, and retention policies
+- **MCP CTI reports** — generate threat assessment, infrastructure analysis, or attack surface reports for the entire workspace
+- **Dedicated workspace views** — full UI for workspace list and workspace detail pages
+
+```mermaid
+graph LR;
+    A[Workspace] --> B[Target 1];
+    A --> C[Target 2];
+    A --> D[Target N];
+    B --> E[Scan 1a];
+    B --> F[Scan 1b];
+    C --> G[Scan 2a];
+    D --> H[Scan Na];
+    E --> I[Cross-Scan Correlation];
+    F --> I;
+    G --> I;
+    H --> I;
+    I --> J[Workspace Report];
+```
+
+---
+
+### Security Grading System
+
+Every scan gets an overall letter grade (A through F) based on a weighted analysis of findings across 7 security categories.
+
+**How it works:**
+1. Each of 130+ event types maps to a **category** with a **scoring rule** and **point value**
+2. Points are summed per category to produce a **raw score**
+3. Raw scores are multiplied by the category **weight** to produce an **adjusted score**
+4. Category score = `max(0, 100 + adjusted_score)` out of 100
+5. **Overall grade** = weighted average of all category scores
+6. Letter grade from thresholds: **A** (90+), **B** (80+), **C** (70+), **D** (60+), **F** (<60)
+
+**Grade Categories:**
+
+| Category | Weight | Description |
+|---|---|---|
+| Network Security | 1.0 | Open ports, CVEs, internal IP exposure, defacements |
+| Web App Security | 1.0 | Web vulnerabilities, forms, uploads, frameworks |
+| Information Leakage | 0.8 | Exposed credentials, emails, personal data, passwords |
+| General Health | 0.8 | SSL certificates, code repos, coordinates, app stores |
+| External Account Exposure | 0.7 | External accounts, social media, compromised accounts |
+| DNS Health | 0.7 | DNS records, SPF, domain registration, WHOIS |
+| IP Reputation | 0.6 | Blacklisted IPs, malicious IPs, malicious subnets |
+| Information / Reference | 0.0 | Informational only — does not affect grade |
+
+**5 Scoring Logic Types:**
+- `unverified_exists` — deduct points if any unvalidated findings exist
+- `zero_entries_fail` — deduct heavy penalty if expected records (like SPF) are missing entirely
+- `crit_high_med` — tiered scoring for vulnerabilities (Critical: -20, High: -10, Medium: -5)
+- `count_scaled` — points multiplied by unique count (with cap)
+- `informational` — no penalty, purely informational
+
+**Fully configurable** — override category weights, event type rules, and grade thresholds via JSON settings.
+
+---
+
+### False Positive & Validation Management
+
+A three-state status system that persists across scans, ensuring your review work is never lost.
+
+**Three status states:**
+- **Unvalidated** (0) — default, not yet reviewed
+- **False Positive** (1) — confirmed does not belong to the organization
+- **Validated** (2) — confirmed belongs to the organization
+
+**Key capabilities:**
+- **Target-level persistence** — FP and Validated status is stored at the target level, so it carries forward to every future scan of the same target
+- **Cross-scan sync** — changing FP status on one scan automatically syncs to all other scans for that target
+- **Auto-enable persistence** — when multiple scans exist for a target, persistence activates automatically
+- **Bulk status editing** — select multiple results and set FP/Validated/Unvalidated in one operation
+- **Cascade to children** — marking a parent as FP automatically cascades to all child elements
+- **Force override** — bypass parent element checks when unsetting FPs
+- **Visual status badges** — color-coded badges (orange FP, blue Validated, gray Unvalidated) with `LEGACY` suffix for items detected from previous scan persistence
+- **Client-side filtering** — toggle visibility of FP, Validated, and Imported rows in the results table
+- **Target FP management** — dedicated API to list, add, and remove target-level false positives
+
+---
+
+### Known Asset Management
+
+Track your organization's known IPs, domains, and employees. Match scan results against your asset inventory to quickly identify what belongs to you.
+
+**Asset types:** IPs, Domains, Employees/Emails
+
+**Capabilities:**
+- **Bulk import** from `.txt`, `.csv`, or `.xlsx` files with auto-header detection
+- **Individual CRUD** — add, update, remove, and list assets per target
+- **Bulk remove** — remove multiple assets at once
+- **Scan result matching** — find scan results that match known assets (Potential Matches view)
+- **Two-way validation sync** — validating a scan result automatically adds it to known assets as `ANALYST_CONFIRMED`
+- **Back-fill sync** — sync existing validated scan results into known assets retroactively
+- **Export** — download known assets as CSV or XLSX
+- **Import history** — full audit trail of import operations (file name, count, user, date)
+- **Asset count dashboard** — per-target counts broken down by type and source
+
+---
+
+### External Vulnerability Tool Integration
+
+Import results from industry-standard vulnerability scanners directly into ASM-NG for unified tracking and reporting.
+
+#### Burp Suite Pro
+
+- **Import Burp XML reports** — full parse of Burp Suite scan results with all fields (severity, host, path, location, confidence, issue background, issue detail, solutions, references, vulnerability classifications, request, response)
+- **Import Burp HTML reports** — enhance existing XML data with additional detail from HTML reports (issue_detail, issue_background, solutions, references merged by plugin_name)
+- **Tracking statuses** — mark each vulnerability as `OPEN`, `CLOSED`, or `TICKETED`
+- **Dedicated storage** — `tbl_scan_burp_results` with 20 structured fields
+- **API endpoints** — list, count, check enhanced status, set tracking, export
+
+#### Nessus Pro
+
+- **Import `.nessus` XML files** — full parse with all fields (severity, plugin name/ID, host IP/name, OS, description, synopsis, solution, see also, service name, port, protocol, request, plugin output, CVSS3 base score)
+- **Tracking statuses** — mark each vulnerability as `OPEN`, `CLOSED`, or `TICKETED`
+- **Dedicated storage** — `tbl_scan_nessus_results` with 18 structured fields
+- **API endpoints** — list, count, set tracking, export
+
+#### Nuclei
+
+- **Native scanner module** (`sfp_tool_nuclei`) — runs Nuclei as part of the scan pipeline
+- **Local and remote execution** — run locally or via SSH on remote hosts
+- **Full template support** — point to any Nuclei template directory
+- **Structured JSON parsing** — results parsed and stored as standard scan events
+
+#### Generic Findings Import
+
+- **Import from Excel** (`.xlsx`) with columns: Priority, Category, Tab, Item, Description, Recommendation
+- **Dedicated storage** — `tbl_scan_findings` with structured fields
+- **Export** — findings export as XLSX
+
+#### Combined Vulnerability Export
+
+- **XLSX** — single Excel file with `EXT-VULNS` (Nessus) and `WEBAPP-VULNS` (Burp) tabs
+- **CSV** — ZIP archive containing separate CSV files per vulnerability type
+- **Tracking labels** — OPEN/CLOSED/TICKETED status included in exports
+
+---
+
+### Auto-Sync Legacy & Historical Scan Data
+
+Never lose previously captured data. ASM-NG automatically detects when you're viewing the latest scan for a target and imports relevant entries from all previous scans.
+
+**Capabilities:**
+- **Latest scan detection** — `LATEST` badge shown when viewing the most recent scan for a target
+- **Auto-import** — when viewing the latest scan, entries from older scans are automatically imported
+- **SYNC / RESYNC badges** — visual indicators for import status; click to trigger sync
+- **Manual sync** — manually trigger import from older scans at any time
+- **Resync** — delete previously imported entries and re-import fresh from all older scans
+- **Deduplication** — remove duplicate entries while preserving FP status on kept rows
+- **Provenance tracking** — every imported entry tracks which scan it came from (`imported_from_scan`)
+- **Filter imported rows** — toggle visibility of imported rows in the UI
+
+**Data Import Page:**
+- **Legacy CSV Import** — import CSV exports from older SpiderFoot versions
+- **Scan Backup Restore** — restore scans from ASM-NG/SpiderFoot CSV backups
+- **Nessus Import** — import `.nessus` XML files
+- **Burp XML Import** — import Burp Suite XML reports
+- **Burp HTML Enhance** — enrich existing Burp data with HTML report details
+- **FP preservation** — all F/P and validated status flags maintained during import
+- **Discovery path reconstruction** — source-to-target entity relationships rebuilt from CSV data
+- **Dry-run validation** — preview every import before committing (row counts, event types, warnings)
+- **Auto-detection** — target, scan name, and timestamps auto-detected from import data
+
+**CLI Import Tool:**
+```bash
+python3 tools/import_legacy_csv.py --csv /path/to/export.csv --name "Imported Scan" --target example.com
+python3 tools/import_legacy_csv.py --csv /path/to/export.csv --dry-run  # Validate without importing
+```
+
+---
+
+### Authentication & User Management
+
+Full user account system with session-based authentication, replacing SpiderFoot's basic HTTP auth.
+
+- **User accounts** — username, salted password hash, display name, active/inactive status
+- **Auto-setup** — default admin user created on first startup with a secure random password
+- **Session authentication** — CherryPy session-based auth with login/logout
+- **Login page** — dedicated login UI with authentication enforcement on all routes
+- **User management** — admin UI for creating, updating, deactivating, and deleting users
+- **Login tracking** — last login timestamp per user
+
+---
+
+### Audit Logging
+
+Comprehensive audit trail for compliance and forensic analysis.
+
+- **Tracked fields** — username, action type, detail, client IP address, timestamp
+- **Dedicated UI** — filterable audit log page (filter by action type, username)
+- **Indexed storage** — `tbl_audit_log` with indexes on username, timestamp, and action for fast queries
+
+---
+
+### AI-Powered Analysis
+
+Automated intelligence analysis powered by AI and Model Context Protocol (MCP) integration.
+
+- **AI Threat Intel** (`sfp__ai_threat_intel`) — cross-scan IOC analysis, loading IOCs from previous scans against the same target for historical threat pattern detection
+- **AI Scan Summaries** (`sfp_ai_summary`) — automated summarization of scan results
+- **MCP CTI Reports** — generate structured Cyber Threat Intelligence reports for workspaces:
+  - **Threat Assessment** — executive summary, threat landscape, IOCs, risk assessment, recommendations
+  - **Infrastructure Analysis** — infrastructure overview, exposed services, vulnerabilities, misconfigurations
+  - **Attack Surface Report** — external exposure, data leakage, third-party risks, mitigation strategies
+- **Traffic Light Protocol** — TLP level support (white, green, amber, red) for report classification
+- **Multiple output formats** — JSON, Markdown, PDF, HTML
+
+---
+
+### Advanced Correlation Engine
+
+Multi-layered correlation analysis that surfaces patterns across modules, event types, and historical scans.
+
+**Three correlation layers:**
+
+1. **YAML Rule-Based Correlation** — 51 pre-defined rules in `/correlations/` that match patterns across event types
+2. **Single-Scan IOC Correlation** — groups IOCs by data value and flags when the same indicator is found by multiple modules or across multiple event types
+3. **Cross-Scan Historical Correlation** — matches IOCs across native scan data and imported historical data, identifying persistent indicators worth investigation
+
+**Risk classification:**
+- 5-tier risk: `CRITICAL` / `HIGH` / `MEDIUM` / `LOW` / `INFO`
+- Risk derived from event type intrinsic risk + multi-module corroboration boost + occurrence count boost
+
+**Features:**
+- **Async processing** — correlations run in the background with polling for status
+- **Expandable detail rows** — each correlation links to all associated events
+- **Export** — CSV export of correlation results
+- **Per-correlation risk** — individual risk level per correlation with color coding
+
+---
+
+### Enhanced Export & Reporting
+
+Multi-format, multi-scan export capabilities for enterprise reporting workflows.
+
+- **Multi-scan CSV export** — export data from multiple scans at once in a single CSV
+- **Multi-scan JSON export** — combined JSON export across selected scans
+- **Multi-scan GEXF** — combined graph visualization across scans
+- **Legacy-compatible export** — event type mapping translates new types to legacy equivalents for existing Excel pivot table workflows
+- **Vulnerability XLSX** — combined Nessus + Burp results in one Excel workbook with separate tabs
+- **Findings XLSX** — structured findings export
+- **Known asset CSV/XLSX** — export asset inventory
+- **Full and legacy export modes** — choose between complete data or backward-compatible format
+
+---
+
+### Security Hardening
+
+- **Content Security Policy** — comprehensive CSP headers (script-src, style-src, img-src, connect-src, frame-src)
+- **Referrer Policy** — `no-referrer` default
+- **Cache Control** — `must-revalidate`
+- **Server header** — generic server identification
+- **Security hardening module** (`sfp__security_hardening`) — built-in security configuration module
+- **Enhanced input validation** — comprehensive sanitization across all endpoints
+
+---
+
+### Database Architecture
+
+ASM-NG supports both SQLite (default) and PostgreSQL, with 9 new database tables and automatic migration on upgrade.
+
+**New tables beyond SpiderFoot v4.0:**
+
+| Table | Purpose |
+|---|---|
+| `tbl_target_false_positives` | Target-level false positive persistence across scans |
+| `tbl_target_validated` | Target-level validated status persistence across scans |
+| `tbl_scan_findings` | Structured findings from Excel imports |
+| `tbl_scan_nessus_results` | Nessus Pro vulnerability scan results (18 fields) |
+| `tbl_scan_burp_results` | Burp Suite Pro vulnerability scan results (20 fields) |
+| `tbl_users` | User accounts with salted password hashes |
+| `tbl_audit_log` | Audit trail with username, action, IP, timestamp |
+| `tbl_known_assets` | Known asset inventory (IPs, domains, employees) |
+| `tbl_asset_import_history` | Asset import operation history |
+
+Plus enhancements to existing tables:
+- `tbl_scan_results` — new `imported_from_scan` column for provenance tracking
+- Comprehensive indexing on all new tables for query performance
+- Auto-migration handles schema upgrades seamlessly
 
 ---
 
@@ -26,172 +352,20 @@ ASM-NG features an embedded web server providing a clean, modern web-based inter
 graph TD;
     A[User] -->|Web UI| B[ASM-NG Core Engine];
     A -->|CLI| B;
-    B --> C[Modules];
-    B --> D[Database];
-    B --> E[API];
-    C --> F[External Data Sources];
-    E --> G[SIEM/SOAR/Integrations];
-    B --> H[Scheduler];
-    B --> I[Correlation Engine];
-    B --> J[Reporting & Export];
+    B --> C[274 Modules];
+    B --> D[Database - SQLite/PostgreSQL];
+    B --> E[REST API];
+    B --> F[Workspace Manager];
+    B --> G[Grading Engine];
+    B --> H[Correlation Engine];
+    C --> I[External Data Sources];
+    E --> J[SIEM/SOAR/Integrations];
+    F --> K[Multi-Target Scans];
+    H --> L[YAML Rules + AI Correlation];
+    B --> M[External Tool Import - Burp/Nessus/Nuclei];
+    B --> N[Asset Manager];
+    B --> O[Auth & Audit];
 ```
-
----
-
-## What Makes ASM-NG Different
-
-This platform includes production-ready enterprise features beyond the original engine:
-
-- **Advanced Storage Engine**: High-performance data storage with optimized querying and reporting
-- **Threat Intelligence**: Automated threat analysis and pattern recognition
-- **Security Hardening**: Enhanced security controls, input validation, and secure configurations
-- **Comprehensive Reporting**: Advanced analytics and customizable report generation
-- **Performance Optimization**: Scalable architecture for enterprise workloads
-- **Production Configuration**: Ready-to-deploy configurations for enterprise environments
-
-![ASM-NG v5](./documentation/images/v5.png)
-
----
-
-## Features
-
-### Core Platform
-
-- Web-based UI or CLI
-- Over 200 modules with enterprise enhancements
-- Python 3.9+
-- YAML-configurable [correlation engine](/correlations/README.md) with 37+ pre-defined rules
-- CSV/JSON/GEXF export with advanced formatting options
-- API key export/import
-- SQLite and PostgreSQL back-end for enterprise scalability
-- Highly configurable with production-ready defaults
-- Fully documented with enterprise deployment guides
-- Advanced visualizations and analytics
-- TOR integration for dark web searching
-- Docker and Kubernetes deployment support
-- Integrates with tools like DNSTwist, Whatweb, Nmap, and CMSeeK
-- Comprehensive REST API for enterprise integration
-
----
-
-## Visual Workflow: Typical OSINT Scan
-
-```mermaid
-graph LR;
-    A[Start Scan] --> B[Select Target];
-    B --> C[Choose Modules];
-    C --> D[Run Scan];
-    D --> E[Data Collection];
-    E --> F[Correlation & Analysis];
-    F --> G[View Results];
-    G --> H[Export/Integrate];
-```
-
----
-
-## Enterprise Capabilities
-
-### Threat Intelligence
-
-- **Automated Threat Analysis**: Rule-based algorithms analyze patterns and identify threats
-- **Pattern Recognition**: Correlation of indicators across data sources
-- **Cross-Scan Analysis**: Threat trend analysis and risk assessment across historical scans
-- **Text Analysis**: Automated analysis of text-based intelligence sources
-
-### Security & Compliance
-
-- **Enhanced Input Validation**: Comprehensive sanitization and validation of all inputs
-- **Security Configuration**: Hardened default configurations and security best practices
-- **Audit Logging**: Comprehensive audit trails for compliance and forensic analysis
-- **Access Controls**: Role-based access control and authentication mechanisms
-
-### Performance & Scalability
-
-- **High-Performance Storage**: Optimized database operations with compression and indexing
-- **Concurrent Processing**: Advanced threading and asynchronous processing capabilities
-- **Resource Management**: Intelligent resource allocation and memory optimization
-- **Load Balancing**: Support for distributed scanning across multiple instances
-
-### Advanced Analytics
-
-- **Custom Dashboards**: Configurable dashboards with real-time metrics and KPIs
-- **Comprehensive Reporting**: Advanced report generation with customizable templates
-- **Data Visualization**: Interactive charts, graphs, and network topology views
-- **Export Capabilities**: Multiple export formats with enterprise-grade data handling
-
-### Enterprise Integration
-
-- **REST API**: Comprehensive API for seamless integration with security tools
-- **Webhook Support**: Real-time notifications and event-driven integrations
-- **SIEM Integration**: Direct integration with popular SIEM platforms
-- **CI/CD Pipeline Support**: Automated scanning integration for DevSecOps workflows
-
----
-
-## Deployment Overview
-
-```mermaid
-graph TD;
-    A[User/Analyst] -->|Web UI/CLI| B[ASM-NG Container];
-    B --> C[Persistent Storage];
-    B --> D[Network];
-    B --> E[External APIs];
-    B --> F[SIEM/SOAR];
-    B --> G[Monitoring];
-```
-
----
-
-## Documentation
-
-Comprehensive documentation is available for all aspects of ASM-NG:
-
-### Quick Links
-
-- **[Installation Guide](documentation/installation.md)** - Complete setup instructions
-- **[Quick Start Guide](documentation/quickstart.md)** - Get scanning quickly
-- **[User Guide](documentation/user_guide.md)** - Fundamental concepts and usage
-- **[CLI Reference](documentation/user_guide.md)** - Command-line interface guide
-- **[API Documentation](documentation/api_reference.md)** - REST API reference
-- **[Module Guide](documentation/modules.md)** - Understanding modules
-
----
-
-## Uses
-
-ASM-NG can be used offensively (e.g. in a red team exercise or penetration test) for reconnaissance of your target or defensively to gather information about what you or your organisation might have exposed over the Internet.
-
-You can target the following entities in a scan:
-
-- IP address
-- Domain/sub-domain name
-- Hostname
-- Network subnet (CIDR)
-- ASN
-- E-mail address
-- Phone number
-- Username
-- Person's name
-- Bitcoin address
-
-The platform's 200+ modules feed each other in a publisher/subscriber model to ensure maximum data extraction to do things like:
-
-- [Host/sub-domain/TLD enumeration/extraction](https://asciinema.org/a/295912)
-- [Email address, phone number and human name extraction](https://asciinema.org/a/295947)
-- [Bitcoin and Ethereum address extraction](https://asciinema.org/a/295957)
-- [Check for susceptibility to sub-domain hijacking](https://asciinema.org/a/344377)
-- DNS zone transfers
-- [Threat intelligence and Blacklist queries](https://asciinema.org/a/295949)
-- API integration with [SHODAN](https://asciinema.org/a/127601), [HaveIBeenPwned](https://asciinema.org/a/128731), [GreyNoise](https://asciinema.org/a/295943), AlienVault, SecurityTrails, etc.
-- [Social media account enumeration](https://asciinema.org/a/295923)
-- [S3/Azure/Digitalocean bucket enumeration/scraping](https://asciinema.org/a/295941)
-- IP geo-location
-- Web scraping, web content analysis
-- [Image, document and binary file meta data analysis](https://asciinema.org/a/296274)
-- Dark web searches
-- [Port scanning and banner grabbing](https://asciinema.org/a/295939)
-- [Data breach searches](https://asciinema.org/a/296145)
-- So much more...
 
 ---
 
@@ -208,145 +382,194 @@ pip3 install -r requirements.txt
 python3 ./sf.py -l 127.0.0.1:5001
 ```
 
+On first startup, ASM-NG will create a default admin account and print the credentials to the console. Change the password after first login.
+
 ### Update Existing Installation
 
 ```bash
 cd asm-ng
 git pull origin master
-source venv/bin/activate  # If using virtual environment
+source venv/bin/activate
 pip3 install -r requirements.txt
 python3 ./sf.py -l 127.0.0.1:5001
 ```
 
-> **Note for Kali/Debian 12+ users:** These systems use "externally managed" Python environments. You must use a virtual environment (`python3 -m venv venv`) to install packages with pip. The commands above handle this automatically.
+> **Note for Kali/Debian 12+ users:** These systems use "externally managed" Python environments. You must use a virtual environment (`python3 -m venv venv`) to install packages with pip.
 
 ### Docker Deployment
 
 ```bash
-# Production deployment with optimized configuration
+# Production deployment
 docker-compose -f docker-compose-prod.yml up -d
 
 # Development environment
 docker-compose up -d
 ```
 
-### CLI Command Aliases (New Host Setup)
+### CLI Command Aliases
 
-When installing on a new host, set up convenience aliases so you can invoke the platform by its new name. Add these to your shell profile (`~/.bashrc`, `~/.zshrc`, etc.):
+Add to your shell profile (`~/.bashrc`, `~/.zshrc`, etc.):
 
 ```bash
-# ASM-NG CLI aliases
 alias asm-ng='python3 /path/to/asm-ng/sf.py'
 alias asm-ng-cli='python3 /path/to/asm-ng/sfcli.py'
 alias asm-ng-api='python3 /path/to/asm-ng/sfapi.py'
 ```
 
-Or, if installed via `pip install .` or `setup.py`, both the legacy `spiderfoot`/`spiderfoot-cli`/`spiderfoot-api` commands **and** the new `asm-ng`/`asm-ng-cli`/`asm-ng-api` commands are registered automatically.
-
-> **Important:** On every new host, you need to either run the pip install (which registers both old and new CLI commands) or manually configure the shell aliases above.
+Or install via `pip install .` / `setup.py` which registers both legacy (`spiderfoot`) and new (`asm-ng`) CLI commands automatically.
 
 ---
 
 ## Database Configuration
 
-ASM-NG supports both SQLite (default) and PostgreSQL for enterprise scalability:
+### SQLite (Default)
 
-### PostgreSQL Setup
+Works out of the box. Database stored at `~/.spiderfoot/spiderfoot.db`.
 
-For high-volume deployments, configure PostgreSQL:
+### PostgreSQL (Enterprise)
 
 ```bash
-# Install PostgreSQL and dependencies
 sudo apt-get install postgresql postgresql-contrib
 pip3 install psycopg2-binary
 
-# Create database and user
 sudo -u postgres psql
 CREATE DATABASE asm_ng;
 CREATE USER asm_ng_user WITH PASSWORD 'secure_password';
 GRANT ALL PRIVILEGES ON DATABASE asm_ng TO asm_ng_user;
 \q
 
-# Configure for PostgreSQL
 python3 ./sf.py --init-db postgresql://asm_ng_user:secure_password@localhost/asm_ng
 ```
 
 ---
 
-## Community
+## Scan Targets
 
-Whether you're a contributor, user, or just curious about ASM-NG and OSINT in general, we'd love to have you join our community! ASM-NG has a [Discord server](https://discord.gg/vyvztrG) for seeking help, requesting features, or general OSINT discussion.
+You can target the following entities:
+
+- IP address
+- Domain/sub-domain name
+- Hostname
+- Network subnet (CIDR)
+- ASN
+- E-mail address
+- Phone number
+- Username
+- Person's name
+- Bitcoin address
 
 ---
 
-## Writing Correlation Rules
+## REST API
 
-We have a comprehensive write-up and reference of the correlation rule-set [here](/correlations/README.md).
+### Key Endpoints
 
-Also take a look at the [template.yaml](/correlations/template.yaml) file for a walk through. The existing [37 rules](/correlations) are also quite readable and good starting points for additional rules.
+**Scans:**
+- `GET /scanlist` — list all scans
+- `POST /startscan` — start a new scan
+- `GET /stopscan` — stop an active scan
+- `GET /scaninfo` — scan detail view
+- `GET /scangrade` — get scan grade with category breakdowns
+- `GET /scanislatest` — check if scan is latest for target
+- `GET /scanhistory` — scan result history
+- `GET /scancorrelations` — get correlation results
+
+**Results & Status:**
+- `GET /scaneventresults` — get scan event results (filterable by type, FP, correlation)
+- `POST /resultsetfppersist` — set FP/Validated status with target-level persistence
+- `GET /scaneventresultexportmulti` — multi-scan CSV/JSON export
+- `GET /scanvulnsexport` — export Nessus + Burp results as XLSX/CSV
+
+**External Tools:**
+- `POST /importnessus` — import Nessus .nessus file
+- `POST /importburp` — import Burp XML
+- `POST /importburphtml` — enhance Burp data with HTML report
+- `POST /importfindings` — import findings from Excel
+- `GET /scannessuslist` / `GET /scanburplist` — list vulnerability results
+
+**Assets:**
+- `GET /knownassetlist` — list known assets
+- `POST /knownassetadd` — add an asset
+- `POST /knownassetimport` — bulk import from file
+- `GET /knownassetmatches` — match scan results against known assets
+- `GET /knownassetexport` — export assets as CSV/XLSX
+
+**Workspaces:**
+- `GET /workspacelist` — list all workspaces
+- `POST /workspacecreate` — create a workspace
+- `GET /workspacesummary` — workspace statistics
+- `POST /workspaceaddtarget` — add target to workspace
+- `POST /workspacemultiscan` — launch multi-target scan
+- `GET /workspacescancorrelations` — workspace-level correlations
+
+**Sync & Import:**
+- `POST /triggerscanmimport` — manually trigger historical import
+- `POST /resyncscanentries` — delete and re-import from older scans
+- `POST /deduplicatescan` — deduplicate scan results
+- `POST /processimport` — process legacy CSV / Nessus / Burp import
+
+**Admin:**
+- `GET /users` — user management
+- `GET /auditlog` — audit log viewer
 
 ---
 
-## Modules / Integrations
+## Modules & Integrations
 
-ASM-NG has over 200 modules, most of which *don't require API keys*, and many of those that do require API keys *have a free tier*.
+ASM-NG has **274 modules**, most of which don't require API keys, and many that do have a free tier.
 
-See the [Module Guide](documentation/modules.md) for the full list and details.
+Module categories include:
+- **OSINT Collection** — DNS, WHOIS, web scraping, port scanning, social media enumeration
+- **Threat Intelligence** — SHODAN, HaveIBeenPwned, GreyNoise, AlienVault, SecurityTrails, and more
+- **Vulnerability Scanning** — Nuclei, Nmap, CMSeeK, Whatweb, DNSTwist
+- **AI Analysis** — AI Threat Intel, AI Scan Summaries
+- **Security Hardening** — built-in hardening configuration module
+- **Data Storage** — database, stdout, and custom storage backends
+
+See the [Module Guide](documentation/modules.md) for the full list.
+
+---
+
+## Correlation Rules
+
+ASM-NG includes **51 YAML correlation rules** plus AI-driven single-scan and cross-scan correlation.
+
+See the [Correlation Rules Reference](/correlations/README.md) and the [template.yaml](/correlations/template.yaml) for writing custom rules.
 
 ---
 
 ## Version Management
 
-ASM-NG uses a centralized version management system:
-
-- **Single Source of Truth**: All versions controlled from the `VERSION` file
-- **Automated Updates**: Use `python update_version.py` to update all version references
-- **Consistency Checking**: Validate version consistency with `python update_version.py --check`
-- **Release Management**: Streamlined version bumping with `python update_version.py --set X.Y.Z`
+- **Single source of truth**: All versions controlled from the `VERSION` file
+- **Automated updates**: `python update_version.py` updates all version references
+- **Consistency checking**: `python update_version.py --check`
+- **Release management**: `python update_version.py --set X.Y.Z`
 
 ---
 
-## REST API Usage
+## Documentation
 
-The ASM-NG REST API allows you to interact with the platform programmatically.
+- **[Installation Guide](documentation/installation.md)** — complete setup instructions
+- **[Quick Start Guide](documentation/quickstart.md)** — get scanning quickly
+- **[User Guide](documentation/user_guide.md)** — fundamental concepts and usage
+- **[API Documentation](documentation/api_reference.md)** — REST API reference
+- **[Module Guide](documentation/modules.md)** — understanding modules
+- **In-app documentation** — accessible from the web UI at `/documentation`
 
-### Available Endpoints
+---
 
-- `GET /api/scan/start`: Start a new scan
-- `POST /api/scan/stop`: Stop an ongoing scan
-- `GET /api/scan/results`: Retrieve scan results
-- `GET /api/modules`: List available modules
-- `GET /api/scans/active`: List active scans
-- `GET /api/scan/status`: Get the status of a specific scan
-- `GET /api/scans/history`: List the history of all scans performed
-- `GET /api/scan/export`: Export scan results in various formats (e.g., CSV, JSON)
-- `POST /api/keys/import`: Import API keys for various modules
-- `GET /api/keys/export`: Export API keys for various modules
+## Community
 
-### Example Usage
-
-```bash
-curl -X GET "http://127.0.0.1:8000/api/scan/start?target=example.com&modules=module1,module2"
-```
-
-```bash
-curl -X POST "http://127.0.0.1:8000/api/scan/stop" -d '{"scan_id": "12345"}'
-```
-
-```bash
-curl -X GET "http://127.0.0.1:8000/api/scan/results?scan_id=12345"
-```
-
-For more detailed instructions and examples, refer to the [API documentation](documentation/api_reference.md).
+Join the [Discord server](https://discord.gg/vyvztrG) for help, feature requests, or general OSINT discussion.
 
 ---
 
 ## Active Maintenance
 
-ASM-NG is actively maintained with regular updates and contributions. Issues and pull requests are actively managed. The community is engaged through discussions and contributions.
+ASM-NG is actively maintained with regular updates. Issues and pull requests are actively managed.
 
 Maintainer: 0x31i <elias@sims.dev>
 
 ---
 
-*For more diagrams and visualizations, see the documentation and web UI dashboards!*
+*Built on SpiderFoot. Transformed into an attack surface management platform.*
