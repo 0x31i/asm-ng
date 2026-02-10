@@ -2340,7 +2340,7 @@
                         html += "<tr class='assets-known-row' data-asset-id='" + a.id + "' data-asset-type='" + a.asset_type + "' data-asset-source='" + a.source + "'" + hideStyle + ">";
                         html += "<td class='assets-cell-select' onclick='knownToggleCb(this, event)'><input type='checkbox' class='asset-cb' value='" + a.id + "' onchange='assetsUpdateSelection()'></td>";
                         html += "<td class='assets-known-type-cell assets-expandable' onclick='knownToggleDetail(this)'><span class='assets-type-badge assets-type-" + a.asset_type + "'>" + a.asset_type.toUpperCase() + "</span></td>";
-                        html += "<td class='assets-known-value-cell assets-expandable' onclick='knownToggleDetail(this)'>" + valueWrapped + "</td>";
+                        html += "<td class='assets-known-value-cell assets-expandable' onclick='knownToggleDetail(this)'><div class='assets-value-truncate'>" + valueWrapped + "</div></td>";
                         html += "<td class='assets-known-source-cell assets-expandable' onclick='knownToggleDetail(this)'><span class='assets-source-badge " + sourceClass + "'>" + sourceLabel + "</span></td>";
                         html += "<td class='assets-known-action-cell'>";
                         html += "<button class='btn btn-xs assets-icon-btn assets-fp-action' onclick='event.stopPropagation();knownAssetAction(" + a.id + ", \"fp\")' title='FALSE POSITIVE'>";

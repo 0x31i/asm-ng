@@ -6412,9 +6412,20 @@ i.glyphicon-white,
   font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
   font-size: 11px;
   font-weight: 600;
-  word-break: normal; overflow-wrap: normal; white-space: normal;
+  word-break: break-all; overflow-wrap: anywhere; white-space: normal;
   line-height: 1.5; padding: 6px 10px !important;
   color: #1e293b;
+}
+.assets-value-truncate {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.assets-row-expanded .assets-value-truncate {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
 }
 .assets-known-source-cell { padding: 6px 10px !important; vertical-align: middle; text-align: center; }
 .assets-known-action-cell { text-align: center; padding: 4px 8px !important; white-space: nowrap; vertical-align: middle; }
