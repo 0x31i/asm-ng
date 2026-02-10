@@ -5865,58 +5865,60 @@ i.glyphicon-white,
    ============================================ */
 
 /* False Positive - ORANGE Box with White Glowing Text */
+/* Status badges - compact, high-contrast for light mode */
 .status-fp {
   display: inline-block;
-  min-width: 130px;
-  padding: 6px 10px;
-  background: linear-gradient(135deg, var(--accent-orange) 0%, #c2410c 100%);
+  min-width: 120px;
+  max-width: 130px;
+  padding: 5px 8px;
+  background: #c2410c;
   color: #ffffff;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
   text-align: center;
   letter-spacing: 0.5px;
-  border-radius: 4px;
-  box-shadow: 0 0 10px var(--glow-orange);
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 0 15px rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 3px rgba(194, 65, 12, 0.3);
   cursor: default;
 }
 
-/* Validated - BLUE Box with White Glowing Text */
+/* Validated - solid green for clear visual signal */
 .status-validated {
   display: inline-block;
-  min-width: 130px;
-  padding: 6px 10px;
-  background: linear-gradient(135deg, var(--accent-blue) 0%, #1d4ed8 100%);
+  min-width: 120px;
+  max-width: 130px;
+  padding: 5px 8px;
+  background: #15803d;
   color: #ffffff;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
   text-align: center;
   letter-spacing: 0.5px;
-  border-radius: 4px;
-  box-shadow: 0 0 10px var(--glow-blue);
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 0 15px rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 3px rgba(21, 128, 61, 0.3);
   cursor: default;
 }
 
-/* Unvalidated - GREY Badge */
+/* Unvalidated - higher contrast grey */
 .status-unvalidated {
   display: inline-block;
-  min-width: 130px;
-  padding: 6px 10px;
-  background: #e2e8f0;
-  color: #475569;
+  min-width: 120px;
+  max-width: 130px;
+  padding: 5px 8px;
+  background: #f1f5f9;
+  color: #334155;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
   text-align: center;
   letter-spacing: 0.5px;
-  border-radius: 4px;
-  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid #94a3b8;
   cursor: default;
 }
 
@@ -6792,7 +6794,7 @@ i.glyphicon-white,
 
 /* Validation status column in tables */
 .validation-status {
-  width: 140px;
+  width: 150px;
   text-align: center;
   vertical-align: middle !important;
 }
@@ -7051,19 +7053,17 @@ i.glyphicon-white,
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-/* ============================================
-   Discovery Path Table - Modern Design
-   Uses CSS variables for automatic light/dark
-   ============================================ */
+/* =====================================================================
+   DISCOVERY PATH VIEW - Modern Overhaul (Light Theme)
+   ===================================================================== */
 
-/* Wrapper constrains table and adds card-like container */
 .discovery-path-wrapper {
   width: 100%;
-  overflow: hidden;
-  border-radius: var(--radius-md);
+  overflow-x: auto;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--glass-border);
-  background: var(--bg-secondary);
-  box-shadow: var(--shadow-sm);
+  background: var(--bg-primary);
+  box-shadow: var(--shadow-md);
 }
 
 /* Table layout */
@@ -7076,32 +7076,32 @@ table.discovery-path-table {
   border: none !important;
 }
 
-/* Column widths */
-table.discovery-path-table th:first-child { width: 36px; }
-table.discovery-path-table th:nth-child(2) { width: 120px; }
+/* Column widths - generous STATUS column to prevent overlap */
+table.discovery-path-table th:first-child,
+table.discovery-path-table col:first-child { width: 40px !important; min-width: 40px !important; }
+table.discovery-path-table th:nth-child(2),
+table.discovery-path-table col:nth-child(2) { width: 150px !important; min-width: 150px !important; }
 
-/* Header - glass effect, theme-aware */
+/* Header - clean, high-contrast */
 table.discovery-path-table > thead > tr > th {
   background: var(--bg-tertiary) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  color: var(--text-muted) !important;
+  color: var(--text-secondary) !important;
   font-family: var(--font-mono) !important;
   font-size: 10px !important;
-  font-weight: 600 !important;
+  font-weight: 700 !important;
   text-transform: uppercase !important;
   letter-spacing: 1.5px !important;
-  padding: 10px 10px !important;
+  padding: 12px 16px !important;
   border: none !important;
-  border-bottom: 1px solid var(--glass-border) !important;
+  border-bottom: 2px solid var(--glass-border) !important;
 }
 
-/* All table cells */
+/* All table cells - increased padding for breathing room */
 table.discovery-path-table > tbody > tr > td {
   vertical-align: top !important;
   border: none !important;
   border-bottom: 1px solid var(--glass-border) !important;
-  padding: 12px 10px !important;
+  padding: 14px 16px !important;
   background: transparent !important;
   color: var(--text-primary) !important;
 }
@@ -7112,140 +7112,193 @@ table.discovery-path-table > tbody > tr {
 }
 
 table.discovery-path-table > tbody > tr:hover > td {
+  background: var(--bg-secondary) !important;
+}
+
+/* Zebra striping */
+table.discovery-path-table > tbody > tr:nth-child(even) > td {
+  background: var(--bg-secondary) !important;
+}
+table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   background: var(--bg-tertiary) !important;
 }
 
 /* Checkbox cell */
 table.discovery-path-table > tbody > tr > td:first-child {
-  padding: 14px 0 !important;
+  padding: 16px 0 !important;
   text-align: center;
+  width: 40px !important;
 }
 
-/* Status cell */
+/* Status cell - generous width, no overflow */
 table.discovery-path-table td.validation-status {
   vertical-align: top !important;
-  padding: 10px 6px !important;
+  padding: 12px 10px !important;
   text-align: center !important;
+  width: 150px !important;
+  min-width: 150px !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
 }
 
 /* Discovery path data cells */
 .discovery-path-cell {
-  padding: 10px 12px !important;
+  padding: 14px 16px !important;
   vertical-align: top !important;
   font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.6;
-  cursor: pointer;
+  font-size: 11.5px;
+  line-height: 1.7;
   position: relative;
   white-space: normal !important;
-  word-break: break-all !important;
+  word-break: break-word !important;
   overflow-wrap: anywhere !important;
   transition: background var(--transition-fast);
 }
 
-/* Wrapper - ALWAYS overflow:hidden to prevent horizontal bleed */
+/* Wrapper - overflow hidden for collapse, smooth transition */
 .dp-cell-wrap {
   position: relative;
   width: 100%;
   max-width: 100%;
   overflow: hidden;
   white-space: normal;
-  word-break: break-all;
+  word-break: break-word;
   overflow-wrap: anywhere;
+  transition: max-height 0.3s ease;
 }
 
-/* Inner divs */
+/* Inner divs - spaced apart for readability */
 .discovery-path-cell .dp-type,
 .discovery-path-cell .dp-module,
 .discovery-path-cell .dp-data {
   white-space: normal;
-  word-break: break-all;
+  word-break: break-word;
   overflow-wrap: anywhere;
-  margin-bottom: 2px;
+  margin-bottom: 6px;
+  line-height: 1.5;
 }
 
-/* Labels (TYPE:, SOURCE MODULE:, DATA:) - theme-aware */
+.discovery-path-cell .dp-data {
+  margin-bottom: 0;
+}
+
+/* Labels (TYPE:, SOURCE MODULE:, DATA:) - high contrast */
 .discovery-path-cell .dp-type strong,
 .discovery-path-cell .dp-module strong,
 .discovery-path-cell .dp-data strong {
-  color: var(--text-muted);
-  font-weight: 600;
+  color: var(--text-secondary);
+  font-weight: 700;
   text-transform: uppercase;
   font-size: 9px;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
+  display: inline-block;
+  margin-right: 4px;
 }
 
-/* Values - theme-aware */
+/* Values - high contrast */
 .discovery-path-cell .dp-value {
   color: var(--text-primary);
   font-weight: 500;
-  word-break: break-all;
+  word-break: break-word;
   overflow-wrap: anywhere;
 }
 
-/* DATA values in green - theme-aware */
+/* DATA values in green - vivid for light mode */
 .discovery-path-cell .dp-data-value {
-  color: var(--accent-green);
+  color: #15803d;
   font-weight: 600;
 }
 
-/* Fade overlay - uses bg-secondary for theme match */
+/* Fade overlay - uses bg-primary for clean fade */
 .discovery-path-cell[data-dp-state="collapsed"] .dp-cell-wrap::after {
   content: '';
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 36px;
-  background: linear-gradient(to bottom, transparent, var(--bg-secondary));
+  height: 40px;
+  background: linear-gradient(to bottom, transparent, var(--bg-primary));
   pointer-events: none;
+  z-index: 1;
 }
 
-/* Expand hint */
-.discovery-path-cell[data-dp-state="collapsed"]::after {
-  content: 'EXPAND';
+/* Expand/collapse toggle button */
+.dp-expand-toggle {
   display: block;
+  width: 100%;
   text-align: center;
   font-family: var(--font-mono);
-  font-size: 8px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  color: var(--accent-green);
-  opacity: 0.5;
-  margin-top: 6px;
-  padding: 3px 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-top: 8px;
+  padding: 4px 0;
   cursor: pointer;
-  transition: opacity var(--transition-fast);
+  border: none;
+  background: none;
+  transition: all var(--transition-fast);
+  border-radius: var(--radius-sm);
 }
 
-.discovery-path-cell[data-dp-state="collapsed"]:hover::after {
-  opacity: 0.85;
+.dp-expand-toggle:focus {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
 }
 
-/* Collapse hint */
-.discovery-path-cell[data-dp-state="expanded"]::after {
-  content: 'COLLAPSE';
-  display: block;
-  text-align: center;
-  font-family: var(--font-mono);
-  font-size: 8px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  color: var(--text-muted);
-  opacity: 0.4;
-  margin-top: 6px;
-  padding: 3px 0;
-  cursor: pointer;
-  transition: opacity var(--transition-fast);
-}
-
-.discovery-path-cell[data-dp-state="expanded"]:hover::after {
+/* Collapsed state - show expand button */
+.discovery-path-cell[data-dp-state="collapsed"] .dp-expand-toggle {
+  color: var(--accent-blue);
   opacity: 0.7;
+}
+
+.discovery-path-cell[data-dp-state="collapsed"] .dp-expand-toggle:hover {
+  opacity: 1;
+  background: rgba(37, 99, 235, 0.06);
+}
+
+/* Expanded state - show collapse button */
+.discovery-path-cell[data-dp-state="expanded"] .dp-expand-toggle {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.discovery-path-cell[data-dp-state="expanded"] .dp-expand-toggle:hover {
+  opacity: 0.8;
+  background: var(--bg-tertiary);
+}
+
+/* Hide toggle when cell doesn't overflow */
+.discovery-path-cell:not([data-dp-state]) .dp-expand-toggle {
+  display: none;
+}
+
+/* Expandable cells - clickable */
+.discovery-path-cell[data-dp-state] {
+  cursor: pointer;
 }
 
 /* Hover highlight on expandable cells */
 .discovery-path-cell[data-dp-state]:hover {
-  background: var(--bg-tertiary) !important;
+  background: var(--bg-secondary) !important;
+}
+
+/* Chevron icon for expand toggle */
+.dp-expand-toggle .dp-chevron {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  vertical-align: middle;
+  transition: transform 0.3s ease;
+}
+
+.discovery-path-cell[data-dp-state="collapsed"] .dp-expand-toggle .dp-chevron {
+  transform: rotate(0deg);
+}
+
+.discovery-path-cell[data-dp-state="expanded"] .dp-expand-toggle .dp-chevron {
+  transform: rotate(180deg);
 }
 
 /* Responsive adjustments */
@@ -7282,10 +7335,23 @@ table.discovery-path-table td.validation-status {
     font-size: 8px;
     padding: 3px 5px;
     letter-spacing: 0.3px;
+    min-width: 90px;
+    max-width: 100px;
   }
 
   .validation-status {
-    width: 100px;
+    width: 110px !important;
+    min-width: 110px !important;
+  }
+
+  table.discovery-path-table td.validation-status {
+    width: 110px !important;
+    min-width: 110px !important;
+  }
+
+  .discovery-path-cell {
+    font-size: 10px;
+    padding: 10px 8px !important;
   }
 }
 

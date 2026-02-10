@@ -5892,58 +5892,61 @@ button[data-target="#createWorkspaceModal"]:hover,
    Enhanced glow effects for dark backgrounds
    ============================================ */
 
-/* False Positive - ORANGE Box with White Glowing Text */
+/* False Positive - ORANGE with subtle glow */
 .status-fp {
   display: inline-block;
-  min-width: 130px;
-  padding: 6px 10px;
+  min-width: 120px;
+  max-width: 130px;
+  padding: 5px 8px;
   background: linear-gradient(135deg, var(--accent-orange) 0%, #ea580c 100%);
   color: #ffffff;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
   text-align: center;
   letter-spacing: 0.5px;
-  border-radius: 4px;
-  box-shadow: 0 0 15px var(--glow-orange), 0 0 30px var(--glow-orange);
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 0 20px rgba(255, 255, 255, 0.6);
+  border-radius: 6px;
+  box-shadow: 0 0 10px var(--glow-orange);
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.5);
   cursor: default;
 }
 
-/* Validated - BLUE Box with White Glowing Text */
+/* Validated - GREEN with subtle glow */
 .status-validated {
   display: inline-block;
-  min-width: 130px;
-  padding: 6px 10px;
-  background: linear-gradient(135deg, var(--accent-blue) 0%, #2563eb 100%);
+  min-width: 120px;
+  max-width: 130px;
+  padding: 5px 8px;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
   color: #ffffff;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
   text-align: center;
   letter-spacing: 0.5px;
-  border-radius: 4px;
-  box-shadow: 0 0 15px var(--glow-blue), 0 0 30px var(--glow-blue);
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 0 20px rgba(255, 255, 255, 0.6);
+  border-radius: 6px;
+  box-shadow: 0 0 10px var(--glow-green);
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.5);
   cursor: default;
 }
 
-/* Unvalidated - GREY Badge */
+/* Unvalidated - subtle border badge */
 .status-unvalidated {
   display: inline-block;
-  min-width: 130px;
-  padding: 6px 10px;
+  min-width: 120px;
+  max-width: 130px;
+  padding: 5px 8px;
   background: var(--bg-tertiary);
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
   text-align: center;
   letter-spacing: 0.5px;
-  border-radius: 4px;
+  border-radius: 6px;
   border: 1px solid var(--glass-border);
   cursor: default;
 }
@@ -6030,6 +6033,54 @@ button[data-target="#createWorkspaceModal"]:hover,
 
 .stats-known-asset .stats-label {
   color: #86efac;
+}
+
+/* =====================================================================
+   DISCOVERY PATH VIEW - Dark Mode Overrides
+   ===================================================================== */
+
+.discovery-path-wrapper {
+  background: var(--bg-secondary);
+  border-color: var(--glass-border);
+}
+
+/* Dark mode zebra striping */
+table.discovery-path-table > tbody > tr:nth-child(even) > td {
+  background: rgba(255, 255, 255, 0.02) !important;
+}
+table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Dark mode cell label contrast */
+.discovery-path-cell .dp-type strong,
+.discovery-path-cell .dp-module strong,
+.discovery-path-cell .dp-data strong {
+  color: #a3a3a3;
+}
+
+/* Dark mode data value - brighter green */
+.discovery-path-cell .dp-data-value {
+  color: var(--accent-green-light);
+}
+
+/* Dark mode fade overlay */
+.discovery-path-cell[data-dp-state="collapsed"] .dp-cell-wrap::after {
+  background: linear-gradient(to bottom, transparent, var(--bg-secondary));
+}
+
+/* Dark mode expand toggle */
+.discovery-path-cell[data-dp-state="collapsed"] .dp-expand-toggle {
+  color: var(--accent-green-light);
+}
+
+.discovery-path-cell[data-dp-state="collapsed"] .dp-expand-toggle:hover {
+  background: rgba(34, 197, 94, 0.08);
+}
+
+/* Dark hover for expandable cells */
+.discovery-path-cell[data-dp-state]:hover {
+  background: rgba(255, 255, 255, 0.03) !important;
 }
 
 /* =====================================================================
@@ -7285,7 +7336,7 @@ button[data-target="#createWorkspaceModal"]:hover,
 
 /* Validation status column in tables */
 .validation-status {
-  width: 140px;
+  width: 150px;
   text-align: center;
   vertical-align: middle !important;
 }
@@ -7336,10 +7387,13 @@ button[data-target="#createWorkspaceModal"]:hover,
     font-size: 8px;
     padding: 3px 5px;
     letter-spacing: 0.3px;
+    min-width: 90px;
+    max-width: 100px;
   }
 
   .validation-status {
-    width: 120px;
+    width: 110px !important;
+    min-width: 110px !important;
   }
 }
 
