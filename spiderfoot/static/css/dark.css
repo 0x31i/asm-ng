@@ -8587,6 +8587,61 @@ i.glyphicon-white,
 .findings-table .col-corr-type { width: 25%; }
 .findings-table .col-corr-elements { width: 150px; }
 
+/* Correlation group rows - grouped/condensed view */
+.corr-group-row {
+  cursor: pointer;
+}
+
+.corr-group-row > td:nth-child(2) {
+  font-weight: 600;
+}
+
+.corr-group-count {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+  padding: 1px 8px;
+  margin-left: 8px;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+
+/* Correlation group child rows - indented to show hierarchy */
+.corr-group-child td:first-child {
+  padding-left: 28px;
+}
+
+.corr-group-child td:nth-child(2) {
+  padding-left: 16px;
+}
+
+/* Group expanded chevron rotation */
+.corr-group-row.finding-expanded .finding-expand-icon {
+  transform: rotate(90deg);
+}
+
+/* Subtle background for group children to show nesting */
+.corr-group-child {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.corr-group-child:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Total findings count in toolbar */
+.findings-count-detail {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #64748b;
+  letter-spacing: 0.3px;
+}
+
 /* Correlation description panel - centered and wide */
 .corr-description-wrapper {
   display: flex;
