@@ -7053,14 +7053,17 @@ i.glyphicon-white,
 
 /* ============================================
    Discovery Path Table - Modern Design
+   Uses CSS variables for automatic light/dark
    ============================================ */
 
 /* Wrapper constrains table and adds card-like container */
 .discovery-path-wrapper {
   width: 100%;
   overflow: hidden;
-  border-radius: var(--radius-md, 8px);
-  border: 1px solid var(--glass-border, rgba(255,255,255,0.1));
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  background: var(--bg-secondary);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Table layout */
@@ -7077,39 +7080,39 @@ table.discovery-path-table {
 table.discovery-path-table th:first-child { width: 36px; }
 table.discovery-path-table th:nth-child(2) { width: 120px; }
 
-/* Header - glass effect */
+/* Header - glass effect, theme-aware */
 table.discovery-path-table > thead > tr > th {
-  background: rgba(10, 10, 10, 0.92) !important;
+  background: var(--bg-tertiary) !important;
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
-  color: var(--text-secondary, #a3a3a3) !important;
-  font-family: var(--font-mono, 'JetBrains Mono', monospace) !important;
+  color: var(--text-muted) !important;
+  font-family: var(--font-mono) !important;
   font-size: 10px !important;
   font-weight: 600 !important;
   text-transform: uppercase !important;
   letter-spacing: 1.5px !important;
-  padding: 12px 10px !important;
+  padding: 10px 10px !important;
   border: none !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-bottom: 1px solid var(--glass-border) !important;
 }
 
-/* All table cells - clean separation */
+/* All table cells */
 table.discovery-path-table > tbody > tr > td {
   vertical-align: top !important;
   border: none !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.03) !important;
+  border-bottom: 1px solid var(--glass-border) !important;
   padding: 12px 10px !important;
   background: transparent !important;
+  color: var(--text-primary) !important;
 }
 
-table.discovery-path-table > tbody > tr > td:last-child {
-  border-right: none !important;
+/* Row hover */
+table.discovery-path-table > tbody > tr {
+  transition: background var(--transition-fast);
 }
 
-/* Row hover effect */
 table.discovery-path-table > tbody > tr:hover > td {
-  background: rgba(255, 255, 255, 0.02) !important;
+  background: var(--bg-tertiary) !important;
 }
 
 /* Checkbox cell */
@@ -7118,7 +7121,7 @@ table.discovery-path-table > tbody > tr > td:first-child {
   text-align: center;
 }
 
-/* Status cell - proper alignment */
+/* Status cell */
 table.discovery-path-table td.validation-status {
   vertical-align: top !important;
   padding: 10px 6px !important;
@@ -7129,7 +7132,7 @@ table.discovery-path-table td.validation-status {
 .discovery-path-cell {
   padding: 10px 12px !important;
   vertical-align: top !important;
-  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.6;
   cursor: pointer;
@@ -7137,7 +7140,7 @@ table.discovery-path-table td.validation-status {
   white-space: normal !important;
   word-break: break-all !important;
   overflow-wrap: anywhere !important;
-  transition: background var(--transition-fast, 0.15s ease);
+  transition: background var(--transition-fast);
 }
 
 /* Wrapper - ALWAYS overflow:hidden to prevent horizontal bleed */
@@ -7158,35 +7161,35 @@ table.discovery-path-table td.validation-status {
   white-space: normal;
   word-break: break-all;
   overflow-wrap: anywhere;
-  margin-bottom: 1px;
+  margin-bottom: 2px;
 }
 
-/* Labels (TYPE:, SOURCE MODULE:, DATA:) */
+/* Labels (TYPE:, SOURCE MODULE:, DATA:) - theme-aware */
 .discovery-path-cell .dp-type strong,
 .discovery-path-cell .dp-module strong,
 .discovery-path-cell .dp-data strong {
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-muted);
   font-weight: 600;
   text-transform: uppercase;
   font-size: 9px;
   letter-spacing: 0.5px;
 }
 
-/* Values */
+/* Values - theme-aware */
 .discovery-path-cell .dp-value {
-  color: var(--text-primary, #e5e7eb);
+  color: var(--text-primary);
   font-weight: 500;
   word-break: break-all;
   overflow-wrap: anywhere;
 }
 
-/* DATA values in green */
+/* DATA values in green - theme-aware */
 .discovery-path-cell .dp-data-value {
-  color: #4ade80;
+  color: var(--accent-green);
   font-weight: 600;
 }
 
-/* Fade overlay on collapsed cells */
+/* Fade overlay - uses bg-secondary for theme match */
 .discovery-path-cell[data-dp-state="collapsed"] .dp-cell-wrap::after {
   content: '';
   position: absolute;
@@ -7194,7 +7197,7 @@ table.discovery-path-table td.validation-status {
   left: 0;
   right: 0;
   height: 36px;
-  background: linear-gradient(to bottom, transparent, rgba(12, 12, 12, 0.95));
+  background: linear-gradient(to bottom, transparent, var(--bg-secondary));
   pointer-events: none;
 }
 
@@ -7203,19 +7206,20 @@ table.discovery-path-table td.validation-status {
   content: 'EXPAND';
   display: block;
   text-align: center;
-  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-family: var(--font-mono);
   font-size: 8px;
   font-weight: 600;
   letter-spacing: 2px;
-  color: rgba(74, 222, 128, 0.5);
+  color: var(--accent-green);
+  opacity: 0.5;
   margin-top: 6px;
   padding: 3px 0;
   cursor: pointer;
-  transition: color var(--transition-fast, 0.15s ease);
+  transition: opacity var(--transition-fast);
 }
 
 .discovery-path-cell[data-dp-state="collapsed"]:hover::after {
-  color: rgba(74, 222, 128, 0.8);
+  opacity: 0.85;
 }
 
 /* Collapse hint */
@@ -7223,24 +7227,25 @@ table.discovery-path-table td.validation-status {
   content: 'COLLAPSE';
   display: block;
   text-align: center;
-  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-family: var(--font-mono);
   font-size: 8px;
   font-weight: 600;
   letter-spacing: 2px;
-  color: rgba(156, 163, 175, 0.35);
+  color: var(--text-muted);
+  opacity: 0.4;
   margin-top: 6px;
   padding: 3px 0;
   cursor: pointer;
-  transition: color var(--transition-fast, 0.15s ease);
+  transition: opacity var(--transition-fast);
 }
 
 .discovery-path-cell[data-dp-state="expanded"]:hover::after {
-  color: rgba(156, 163, 175, 0.6);
+  opacity: 0.7;
 }
 
 /* Hover highlight on expandable cells */
 .discovery-path-cell[data-dp-state]:hover {
-  background: rgba(255, 255, 255, 0.02) !important;
+  background: var(--bg-tertiary) !important;
 }
 
 /* Responsive adjustments */
