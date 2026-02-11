@@ -40,7 +40,7 @@ class sfp_tool_dnstwist(SpiderFootPlugin):
 
     # Default options
     opts = {
-        'pythonpath': "python",
+        'pythonpath': "python3",
         'dnstwistpath': "",
         'skipwildcards': True
     }

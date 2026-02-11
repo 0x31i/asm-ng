@@ -5,7 +5,7 @@
 #
 # Author:       Enhancement Team
 # Created:      2025-06-20
-# Copyright:    (c) SpiderFoot Enterprise 2025
+# Copyright:    (c) ASM-NG 2025
 # License:      MIT
 # -------------------------------------------------------------------------------
 
@@ -1057,7 +1057,7 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
     meta = {
         'name': "Threat Intelligence Engine",
         'summary': "Threat intelligence with pattern recognition, trend analysis, and automated IOC correlation.",
-        'flags': ["enterprise"]
+        'flags': []
     }
 
     _priority = 1  # High priority for threat intelligence

@@ -45,8 +45,8 @@ class sfp_tool_nuclei(SpiderFootPlugin):
 
     # Default options
     opts = {
-        "nuclei_path": "",
-        "template_path": "",
+        "nuclei_path": "/usr/local/bin/nuclei",
+        "template_path": "/opt/nuclei-templates",
         'netblockscan': True,
         'netblockscanmax': 24,
         # Remote execution options

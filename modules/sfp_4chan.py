@@ -26,7 +26,7 @@ class sfp_4chan(SpiderFootPlugin):
     }
 
     opts = {
-        "boards": "",  # Comma-separated board names (e.g. pol,b)
+        "boards": "pol,b,g,k,biz",  # Comma-separated board names (e.g. pol,b)
         "max_threads": 10
     }
 

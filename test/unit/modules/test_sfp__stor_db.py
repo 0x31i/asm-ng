@@ -14,7 +14,7 @@ from test.unit.utils.test_helpers import safe_recursion
 class TestModuleStor_db(SpiderFootTestBase):
     """Comprehensive test suite for enhanced database storage module.
     
-    Tests all enterprise-grade features including:
+    Tests all advanced features including:
     - Connection pooling and health checks
     - PostgreSQL and SQLite storage
     - Error handling and recovery
@@ -576,12 +576,12 @@ class TestModuleStor_db(SpiderFootTestBase):
             # Reset for next test
             module = sfp__stor_db()
             
-    def test_phase2_enterprise_feature_integration(self):
-        """Test Phase 2 enterprise features integration."""
+    def test_phase2_feature_integration(self):
+        """Test Phase 2 features integration."""
         module = sfp__stor_db()
         
-        # Test with full enterprise configuration
-        enterprise_opts = {
+        # Test with full configuration
+        full_opts = {
             'maxstorage': 1024,
             '_store': True,
             'db_type': 'postgresql',
@@ -591,7 +591,7 @@ class TestModuleStor_db(SpiderFootTestBase):
             'postgresql_username': 'enterprise_user',
             'postgresql_password': 'secure_password',
             'postgresql_timeout': 30,
-            # Phase 2 enterprise features
+            # Phase 2 advanced features
             'enable_connection_pooling': True,
             'enable_load_balancing': True,
             'enable_auto_scaling': True,
@@ -605,18 +605,18 @@ class TestModuleStor_db(SpiderFootTestBase):
             'enable_graceful_shutdown': True
         }
         
-        # Setup should not fail with enterprise configuration
+        # Setup should not fail with full configuration
         try:
-            module.setup(self.sf_instance, enterprise_opts)
+            module.setup(self.sf_instance, full_opts)
             setup_successful = True
         except Exception as e:
             setup_successful = False
-            print(f"Enterprise setup failed: {e}")
+            print(f"Setup failed: {e}")
             
         # Even if PostgreSQL is not available, setup should handle gracefully
-        # The key is that it doesn't crash with enterprise options
+        # The key is that it doesn't crash with advanced options
         self.assertTrue(setup_successful or module.errorState, 
-                       "Enterprise configuration should be handled gracefully")
+                       "Full configuration should be handled gracefully")
                        
     def test_phase2_backward_compatibility(self):
         """Test Phase 2 enhancements maintain backward compatibility."""

@@ -38,7 +38,7 @@ class sfp_tool_retirejs(SpiderFootPlugin):
 
     # Default options
     opts = {
-        "retirejs_path": "",
+        "retirejs_path": "retire",
     }
 
     # Option descriptions
