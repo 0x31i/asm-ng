@@ -39,9 +39,9 @@ class sfp_tool_trufflehog(SpiderFootPlugin):
     }
 
     opts = {
-        'entropy': False,
-        'allrepos': False,
-        'trufflehog_path': ''
+        'entropy': True,
+        'allrepos': True,
+        'trufflehog_path': 'trufflehog'
     }
 
     optdescs = {

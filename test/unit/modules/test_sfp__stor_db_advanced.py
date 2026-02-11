@@ -547,18 +547,18 @@ class TestAdvancedStorageModule(unittest.TestCase):
     @patch('modules.sfp__stor_db_advanced.QueryOptimizer')
     @patch('modules.sfp__stor_db_advanced.PerformanceMonitor')
     @patch('modules.sfp__stor_db_advanced.AutoScaler')
-    def test_module_setup_with_enterprise_features(self, mock_scaler, mock_monitor, mock_optimizer, mock_balancer):
-        """Test module setup with enterprise features enabled."""
+    def test_module_setup_with_advanced_features(self, mock_scaler, mock_monitor, mock_optimizer, mock_balancer):
+        """Test module setup with advanced features enabled."""
         # Set up mocks
         mock_balancer.return_value = Mock()
         mock_optimizer.return_value = Mock()
         mock_monitor.return_value = Mock()
         mock_scaler.return_value = Mock()
-        
+
         # Setup module
         self.module.setup(self.sf, self.test_opts)
-        
-        # Verify enterprise features initialized
+
+        # Verify advanced features initialized
         self.assertFalse(self.module.errorState)
         mock_balancer.assert_called_once()
         mock_optimizer.assert_called_once()
@@ -722,7 +722,7 @@ class TestPhase2StorageIntegration(unittest.TestCase):
     
     def test_end_to_end_event_processing(self):
         """Test end-to-end event processing with all features enabled."""
-        # Configure module with all enterprise features
+        # Configure module with all advanced features
         module = sfp__stor_db_advanced()
         opts = {
             'maxstorage': 1024,

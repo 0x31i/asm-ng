@@ -1,5 +1,5 @@
 #
-# ASM-NG Dockerfile - Enterprise Edition
+# ASM-NG Dockerfile
 # Improved version with virtual environment support and FastAPI
 #
 

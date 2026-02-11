@@ -13,7 +13,7 @@ from test.unit.utils.test_helpers import safe_recursion
 class TestModuleStorElasticsearch(SpiderFootTestBase):
     """Comprehensive test suite for enhanced Elasticsearch storage module.
     
-    Tests all enterprise-grade features including:
+    Tests all advanced features including:
     - Connection retry and error handling
     - Bulk insertion and buffering
     - Thread safety
