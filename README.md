@@ -11,7 +11,7 @@
 [![Discord](https://img.shields.io/discord/770524432464216074)](https://discord.gg/vyvztrG)
 ![Active Development](https://img.shields.io/badge/Maintenance%20Level-Actively%20Developed-brightgreen.svg)
 
-**ASM-NG** is a production-ready, enterprise-grade attack surface management and OSINT platform. Built on a battle-tested scanning engine with 200+ modules, it extends far beyond traditional OSINT with **workspace management**, **security grading**, **false positive tracking**, **known asset management**, **external vulnerability tool integration** (Burp Suite Pro, Nessus Pro, Nuclei), and **multi-layered cross-scan correlation** — making intelligence data truly navigable and actionable.
+**ASM-NG** is a production-ready attack surface management and OSINT platform. Built on a battle-tested scanning engine with 200+ modules, it extends far beyond traditional OSINT with **workspace management**, **security grading**, **false positive tracking**, **known asset management**, **external vulnerability tool integration** (Burp Suite Pro, Nessus Pro, Nuclei), and **multi-layered cross-scan correlation** — making intelligence data truly navigable and actionable.
 
 ASM-NG features an embedded web server with a clean, modern interface and can also be used entirely via the command line. Written in **Python 3** and **MIT-licensed**.
 
@@ -299,7 +299,7 @@ Structured analysis modules and report generation built on the correlation engin
 
 ### Enhanced Export & Reporting
 
-Multi-format, multi-scan export capabilities for enterprise reporting workflows.
+Multi-format, multi-scan export capabilities for professional reporting workflows.
 
 - **Multi-scan CSV export** — export data from multiple scans at once in a single CSV
 - **Multi-scan JSON export** — combined JSON export across selected scans
@@ -428,11 +428,10 @@ Or install via `pip install .` / `setup.py` which registers both legacy (`spider
 
 Works out of the box. Database stored at `~/.spiderfoot/spiderfoot.db`.
 
-### PostgreSQL (Enterprise)
+### PostgreSQL
 
 ```bash
 sudo apt-get install postgresql postgresql-contrib
-pip3 install psycopg2-binary
 
 sudo -u postgres psql
 CREATE DATABASE asm_ng;
