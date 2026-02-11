@@ -33,7 +33,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy requirements and install Python packages
 ARG REQUIREMENTS=requirements.txt
-COPY $REQUIREMENTS requirements.txt ./
+COPY ${REQUIREMENTS} ./requirements.txt
 
 # Install Python packages in virtual environment
 RUN pip install --no-cache-dir -U pip==25.0.1 && \
