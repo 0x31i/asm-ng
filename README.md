@@ -12,8 +12,6 @@ ASM-NG features an embedded web server with a clean, modern interface and can al
 
 > **Note:** ASM-NG is built on the SpiderFoot OSINT engine. Core scanning modules retain their original naming for stability. All user-facing features, branding, and tooling have been updated to ASM-NG.
 
-![ASM-NG v5](./documentation/images/v5.png)
-
 ---
 
 ## What's New vs. SpiderFoot v4.0
