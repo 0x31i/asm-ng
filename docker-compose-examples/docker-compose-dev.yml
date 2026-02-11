@@ -1,13 +1,15 @@
 services:
   asm-ng:
     build:
-      context: .
+      context: ..
+      dockerfile: Dockerfile
     volumes:
-      - asm-ng-data:/var/lib/spiderfoot
+      - asm-ng-data:/home/spiderfoot/data
     image: asm-ng
     container_name: asm-ng
     ports:
       - "5001:5001"
+      - "8001:8001"
     restart: unless-stopped
 
 volumes:

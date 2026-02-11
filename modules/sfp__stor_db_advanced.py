@@ -803,7 +803,7 @@ class sfp__stor_db_advanced(SpiderFootPlugin):
 
     def __del__(self):
         """Clean up resources."""
-        if hasattr(self, '_graceful_shutdown'):
+        if hasattr(self, '_graceful_shutdown') and hasattr(self, '_SpiderFootPlugin__scanId__'):
             self._graceful_shutdown()
 
 # End of sfp__stor_db_advanced class
