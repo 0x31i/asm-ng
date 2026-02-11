@@ -164,7 +164,7 @@ class SpiderFootWebUi:
 
         cherrypy.config.update({
             "tools.response_headers.on": True,
-            "tools.response_headers.headers": secure_headers.framework.cherrypy()
+            "tools.response_headers.headers": list(secure_headers.headers.items())
         })
 
     def currentUser(self: 'SpiderFootWebUi') -> str:
