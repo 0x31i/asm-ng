@@ -162,9 +162,25 @@ class SpiderFootWebUi:
             referrer=secure.ReferrerPolicy().no_referrer(),
         )
 
+        # Build header list compatible with both secure 0.x and 1.x
+        try:
+            # secure >= 1.0: .headers is a dict property
+            hdrs = secure_headers.headers
+            if callable(hdrs):
+                hdrs = hdrs()
+            if isinstance(hdrs, dict):
+                header_list = [(k, v) for k, v in hdrs.items()]
+            elif isinstance(hdrs, list):
+                header_list = hdrs
+            else:
+                header_list = list(hdrs)
+        except AttributeError:
+            # secure 0.x: .framework.cherrypy() returns a list of tuples
+            header_list = secure_headers.framework.cherrypy()
+
         cherrypy.config.update({
             "tools.response_headers.on": True,
-            "tools.response_headers.headers": list(secure_headers.headers.items())
+            "tools.response_headers.headers": header_list
         })
 
     def currentUser(self: 'SpiderFootWebUi') -> str:
