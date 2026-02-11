@@ -1,4 +1,4 @@
-# Production Docker Compose Configuration for ASM-NG Enterprise
+# Production Docker Compose Configuration for ASM-NG
 # Includes: PostgreSQL, Elasticsearch, Nginx, Redis, and monitoring
 # Written by poppopjmp
 

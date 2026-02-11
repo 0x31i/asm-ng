@@ -3,7 +3,6 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/0x31i/asm-ng/master/LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.9+-green)](https://www.python.org)
 [![Stable Release](https://img.shields.io/badge/version-5.2.9-blue.svg)](https://github.com/0x31i/asm-ng/releases/tag/v5.2.9)
-[![Production Grade](https://img.shields.io/badge/Production-Grade-blue.svg)](https://github.com/0x31i/asm-ng)
 [![CI status](https://github.com/0x31i/asm-ng/workflows/Tests/badge.svg)](https://github.com/0x31i/asm-ng/actions?query=workflow%3A"Tests")
 [![Docker CI Build](https://github.com/0x31i/asm-ng/workflows/Docker%20Image%20CI/badge.svg)](https://github.com/0x31i/asm-ng/actions?query=workflow%3A"Docker%20Image%20CI")
 [![Code QL](https://github.com/0x31i/asm-ng/workflows/CodeQL/badge.svg)](https://github.com/0x31i/asm-ng/actions?query=workflow%3A"CodeQL")
@@ -385,6 +384,8 @@ python3 ./sf.py -l 127.0.0.1:5001
 ```
 
 On first startup, ASM-NG will create a default admin account and print the credentials to the console. Change the password after first login.
+
+All scanning features and tool integrations are enabled by default. See Settings to review or customize module options.
 
 ### Update Existing Installation
 
