@@ -42,7 +42,7 @@ class sfp_tool_nmap(SpiderFootPlugin):
 
     # Default options
     opts = {
-        'nmappath': "",
+        'nmappath': "/usr/bin/nmap",
         'netblockscan': True,
         'netblockscanmax': 24,
         # Remote execution options

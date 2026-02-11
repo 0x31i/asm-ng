@@ -49,12 +49,12 @@ class sfp_hackertarget(SpiderFootPlugin):
     }
 
     opts = {
-        'cohostsamedomain': False,
+        'cohostsamedomain': True,
         'verify': True,
         'netblocklookup': True,
         'maxnetblock': 24,
         'maxcohost': 100,
-        'http_headers': False,
+        'http_headers': True,
     }
 
     optdescs = {

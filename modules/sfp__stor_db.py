@@ -46,18 +46,17 @@ class sfp__stor_db(SpiderFootPlugin):
         'postgresql_username': 'spiderfoot',
         'postgresql_password': '',
         'postgresql_timeout': 30,
-        # Phase 2 enterprise features (stub implementations)
-        'enable_auto_recovery': False,
-        'enable_connection_monitoring': False,
-        'enable_performance_monitoring': False,
-        'enable_graceful_shutdown': False,
-        'enable_health_monitoring': False,
-        'enable_connection_pooling': False,
-        'enable_load_balancing': False,
-        'enable_auto_scaling': False,
-        'enable_query_optimization': False,
-        'enable_performance_benchmarking': False,
-        'collect_metrics': False
+        'enable_auto_recovery': True,
+        'enable_connection_monitoring': True,
+        'enable_performance_monitoring': True,
+        'enable_graceful_shutdown': True,
+        'enable_health_monitoring': True,
+        'enable_connection_pooling': True,
+        'enable_load_balancing': True,
+        'enable_auto_scaling': True,
+        'enable_query_optimization': True,
+        'enable_performance_benchmarking': True,
+        'collect_metrics': True
     }    # Option descriptions
     optdescs = {        'maxstorage': "Maximum bytes to store for any piece of information retrieved (0 = unlimited.)",
         'db_type': "Database type to use (sqlite or postgresql)",
@@ -67,18 +66,17 @@ class sfp__stor_db(SpiderFootPlugin):
         'postgresql_username': "PostgreSQL username if using postgresql as db_type",
         'postgresql_password': "PostgreSQL password if using postgresql as db_type",
         'postgresql_timeout': "Connection timeout in seconds for PostgreSQL",
-        # Phase 2 enterprise features
-        'enable_auto_recovery': "Enable automatic error recovery (enterprise feature)",
-        'enable_connection_monitoring': "Enable connection health monitoring (enterprise feature)",
-        'enable_performance_monitoring': "Enable performance monitoring (enterprise feature)",
-        'enable_graceful_shutdown': "Enable graceful shutdown procedures (enterprise feature)",
-        'enable_health_monitoring': "Enable health monitoring (enterprise feature)",
-        'enable_connection_pooling': "Enable connection pooling (enterprise feature)",
-        'enable_load_balancing': "Enable load balancing (enterprise feature)",
-        'enable_auto_scaling': "Enable auto scaling (enterprise feature)",
-        'enable_query_optimization': "Enable query optimization (enterprise feature)",
-        'enable_performance_benchmarking': "Enable performance benchmarking (enterprise feature)",
-        'collect_metrics': "Enable metrics collection (enterprise feature)"
+        'enable_auto_recovery': "Enable automatic error recovery",
+        'enable_connection_monitoring': "Enable connection health monitoring",
+        'enable_performance_monitoring': "Enable performance monitoring",
+        'enable_graceful_shutdown': "Enable graceful shutdown procedures",
+        'enable_health_monitoring': "Enable health monitoring",
+        'enable_connection_pooling': "Enable connection pooling",
+        'enable_load_balancing': "Enable load balancing",
+        'enable_auto_scaling': "Enable auto scaling",
+        'enable_query_optimization': "Enable query optimization",
+        'enable_performance_benchmarking': "Enable performance benchmarking",
+        'collect_metrics': "Enable metrics collection"
     }
 
     def setup(self, sfc, userOpts=dict()):

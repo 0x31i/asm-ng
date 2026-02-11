@@ -34,7 +34,7 @@ class sfp_dnsbrute(SpiderFootPlugin):
         "skipcommonwildcard": True,
         "domainonly": True,
         "commons": True,
-        "top10000": False,
+        "top10000": True,
         "numbersuffix": True,
         "numbersuffixlimit": True,
         "_maxthreads": 100
