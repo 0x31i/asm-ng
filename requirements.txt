@@ -1,12 +1,12 @@
 -i https://pypi.org/simple
 adblockparser==0.7
-beautifulsoup4==4.13.4
+beautifulsoup4==4.14.3
 cherrypy==18.10.0
 cherrypy-cors==1.7.0
-cryptography>=43.0.5,<46.0.0
+cryptography>=43.0.5,<47.0.0
 dnspython>=2.6.1,<3.0.0
-elasticsearch==9.0.2
-exifread==3.3.1
+elasticsearch==9.3.0
+exifread==3.5.1
 ipaddr==2.2.0
 ipwhois>=1.3.0,<2.0.0
 lxml>=5.4.0,<7.0.0
@@ -20,16 +20,17 @@ psycopg2-binary>=2.9.3,<3.0.0
 publicsuffixlist>=1.0.2.20250613,<2.0.0
 pygexf>=0.2.2,<0.3.0
 pyopenssl>=24.0.0,<26.0.0
-pypdf>=3.1.0,<6.0.0
+pypdf>=3.1.0,<7.0.0
 pysocks>=1.7.1,<2.0.0
 python-docx>=1.1.2,<2.0.0
 python-pptx>=1.0.2,<2.0.0
 python-whois>=0.9.5,<1.0.0
 pyyaml>=6.0.1,<7.0.0
 requests>=2.32.0,<3.0.0
-secure>=0.3.0,<1.0.0
+secure>=0.3.0,<2.0.0
 jsonschema>=4.0.0,<5.0.0
 pillow>=10.3.0,<13.0.0
+setuptools>=78.1.1,<83.0.0
 setuptools>=78.1.1,<81.0.0
 uvicorn>=0.30.0,<1.0.0
 zipp>=3.19.1,<4.0.0
