@@ -36,7 +36,7 @@ class sfp_accounts(SpiderFootPlugin):
         "ignoreworddict": True,
         "musthavename": True,
         "userfromemail": True,
-        "permutate": False,
+        "permutate": True,
         "usernamesize": 4,
         "_maxthreads": 20
     }

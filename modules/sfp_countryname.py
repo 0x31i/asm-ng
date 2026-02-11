@@ -33,7 +33,7 @@ class sfp_countryname(SpiderFootPlugin):
         'cohosted': True,
         'affiliate': True,
         'noncountrytld': True,
-        'similardomain': False,
+        'similardomain': True,
     }
 
     optdescs = {

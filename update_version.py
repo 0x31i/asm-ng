@@ -62,16 +62,6 @@ def update_readme():
         updated = True
         content = new_content
     
-    # Update badge version for --Enterprise (if present)
-    new_content = re.sub(
-        r'version-\d+\.\d+\.\d+--Enterprise',
-        f'version-{version}--Enterprise',
-        content
-    )
-    if new_content != content:
-        updated = True
-        content = new_content
-    
     # Update release tag (for any other occurrences)
     new_content = re.sub(
         r'/releases/tag/v\d+\.\d+\.\d+',
@@ -332,7 +322,6 @@ def check_version_consistency():
     # Check patterns in different files
     patterns = [
         ("README.md", [
-            r'version-(\d+\.\d+\.\d+)--Enterprise',
             r'/releases/tag/v(\d+\.\d+\.\d+)'
         ]),
         ("docs/index.rst", [

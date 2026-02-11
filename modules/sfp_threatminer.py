@@ -46,9 +46,9 @@ class sfp_threatminer(SpiderFootPlugin):
     # Default options
     opts = {
         'verify': True,
-        'netblocklookup': False,
+        'netblocklookup': True,
         'maxnetblock': 24,
-        'subnetlookup': False,
+        'subnetlookup': True,
         'maxsubnet': 24,
         'maxcohost': 100,
         "age_limit_days": 90
