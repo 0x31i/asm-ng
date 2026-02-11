@@ -371,6 +371,14 @@ graph TD;
 ```bash
 git clone https://github.com/0x31i/asm-ng.git
 cd asm-ng
+./run.sh
+```
+
+Or manually:
+
+```bash
+git clone https://github.com/0x31i/asm-ng.git
+cd asm-ng
 python3 -m venv venv
 source venv/bin/activate
 pip3 install -r requirements.txt
@@ -386,12 +394,22 @@ All scanning features and tool integrations are enabled by default. See Settings
 ```bash
 cd asm-ng
 git pull origin master
+./run.sh
+```
+
+Or manually:
+
+```bash
+cd asm-ng
+git pull origin master
 source venv/bin/activate
 pip3 install -r requirements.txt
 python3 ./sf.py -l 127.0.0.1:5001
 ```
 
-> **Note for Kali/Debian 12+ users:** These systems use "externally managed" Python environments. You must use a virtual environment (`python3 -m venv venv`) to install packages with pip.
+> **Note for Kali/Debian 12+ users:** These systems use "externally managed" Python environments. You must use a virtual environment (`python3 -m venv venv`) to install packages with pip. The `run.sh` script handles this automatically.
+
+> **Troubleshooting:** If you get `fatal: not a git repository` or `No such file or directory` errors, you are likely in the wrong directory. Make sure you `cd` into the directory created by `git clone` (e.g., `cd asm-ng`). Do **not** create the `asm-ng` folder manually before cloning — `git clone` creates it for you.
 
 ### Docker Deployment
 
