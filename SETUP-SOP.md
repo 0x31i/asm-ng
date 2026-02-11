@@ -111,14 +111,9 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 2.3 Install Enterprise Dependencies
-
-```bash
-bash enterprise/install-deps.sh --full
-```
-
-Watch the output — every package should show `[OK]`. If any show `[MISSING]`,
-re-run the specific category (`--ai`, `--security`, `--elasticsearch`, `--postgresql`).
+All dependencies (including advanced features such as database monitoring, AI
+threat intelligence, and security hardening) are included in the main
+`requirements.txt`. No separate install step is needed.
 
 ### 2.4 Grant Nmap Raw Socket Capabilities
 
@@ -154,24 +149,12 @@ top-right user menu.
 
 Stop the server with `Ctrl+C`.
 
-### 2.6 Import Enterprise Configuration
+### 2.6 Verify Default Configuration
 
-Restart the server:
-
-```bash
-source ~/asm-ng/venv/bin/activate
-cd ~/asm-ng
-python3 sf.py -l 0.0.0.0:5001
-```
-
-1. Navigate to **Settings** in the web UI
-2. Click **IMPORT API KEYS** (top of the Settings page)
-3. Select the file: `enterprise/enterprise-full.cfg`
-4. Click **Import**
-
-This enables all enterprise module optimizations (AI threat intel, security
-hardening, thorough scanning defaults). It does **not** set tool paths or API
-keys — that comes in Parts 3-5.
+All advanced features (database monitoring, threat intelligence, security
+hardening, and thorough scanning options) are enabled by default. No
+configuration import is needed. You can review or adjust these settings in
+the web UI under **Settings**.
 
 ### 2.7 Shell Alias (Optional)
 
@@ -578,9 +561,10 @@ sfp_tool_trufflehog:allrepos=1
 
 
 # ==============================================================================
-# SECTION 2: ENTERPRISE MODULE OPTIMIZATIONS
+# SECTION 2: MODULE OPTIMIZATIONS
 # ==============================================================================
-# These turn on enhanced features from enterprise-full.cfg.
+# These advanced features are now enabled by default. This section is provided
+# for reference only — you do not need to import these settings manually.
 # No API keys needed — just better defaults.
 
 sfp__stor_db:enable_auto_recovery=1
@@ -702,7 +686,7 @@ After completing Parts 1-5, work through this checklist:
 
 - [ ] ASM-NG web UI loads at `http://<TAILSCALE_IP>:5001`
 - [ ] Can log in with admin credentials
-- [ ] Settings page shows all enterprise modules enabled
+- [ ] Settings page shows all advanced modules enabled
 - [ ] All 15 tool tabs in Settings show configured paths (no empty path fields)
 
 ### Tool Verification

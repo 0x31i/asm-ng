@@ -5,14 +5,14 @@
 #
 # Author:       Security Team
 # Created:      2025-06-20
-# Copyright:    (c) SpiderFoot Enterprise 2025
+# Copyright:    (c) ASM-NG 2025
 # License:      MIT
 # -------------------------------------------------------------------------------
 
 """
 Advanced Security Hardening Module
 
-This module implements enterprise-grade security features:
+This module implements advanced security features:
 - Zero-Trust Architecture implementation
 - End-to-End Encryption for data at rest and in transit
 - Multi-Factor Authentication (MFA) integration
@@ -400,7 +400,7 @@ class AuthenticationManager:
                 totp = pyotp.TOTP(user.totp_secret)
                 provisioning_uri = totp.provisioning_uri(
                     name=user.email,
-                    issuer_name="SpiderFoot Enterprise"
+                    issuer_name="ASM-NG"
                 )
                 return provisioning_uri
             
@@ -739,7 +739,7 @@ class sfp__security_hardening(SpiderFootPlugin):
     meta = {
         'name': "Security Hardening Engine",
         'summary': "Advanced security hardening with zero-trust, encryption, MFA, RBAC, and comprehensive audit logging.",
-        'flags': ["enterprise", "security"]
+        'flags': ["security"]
     }
 
     _priority = 0  # High priority for security

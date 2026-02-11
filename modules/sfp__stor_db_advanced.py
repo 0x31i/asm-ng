@@ -1,18 +1,19 @@
 # -*- coding: utf-8 -*-
 # -------------------------------------------------------------------------------
 # Name:         sfp_stor_db_advanced
-# Purpose:      Advanced enterprise-grade storage module with Phase 2 features
+# Purpose:      Advanced storage module with connection pooling, load balancing,
+#               auto-scaling, and query optimization.
 #
-# Author:       Enterprise Enhancement Team
+# Author:       ASM-NG Team
 # Created:      2025-01-XX
-# Copyright:    (c) SpiderFoot Enterprise 2025
+# Copyright:    (c) ASM-NG 2025
 # License:      MIT
 # -------------------------------------------------------------------------------
 
 """
-Phase 2 Enterprise Storage Module
+Advanced Storage Module
 
-This module implements advanced enterprise features:
+This module implements advanced storage features:
 - Advanced query optimization with prepared statements
 - Connection load balancing across multiple databases
 - Automated scaling with connection pooling
@@ -489,12 +490,12 @@ class AutoScaler:
 
 
 class sfp__stor_db_advanced(SpiderFootPlugin):
-    """Advanced enterprise storage module with Phase 2 features."""
+    """Advanced storage module with connection pooling, load balancing, and optimization."""
 
     meta = {
-        'name': "Advanced Database Storage (Enterprise)",
-        'summary': "Enterprise-grade storage with advanced features: connection pooling, load balancing, auto-scaling, and AI optimization.",
-        'flags': ["enterprise", "production"]
+        'name': "Advanced Database Storage",
+        'summary': "Advanced storage with connection pooling, load balancing, auto-scaling, and query optimization.",
+        'flags': ["production"]
     }
 
     _priority = 0
@@ -543,14 +544,14 @@ class sfp__stor_db_advanced(SpiderFootPlugin):
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
-        # Initialize enterprise components
-        self._initialize_enterprise_features()
+        # Initialize advanced components
+        self._initialize_advanced_features()
         
         # Set up graceful shutdown
         self._setup_graceful_shutdown()
 
-    def _initialize_enterprise_features(self):
-        """Initialize enterprise features based on configuration."""
+    def _initialize_advanced_features(self):
+        """Initialize advanced features based on configuration."""
         try:
             # Load balancer
             if self.opts['enable_load_balancing'] and self.opts['database_configs']:
@@ -577,10 +578,10 @@ class sfp__stor_db_advanced(SpiderFootPlugin):
             else:
                 self.auto_scaler = None
                 
-            self.debug("Enterprise features initialized successfully")
+            self.debug("Advanced features initialized successfully")
             
         except Exception as e:
-            self.error(f"Failed to initialize enterprise features: {e}")
+            self.error(f"Failed to initialize advanced features: {e}")
             self.errorState = True
 
     def _setup_graceful_shutdown(self):
@@ -597,7 +598,7 @@ class sfp__stor_db_advanced(SpiderFootPlugin):
         return ["*"]
 
     def handleEvent(self, sfEvent):
-        """Handle events with enterprise features."""
+        """Handle events with advanced storage features."""
         if not self.opts['_store'] or self.errorState:
             return
 

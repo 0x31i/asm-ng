@@ -35,7 +35,7 @@ class sfp_tool_wafw00f(SpiderFootPlugin):
 
     opts = {
         'python_path': 'python3',
-        'wafw00f_path': ''
+        'wafw00f_path': 'wafw00f'
     }
 
     optdescs = {

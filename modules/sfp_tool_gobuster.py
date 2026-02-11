@@ -39,8 +39,8 @@ class sfp_tool_gobuster(SpiderFootPlugin):
 
     # Default options
     opts = {
-        "gobuster_path": "",
-        "wordlist": "",
+        "gobuster_path": "/usr/bin/gobuster",
+        "wordlist": "/usr/share/wordlists/dirb/common.txt",
         "threads": 10,
         "timeout": 30,
         "status_codes": "200,204,301,302,307,401,403",

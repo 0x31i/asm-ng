@@ -43,7 +43,7 @@ class sfp_spider(SpiderFootPlugin):
         'filtermime': ['image/'],
         'filterusers': True,  # Don't follow /~user directories
         'nosubs': False,  # Should links to subdomains be ignored?
-        'reportduplicates': False
+        'reportduplicates': True
     }
 
     # Option descriptions

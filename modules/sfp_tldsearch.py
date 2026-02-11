@@ -33,7 +33,7 @@ class sfp_tldsearch(SpiderFootPlugin):
     # Default options
     opts = {
         # Only report domains that have content (try to fetch the page)
-        'activeonly': False,
+        'activeonly': True,
         'skipwildcards': True,
         '_maxthreads': 50
     }

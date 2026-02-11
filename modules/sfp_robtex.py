@@ -47,9 +47,9 @@ class sfp_robtex(SpiderFootPlugin):
         'netblocklookup': True,
         'maxnetblock': 24,
         'maxv6netblock': 120,
-        'cohostsamedomain': False,
+        'cohostsamedomain': True,
         'maxcohost': 100,
-        'subnetlookup': False,
+        'subnetlookup': True,
         'maxsubnet': 24,
         'maxv6subnet': 120,
     }
