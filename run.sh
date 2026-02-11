@@ -37,6 +37,9 @@ fi
 # Activate virtual environment
 source venv/bin/activate
 
+# Upgrade pip to handle modern packages
+pip3 install -q --upgrade pip
+
 # Install/update dependencies
 echo "Installing dependencies..."
 pip3 install -q -r requirements.txt
