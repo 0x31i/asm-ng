@@ -554,12 +554,6 @@ See the [Correlation Rules Reference](/correlations/README.md) and the [template
 
 ---
 
-## Community
-
-Join the [Discord server](https://discord.gg/vyvztrG) for help, feature requests, or general OSINT discussion.
-
----
-
 ## Active Maintenance
 
 ASM-NG is actively maintained with regular updates. Issues and pull requests are actively managed.
