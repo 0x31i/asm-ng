@@ -3,11 +3,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/0x31i/asm-ng/master/LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.9+-green)](https://www.python.org)
 [![Stable Release](https://img.shields.io/badge/version-5.2.9-blue.svg)](https://github.com/0x31i/asm-ng/releases/tag/v5.2.9)
-[![CI status](https://github.com/0x31i/asm-ng/workflows/Tests/badge.svg)](https://github.com/0x31i/asm-ng/actions?query=workflow%3A"Tests")
-[![Docker CI Build](https://github.com/0x31i/asm-ng/workflows/Docker%20Image%20CI/badge.svg)](https://github.com/0x31i/asm-ng/actions?query=workflow%3A"Docker%20Image%20CI")
-[![Code QL](https://github.com/0x31i/asm-ng/workflows/CodeQL/badge.svg)](https://github.com/0x31i/asm-ng/actions?query=workflow%3A"CodeQL")
 [![Last Commit](https://img.shields.io/github/last-commit/0x31i/asm-ng)](https://github.com/0x31i/asm-ng/commits/master)
-[![Discord](https://img.shields.io/discord/770524432464216074)](https://discord.gg/vyvztrG)
 ![Active Development](https://img.shields.io/badge/Maintenance%20Level-Actively%20Developed-brightgreen.svg)
 
 **ASM-NG** is a production-ready attack surface management and OSINT platform. Built on a battle-tested scanning engine with 200+ modules, it extends far beyond traditional OSINT with **workspace management**, **security grading**, **false positive tracking**, **known asset management**, **external vulnerability tool integration** (Burp Suite Pro, Nessus Pro, Nuclei), and **multi-layered cross-scan correlation** — making intelligence data truly navigable and actionable.
