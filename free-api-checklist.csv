@@ -1,0 +1,49 @@
+Done,#,Priority,Service,Signup URL,Module Tab,Setting Key(s),Where to Find Key,Notes
+,1,Core,Shodan,https://shodan.io,Shodan,api_key,Account > top of page,High-value for most engagements
+,2,Core,Censys,https://censys.io,Censys,censys_api_key_uid + censys_api_key_secret,Account > API tab,Two keys required (UID and Secret)
+,3,Core,VirusTotal,https://www.virustotal.com,VirusTotal,api_key,Menu > API Key,High-value for most engagements
+,4,Core,SecurityTrails,https://securitytrails.com,SecurityTrails,api_key,Account > API,High-value for most engagements
+,5,Core,AbuseIPDB,https://www.abuseipdb.com,AbuseIPDB,api_key,Account > API > Keys,High-value for most engagements
+,6,Core,AlienVault OTX,https://otx.alienvault.com,AlienVault OTX,api_key,Settings > API,High-value for most engagements
+,7,Core,BinaryEdge,https://www.binaryedge.io,BinaryEdge,binaryedge_api_key,Account > API Access,High-value for most engagements
+,8,Core,GreyNoise,https://viz.greynoise.io/signup,GreyNoise,api_key,Account > API Key,High-value for most engagements
+,9,Core,Hybrid Analysis,https://www.hybrid-analysis.com/signup,Hybrid Analysis,api_key,Account > API Key tab,High-value for most engagements
+,10,Core,IntelligenceX,https://intelx.io,IntelligenceX,api_key,Account > Developer tab,High-value for most engagements
+,11,Extended,IPInfo,https://ipinfo.io,IPInfo,api_key,"Account > above ""access token""",
+,12,Extended,IPStack,https://ipstack.com,ipstack,api_key,Dashboard > API Access Key,
+,13,Extended,ipapi.com,https://ipapi.com,ipapi.com,api_key,Dashboard > API Access Key,
+,14,Extended,IPQualityScore,https://www.ipqualityscore.com,IPQualityScore,api_key,Account > API Settings,
+,15,Extended,FullHunt,https://fullhunt.io,FullHunt,api_key,Settings > API Access,
+,16,Extended,Pulsedive,https://pulsedive.com,Pulsedive,api_key,Account > API Key,
+,17,Extended,CertSpotter,https://sslmate.com/signup?for=ct_search_api,CertSpotter,api_key,Account > API Credentials,
+,18,Extended,BuiltWith,https://api.builtwith.com/free-api,BuiltWith,api_key,Free API page > Your API Key,
+,19,Extended,Hunter.io,https://hunter.io,Hunter.io,api_key,Account Settings > API,
+,20,Extended,Netlas,https://netlas.io,Netlas,api_key,Dashboard > API Key,
+,21,Specialized,CriminalIP,https://www.criminalip.io,CriminalIP,api_key,My Page > API Key,
+,22,Specialized,ZoomEye,https://www.zoomeye.org,ZoomEye,api_key,Account > API,
+,23,Specialized,ONYPHE,https://www.onyphe.io,ONYPHE,api_key,Account > API,
+,24,Specialized,MetaDefender,https://metadefender.opswat.com,MetaDefender,api_key,Dashboard > API Key,
+,25,Specialized,FullContact,https://fullcontact.com,FullContact,api_key,Dashboard > API Keys,
+,26,Specialized,EmailCrawlr,https://emailcrawlr.com,EmailCrawlr,api_key,Dashboard > API Key,
+,27,Specialized,EmailRep,https://emailrep.io/free,EmailRep,api_key,Emailed after approval,Key is emailed to you after approval
+,28,Specialized,BotScout,http://botscout.com/getkey.htm,BotScout,api_key,Emailed to account,Key is emailed to your registered address
+,29,Specialized,LeakIX,https://leakix.net,LeakIX,api_key,Account > API,
+,30,Specialized,Leak-Lookup,https://leak-lookup.com,Leak-Lookup,api_key,Account > API > API Key,
+,31,Specialized,GrayHatWarfare,https://grayhatwarfare.com,GrayHatWarfare,api_key,Account > API,
+,32,Specialized,Etherscan,https://etherscan.io,Etherscan,api_key,My API Keys > Add > Token,
+,33,Specialized,BitcoinWhoWho,https://bitcoinwhoswho.com/signup,Bitcoin Who's Who,api_key,API > Request Key,
+,34,Specialized,FraudGuard,https://fraudguard.io,FraudGuard,fraudguard_api_key_account + fraudguard_api_key_password,Dashboard,Two keys required (account + password)
+,35,Specialized,Snov.io,https://snov.io,Snov,api_key_client_id + api_key_client_secret,Account > API,Two keys required (client ID + secret)
+,36,Specialized,RocketReach,https://rocketreach.co,RocketReach,api_key,Account > API,
+,37,Specialized,NameAPI,https://www.nameapi.org,NameAPI,api_key,Dashboard > API Key,
+,38,Specialized,NumVerify,https://numverify.com,numverify,api_key,Dashboard > API Key,
+,39,Specialized,AbstractAPI,https://app.abstractapi.com/users/signup,AbstractAPI,companyenrichment_api_key + phonevalidation_api_key + ipgeolocation_api_key,Each API page > Try It > Key,Three separate API keys (one per API)
+,40,Specialized,Wappalyzer,https://www.wappalyzer.com/api/,Tool - Wappalyzer (API),wappalyzer_api_key,API dashboard,
+,41,Google/Azure,Google Custom Search,https://console.cloud.google.com/apis/library/customsearch.googleapis.com,Google,api_key,GCP Console > Credentials > API Key,Create a GCP project first; also need a Custom Search Engine ID from https://programmablesearchengine.google.com/
+,42,Google/Azure,Google Maps Geocoding,https://console.cloud.google.com/apis/library/geocoding-backend.googleapis.com,Google Maps,api_key,GCP Console > Credentials > API Key,Same GCP project as Custom Search
+,43,Google/Azure,Google Safe Browsing,https://console.cloud.google.com/apis/library/safebrowsing.googleapis.com,Google SafeBrowsing,api_key,GCP Console > Credentials > API Key,Same GCP project as Custom Search
+,44,Google/Azure,Bing Web Search,https://azure.microsoft.com/en-us/services/cognitive-services/bing-web-search-api/,Bing,api_key,Azure Portal > Cognitive Services > Keys,Requires Azure account
+,45,Manual Approval,CIRCL.lu,https://www.circl.lu/contact/,CIRCL Passive DNS/SSL,api_key_login + api_key_password,Provided after approval,Email to request access; two keys required
+,46,Manual Approval,NeutrinoAPI,https://www.neutrinoapi.com,NeutrinoAPI,user_id + api_key,Account after registration,Two keys required (user ID + API key)
+,47,Manual Approval,FOFA,https://fofa.info/user/register,FOFA,api_email + api_key,Account after registration,Chinese service; free tier available; two keys required
+,48,Bonus,GreyNoise Community,https://viz.greynoise.io/signup,GreyNoise Community,api_key,Account > API Key,Separate module from main GreyNoise; uses same account/key
