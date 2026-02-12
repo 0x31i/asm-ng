@@ -167,6 +167,7 @@ class SpiderFootDb:
             request             VARCHAR, \
             response            VARCHAR, \
             tracking            INT NOT NULL DEFAULT 0, \
+            html_enhanced       INT NOT NULL DEFAULT 0, \
             created             INT NOT NULL \
         )",
         "CREATE INDEX idx_scan_burp_results ON tbl_scan_burp_results (scan_instance_id)",
@@ -746,6 +747,16 @@ class SpiderFootDb:
             except sqlite3.Error:
                 try:
                     self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN tracking INT NOT NULL DEFAULT 0")
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass
+
+            # Migration: Add html_enhanced column to burp results
+            try:
+                self.dbh.execute("SELECT html_enhanced FROM tbl_scan_burp_results LIMIT 1")
+            except sqlite3.Error:
+                try:
+                    self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN html_enhanced INT NOT NULL DEFAULT 0")
                     self.conn.commit()
                 except sqlite3.Error:
                     pass
@@ -4711,8 +4722,8 @@ class SpiderFootDb:
                         plugin_name, issue_type, path, location, confidence, \
                         issue_background, issue_detail, solutions, see_also, \
                         reference_links, vulnerability_classifications, \
-                        request, response, tracking, created) \
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                        request, response, tracking, html_enhanced, created) \
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                     self.dbh.execute(qry, [
                         instanceId,
                         str(r.get('severity', '')),
@@ -4733,6 +4744,7 @@ class SpiderFootDb:
                         str(r.get('request', '')),
                         str(r.get('response', '')),
                         tracking_val,
+                        0,
                         now
                     ])
                     count += 1
@@ -4848,6 +4860,9 @@ class SpiderFootDb:
                                 updates.append(f"{col_name} = {ph}")
                                 values.append(new_val)
 
+                        # Always mark as html_enhanced when processing HTML enhancement
+                        updates.append(f"html_enhanced = 1")
+
                         if updates:
                             values.append(match['id'])
                             update_sql = f"UPDATE tbl_scan_burp_results SET {', '.join(updates)} WHERE id = {ph}"
@@ -4921,11 +4936,11 @@ class SpiderFootDb:
             instanceId (str): scan instance ID
 
         Returns:
-            bool: True if any records have issue_detail or solutions populated
+            bool: True if any records have html_enhanced flag set
         """
         qry = ("SELECT COUNT(*) FROM tbl_scan_burp_results "
                "WHERE scan_instance_id = ? "
-               "AND (issue_detail IS NOT NULL AND issue_detail != '')")
+               "AND html_enhanced = 1")
 
         with self.dbhLock:
             try:
