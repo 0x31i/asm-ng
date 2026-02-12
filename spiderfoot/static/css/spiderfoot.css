@@ -6460,25 +6460,22 @@ i.glyphicon-white,
   overflow: visible;
 }
 
-/* Expand hint - right-aligned indicator */
+/* Expand hint - subtle chevron on far right */
 .assets-expand-hint {
   position: absolute;
-  right: 10px;
+  right: 6px;
   top: 50%;
   transform: translateY(-50%);
-  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
   font-size: 8px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
   color: #94a3b8;
-  opacity: 0.5;
-  white-space: nowrap;
+  opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s ease, color 0.15s ease;
+  line-height: 1;
 }
-.assets-known-row:hover .assets-expand-hint {
-  opacity: 1;
+.assets-known-row:hover .assets-expand-hint,
+.assets-match-row:hover .assets-expand-hint {
+  opacity: 0.7;
   color: #16a34a;
 }
 .assets-row-expanded .assets-expand-hint {
@@ -6627,16 +6624,28 @@ i.glyphicon-white,
 /* Compact matches table */
 .assets-matches-compact { table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0; }
 
-/* Sticky table header - stacks below the action bar */
-.assets-matches-compact thead th {
+/* Higher specificity to override global .table > thead > tr > th */
+.assets-matches-compact.table > thead > tr > th {
   position: sticky !important;
   top: var(--sticky-offset, 62px) !important;
   z-index: 100 !important;
   background: #f1f5f9 !important;
   color: #1e293b;
+  border: none !important;
   border-bottom: 2px solid #94a3b8 !important;
   font-weight: 700;
+  font-size: 11px !important;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace !important;
+  padding: 8px 10px !important;
+  letter-spacing: 1px;
 }
+
+/* Override global .table th min-width for compact columns */
+.assets-matches-compact.table th:nth-child(1),
+.assets-matches-compact.table th:nth-child(2) {
+  min-width: 0 !important;
+}
+
 .assets-matches-compact .assets-col-select { width: 36px; text-align: center; vertical-align: middle; }
 .assets-matches-compact .assets-col-status { width: 140px; text-align: center; }
 .assets-matches-compact .assets-col-actions { width: 60px; text-align: right; }
@@ -6651,10 +6660,19 @@ i.glyphicon-white,
 .assets-expandable { cursor: pointer; }
 .assets-expandable:hover { background: rgba(0,0,0,0.01); }
 
+/* Override global .table > tbody > tr > td for compact match cells */
+.assets-matches-compact.table > tbody > tr > td {
+  padding: 6px 10px !important;
+  font-size: 11px !important;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace !important;
+  border: 1px solid var(--glass-border, rgba(0,0,0,0.1)) !important;
+}
+
 .assets-matches-compact .assets-matched-asset,
 .assets-matches-compact .assets-value-cell {
   word-break: normal; overflow-wrap: normal; white-space: normal;
   line-height: 1.5; padding: 6px 10px !important;
+  position: relative;
 }
 .assets-col-status-cell { padding: 4px 2px !important; }
 
@@ -6664,8 +6682,15 @@ i.glyphicon-white,
   border-radius: 2px; padding: 1px 0;
 }
 
+/* Override global .table > tbody > tr for match rows */
+.assets-matches-compact.table > tbody > tr.assets-match-row {
+  background: transparent !important;
+}
+.assets-matches-compact.table > tbody > tr.assets-match-row:hover {
+  background: rgba(0,0,0,0.02) !important;
+}
+
 .assets-match-row { cursor: default; }
-.assets-match-row:hover { background: rgba(0,0,0,0.02) !important; }
 .assets-row-expanded { border-bottom-color: transparent !important; }
 
 /* Square icon buttons */
@@ -6714,6 +6739,11 @@ i.glyphicon-white,
 /* Detail row */
 .assets-detail-row { background: #f8fafc !important; }
 .assets-detail-row > td { padding: 12px 16px !important; border-top: none !important; }
+.assets-matches-compact.table > tbody > tr.assets-detail-row > td {
+  padding: 12px 16px !important;
+  border-top: none !important;
+  background: #f8fafc !important;
+}
 .assets-detail-grid { display: flex; gap: 10px; flex-wrap: wrap; padding: 2px 0; }
 
 .assets-detail-card {
