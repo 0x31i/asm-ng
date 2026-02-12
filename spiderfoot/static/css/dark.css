@@ -6792,13 +6792,25 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   border-spacing: 0;
 }
 
-/* Sticky table header - stacks below the action bar */
-.assets-matches-compact thead th {
+/* Higher specificity to override global .table > thead > tr > th */
+.assets-matches-compact.table > thead > tr > th {
   position: sticky !important;
   top: var(--sticky-offset, 62px) !important;
   z-index: 100 !important;
   background: var(--bg-primary, #0a0f1a) !important;
   box-shadow: 0 1px 0 var(--glass-border, rgba(255,255,255,0.08));
+  font-weight: 700;
+  font-size: 11px !important;
+  font-family: var(--font-mono) !important;
+  padding: 8px 10px !important;
+  letter-spacing: 1px;
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.08)) !important;
+}
+
+/* Override global .table th min-width for compact columns */
+.assets-matches-compact.table th:nth-child(1),
+.assets-matches-compact.table th:nth-child(2) {
+  min-width: 0 !important;
 }
 
 .assets-matches-compact .assets-col-select {
@@ -6840,6 +6852,14 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   background: rgba(255,255,255,0.02);
 }
 
+/* Override global .table > tbody > tr > td for compact match cells */
+.assets-matches-compact.table > tbody > tr > td {
+  padding: 6px 10px !important;
+  font-size: 11px !important;
+  font-family: var(--font-mono) !important;
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.08)) !important;
+}
+
 /* Value cells - wrap at delimiters */
 .assets-matches-compact .assets-matched-asset,
 .assets-matches-compact .assets-value-cell {
@@ -6848,6 +6868,7 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   white-space: normal;
   line-height: 1.5;
   padding: 6px 10px !important;
+  position: relative;
 }
 
 /* Status cell - compact */
@@ -6865,18 +6886,30 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   padding: 1px 0;
 }
 
+/* Override global .table > tbody > tr for match rows */
+.assets-matches-compact.table > tbody > tr.assets-match-row {
+  background: transparent !important;
+}
+
+.assets-matches-compact.table > tbody > tr.assets-match-row:hover {
+  background: rgba(255,255,255,0.03) !important;
+}
+
 /* Row styles */
 .assets-match-row {
   cursor: default;
   transition: background 0.1s ease;
 }
 
-.assets-match-row:hover {
-  background: rgba(255,255,255,0.03) !important;
-}
-
 .assets-row-expanded {
   border-bottom-color: transparent !important;
+}
+
+/* Detail row override for matches table */
+.assets-matches-compact.table > tbody > tr.assets-detail-row > td {
+  padding: 12px 16px !important;
+  border-top: none !important;
+  background: var(--bg-tertiary, #1e293b) !important;
 }
 
 /* Square icon buttons */
@@ -7335,25 +7368,22 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   overflow: visible;
 }
 
-/* Expand hint - right-aligned indicator */
+/* Expand hint - subtle chevron on far right */
 .assets-expand-hint {
   position: absolute;
-  right: 10px;
+  right: 6px;
   top: 50%;
   transform: translateY(-50%);
-  font-family: var(--font-mono);
   font-size: 8px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
   color: var(--text-muted, #64748b);
-  opacity: 0.4;
-  white-space: nowrap;
+  opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease, color 0.15s ease;
+  line-height: 1;
 }
-.assets-known-row:hover .assets-expand-hint {
-  opacity: 1;
+.assets-known-row:hover .assets-expand-hint,
+.assets-match-row:hover .assets-expand-hint {
+  opacity: 0.7;
   color: var(--accent-green, #4ade80);
   text-shadow: 0 0 6px var(--glow-green, rgba(74,222,128,0.3));
 }
