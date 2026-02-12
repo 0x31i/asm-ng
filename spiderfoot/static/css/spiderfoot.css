@@ -6390,22 +6390,52 @@ i.glyphicon-white,
 
 /* Known assets compact table */
 .assets-known-compact { table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0; }
-.assets-known-compact thead th {
+
+/* Higher specificity to override global .table > thead > tr > th */
+.assets-known-compact.table > thead > tr > th {
   position: sticky !important;
   top: var(--sticky-offset, 0px) !important;
   z-index: 100 !important;
   background: #f1f5f9 !important;
   color: #1e293b;
+  border: none !important;
   border-bottom: 2px solid #94a3b8 !important;
   font-weight: 700;
+  font-size: 11px !important;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace !important;
+  padding: 8px 10px !important;
+  letter-spacing: 1px;
 }
+
+/* Override global .table th min-width for compact columns */
+.assets-known-compact.table th:nth-child(1),
+.assets-known-compact.table th:nth-child(2) {
+  min-width: 0 !important;
+}
+
 .assets-known-col-select { width: 36px; text-align: center; vertical-align: middle; }
 .assets-known-col-type { width: 90px; }
 .assets-known-col-source { width: 100px; }
 .assets-known-col-actions { width: 80px; text-align: center; }
 
 .assets-known-row { cursor: default; }
-.assets-known-row:hover { background: rgba(0,0,0,0.02) !important; }
+
+/* Override global .table > tbody > tr for known assets rows */
+.assets-known-compact.table > tbody > tr.assets-known-row {
+  background: transparent !important;
+}
+
+.assets-known-compact.table > tbody > tr.assets-known-row:hover {
+  background: rgba(0,0,0,0.02) !important;
+}
+
+/* Override global .table > tbody > tr > td for compact cells */
+.assets-known-compact.table > tbody > tr > td {
+  padding: 6px 10px !important;
+  font-size: 11px !important;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace !important;
+  border: 1px solid var(--glass-border, rgba(0,0,0,0.1)) !important;
+}
 
 .assets-known-type-cell { padding: 6px 10px !important; vertical-align: middle; }
 .assets-known-value-cell {
@@ -6415,6 +6445,8 @@ i.glyphicon-white,
   word-break: break-all; overflow-wrap: anywhere; white-space: normal;
   line-height: 1.5; padding: 6px 10px !important;
   color: #1e293b;
+  position: relative;
+  cursor: pointer;
 }
 .assets-value-truncate {
   display: -webkit-box;
@@ -6426,6 +6458,31 @@ i.glyphicon-white,
   display: block;
   -webkit-line-clamp: unset;
   overflow: visible;
+}
+
+/* Expand hint - right-aligned indicator */
+.assets-expand-hint {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #94a3b8;
+  opacity: 0.5;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+.assets-known-row:hover .assets-expand-hint {
+  opacity: 1;
+  color: #16a34a;
+}
+.assets-row-expanded .assets-expand-hint {
+  display: none;
 }
 .assets-known-source-cell { padding: 6px 10px !important; vertical-align: middle; text-align: center; }
 .assets-known-action-cell { text-align: center; padding: 4px 8px !important; white-space: nowrap; vertical-align: middle; }
@@ -6460,7 +6517,11 @@ i.glyphicon-white,
 .assets-known-row-pending { background: rgba(34,197,94,0.08) !important; }
 
 /* Known assets detail row */
-.assets-known-detail > td { padding: 12px 16px !important; border-top: none !important; }
+.assets-known-compact.table > tbody > tr.assets-known-detail > td {
+  padding: 12px 16px !important;
+  border-top: none !important;
+  background: #f8fafc !important;
+}
 
 .assets-match-stats {
   display: flex;
@@ -8280,6 +8341,11 @@ table.discovery-path-table td.validation-status {
   word-break: break-word;
 }
 
+#nessus-table.findings-table .finding-row.finding-expanded .cell-clamp {
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
 #burp-table.findings-table {
   table-layout: fixed;
 }
@@ -8291,6 +8357,11 @@ table.discovery-path-table td.validation-status {
   overflow: hidden;
   white-space: normal;
   word-break: break-word;
+}
+
+#burp-table.findings-table .finding-row.finding-expanded .cell-clamp {
+  -webkit-line-clamp: unset;
+  overflow: visible;
 }
 
 #nessus-table.findings-table thead th,

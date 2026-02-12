@@ -7260,13 +7260,25 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   border-spacing: 0;
 }
 
-.assets-known-compact thead th {
+/* Higher specificity to override global .table > thead > tr > th */
+.assets-known-compact.table > thead > tr > th {
   position: sticky !important;
   top: var(--sticky-offset, 0px) !important;
   z-index: 100 !important;
   background: var(--bg-primary, #0a0f1a) !important;
   box-shadow: 0 1px 0 var(--glass-border, rgba(255,255,255,0.08));
   font-weight: 700;
+  font-size: 11px !important;
+  font-family: var(--font-mono) !important;
+  padding: 8px 10px !important;
+  letter-spacing: 1px;
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.08)) !important;
+}
+
+/* Override global .table th min-width for compact columns */
+.assets-known-compact.table th:nth-child(1),
+.assets-known-compact.table th:nth-child(2) {
+  min-width: 0 !important;
 }
 
 .assets-known-col-select { width: 36px; text-align: center; vertical-align: middle; }
@@ -7279,8 +7291,21 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   transition: background 0.1s ease;
 }
 
-.assets-known-row:hover {
+/* Override global .table > tbody > tr for known assets rows */
+.assets-known-compact.table > tbody > tr.assets-known-row {
+  background: transparent !important;
+}
+
+.assets-known-compact.table > tbody > tr.assets-known-row:hover {
   background: rgba(255,255,255,0.03) !important;
+}
+
+/* Override global .table > tbody > tr > td for compact cells */
+.assets-known-compact.table > tbody > tr > td {
+  padding: 6px 10px !important;
+  font-size: 11px !important;
+  font-family: var(--font-mono) !important;
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.08)) !important;
 }
 
 .assets-known-type-cell { padding: 6px 10px !important; vertical-align: middle; }
@@ -7295,6 +7320,8 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   line-height: 1.5;
   padding: 6px 10px !important;
   color: var(--text-primary, #e2e8f0);
+  position: relative;
+  cursor: pointer;
 }
 .assets-value-truncate {
   display: -webkit-box;
@@ -7306,6 +7333,32 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   display: block;
   -webkit-line-clamp: unset;
   overflow: visible;
+}
+
+/* Expand hint - right-aligned indicator */
+.assets-expand-hint {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted, #64748b);
+  opacity: 0.4;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.assets-known-row:hover .assets-expand-hint {
+  opacity: 1;
+  color: var(--accent-green, #4ade80);
+  text-shadow: 0 0 6px var(--glow-green, rgba(74,222,128,0.3));
+}
+.assets-row-expanded .assets-expand-hint {
+  display: none;
 }
 
 .assets-known-source-cell { padding: 6px 10px !important; vertical-align: middle; text-align: center; }
@@ -7335,7 +7388,11 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
 .assets-known-row-pending { background: rgba(34, 197, 94, 0.1) !important; }
 
 /* Known assets detail row */
-.assets-known-detail > td { padding: 12px 16px !important; border-top: none !important; }
+.assets-known-compact.table > tbody > tr.assets-known-detail > td {
+  padding: 12px 16px !important;
+  border-top: none !important;
+  background: var(--bg-tertiary, #1e293b) !important;
+}
 
 /* Modal overlay */
 .assets-modal-overlay {
@@ -8843,6 +8900,11 @@ i.glyphicon-white,
   word-break: break-word;
 }
 
+#nessus-table.findings-table .finding-row.finding-expanded .cell-clamp {
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
 #burp-table.findings-table {
   table-layout: fixed;
 }
@@ -8854,6 +8916,11 @@ i.glyphicon-white,
   overflow: hidden;
   white-space: normal;
   word-break: break-word;
+}
+
+#burp-table.findings-table .finding-row.finding-expanded .cell-clamp {
+  -webkit-line-clamp: unset;
+  overflow: visible;
 }
 
 #nessus-table.findings-table thead th,
