@@ -162,9 +162,32 @@ class SpiderFootWebUi:
             referrer=secure.ReferrerPolicy().no_referrer(),
         )
 
+        # Build header list compatible with secure 0.x, 1.x, and edge versions.
+        # CherryPy expects a list of (str, str) tuples.
+        header_list = []
+        try:
+            if hasattr(secure_headers, 'framework'):
+                # secure 0.x
+                header_list = secure_headers.framework.cherrypy()
+            else:
+                # secure >= 1.0
+                hdrs = secure_headers.headers
+                if callable(hdrs):
+                    hdrs = hdrs()
+                if isinstance(hdrs, dict):
+                    header_list = [(str(k), str(v)) for k, v in hdrs.items()]
+                elif isinstance(hdrs, (list, tuple)):
+                    for item in hdrs:
+                        if isinstance(item, (list, tuple)) and len(item) == 2:
+                            header_list.append((str(item[0]), str(item[1])))
+                        elif hasattr(item, 'header_name') and hasattr(item, 'value'):
+                            header_list.append((str(item.header_name), str(item.value)))
+        except Exception:
+            pass
+
         cherrypy.config.update({
             "tools.response_headers.on": True,
-            "tools.response_headers.headers": list(secure_headers.headers.items())
+            "tools.response_headers.headers": header_list
         })
 
     def currentUser(self: 'SpiderFootWebUi') -> str:
