@@ -53,6 +53,13 @@ from spiderfoot.grade_config import (
     get_event_grading,
     DEFAULT_GRADE_CATEGORIES,
 )
+from spiderfoot.excel_styles import (
+    build_executive_summary,
+    build_findings_sheet,
+    build_correlations_sheet,
+    build_category_sheet,
+    sanitize_sheet_name,
+)
 
 mp.set_start_method("spawn", force=True)
 
@@ -5961,32 +5968,48 @@ class SpiderFootWebUi:
             pass
 
         if filetype.lower() in ["xlsx", "excel"]:
-            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-FINDINGS.xlsx"
+            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-REPORT.xlsx"
             cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             cherrypy.response.headers['Pragma'] = "no-cache"
 
-            import openpyxl
-            from io import BytesIO
             wb = openpyxl.Workbook()
 
-            # Findings sheet
-            ws_findings = wb.active
-            ws_findings.title = "Findings"
-            findings_headers = ["Priority", "Category", "Tab", "Item", "Description", "Recommendation"]
-            for col_num, header in enumerate(findings_headers, 1):
-                ws_findings.cell(row=1, column=col_num, value=header)
-            for row_num, row_data in enumerate(findings_rows, 2):
-                for col_num, cell_value in enumerate(row_data, 1):
-                    ws_findings.cell(row=row_num, column=col_num, value=cell_value)
+            # Gather grade data and scan metadata for Executive Summary
+            grade_data = self._calculateScanGrade(dbh, id)
+            scan_instance = dbh.scanInstanceGet(id)
+            scan_info = {
+                'name': scan_instance[0] if scan_instance else '',
+                'target': scan_instance[1] if scan_instance else '',
+                'date': time.strftime(
+                    "%Y-%m-%d %H:%M:%S",
+                    time.localtime(scan_instance[2]),
+                ) if scan_instance and scan_instance[2] else '',
+            }
 
-            # Correlations sheet
+            # Sheet 1: Executive Summary (reuse the default active sheet)
+            ws_summary = wb.active
+            ws_summary.title = "Executive Summary"
+            build_executive_summary(ws_summary, grade_data, scan_info)
+
+            # Sheet 2: Findings (black tab, severity colors)
+            ws_findings = wb.create_sheet("Findings")
+            build_findings_sheet(ws_findings, findings_rows)
+
+            # Sheet 3: Correlations (dark gray tab, risk colors)
             ws_corr = wb.create_sheet("Correlations")
-            corr_headers = ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"]
-            for col_num, header in enumerate(corr_headers, 1):
-                ws_corr.cell(row=1, column=col_num, value=header)
-            for row_num, row_data in enumerate(correlation_rows, 2):
-                for col_num, cell_value in enumerate(row_data, 1):
-                    ws_corr.cell(row=row_num, column=col_num, value=cell_value)
+            build_correlations_sheet(ws_corr, correlation_rows)
+
+            # Sheets 4+: Category tabs ordered by weight descending
+            cat_results = grade_data.get('categories', {})
+            sorted_cats = sorted(
+                cat_results.items(),
+                key=lambda x: (-x[1].get('weight', 0), x[0]),
+            )
+            for cat_name, cat_data in sorted_cats:
+                safe_name = sanitize_sheet_name(cat_name)
+                ws_cat = wb.create_sheet(safe_name)
+                cat_color = cat_data.get('color', '#6b7280')
+                build_category_sheet(ws_cat, cat_name, cat_color, cat_data)
 
             with BytesIO() as f:
                 wb.save(f)
