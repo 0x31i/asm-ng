@@ -2340,7 +2340,8 @@
                         html += "<tr class='assets-known-row' data-asset-id='" + a.id + "' data-asset-type='" + a.asset_type + "' data-asset-source='" + a.source + "'" + hideStyle + ">";
                         html += "<td class='assets-cell-select' onclick='knownToggleCb(this, event)'><input type='checkbox' class='asset-cb' value='" + a.id + "' onchange='assetsUpdateSelection()'></td>";
                         html += "<td class='assets-known-type-cell assets-expandable' onclick='knownToggleDetail(this)'><span class='assets-type-badge assets-type-" + a.asset_type + "'>" + a.asset_type.toUpperCase() + "</span></td>";
-                        html += "<td class='assets-known-value-cell assets-expandable' onclick='knownToggleDetail(this)'><div class='assets-value-truncate'>" + valueWrapped + "</div></td>";
+                        html += "<td class='assets-known-value-cell assets-expandable' onclick='knownToggleDetail(this)'><div class='assets-value-truncate'>" + valueWrapped + "</div>";
+                        html += "<span class='assets-expand-hint'><i class='glyphicon glyphicon-chevron-down'></i>&nbsp;EXPAND</span></td>";
                         html += "<td class='assets-known-source-cell assets-expandable' onclick='knownToggleDetail(this)'><span class='assets-source-badge " + sourceClass + "'>" + sourceLabel + "</span></td>";
                         html += "<td class='assets-known-action-cell'>";
                         html += "<button class='btn btn-xs assets-icon-btn assets-fp-action' onclick='event.stopPropagation();knownAssetAction(" + a.id + ", \"fp\")' title='FALSE POSITIVE'>";
@@ -2367,23 +2368,14 @@
                 $("#loader").hide();
                 knownInitSelectionTracking();
 
-                // Make filter bar sticky with inline styles (ensures it works even if CSS fails)
+                // Set sticky offset CSS variable so thead stacks below the filter bar
                 var knownStickyBar = document.getElementById('assets-known-sticky-bar');
                 if (knownStickyBar) {
-                    var isDarkMode = localStorage.getItem("theme") === "dark-theme";
-                    knownStickyBar.style.setProperty('position', 'sticky', 'important');
-                    knownStickyBar.style.setProperty('top', '0', 'important');
-                    knownStickyBar.style.setProperty('z-index', '200', 'important');
-                    knownStickyBar.style.setProperty('background', isDarkMode ? '#0a0f1a' : '#ffffff', 'important');
-                    // Set thead sticky offset to bar height using inline !important to override global CSS
                     var barHeight = knownStickyBar.offsetHeight;
-                    var thBg = isDarkMode ? "rgba(0, 0, 0, 0.85)" : "#f1f5f9";
-                    $('#known-assets-table thead th').each(function() {
-                        this.style.setProperty('position', 'sticky', 'important');
-                        this.style.setProperty('top', barHeight + 'px', 'important');
-                        this.style.setProperty('z-index', '100', 'important');
-                        this.style.setProperty('background', thBg, 'important');
-                    });
+                    var table = document.getElementById('known-assets-table');
+                    if (table) {
+                        table.style.setProperty('--sticky-offset', barHeight + 'px');
+                    }
                 }
             });
         }
