@@ -3171,7 +3171,7 @@
             var order = [];
             for (var i = 0; i < results.length; i++) {
                 var r = results[i];
-                var key = (r.plugin_name || '').toLowerCase() + '|' + (r.host_ip || '').toLowerCase() + '|' + (r.host_name || '').toLowerCase();
+                var key = (r.plugin_name || '').toLowerCase();
                 if (!groups[key]) {
                     groups[key] = [];
                     order.push(key);
