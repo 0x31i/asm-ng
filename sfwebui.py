@@ -24,6 +24,7 @@ import string
 import threading
 import time
 import os
+import warnings
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime as dt_datetime
@@ -5979,44 +5980,55 @@ class SpiderFootWebUi:
             if report == "full":
                 cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-REPORT.xlsx"
                 try:
-                    wb = openpyxl.Workbook()
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings('ignore', message='Title is more than 31 characters')
 
-                    # Gather grade data and scan metadata for Executive Summary
-                    grade_data = self._calculateScanGrade(dbh, id)
-                    scan_instance = dbh.scanInstanceGet(id)
-                    scan_info = {
-                        'name': scan_instance[0] if scan_instance else '',
-                        'target': scan_instance[1] if scan_instance else '',
-                        'date': time.strftime(
-                            "%Y-%m-%d %H:%M:%S",
-                            time.localtime(scan_instance[2]),
-                        ) if scan_instance and scan_instance[2] else '',
-                    }
+                        wb = openpyxl.Workbook()
 
-                    # Sheet 1: Executive Summary (reuse the default active sheet)
-                    ws_summary = wb.active
-                    ws_summary.title = "Executive Summary"
-                    build_executive_summary(ws_summary, grade_data, scan_info)
+                        # Gather grade data and scan metadata for Executive Summary
+                        self.log.info(f"Full report: calculating grade for scan {id}")
+                        grade_data = self._calculateScanGrade(dbh, id)
+                        scan_instance = dbh.scanInstanceGet(id)
+                        scan_info = {
+                            'name': scan_instance[0] if scan_instance else '',
+                            'target': scan_instance[1] if scan_instance else '',
+                            'date': time.strftime(
+                                "%Y-%m-%d %H:%M:%S",
+                                time.localtime(scan_instance[2]),
+                            ) if scan_instance and scan_instance[2] else '',
+                        }
 
-                    # Sheet 2: Findings (black tab, severity colors)
-                    ws_findings = wb.create_sheet("Findings")
-                    build_findings_sheet(ws_findings, findings_rows)
+                        # Sheet 1: Executive Summary (reuse the default active sheet)
+                        self.log.info("Full report: building Executive Summary")
+                        ws_summary = wb.active
+                        ws_summary.title = "Executive Summary"
+                        build_executive_summary(ws_summary, grade_data, scan_info)
 
-                    # Sheet 3: Correlations (dark gray tab, risk colors)
-                    ws_corr = wb.create_sheet("Correlations")
-                    build_correlations_sheet(ws_corr, correlation_rows)
+                        # Sheet 2: Findings (black tab, severity colors)
+                        self.log.info(f"Full report: building Findings sheet ({len(findings_rows)} rows)")
+                        ws_findings = wb.create_sheet("Findings")
+                        build_findings_sheet(ws_findings, findings_rows)
 
-                    # Sheets 4+: Category tabs ordered by weight descending
-                    cat_results = grade_data.get('categories', {})
-                    sorted_cats = sorted(
-                        cat_results.items(),
-                        key=lambda x: (-x[1].get('weight', 0), x[0]),
-                    )
-                    for cat_name, cat_data in sorted_cats:
-                        safe_name = sanitize_sheet_name(cat_name)
-                        ws_cat = wb.create_sheet(safe_name)
-                        cat_color = cat_data.get('color', '#6b7280')
-                        build_category_sheet(ws_cat, cat_name, cat_color, cat_data)
+                        # Sheet 3: Correlations (dark gray tab, risk colors)
+                        self.log.info(f"Full report: building Correlations sheet ({len(correlation_rows)} rows)")
+                        ws_corr = wb.create_sheet("Correlations")
+                        build_correlations_sheet(ws_corr, correlation_rows)
+
+                        # Sheets 4+: Category tabs ordered by weight descending
+                        cat_results = grade_data.get('categories', {})
+                        sorted_cats = sorted(
+                            cat_results.items(),
+                            key=lambda x: (-x[1].get('weight', 0), x[0]),
+                        )
+                        self.log.info(f"Full report: building {len(sorted_cats)} category tabs")
+                        for cat_name, cat_data in sorted_cats:
+                            safe_name = sanitize_sheet_name(cat_name)
+                            self.log.info(f"Full report: creating category tab '{safe_name}'")
+                            ws_cat = wb.create_sheet(safe_name)
+                            cat_color = cat_data.get('color', '#6b7280')
+                            build_category_sheet(ws_cat, cat_name, cat_color, cat_data)
+
+                        self.log.info("Full report: workbook built successfully")
 
                 except Exception as e:
                     self.log.error(f"Styled report export failed, falling back to basic: {e}", exc_info=True)
