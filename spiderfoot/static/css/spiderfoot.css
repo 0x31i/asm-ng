@@ -8280,6 +8280,11 @@ table.discovery-path-table td.validation-status {
   word-break: break-word;
 }
 
+#nessus-table.findings-table .finding-row.finding-expanded .cell-clamp {
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
 #burp-table.findings-table {
   table-layout: fixed;
 }
@@ -8291,6 +8296,11 @@ table.discovery-path-table td.validation-status {
   overflow: hidden;
   white-space: normal;
   word-break: break-word;
+}
+
+#burp-table.findings-table .finding-row.finding-expanded .cell-clamp {
+  -webkit-line-clamp: unset;
+  overflow: visible;
 }
 
 #nessus-table.findings-table thead th,
