@@ -414,8 +414,10 @@ def build_category_sheet(ws, cat_name: str, cat_color: str, cat_data: dict):
 def sanitize_sheet_name(name: str) -> str:
     """Sanitize a string for use as an Excel sheet name.
 
-    Excel sheet names cannot exceed 31 characters or contain: \\ / ? * [ ]
+    Excel sheet names cannot exceed 31 characters or contain: \\ / ? * [ ] :
+    Leading single quotes are also prohibited.
     """
-    for ch in ('\\', '/', '?', '*', '[', ']'):
+    for ch in ('\\', '/', '?', '*', '[', ']', ':'):
         name = name.replace(ch, '-')
-    return name[:31]
+    name = name.strip().lstrip("'")
+    return name[:31] if name else 'Sheet'
