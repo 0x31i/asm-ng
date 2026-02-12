@@ -4659,6 +4659,20 @@ class SpiderFootWebUi:
         except Exception as e:
             return {'status': 'error', 'error': str(e)}
 
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def dbintegritycheck(self):
+        """Run a full integrity check on the database.
+
+        Returns:
+            dict: integrity check results with 'ok' status and details.
+        """
+        dbh = SpiderFootDb(self.config)
+        try:
+            return dbh.integrityCheck()
+        except Exception as e:
+            return {'ok': False, 'integrity_check': [str(e)], 'foreign_key_check': []}
+
     #
     # DATA PROVIDERS
     #

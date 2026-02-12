@@ -35,6 +35,7 @@
 <ul class="nav nav-pills nav-stacked col-md-3">
 <li id='tab_global' class="active"><a href="javascript:void(0)">Global</a></li>
 <li id='tab_gradeconfig'><a href='javascript:void(0)' onclick='switchTab("gradeconfig");'>Grade Configuration</a></li>
+<li id='tab_dbmanage'><a href='javascript:void(0)' onclick='switchTab("dbmanage");'>Database Management</a></li>
 % for mod in sorted(opts['__modules__'].keys()):
     <% keylist = dict((k, v) for k, v in opts['__modules__'][mod]['opts'].items() if not k.startswith('_')) %>
     % if len(keylist) > 0:
@@ -280,6 +281,233 @@ $(document).ready(function() {
         }, true);
     }
 });
+</script>
+</div>
+
+<div id='optsect_dbmanage' class="tab-pane" style="display: none">
+<h4>Database Management</h4>
+<p style="color: var(--text-secondary); margin-bottom: 15px;">
+Monitor database health, create backups, and perform maintenance on the SQLite database.
+</p>
+
+<!-- Health Status -->
+<h5><i class="glyphicon glyphicon-heart"></i> Database Health</h5>
+<div id="db-health-container">
+<table class='table table-bordered table-striped' id="db-health-table">
+<tbody>
+<tr><td style="width:200px">Status</td><td><span id="db-health-status" class="label label-default">Not checked</span></td></tr>
+<tr><td>Database File</td><td id="db-health-path">-</td></tr>
+<tr><td>File Size</td><td id="db-health-filesize">-</td></tr>
+<tr><td>Page Count</td><td id="db-health-pages">-</td></tr>
+<tr><td>Free Pages</td><td id="db-health-freepages">-</td></tr>
+<tr><td>Page Size</td><td id="db-health-pagesize">-</td></tr>
+<tr><td>WAL File Size</td><td id="db-health-walsize">-</td></tr>
+<tr><td>Journal Mode</td><td id="db-health-journal">-</td></tr>
+<tr><td>Integrity</td><td id="db-health-integrity">-</td></tr>
+</tbody>
+</table>
+<button type="button" class="btn btn-info" id="btn-db-health" onclick="dbHealthCheck()">
+<i class="glyphicon glyphicon-refresh"></i> Check Health
+</button>
+</div>
+
+<hr>
+
+<!-- Integrity Check -->
+<h5><i class="glyphicon glyphicon-ok-circle"></i> Full Integrity Check</h5>
+<p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">
+Run a full integrity check including foreign key validation. This may take a moment on large databases.
+</p>
+<div id="db-integrity-result" style="display:none; margin-bottom: 10px;"></div>
+<button type="button" class="btn btn-warning" id="btn-db-integrity" onclick="dbIntegrityCheck()">
+<i class="glyphicon glyphicon-search"></i> Run Full Integrity Check
+</button>
+
+<hr>
+
+<!-- Backup -->
+<h5><i class="glyphicon glyphicon-save"></i> Database Backup</h5>
+<p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">
+Create a hot backup of the database. The backup is created using SQLite's built-in backup API
+and is safe to run while scans are in progress.
+</p>
+<div id="db-backup-result" style="display:none; margin-bottom: 10px;"></div>
+<button type="button" class="btn btn-success" id="btn-db-backup" onclick="dbBackup()">
+<i class="glyphicon glyphicon-download-alt"></i> Create Backup
+</button>
+
+<hr>
+
+<!-- Vacuum -->
+<h5><i class="glyphicon glyphicon-compressed"></i> Vacuum Database</h5>
+<p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">
+Reclaim unused space from deleted records. This rebuilds the database file, removing fragmentation and reducing file size.
+This operation may take a while on large databases.
+</p>
+<div id="db-vacuum-result" style="display:none; margin-bottom: 10px;"></div>
+<button type="button" class="btn btn-danger" id="btn-db-vacuum" onclick="dbVacuum()">
+<i class="glyphicon glyphicon-trash"></i> Vacuum Database
+</button>
+
+<script>
+function dbHealthCheck() {
+    var btn = document.getElementById('btn-db-health');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="glyphicon glyphicon-refresh glyphicon-spin"></i> Checking...';
+
+    $.ajax({
+        url: docroot + '/dbhealth',
+        type: 'GET',
+        dataType: 'json',
+        success: function(data) {
+            var statusEl = document.getElementById('db-health-status');
+            if (data.status === 'healthy') {
+                statusEl.className = 'label label-success';
+                statusEl.textContent = 'Healthy';
+            } else if (data.status === 'degraded') {
+                statusEl.className = 'label label-warning';
+                statusEl.textContent = 'Degraded';
+            } else {
+                statusEl.className = 'label label-danger';
+                statusEl.textContent = data.status || 'Error';
+            }
+
+            document.getElementById('db-health-path').textContent = data.db_path || '-';
+            document.getElementById('db-health-filesize').textContent = data.file_size_human || formatBytes(data.file_size || 0);
+            document.getElementById('db-health-pages').textContent = (data.page_count || 0).toLocaleString();
+            document.getElementById('db-health-freepages').textContent = (data.free_pages || 0).toLocaleString();
+            document.getElementById('db-health-pagesize').textContent = formatBytes(data.page_size || 0);
+            document.getElementById('db-health-walsize').textContent = data.wal_file_size_human || formatBytes(data.wal_file_size || 0);
+            document.getElementById('db-health-journal').textContent = data.journal_mode || '-';
+            document.getElementById('db-health-integrity').textContent = data.integrity || '-';
+        },
+        error: function(xhr) {
+            document.getElementById('db-health-status').className = 'label label-danger';
+            document.getElementById('db-health-status').textContent = 'Error';
+        },
+        complete: function() {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="glyphicon glyphicon-refresh"></i> Check Health';
+        }
+    });
+}
+
+function dbIntegrityCheck() {
+    var btn = document.getElementById('btn-db-integrity');
+    var resultDiv = document.getElementById('db-integrity-result');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="glyphicon glyphicon-search"></i> Running...';
+    resultDiv.style.display = 'none';
+
+    $.ajax({
+        url: docroot + '/dbintegritycheck',
+        type: 'GET',
+        dataType: 'json',
+        success: function(data) {
+            resultDiv.style.display = 'block';
+            if (data.ok) {
+                resultDiv.className = 'alert alert-success';
+                resultDiv.innerHTML = '<strong>Passed!</strong> Database integrity check and foreign key check both passed.';
+            } else {
+                resultDiv.className = 'alert alert-danger';
+                var msg = '<strong>Issues found:</strong><br>';
+                if (data.integrity_check && data.integrity_check.length > 0) {
+                    msg += '<br><strong>Integrity:</strong> ' + data.integrity_check.join(', ');
+                }
+                if (data.foreign_key_check && data.foreign_key_check.length > 0) {
+                    msg += '<br><strong>Foreign keys:</strong> ' + data.foreign_key_check.join(', ');
+                }
+                resultDiv.innerHTML = msg;
+            }
+        },
+        error: function(xhr) {
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'alert alert-danger';
+            resultDiv.innerHTML = '<strong>Error:</strong> Failed to run integrity check.';
+        },
+        complete: function() {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="glyphicon glyphicon-search"></i> Run Full Integrity Check';
+        }
+    });
+}
+
+function dbBackup() {
+    var btn = document.getElementById('btn-db-backup');
+    var resultDiv = document.getElementById('db-backup-result');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="glyphicon glyphicon-download-alt"></i> Creating backup...';
+    resultDiv.style.display = 'none';
+
+    $.ajax({
+        url: docroot + '/dbbackup',
+        type: 'GET',
+        dataType: 'json',
+        success: function(data) {
+            resultDiv.style.display = 'block';
+            if (data.status === 'success') {
+                resultDiv.className = 'alert alert-success';
+                resultDiv.innerHTML = '<strong>Backup created!</strong><br>' +
+                    'File: <code>' + (data.backup_path || '') + '</code><br>' +
+                    'Size: ' + (data.backup_size_human || '') + '<br>' +
+                    'Time: ' + (data.timestamp || '');
+            } else {
+                resultDiv.className = 'alert alert-danger';
+                resultDiv.innerHTML = '<strong>Backup failed:</strong> ' + (data.error || 'Unknown error');
+            }
+        },
+        error: function(xhr) {
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'alert alert-danger';
+            resultDiv.innerHTML = '<strong>Error:</strong> Failed to create backup.';
+        },
+        complete: function() {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="glyphicon glyphicon-download-alt"></i> Create Backup';
+        }
+    });
+}
+
+function dbVacuum() {
+    var btn = document.getElementById('btn-db-vacuum');
+    var resultDiv = document.getElementById('db-vacuum-result');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="glyphicon glyphicon-trash"></i> Vacuuming...';
+    resultDiv.style.display = 'none';
+
+    $.ajax({
+        url: docroot + '/vacuum',
+        type: 'GET',
+        dataType: 'json',
+        success: function(data) {
+            resultDiv.style.display = 'block';
+            if (data && data[0] === 'SUCCESS') {
+                resultDiv.className = 'alert alert-success';
+                resultDiv.innerHTML = '<strong>Vacuum complete!</strong> Database has been optimized and unused space reclaimed.';
+            } else {
+                resultDiv.className = 'alert alert-danger';
+                resultDiv.innerHTML = '<strong>Vacuum failed:</strong> ' + (data && data[1] ? data[1] : 'Unknown error');
+            }
+        },
+        error: function(xhr) {
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'alert alert-danger';
+            resultDiv.innerHTML = '<strong>Error:</strong> Failed to vacuum database.';
+        },
+        complete: function() {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="glyphicon glyphicon-trash"></i> Vacuum Database';
+        }
+    });
+}
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    var k = 1024;
+    var sizes = ['B', 'KB', 'MB', 'GB'];
+    var i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
 </script>
 </div>
 
