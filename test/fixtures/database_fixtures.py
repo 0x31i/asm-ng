@@ -230,12 +230,6 @@ def mock_spiderfoot_db():
 
 
 @pytest.fixture
-def mock_psycopg2_connect():
-    with patch('spiderfoot.db.psycopg2.connect') as mock_connect:
-        yield mock_connect
-
-
-@pytest.fixture
 def mock_db_cursor():
     cursor = MagicMock()
     yield cursor

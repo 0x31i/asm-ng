@@ -1,5 +1,6 @@
 # Production Docker Compose Configuration for ASM-NG
-# Includes: PostgreSQL, Elasticsearch, Nginx, Redis, and monitoring
+# Includes: Elasticsearch, Nginx, Redis, and monitoring
+# Database: SQLite (embedded, stored in asm-ng-data volume)
 # Written by poppopjmp
 
 version: "3.9"
@@ -33,13 +34,6 @@ services:
       - asm-ng-cache:/home/spiderfoot/cache
       - asm-ng-config:/home/spiderfoot/config
     environment:
-      # Database Configuration
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=asm_ng_prod
-      - POSTGRES_USER=asm_ng
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change_this_password}
-      - POSTGRES_PORT=5432
-      
       # Elasticsearch Configuration
       - ELASTICSEARCH_ENABLED=true
       - ELASTICSEARCH_HOST=elasticsearch
@@ -66,8 +60,6 @@ services:
       - SF_SECURE_HEADERS=true
       
     depends_on:
-      postgres:
-        condition: service_healthy
       elasticsearch:
         condition: service_healthy
       redis:
@@ -78,47 +70,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    container_name: asm-ng-postgres
-    restart: unless-stopped
-    networks:
-      - asm-ng-backend
-    environment:
-      - POSTGRES_DB=asm_ng_prod
-      - POSTGRES_USER=asm_ng
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change_this_password}
-      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
-      - PGDATA=/var/lib/postgresql/data/pgdata
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - postgres-backups:/backups
-      - ./docker-compose-production-files/postgres-init:/docker-entrypoint-initdb.d:ro
-    command: |
-      postgres
-        -c max_connections=200
-        -c shared_buffers=256MB
-        -c effective_cache_size=1GB
-        -c maintenance_work_mem=64MB
-        -c checkpoint_completion_target=0.9
-        -c wal_buffers=16MB
-        -c default_statistics_target=100
-        -c random_page_cost=1.1
-        -c effective_io_concurrency=200
-        -c work_mem=4MB
-        -c min_wal_size=1GB
-        -c max_wal_size=4GB
-        -c max_worker_processes=8
-        -c max_parallel_workers_per_gather=4
-        -c max_parallel_workers=8
-        -c max_parallel_maintenance_workers=4
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U asm_ng -d asm_ng_prod"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   # Elasticsearch for Advanced Search and Analytics
   elasticsearch:
@@ -291,44 +242,6 @@ services:
       retries: 3
     profiles:
       - monitoring
-  # Database Backup Service
-  postgres-backup:
-    image: postgres:15-alpine
-    container_name: asm-ng-backup
-    restart: "no"
-    networks:
-      - asm-ng-backend
-    environment:
-      - POSTGRES_DB=asm_ng_prod
-      - POSTGRES_USER=asm_ng
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change_this_password}
-      - POSTGRES_HOST=postgres
-    volumes:
-      - postgres-backups:/backups
-      - ./docker-compose-production-files/backup-scripts:/scripts:ro
-    command: ["/scripts/backup.sh"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    profiles:
-      - backup
-
-  # PostgreSQL Exporter for Prometheus
-  postgres-exporter:
-    image: prometheuscommunity/postgres-exporter:latest
-    container_name: asm-ng-postgres-exporter
-    restart: unless-stopped
-    networks:
-      - asm-ng-backend
-      - monitoring
-    environment:
-      - DATA_SOURCE_NAME=postgresql://asm_ng:${POSTGRES_PASSWORD:-change_this_password}@postgres:5432/asm_ng_prod?sslmode=disable
-    depends_on:
-      postgres:
-        condition: service_healthy
-    profiles:
-      - monitoring
-
   # Redis Exporter for Prometheus
   redis-exporter:
     image: oliver006/redis_exporter:latest
@@ -434,20 +347,6 @@ volumes:
       type: none
       o: bind
       device: ${CONFIG_PATH:-./config}/asm-ng
-
-  # Database Volumes
-  postgres-data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_PATH:-./data}/postgres
-  postgres-backups:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${BACKUP_PATH:-./backups}/postgres
 
   # Elasticsearch Volumes
   elasticsearch-data:

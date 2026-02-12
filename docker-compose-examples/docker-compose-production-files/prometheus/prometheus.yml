@@ -24,12 +24,6 @@ scrape_configs:
     metrics_path: '/metrics'
     scrape_interval: 30s
     scrape_timeout: 10s
-  # PostgreSQL Metrics (with postgres_exporter)
-  - job_name: 'postgres'
-    static_configs:
-      - targets: ['postgres-exporter:9187']
-    scrape_interval: 30s
-
   # Elasticsearch Metrics (with elasticsearch_exporter)
   - job_name: 'elasticsearch'
     static_configs:

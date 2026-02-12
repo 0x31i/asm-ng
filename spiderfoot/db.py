@@ -19,16 +19,14 @@ import secrets
 import sqlite3
 import threading
 import time
-import psycopg2
-import psycopg2.extras
 
 
 class SpiderFootDb:
-    """SpiderFoot database.
+    """SpiderFoot SQLite database.
 
     Attributes:
-        conn: Database connection
-        dbh: Database cursor
+        conn: SQLite database connection
+        dbh: SQLite database cursor
         dbhLock (_thread.RLock): thread lock on database handle
     """
 
@@ -242,211 +240,6 @@ class SpiderFootDb:
             date_imported   INT NOT NULL \
         )",
         "CREATE INDEX idx_asset_import_history_target ON tbl_asset_import_history (target)"
-    ]
-
-    # PostgreSQL-specific schema queries
-    createPostgreSQLSchemaQueries = [
-        "CREATE TABLE IF NOT EXISTS tbl_event_types ( \
-            event       VARCHAR NOT NULL PRIMARY KEY, \
-            event_descr VARCHAR NOT NULL, \
-            event_raw   INT NOT NULL DEFAULT 0, \
-            event_type  VARCHAR NOT NULL \
-        )",
-        "CREATE TABLE IF NOT EXISTS tbl_config ( \
-            scope   VARCHAR NOT NULL, \
-            opt     VARCHAR NOT NULL, \
-            val     VARCHAR NOT NULL, \
-            PRIMARY KEY (scope, opt) \
-        )",
-        "CREATE TABLE IF NOT EXISTS tbl_scan_instance ( \
-            guid        VARCHAR NOT NULL PRIMARY KEY, \
-            name        VARCHAR NOT NULL, \
-            seed_target VARCHAR NOT NULL, \
-            created     BIGINT DEFAULT 0, \
-            started     BIGINT DEFAULT 0, \
-            ended       BIGINT DEFAULT 0, \
-            status      VARCHAR NOT NULL \
-        )",
-        "CREATE TABLE IF NOT EXISTS tbl_scan_log ( \
-            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
-            generated           BIGINT NOT NULL, \
-            component           VARCHAR, \
-            type                VARCHAR NOT NULL, \
-            message             VARCHAR \
-        )",
-        "CREATE TABLE IF NOT EXISTS tbl_scan_config ( \
-            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
-            component           VARCHAR NOT NULL, \
-            opt                 VARCHAR NOT NULL, \
-            val                 VARCHAR NOT NULL \
-        )",
-        "CREATE TABLE IF NOT EXISTS tbl_scan_results ( \
-            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
-            hash                VARCHAR NOT NULL, \
-            type                VARCHAR NOT NULL REFERENCES tbl_event_types(event), \
-            generated           BIGINT NOT NULL, \
-            confidence          INT NOT NULL DEFAULT 100, \
-            visibility          INT NOT NULL DEFAULT 100, \
-            risk                INT NOT NULL DEFAULT 0, \
-            module              VARCHAR NOT NULL, \
-            data                TEXT, \
-            false_positive      INT NOT NULL DEFAULT 0, \
-            source_event_hash  VARCHAR DEFAULT 'ROOT', \
-            imported_from_scan  VARCHAR DEFAULT NULL \
-        )",
-        "CREATE TABLE IF NOT EXISTS tbl_scan_correlation_results ( \
-            id                  VARCHAR NOT NULL PRIMARY KEY, \
-            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
-            title               VARCHAR NOT NULL, \
-            rule_risk           VARCHAR NOT NULL, \
-            rule_id             VARCHAR NOT NULL, \
-            rule_name           VARCHAR NOT NULL, \
-            rule_descr          VARCHAR NOT NULL, \
-            rule_logic          VARCHAR NOT NULL \
-        )",
-        "CREATE TABLE IF NOT EXISTS tbl_scan_correlation_results_events ( \
-            correlation_id      VARCHAR NOT NULL REFERENCES tbl_scan_correlation_results(id), \
-            event_hash          VARCHAR NOT NULL REFERENCES tbl_scan_results(hash) \
-        )",
-        "CREATE INDEX IF NOT EXISTS idx_scan_results_id ON tbl_scan_results (scan_instance_id)",
-        "CREATE INDEX IF NOT EXISTS idx_scan_results_type ON tbl_scan_results (scan_instance_id, type)",
-        "CREATE INDEX IF NOT EXISTS idx_scan_results_hash ON tbl_scan_results (scan_instance_id, hash)",
-        "CREATE INDEX IF NOT EXISTS idx_scan_results_module ON tbl_scan_results(scan_instance_id, module)",
-        "CREATE INDEX IF NOT EXISTS idx_scan_results_srchash ON tbl_scan_results (scan_instance_id, source_event_hash)",
-        "CREATE INDEX IF NOT EXISTS idx_scan_logs ON tbl_scan_log (scan_instance_id)",
-        "CREATE INDEX IF NOT EXISTS idx_scan_correlation ON tbl_scan_correlation_results (scan_instance_id, id)",
-        "CREATE INDEX IF NOT EXISTS idx_scan_correlation_events ON tbl_scan_correlation_results_events (correlation_id)",
-        "CREATE INDEX IF NOT EXISTS idx_scan_correlation_events_hash ON tbl_scan_correlation_results_events (event_hash)",
-        "CREATE TABLE IF NOT EXISTS tbl_scan_findings ( \
-            id                  SERIAL PRIMARY KEY, \
-            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
-            priority            VARCHAR NOT NULL, \
-            category            VARCHAR, \
-            tab                 VARCHAR, \
-            item                VARCHAR, \
-            description         TEXT, \
-            recommendation      TEXT, \
-            created             BIGINT NOT NULL \
-        )",
-        "CREATE INDEX IF NOT EXISTS idx_scan_findings ON tbl_scan_findings (scan_instance_id)",
-        "CREATE TABLE IF NOT EXISTS tbl_scan_nessus_results ( \
-            id                  SERIAL PRIMARY KEY, \
-            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
-            severity            VARCHAR, \
-            severity_number     INT DEFAULT 0, \
-            plugin_name         VARCHAR, \
-            plugin_id           VARCHAR, \
-            host_ip             VARCHAR, \
-            host_name           VARCHAR, \
-            operating_system    VARCHAR, \
-            description         TEXT, \
-            synopsis            TEXT, \
-            solution            TEXT, \
-            see_also            TEXT, \
-            service_name        VARCHAR, \
-            port                INT, \
-            protocol            VARCHAR, \
-            request             TEXT, \
-            plugin_output       TEXT, \
-            cvss3_base_score    VARCHAR, \
-            tracking            INT NOT NULL DEFAULT 0, \
-            created             BIGINT NOT NULL \
-        )",
-        "CREATE INDEX IF NOT EXISTS idx_scan_nessus_results ON tbl_scan_nessus_results (scan_instance_id)",
-        "CREATE TABLE IF NOT EXISTS tbl_scan_burp_results ( \
-            id                  SERIAL PRIMARY KEY, \
-            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
-            severity            VARCHAR, \
-            severity_number     INT DEFAULT 0, \
-            host_ip             VARCHAR, \
-            host_name           VARCHAR, \
-            plugin_name         VARCHAR, \
-            issue_type          VARCHAR, \
-            path                VARCHAR, \
-            location            VARCHAR, \
-            confidence          VARCHAR, \
-            issue_background    TEXT, \
-            issue_detail        TEXT, \
-            solutions           TEXT, \
-            see_also            TEXT, \
-            reference_links     TEXT, \
-            vulnerability_classifications TEXT, \
-            request             TEXT, \
-            response            TEXT, \
-            tracking            INT NOT NULL DEFAULT 0, \
-            created             BIGINT NOT NULL \
-        )",
-        "CREATE INDEX IF NOT EXISTS idx_scan_burp_results ON tbl_scan_burp_results (scan_instance_id)",
-        "CREATE TABLE IF NOT EXISTS tbl_target_false_positives ( \
-            id              SERIAL PRIMARY KEY, \
-            target          VARCHAR NOT NULL, \
-            event_type      VARCHAR NOT NULL, \
-            event_data      TEXT NOT NULL, \
-            source_data     TEXT, \
-            date_added      BIGINT NOT NULL, \
-            notes           TEXT, \
-            UNIQUE(target, event_type, event_data, source_data) \
-        )",
-        "CREATE INDEX IF NOT EXISTS idx_target_fp_target ON tbl_target_false_positives (target)",
-        "CREATE INDEX IF NOT EXISTS idx_target_fp_lookup ON tbl_target_false_positives (target, event_type, event_data, source_data)",
-        "CREATE TABLE IF NOT EXISTS tbl_target_validated ( \
-            id              SERIAL PRIMARY KEY, \
-            target          VARCHAR NOT NULL, \
-            event_type      VARCHAR NOT NULL, \
-            event_data      TEXT NOT NULL, \
-            source_data     TEXT, \
-            date_added      BIGINT NOT NULL, \
-            notes           TEXT, \
-            UNIQUE(target, event_type, event_data, source_data) \
-        )",
-        "CREATE INDEX IF NOT EXISTS idx_target_val_target ON tbl_target_validated (target)",
-        "CREATE INDEX IF NOT EXISTS idx_target_val_lookup ON tbl_target_validated (target, event_type, event_data, source_data)",
-        "CREATE TABLE IF NOT EXISTS tbl_users ( \
-            id              SERIAL PRIMARY KEY, \
-            username        VARCHAR NOT NULL UNIQUE, \
-            password_hash   VARCHAR NOT NULL, \
-            salt            VARCHAR NOT NULL, \
-            display_name    VARCHAR, \
-            active          INT NOT NULL DEFAULT 1, \
-            created         BIGINT NOT NULL, \
-            last_login      BIGINT DEFAULT 0 \
-        )",
-        "CREATE TABLE IF NOT EXISTS tbl_audit_log ( \
-            id              SERIAL PRIMARY KEY, \
-            username        VARCHAR NOT NULL, \
-            action          VARCHAR NOT NULL, \
-            detail          TEXT, \
-            ip_address      VARCHAR, \
-            created         BIGINT NOT NULL \
-        )",
-        "CREATE INDEX IF NOT EXISTS idx_audit_log_username ON tbl_audit_log (username)",
-        "CREATE INDEX IF NOT EXISTS idx_audit_log_created ON tbl_audit_log (created)",
-        "CREATE INDEX IF NOT EXISTS idx_audit_log_action ON tbl_audit_log (action)",
-        "CREATE TABLE IF NOT EXISTS tbl_known_assets ( \
-            id              SERIAL PRIMARY KEY, \
-            target          VARCHAR NOT NULL, \
-            asset_type      VARCHAR NOT NULL, \
-            asset_value     TEXT NOT NULL, \
-            source          VARCHAR NOT NULL DEFAULT 'CLIENT_PROVIDED', \
-            import_batch    VARCHAR, \
-            date_added      BIGINT NOT NULL, \
-            added_by        VARCHAR, \
-            notes           TEXT, \
-            UNIQUE(target, asset_type, asset_value) \
-        )",
-        "CREATE INDEX IF NOT EXISTS idx_known_assets_target ON tbl_known_assets (target)",
-        "CREATE INDEX IF NOT EXISTS idx_known_assets_type ON tbl_known_assets (target, asset_type)",
-        "CREATE INDEX IF NOT EXISTS idx_known_assets_value ON tbl_known_assets (asset_value)",
-        "CREATE TABLE IF NOT EXISTS tbl_asset_import_history ( \
-            id              SERIAL PRIMARY KEY, \
-            target          VARCHAR NOT NULL, \
-            asset_type      VARCHAR NOT NULL, \
-            file_name       VARCHAR, \
-            item_count      INT NOT NULL DEFAULT 0, \
-            imported_by     VARCHAR, \
-            date_imported   BIGINT NOT NULL \
-        )",
-        "CREATE INDEX IF NOT EXISTS idx_asset_import_history_target ON tbl_asset_import_history (target)"
     ]
 
     eventDetails = [
@@ -672,526 +465,331 @@ class SpiderFootDb:
         if not opts.get('__database'):
             raise ValueError("opts['__database'] is empty") from None
 
-        self.db_type = opts.get('__dbtype', 'sqlite')
+        self.db_type = 'sqlite'
 
-        if self.db_type == 'sqlite':
-            database_path = opts['__database']
+        database_path = opts['__database']
 
-            # create database directory
-            Path(database_path).parent.mkdir(exist_ok=True, parents=True)
+        # create database directory
+        Path(database_path).parent.mkdir(exist_ok=True, parents=True)
 
-            # connect() will create the database file if it doesn't exist, but
-            # at least we can use this opportunity to ensure we have permissions to
-            # read and write to such a file.
+        # connect() will create the database file if it doesn't exist, but
+        # at least we can use this opportunity to ensure we have permissions to
+        # read and write to such a file.
+        try:
+            dbh = sqlite3.connect(database_path)
+        except Exception as e:
+            raise IOError(
+                f"Error connecting to internal database {database_path}") from e
+
+        if dbh is None:
+            raise IOError(
+                f"Could not connect to internal database, and could not create {database_path}") from None
+
+        dbh.text_factory = str
+
+        self.conn = dbh
+        self.dbh = dbh.cursor()
+
+        # SQLite hardening PRAGMAs
+        self.dbh.execute("PRAGMA journal_mode=WAL")
+        self.dbh.execute("PRAGMA synchronous=NORMAL")
+        self.dbh.execute("PRAGMA busy_timeout=5000")
+        self.dbh.execute("PRAGMA cache_size=-64000")
+        self.dbh.execute("PRAGMA temp_store=MEMORY")
+        self.dbh.execute("PRAGMA mmap_size=268435456")
+        self.dbh.execute("PRAGMA foreign_keys=ON")
+
+        # Startup integrity check
+        try:
+            self.dbh.execute("PRAGMA quick_check")
+            result = self.dbh.fetchone()
+            if result and result[0] != 'ok':
+                import logging
+                logging.warning(f"SQLite integrity check warning: {result[0]}")
+        except sqlite3.Error as e:
+            import logging
+            logging.warning(f"SQLite integrity check failed: {e}")
+
+        def __dbregex__(qry: str, data: str) -> bool:
+            """SQLite doesn't support regex queries, so we create a custom
+            function to do so.
+
+            Args:
+                qry (str): TBD
+                data (str): TBD
+
+            Returns:
+                bool: matches
+            """
+
             try:
-                dbh = sqlite3.connect(database_path)
-            except Exception as e:
-                raise IOError(
-                    f"Error connecting to internal database {database_path}") from e
+                rx = re.compile(qry, re.IGNORECASE | re.DOTALL)
+                ret = rx.match(data)
+            except Exception:
+                return False
+            return ret is not None
 
-            if dbh is None:
-                raise IOError(
-                    f"Could not connect to internal database, and could not create {database_path}") from None
-
-            dbh.text_factory = str
-
-            self.conn = dbh
-            self.dbh = dbh.cursor()
-
-            def __dbregex__(qry: str, data: str) -> bool:
-                """SQLite doesn't support regex queries, so we create a custom
-                function to do so.
-
-                Args:
-                    qry (str): TBD
-                    data (str): TBD
-
-                Returns:
-                    bool: matches
-                """
-
-                try:
-                    rx = re.compile(qry, re.IGNORECASE | re.DOTALL)
-                    ret = rx.match(data)
-                except Exception:
-                    return False
-                return ret is not None
-
-            # Now we actually check to ensure the database file has the schema set
-            # up correctly.
-            with self.dbhLock:
-                try:
-                    self.dbh.execute('SELECT COUNT(*) FROM tbl_scan_config')
-                    self.conn.create_function("REGEXP", 2, __dbregex__)
-                except sqlite3.Error:
-                    init = True
-                    try:
-                        self.create()
-                    except Exception as e:
-                        raise IOError(
-                            "Tried to set up the SpiderFoot database schema, but failed") from e
-
-                # For users with pre 4.0 databases, add the correlation
-                # tables + indexes if they don't exist.
-                try:
-                    self.dbh.execute(
-                        "SELECT COUNT(*) FROM tbl_scan_correlation_results")
-                except sqlite3.Error:
-                    try:
-                        for query in self.createSchemaQueries:
-                            if "correlation" in query:
-                                self.dbh.execute(query)
-                        self.conn.commit()
-                    except sqlite3.Error:
-                        raise IOError("Looks like you are running a pre-4.0 database. Unfortunately "
-                                      "SpiderFoot wasn't able to migrate you, so you'll need to delete "
-                                      "your SpiderFoot database in order to proceed.") from None
-
-                # Add event_hash index for faster correlation loading
-                try:
-                    self.dbh.execute(
-                        "CREATE INDEX IF NOT EXISTS idx_scan_correlation_events_hash "
-                        "ON tbl_scan_correlation_results_events (event_hash)")
-                    self.conn.commit()
-                except sqlite3.Error:
-                    pass  # Index may already exist or table missing
-
-                # Add target false positives table if it doesn't exist (migration)
-                try:
-                    self.dbh.execute(
-                        "SELECT COUNT(*) FROM tbl_target_false_positives")
-                except sqlite3.Error:
-                    try:
-                        for query in self.createSchemaQueries:
-                            if "target_false_positives" in query or "target_fp" in query:
-                                self.dbh.execute(query)
-                        self.conn.commit()
-                    except sqlite3.Error:
-                        pass  # Table creation failed, but this is not critical
-
-                # Migration: Add source_data column and update UNIQUE constraint
-                # SQLite doesn't support modifying constraints, so we need to recreate the table
-                try:
-                    self.dbh.execute("SELECT source_data FROM tbl_target_false_positives LIMIT 1")
-                    # Column exists, but check if we need to fix the UNIQUE constraint
-                    # by checking if we can insert two entries with same (target, type, data) but different source
-                    self.dbh.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='tbl_target_false_positives'")
-                    table_sql = self.dbh.fetchone()
-                    if table_sql and 'source_data' not in str(table_sql[0]).split('UNIQUE')[1] if 'UNIQUE' in str(table_sql[0]) else True:
-                        # Need to recreate table with updated UNIQUE constraint
-                        raise sqlite3.Error("Need to update UNIQUE constraint")
-                except sqlite3.Error:
-                    try:
-                        # Recreate table with source_data in UNIQUE constraint
-                        self.dbh.execute("CREATE TABLE IF NOT EXISTS tbl_target_false_positives_new ( \
-                            id INTEGER PRIMARY KEY AUTOINCREMENT, \
-                            target VARCHAR NOT NULL, \
-                            event_type VARCHAR NOT NULL, \
-                            event_data VARCHAR NOT NULL, \
-                            source_data VARCHAR, \
-                            date_added INT NOT NULL, \
-                            notes VARCHAR, \
-                            UNIQUE(target, event_type, event_data, source_data) \
-                        )")
-                        # Copy existing data
-                        self.dbh.execute("INSERT OR IGNORE INTO tbl_target_false_positives_new \
-                            (id, target, event_type, event_data, source_data, date_added, notes) \
-                            SELECT id, target, event_type, event_data, \
-                            CASE WHEN source_data IS NULL THEN NULL ELSE source_data END, \
-                            date_added, notes FROM tbl_target_false_positives")
-                        # Drop old table and rename new one
-                        self.dbh.execute("DROP TABLE tbl_target_false_positives")
-                        self.dbh.execute("ALTER TABLE tbl_target_false_positives_new RENAME TO tbl_target_false_positives")
-                        # Recreate indexes
-                        self.dbh.execute("CREATE INDEX IF NOT EXISTS idx_target_fp_target ON tbl_target_false_positives (target)")
-                        self.dbh.execute("CREATE INDEX IF NOT EXISTS idx_target_fp_lookup ON tbl_target_false_positives (target, event_type, event_data, source_data)")
-                        self.conn.commit()
-                    except sqlite3.Error:
-                        pass  # Migration failed, but continue
-
-                # Add target validated table if it doesn't exist (migration for validated status feature)
-                try:
-                    self.dbh.execute(
-                        "SELECT COUNT(*) FROM tbl_target_validated")
-                except sqlite3.Error:
-                    try:
-                        for query in self.createSchemaQueries:
-                            if "target_validated" in query or "target_val" in query:
-                                self.dbh.execute(query)
-                        self.conn.commit()
-                    except sqlite3.Error:
-                        pass  # Table creation failed, but this is not critical
-
-                # Migration: Add imported_from_scan column to tbl_scan_results if it doesn't exist
-                try:
-                    self.dbh.execute("SELECT imported_from_scan FROM tbl_scan_results LIMIT 1")
-                except sqlite3.Error:
-                    try:
-                        self.dbh.execute("ALTER TABLE tbl_scan_results ADD COLUMN imported_from_scan VARCHAR DEFAULT NULL")
-                        self.conn.commit()
-                    except sqlite3.Error:
-                        pass  # Column addition failed, but continue
-
-                # Migration: Add tbl_users table if it doesn't exist
-                try:
-                    self.dbh.execute("SELECT COUNT(*) FROM tbl_users")
-                except sqlite3.Error:
-                    try:
-                        for query in self.createSchemaQueries:
-                            if "tbl_users" in query:
-                                self.dbh.execute(query)
-                        self.conn.commit()
-                    except sqlite3.Error:
-                        pass
-
-                # Migration: Add tbl_audit_log table if it doesn't exist
-                try:
-                    self.dbh.execute("SELECT COUNT(*) FROM tbl_audit_log")
-                except sqlite3.Error:
-                    try:
-                        for query in self.createSchemaQueries:
-                            if "audit_log" in query:
-                                self.dbh.execute(query)
-                        self.conn.commit()
-                    except sqlite3.Error:
-                        pass
-
-                # Migration: Ensure correlation event types exist
-                for ai_type in ('AI_SINGLE_SCAN_CORRELATION', 'AI_CROSS_SCAN_CORRELATION'):
-                    try:
-                        self.dbh.execute("SELECT event FROM tbl_event_types WHERE event = ?", (ai_type,))
-                        if not self.dbh.fetchone():
-                            for row in self.eventDetails:
-                                if row[0] == ai_type:
-                                    self.dbh.execute(
-                                        "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (?, ?, ?, ?)",
-                                        (row[0], row[1], row[2], row[3])
-                                    )
-                                    break
-                        self.conn.commit()
-                    except sqlite3.Error:
-                        pass
-
-                # Migration: Add tbl_scan_findings table if it doesn't exist
-                try:
-                    self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_findings")
-                except sqlite3.Error:
-                    try:
-                        for query in self.createSchemaQueries:
-                            if "tbl_scan_findings" in query or "idx_scan_findings" in query:
-                                self.dbh.execute(query)
-                        self.conn.commit()
-                    except sqlite3.Error:
-                        pass
-
-                # Migration: Add tbl_scan_nessus_results table if it doesn't exist
-                try:
-                    self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_nessus_results")
-                except sqlite3.Error:
-                    try:
-                        for query in self.createSchemaQueries:
-                            if "tbl_scan_nessus_results" in query or "idx_scan_nessus_results" in query:
-                                self.dbh.execute(query)
-                        self.conn.commit()
-                    except sqlite3.Error:
-                        pass
-
-                # Migration: Add tbl_scan_burp_results table if it doesn't exist
-                try:
-                    self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_burp_results")
-                except sqlite3.Error:
-                    try:
-                        for query in self.createSchemaQueries:
-                            if "tbl_scan_burp_results" in query or "idx_scan_burp_results" in query:
-                                self.dbh.execute(query)
-                        self.conn.commit()
-                    except sqlite3.Error:
-                        pass
-
-                # Migration: Add reference_links and vulnerability_classifications columns to burp results
-                try:
-                    self.dbh.execute("SELECT reference_links FROM tbl_scan_burp_results LIMIT 1")
-                except sqlite3.Error:
-                    try:
-                        self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN reference_links VARCHAR")
-                        self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN vulnerability_classifications VARCHAR")
-                        self.conn.commit()
-                    except sqlite3.Error:
-                        pass
-
-                # Migration: Add tracking column to nessus and burp results
-                try:
-                    self.dbh.execute("SELECT tracking FROM tbl_scan_nessus_results LIMIT 1")
-                except sqlite3.Error:
-                    try:
-                        self.dbh.execute("ALTER TABLE tbl_scan_nessus_results ADD COLUMN tracking INT NOT NULL DEFAULT 0")
-                        self.conn.commit()
-                    except sqlite3.Error:
-                        pass
-
-                try:
-                    self.dbh.execute("SELECT tracking FROM tbl_scan_burp_results LIMIT 1")
-                except sqlite3.Error:
-                    try:
-                        self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN tracking INT NOT NULL DEFAULT 0")
-                        self.conn.commit()
-                    except sqlite3.Error:
-                        pass
-
-                # Migration: Create known assets tables
-                try:
-                    self.dbh.execute("SELECT COUNT(*) FROM tbl_known_assets")
-                except sqlite3.Error:
-                    try:
-                        for qry in self.createSchemaQueries:
-                            if "tbl_known_assets" in qry:
-                                self.dbh.execute(qry)
-                        self.conn.commit()
-                    except sqlite3.Error:
-                        pass
-
-                try:
-                    self.dbh.execute("SELECT COUNT(*) FROM tbl_asset_import_history")
-                except sqlite3.Error:
-                    try:
-                        for qry in self.createSchemaQueries:
-                            if "tbl_asset_import_history" in qry:
-                                self.dbh.execute(qry)
-                        self.conn.commit()
-                    except sqlite3.Error:
-                        pass
-
-                if init:
-                    for row in self.eventDetails:
-                        event = row[0]
-                        event_descr = row[1]
-                        event_raw = row[2]
-                        event_type = row[3]
-                        qry = "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (?, ?, ?, ?)"
-
-                        try:
-                            self.dbh.execute(qry, (
-                                event, event_descr, event_raw, event_type
-                            ))
-                            self.conn.commit()
-                        except Exception:
-                            continue
-                    self.conn.commit()
-
-        elif self.db_type == 'postgresql':
+        # Now we actually check to ensure the database file has the schema set
+        # up correctly.
+        with self.dbhLock:
             try:
-                self.conn = psycopg2.connect(opts['__database'])
-                self.dbh = self.conn.cursor(
-                    cursor_factory=psycopg2.extras.DictCursor)
-            except Exception as e:
-                raise IOError(
-                    f"Error connecting to PostgreSQL database {opts['__database']}") from e
-
-            with self.dbhLock:
+                self.dbh.execute('SELECT COUNT(*) FROM tbl_scan_config')
+                self.conn.create_function("REGEXP", 2, __dbregex__)
+            except sqlite3.Error:
+                init = True
                 try:
-                    self.dbh.execute('SELECT COUNT(*) FROM tbl_scan_config')
-                except psycopg2.Error:
-                    init = True
-                    try:
-                        self.create()
-                    except Exception as e:
-                        raise IOError(
-                            "Tried to set up the SpiderFoot database schema, but failed") from e
+                    self.create()
+                except Exception as e:
+                    raise IOError(
+                        "Tried to set up the SpiderFoot database schema, but failed") from e
 
-                if init:
-                    for row in self.eventDetails:
-                        event = row[0]
-                        event_descr = row[1]
-                        event_raw = row[2]
-                        event_type = row[3]
-                        qry = "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (%s, %s, %s, %s)"
-
-                        try:
-                            self.dbh.execute(qry, (
-                                event, event_descr, event_raw, event_type
-                            ))
-                            self.conn.commit()
-                        except Exception:
-                            continue
+            # For users with pre 4.0 databases, add the correlation
+            # tables + indexes if they don't exist.
+            try:
+                self.dbh.execute(
+                    "SELECT COUNT(*) FROM tbl_scan_correlation_results")
+            except sqlite3.Error:
+                try:
+                    for query in self.createSchemaQueries:
+                        if "correlation" in query:
+                            self.dbh.execute(query)
                     self.conn.commit()
+                except sqlite3.Error:
+                    raise IOError("Looks like you are running a pre-4.0 database. Unfortunately "
+                                  "SpiderFoot wasn't able to migrate you, so you'll need to delete "
+                                  "your SpiderFoot database in order to proceed.") from None
 
-                # Migration: Ensure correlation event types exist
-                for ai_type in ('AI_SINGLE_SCAN_CORRELATION', 'AI_CROSS_SCAN_CORRELATION'):
-                    try:
-                        self.dbh.execute("SELECT event FROM tbl_event_types WHERE event = %s", (ai_type,))
-                        if not self.dbh.fetchone():
-                            for row in self.eventDetails:
-                                if row[0] == ai_type:
-                                    self.dbh.execute(
-                                        "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (%s, %s, %s, %s)",
-                                        (row[0], row[1], row[2], row[3])
-                                    )
-                                    break
-                        self.conn.commit()
-                    except psycopg2.Error:
-                        self.conn.rollback()
+            # Add event_hash index for faster correlation loading
+            try:
+                self.dbh.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_scan_correlation_events_hash "
+                    "ON tbl_scan_correlation_results_events (event_hash)")
+                self.conn.commit()
+            except sqlite3.Error:
+                pass  # Index may already exist or table missing
 
-                # Migration: Add source_data column and update UNIQUE constraint
+            # Add target false positives table if it doesn't exist (migration)
+            try:
+                self.dbh.execute(
+                    "SELECT COUNT(*) FROM tbl_target_false_positives")
+            except sqlite3.Error:
                 try:
-                    self.dbh.execute("SELECT source_data FROM tbl_target_false_positives LIMIT 1")
-                except psycopg2.Error:
-                    self.conn.rollback()
-                    try:
-                        self.dbh.execute("ALTER TABLE tbl_target_false_positives ADD COLUMN source_data TEXT")
-                        self.conn.commit()
-                    except psycopg2.Error:
-                        self.conn.rollback()
-
-                # Update UNIQUE constraint to include source_data (PostgreSQL)
-                try:
-                    # Check if old constraint exists and drop it
-                    self.dbh.execute("ALTER TABLE tbl_target_false_positives DROP CONSTRAINT IF EXISTS tbl_target_false_positives_target_event_type_event_data_key")
+                    for query in self.createSchemaQueries:
+                        if "target_false_positives" in query or "target_fp" in query:
+                            self.dbh.execute(query)
                     self.conn.commit()
-                except psycopg2.Error:
-                    self.conn.rollback()
+                except sqlite3.Error:
+                    pass  # Table creation failed, but this is not critical
 
+            # Migration: Add source_data column and update UNIQUE constraint
+            # SQLite doesn't support modifying constraints, so we need to recreate the table
+            try:
+                self.dbh.execute("SELECT source_data FROM tbl_target_false_positives LIMIT 1")
+                # Column exists, but check if we need to fix the UNIQUE constraint
+                # by checking if we can insert two entries with same (target, type, data) but different source
+                self.dbh.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='tbl_target_false_positives'")
+                table_sql = self.dbh.fetchone()
+                if table_sql and 'source_data' not in str(table_sql[0]).split('UNIQUE')[1] if 'UNIQUE' in str(table_sql[0]) else True:
+                    # Need to recreate table with updated UNIQUE constraint
+                    raise sqlite3.Error("Need to update UNIQUE constraint")
+            except sqlite3.Error:
                 try:
-                    # Add new constraint with source_data
-                    self.dbh.execute("ALTER TABLE tbl_target_false_positives ADD CONSTRAINT tbl_target_false_positives_target_event_type_event_data_source_key UNIQUE (target, event_type, event_data, source_data)")
+                    # Recreate table with source_data in UNIQUE constraint
+                    self.dbh.execute("CREATE TABLE IF NOT EXISTS tbl_target_false_positives_new ( \
+                        id INTEGER PRIMARY KEY AUTOINCREMENT, \
+                        target VARCHAR NOT NULL, \
+                        event_type VARCHAR NOT NULL, \
+                        event_data VARCHAR NOT NULL, \
+                        source_data VARCHAR, \
+                        date_added INT NOT NULL, \
+                        notes VARCHAR, \
+                        UNIQUE(target, event_type, event_data, source_data) \
+                    )")
+                    # Copy existing data
+                    self.dbh.execute("INSERT OR IGNORE INTO tbl_target_false_positives_new \
+                        (id, target, event_type, event_data, source_data, date_added, notes) \
+                        SELECT id, target, event_type, event_data, \
+                        CASE WHEN source_data IS NULL THEN NULL ELSE source_data END, \
+                        date_added, notes FROM tbl_target_false_positives")
+                    # Drop old table and rename new one
+                    self.dbh.execute("DROP TABLE tbl_target_false_positives")
+                    self.dbh.execute("ALTER TABLE tbl_target_false_positives_new RENAME TO tbl_target_false_positives")
+                    # Recreate indexes
+                    self.dbh.execute("CREATE INDEX IF NOT EXISTS idx_target_fp_target ON tbl_target_false_positives (target)")
+                    self.dbh.execute("CREATE INDEX IF NOT EXISTS idx_target_fp_lookup ON tbl_target_false_positives (target, event_type, event_data, source_data)")
                     self.conn.commit()
-                except psycopg2.Error:
-                    self.conn.rollback()  # Constraint may already exist
+                except sqlite3.Error:
+                    pass  # Migration failed, but continue
 
-                # Migration: Add imported_from_scan column to tbl_scan_results if it doesn't exist
+            # Add target validated table if it doesn't exist (migration for validated status feature)
+            try:
+                self.dbh.execute(
+                    "SELECT COUNT(*) FROM tbl_target_validated")
+            except sqlite3.Error:
                 try:
-                    self.dbh.execute("SELECT imported_from_scan FROM tbl_scan_results LIMIT 1")
-                except psycopg2.Error:
-                    self.conn.rollback()
-                    try:
-                        self.dbh.execute("ALTER TABLE tbl_scan_results ADD COLUMN imported_from_scan VARCHAR DEFAULT NULL")
-                        self.conn.commit()
-                    except psycopg2.Error:
-                        self.conn.rollback()  # Column addition failed, but continue
+                    for query in self.createSchemaQueries:
+                        if "target_validated" in query or "target_val" in query:
+                            self.dbh.execute(query)
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass  # Table creation failed, but this is not critical
 
-                # Migration: Add tbl_users table if it doesn't exist
+            # Migration: Add imported_from_scan column to tbl_scan_results if it doesn't exist
+            try:
+                self.dbh.execute("SELECT imported_from_scan FROM tbl_scan_results LIMIT 1")
+            except sqlite3.Error:
                 try:
-                    self.dbh.execute("SELECT COUNT(*) FROM tbl_users")
-                except psycopg2.Error:
-                    self.conn.rollback()
-                    try:
-                        for query in self.createPostgreSQLSchemaQueries:
-                            if "tbl_users" in query:
-                                self.dbh.execute(query)
-                        self.conn.commit()
-                    except psycopg2.Error:
-                        self.conn.rollback()
+                    self.dbh.execute("ALTER TABLE tbl_scan_results ADD COLUMN imported_from_scan VARCHAR DEFAULT NULL")
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass  # Column addition failed, but continue
 
-                # Migration: Add tbl_audit_log table if it doesn't exist
+            # Migration: Add tbl_users table if it doesn't exist
+            try:
+                self.dbh.execute("SELECT COUNT(*) FROM tbl_users")
+            except sqlite3.Error:
                 try:
-                    self.dbh.execute("SELECT COUNT(*) FROM tbl_audit_log")
-                except psycopg2.Error:
-                    self.conn.rollback()
-                    try:
-                        for query in self.createPostgreSQLSchemaQueries:
-                            if "audit_log" in query:
-                                self.dbh.execute(query)
-                        self.conn.commit()
-                    except psycopg2.Error:
-                        self.conn.rollback()
+                    for query in self.createSchemaQueries:
+                        if "tbl_users" in query:
+                            self.dbh.execute(query)
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass
 
-                # Migration: Add tbl_scan_findings table if it doesn't exist
+            # Migration: Add tbl_audit_log table if it doesn't exist
+            try:
+                self.dbh.execute("SELECT COUNT(*) FROM tbl_audit_log")
+            except sqlite3.Error:
                 try:
-                    self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_findings")
-                except psycopg2.Error:
-                    self.conn.rollback()
-                    try:
-                        for query in self.createPostgreSQLSchemaQueries:
-                            if "tbl_scan_findings" in query or "idx_scan_findings" in query:
-                                self.dbh.execute(query)
-                        self.conn.commit()
-                    except psycopg2.Error:
-                        self.conn.rollback()
+                    for query in self.createSchemaQueries:
+                        if "audit_log" in query:
+                            self.dbh.execute(query)
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass
 
-                # Migration: Add tbl_scan_nessus_results table if it doesn't exist
+            # Migration: Ensure correlation event types exist
+            for ai_type in ('AI_SINGLE_SCAN_CORRELATION', 'AI_CROSS_SCAN_CORRELATION'):
                 try:
-                    self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_nessus_results")
-                except psycopg2.Error:
-                    self.conn.rollback()
-                    try:
-                        for query in self.createPostgreSQLSchemaQueries:
-                            if "tbl_scan_nessus_results" in query or "idx_scan_nessus_results" in query:
-                                self.dbh.execute(query)
-                        self.conn.commit()
-                    except psycopg2.Error:
-                        self.conn.rollback()
+                    self.dbh.execute("SELECT event FROM tbl_event_types WHERE event = ?", (ai_type,))
+                    if not self.dbh.fetchone():
+                        for row in self.eventDetails:
+                            if row[0] == ai_type:
+                                self.dbh.execute(
+                                    "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (?, ?, ?, ?)",
+                                    (row[0], row[1], row[2], row[3])
+                                )
+                                break
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass
 
-                # Migration: Add tbl_scan_burp_results table if it doesn't exist
+            # Migration: Add tbl_scan_findings table if it doesn't exist
+            try:
+                self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_findings")
+            except sqlite3.Error:
                 try:
-                    self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_burp_results")
-                except psycopg2.Error:
-                    self.conn.rollback()
-                    try:
-                        for query in self.createPostgreSQLSchemaQueries:
-                            if "tbl_scan_burp_results" in query or "idx_scan_burp_results" in query:
-                                self.dbh.execute(query)
-                        self.conn.commit()
-                    except psycopg2.Error:
-                        self.conn.rollback()
+                    for query in self.createSchemaQueries:
+                        if "tbl_scan_findings" in query or "idx_scan_findings" in query:
+                            self.dbh.execute(query)
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass
 
-                # Migration: Add reference_links and vulnerability_classifications columns to burp results
+            # Migration: Add tbl_scan_nessus_results table if it doesn't exist
+            try:
+                self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_nessus_results")
+            except sqlite3.Error:
                 try:
-                    self.dbh.execute("SELECT reference_links FROM tbl_scan_burp_results LIMIT 1")
-                except psycopg2.Error:
-                    self.conn.rollback()
-                    try:
-                        self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN reference_links TEXT")
-                        self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN vulnerability_classifications TEXT")
-                        self.conn.commit()
-                    except psycopg2.Error:
-                        self.conn.rollback()
+                    for query in self.createSchemaQueries:
+                        if "tbl_scan_nessus_results" in query or "idx_scan_nessus_results" in query:
+                            self.dbh.execute(query)
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass
 
-                # Migration: Add tracking column to nessus and burp results
+            # Migration: Add tbl_scan_burp_results table if it doesn't exist
+            try:
+                self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_burp_results")
+            except sqlite3.Error:
                 try:
-                    self.dbh.execute("SELECT tracking FROM tbl_scan_nessus_results LIMIT 1")
-                except psycopg2.Error:
-                    self.conn.rollback()
-                    try:
-                        self.dbh.execute("ALTER TABLE tbl_scan_nessus_results ADD COLUMN tracking INT NOT NULL DEFAULT 0")
-                        self.conn.commit()
-                    except psycopg2.Error:
-                        self.conn.rollback()
+                    for query in self.createSchemaQueries:
+                        if "tbl_scan_burp_results" in query or "idx_scan_burp_results" in query:
+                            self.dbh.execute(query)
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass
 
+            # Migration: Add reference_links and vulnerability_classifications columns to burp results
+            try:
+                self.dbh.execute("SELECT reference_links FROM tbl_scan_burp_results LIMIT 1")
+            except sqlite3.Error:
                 try:
-                    self.dbh.execute("SELECT tracking FROM tbl_scan_burp_results LIMIT 1")
-                except psycopg2.Error:
-                    self.conn.rollback()
-                    try:
-                        self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN tracking INT NOT NULL DEFAULT 0")
-                        self.conn.commit()
-                    except psycopg2.Error:
-                        self.conn.rollback()
+                    self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN reference_links VARCHAR")
+                    self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN vulnerability_classifications VARCHAR")
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass
 
-                # Migration: Create known assets tables
+            # Migration: Add tracking column to nessus and burp results
+            try:
+                self.dbh.execute("SELECT tracking FROM tbl_scan_nessus_results LIMIT 1")
+            except sqlite3.Error:
                 try:
-                    self.dbh.execute("SELECT COUNT(*) FROM tbl_known_assets")
-                except psycopg2.Error:
-                    self.conn.rollback()
-                    try:
-                        for query in self.createPostgreSQLSchemaQueries:
-                            if "tbl_known_assets" in query:
-                                self.dbh.execute(query)
-                        self.conn.commit()
-                    except psycopg2.Error:
-                        self.conn.rollback()
+                    self.dbh.execute("ALTER TABLE tbl_scan_nessus_results ADD COLUMN tracking INT NOT NULL DEFAULT 0")
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass
 
+            try:
+                self.dbh.execute("SELECT tracking FROM tbl_scan_burp_results LIMIT 1")
+            except sqlite3.Error:
                 try:
-                    self.dbh.execute("SELECT COUNT(*) FROM tbl_asset_import_history")
-                except psycopg2.Error:
-                    self.conn.rollback()
+                    self.dbh.execute("ALTER TABLE tbl_scan_burp_results ADD COLUMN tracking INT NOT NULL DEFAULT 0")
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass
+
+            # Migration: Create known assets tables
+            try:
+                self.dbh.execute("SELECT COUNT(*) FROM tbl_known_assets")
+            except sqlite3.Error:
+                try:
+                    for qry in self.createSchemaQueries:
+                        if "tbl_known_assets" in qry:
+                            self.dbh.execute(qry)
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass
+
+            try:
+                self.dbh.execute("SELECT COUNT(*) FROM tbl_asset_import_history")
+            except sqlite3.Error:
+                try:
+                    for qry in self.createSchemaQueries:
+                        if "tbl_asset_import_history" in qry:
+                            self.dbh.execute(qry)
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass
+
+            if init:
+                for row in self.eventDetails:
+                    event = row[0]
+                    event_descr = row[1]
+                    event_raw = row[2]
+                    event_type = row[3]
+                    qry = "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (?, ?, ?, ?)"
+
                     try:
-                        for query in self.createPostgreSQLSchemaQueries:
-                            if "tbl_asset_import_history" in query:
-                                self.dbh.execute(query)
+                        self.dbh.execute(qry, (
+                            event, event_descr, event_raw, event_type
+                        ))
                         self.conn.commit()
-                    except psycopg2.Error:
-                        self.conn.rollback()
-        else:
-            raise ValueError(f"Unsupported database type: {self.db_type}")
+                    except Exception:
+                        continue
+                self.conn.commit()
+
 
     #
     # Back-end database operations
@@ -1206,32 +804,22 @@ class SpiderFootDb:
 
         with self.dbhLock:
             try:
-                if self.db_type == 'sqlite':
-                    for qry in self.createSchemaQueries:
-                        self.dbh.execute(qry)
-                elif self.db_type == 'postgresql':
-                    for qry in self.createPostgreSQLSchemaQueries:
-                        self.dbh.execute(qry)
-                
+                for qry in self.createSchemaQueries:
+                    self.dbh.execute(qry)
+
                 self.conn.commit()
-                
+
                 # Insert event types
                 for row in self.eventDetails:
                     event = row[0]
                     event_descr = row[1]
                     event_raw = row[2]
                     event_type = row[3]
-                    
-                    if self.db_type == 'sqlite':
-                        qry = "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (?, ?, ?, ?)"
-                        params = (event, event_descr, event_raw, event_type)
-                    else:  # postgresql
-                        qry = "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (%s, %s, %s, %s) ON CONFLICT (event) DO NOTHING"
-                        params = (event, event_descr, event_raw, event_type)
 
-                    self.dbh.execute(qry, params)
+                    qry = "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (?, ?, ?, ?)"
+                    self.dbh.execute(qry, (event, event_descr, event_raw, event_type))
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when setting up database") from e
 
@@ -1257,14 +845,187 @@ class SpiderFootDb:
         """
         with self.dbhLock:
             try:
-                if ((self.db_type == 'sqlite') or (self.db_type == 'postgresql')):
-                    self.dbh.execute("VACUUM")
+                self.dbh.execute("VACUUM")
                 self.conn.commit()
                 return True
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when vacuuming the database") from e
         return False
+
+    def integrityCheck(self) -> dict:
+        """Run SQLite integrity checks on the database.
+
+        Returns:
+            dict: status dict with 'ok' bool, 'integrity_check' and 'foreign_key_check' results
+        """
+        result = {
+            'ok': True,
+            'integrity_check': [],
+            'foreign_key_check': []
+        }
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute("PRAGMA integrity_check")
+                rows = self.dbh.fetchall()
+                for row in rows:
+                    result['integrity_check'].append(row[0])
+                    if row[0] != 'ok':
+                        result['ok'] = False
+            except sqlite3.Error as e:
+                result['ok'] = False
+                result['integrity_check'].append(str(e))
+
+            try:
+                self.dbh.execute("PRAGMA foreign_key_check")
+                rows = self.dbh.fetchall()
+                for row in rows:
+                    result['foreign_key_check'].append(str(row))
+                    result['ok'] = False
+            except sqlite3.Error as e:
+                result['ok'] = False
+                result['foreign_key_check'].append(str(e))
+
+        return result
+
+    def backupDB(self, destination_path: str) -> str:
+        """Create a hot backup of the SQLite database.
+
+        Uses SQLite's built-in backup API which is safe to call
+        while the database is in use.
+
+        Args:
+            destination_path (str): path for the backup file
+
+        Returns:
+            str: path to the backup file on success
+
+        Raises:
+            IOError: if the backup fails
+        """
+        import os
+
+        # Ensure destination directory exists
+        dest_dir = os.path.dirname(destination_path)
+        if dest_dir and not os.path.exists(dest_dir):
+            os.makedirs(dest_dir, exist_ok=True)
+
+        with self.dbhLock:
+            try:
+                backup_conn = sqlite3.connect(destination_path)
+                self.conn.backup(backup_conn)
+                backup_conn.close()
+                return destination_path
+            except sqlite3.Error as e:
+                raise IOError(f"Database backup failed: {e}") from e
+
+    def _execute_with_retry(self, query: str, params=None, max_retries: int = 3) -> None:
+        """Execute a query with retry logic for transient SQLite errors.
+
+        Retries on 'database is locked' and 'database is busy' errors
+        with exponential backoff.
+
+        Args:
+            query (str): SQL query to execute
+            params: query parameters
+            max_retries (int): maximum number of retries
+
+        Raises:
+            sqlite3.Error: if the query fails after all retries
+        """
+        import time
+
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                if params:
+                    self.dbh.execute(query, params)
+                else:
+                    self.dbh.execute(query)
+                return
+            except sqlite3.OperationalError as e:
+                error_msg = str(e).lower()
+                if 'locked' in error_msg or 'busy' in error_msg:
+                    last_error = e
+                    if attempt < max_retries:
+                        time.sleep(0.1 * (2 ** attempt))  # 0.1s, 0.2s, 0.4s
+                        continue
+                raise
+
+        raise last_error
+
+    def dbHealth(self) -> dict:
+        """Get database health status information.
+
+        Returns:
+            dict: health information including file size, page counts,
+                  integrity status, and WAL info
+        """
+        import os
+
+        health = {
+            'status': 'unknown',
+            'file_size': 0,
+            'page_count': 0,
+            'free_pages': 0,
+            'page_size': 0,
+            'wal_file_size': 0,
+            'integrity': 'unknown',
+            'journal_mode': 'unknown',
+            'db_path': ''
+        }
+
+        with self.dbhLock:
+            try:
+                # Get database file path
+                self.dbh.execute("PRAGMA database_list")
+                db_info = self.dbh.fetchone()
+                if db_info:
+                    health['db_path'] = db_info[2] if len(db_info) > 2 else ''
+                    if health['db_path'] and os.path.exists(health['db_path']):
+                        health['file_size'] = os.path.getsize(health['db_path'])
+                        # Check WAL file
+                        wal_path = health['db_path'] + '-wal'
+                        if os.path.exists(wal_path):
+                            health['wal_file_size'] = os.path.getsize(wal_path)
+
+                # Page statistics
+                self.dbh.execute("PRAGMA page_count")
+                row = self.dbh.fetchone()
+                if row:
+                    health['page_count'] = row[0]
+
+                self.dbh.execute("PRAGMA freelist_count")
+                row = self.dbh.fetchone()
+                if row:
+                    health['free_pages'] = row[0]
+
+                self.dbh.execute("PRAGMA page_size")
+                row = self.dbh.fetchone()
+                if row:
+                    health['page_size'] = row[0]
+
+                self.dbh.execute("PRAGMA journal_mode")
+                row = self.dbh.fetchone()
+                if row:
+                    health['journal_mode'] = row[0]
+
+                # Quick integrity check
+                self.dbh.execute("PRAGMA quick_check")
+                row = self.dbh.fetchone()
+                if row and row[0] == 'ok':
+                    health['integrity'] = 'ok'
+                    health['status'] = 'healthy'
+                else:
+                    health['integrity'] = row[0] if row else 'failed'
+                    health['status'] = 'degraded'
+
+            except sqlite3.Error as e:
+                health['status'] = 'error'
+                health['integrity'] = str(e)
+
+        return health
 
     def search(self, criteria: dict, filterFp: bool = False) -> list:
         """Search database.
@@ -1350,7 +1111,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when fetching search results") from e
 
@@ -1369,7 +1130,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when retrieving event types") from e
 
@@ -1421,14 +1182,9 @@ class SpiderFootDb:
         if not inserts:
             return True
 
-        if self.db_type == 'sqlite':
-            qry = "INSERT INTO tbl_scan_log \
-                (scan_instance_id, generated, component, type, message) \
-                VALUES (?, ?, ?, ?, ?)"
-        else:  # postgresql
-            qry = "INSERT INTO tbl_scan_log \
-                (scan_instance_id, generated, component, type, message) \
-                VALUES (%s, %s, %s, %s, %s)"
+        qry = "INSERT INTO tbl_scan_log \
+            (scan_instance_id, generated, component, type, message) \
+            VALUES (?, ?, ?, ?, ?)"
 
         with self.dbhLock:
             try:
@@ -1439,7 +1195,7 @@ class SpiderFootDb:
                 self.dbh.executemany(qry, inserts)
                 self.conn.commit()
                 return True
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 # More specific error handling
                 if "locked" in str(e).lower() or "thread" in str(e).lower():
                     return False
@@ -1494,7 +1250,7 @@ class SpiderFootDb:
                     instanceId, time.time() * 1000, component, classification, message
                 ))
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 if "locked" not in e.args[0] and "thread" not in e.args[0]:
                     raise IOError(
                         "Unable to log scan event in database") from e
@@ -1537,7 +1293,7 @@ class SpiderFootDb:
                     instanceId, scanName, scanTarget, time.time() * 1000, 'CREATED'
                 ))
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "Unable to create scan instance in database") from e
 
@@ -1583,7 +1339,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error):
+            except sqlite3.Error:
                 raise IOError(
                     "Unable to set information for the scan instance.") from None
 
@@ -1615,7 +1371,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchone()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when retrieving scan instance") from e
 
@@ -1642,7 +1398,7 @@ class SpiderFootDb:
                 self.dbh.execute(qry, [target])
                 row = self.dbh.fetchone()
                 return row[0] if row else 0
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when counting scans for target") from e
 
     def scanResultSummary(self, instanceId: str, by: str = "type") -> list:
@@ -1698,7 +1454,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when fetching result summary") from e
 
@@ -1846,7 +1602,7 @@ class SpiderFootDb:
 
                 return result
 
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when fetching scan progress") from e
 
@@ -1893,7 +1649,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when fetching correlation summary") from e
 
@@ -1920,20 +1676,17 @@ class SpiderFootDb:
         # × scan_results in one pass, which was extremely slow on large scans.
         # Subqueries let the DB process each correlation independently using
         # existing indexes on correlation_id and (scan_instance_id, hash).
-        placeholder = '%s' if self.db_type == 'postgresql' else '?'
-        agg_fn = 'STRING_AGG(DISTINCT r.type, \',\')' if self.db_type == 'postgresql' else 'GROUP_CONCAT(DISTINCT r.type)'
-
-        qry = f"""SELECT c.id, c.title, c.rule_id, c.rule_risk, c.rule_name,
+        qry = """SELECT c.id, c.title, c.rule_id, c.rule_risk, c.rule_name,
                 c.rule_descr, c.rule_logic,
                 (SELECT COUNT(*) FROM tbl_scan_correlation_results_events e
                  WHERE e.correlation_id = c.id) AS event_count,
-                (SELECT {agg_fn}
+                (SELECT GROUP_CONCAT(DISTINCT r.type)
                  FROM tbl_scan_correlation_results_events e
                  JOIN tbl_scan_results r ON e.event_hash = r.hash
-                    AND r.scan_instance_id = {placeholder}
+                    AND r.scan_instance_id = ?
                  WHERE e.correlation_id = c.id) AS event_types
                 FROM tbl_scan_correlation_results c
-                WHERE c.scan_instance_id = {placeholder}
+                WHERE c.scan_instance_id = ?
                 ORDER BY c.title, c.rule_risk"""
 
         qvars = [instanceId, instanceId]
@@ -1942,7 +1695,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when fetching correlation list") from e
 
@@ -2047,7 +1800,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when fetching result events") from e
 
@@ -2092,7 +1845,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when fetching unique result events") from e
 
@@ -2140,7 +1893,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when fetching scan logs") from e
 
@@ -2180,7 +1933,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when fetching scan errors") from e
 
@@ -2215,7 +1968,7 @@ class SpiderFootDb:
                 self.dbh.execute(qry3, qvars)
                 self.dbh.execute(qry4, qvars)
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when deleting scan") from e
 
@@ -2252,13 +2005,13 @@ class SpiderFootDb:
                 qvars = [fpFlag, instanceId, resultHash]
                 try:
                     self.dbh.execute(qry, qvars)
-                except (sqlite3.Error, psycopg2.Error) as e:
+                except sqlite3.Error as e:
                     raise IOError(
                         "SQL error encountered when updating false-positive") from e
 
             try:
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when updating false-positive") from e
 
@@ -2324,7 +2077,7 @@ class SpiderFootDb:
                 rowcount = self.dbh.rowcount
                 self.conn.commit()
                 return rowcount
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when syncing false positive across scans") from e
 
     def targetFalsePositiveAdd(self, target: str, eventType: str, eventData: str, sourceData: str = None, notes: str = None) -> bool:
@@ -2353,20 +2106,15 @@ class SpiderFootDb:
         if not isinstance(eventData, str):
             raise TypeError(f"eventData is {type(eventData)}; expected str()") from None
 
-        if self.db_type == 'sqlite':
-            qry = "INSERT OR IGNORE INTO tbl_target_false_positives \
-                (target, event_type, event_data, source_data, date_added, notes) \
-                VALUES (?, ?, ?, ?, ?, ?)"
-        else:  # postgresql
-            qry = "INSERT INTO tbl_target_false_positives \
-                (target, event_type, event_data, source_data, date_added, notes) \
-                VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING"
+        qry = "INSERT OR IGNORE INTO tbl_target_false_positives \
+            (target, event_type, event_data, source_data, date_added, notes) \
+            VALUES (?, ?, ?, ?, ?, ?)"
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, (target, eventType, eventData, sourceData, int(time.time() * 1000), notes))
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when adding target false positive") from e
 
         return True
@@ -2412,7 +2160,7 @@ class SpiderFootDb:
                     qry_null = "DELETE FROM tbl_target_false_positives WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
                     self.dbh.execute(qry_null, (target, eventType, eventData))
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when removing target false positive") from e
 
         return True
@@ -2439,7 +2187,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, (fpId,))
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when removing target false positive") from e
 
         return True
@@ -2469,7 +2217,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when fetching target false positives") from e
 
     def targetFalsePositiveCheck(self, target: str, eventType: str, eventData: str) -> bool:
@@ -2502,7 +2250,7 @@ class SpiderFootDb:
                 self.dbh.execute(qry, (target, eventType, eventData))
                 row = self.dbh.fetchone()
                 return row[0] > 0
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when checking target false positive") from e
 
     def targetFalsePositivesForTarget(self, target: str) -> set:
@@ -2527,7 +2275,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, (target,))
                 return {(row[0], row[1], row[2]) for row in self.dbh.fetchall()}
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when fetching target false positives") from e
 
     def targetValidatedAdd(self, target: str, eventType: str, eventData: str, sourceData: str = None, notes: str = None) -> bool:
@@ -2557,20 +2305,15 @@ class SpiderFootDb:
         if not isinstance(eventData, str):
             raise TypeError(f"eventData is {type(eventData)}; expected str()") from None
 
-        if self.db_type == 'sqlite':
-            qry = "INSERT OR IGNORE INTO tbl_target_validated \
-                (target, event_type, event_data, source_data, date_added, notes) \
-                VALUES (?, ?, ?, ?, ?, ?)"
-        else:  # postgresql
-            qry = "INSERT INTO tbl_target_validated \
-                (target, event_type, event_data, source_data, date_added, notes) \
-                VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING"
+        qry = "INSERT OR IGNORE INTO tbl_target_validated \
+            (target, event_type, event_data, source_data, date_added, notes) \
+            VALUES (?, ?, ?, ?, ?, ?)"
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, (target, eventType, eventData, sourceData, int(time.time() * 1000), notes))
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when adding target validated entry") from e
 
         return True
@@ -2616,7 +2359,7 @@ class SpiderFootDb:
                     qry_null = "DELETE FROM tbl_target_validated WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
                     self.dbh.execute(qry_null, (target, eventType, eventData))
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when removing target validated entry") from e
 
         return True
@@ -2643,7 +2386,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, (valId,))
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when removing target validated entry") from e
 
         return True
@@ -2673,7 +2416,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when fetching target validated entries") from e
 
     def targetValidatedCheck(self, target: str, eventType: str, eventData: str) -> bool:
@@ -2706,7 +2449,7 @@ class SpiderFootDb:
                 self.dbh.execute(qry, (target, eventType, eventData))
                 row = self.dbh.fetchone()
                 return row[0] > 0
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when checking target validated status") from e
 
     def targetValidatedForTarget(self, target: str) -> set:
@@ -2731,7 +2474,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, (target,))
                 return {(row[0], row[1], row[2]) for row in self.dbh.fetchall()}
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when fetching target validated entries") from e
 
     # -------------------------------------------------------------------
@@ -2758,21 +2501,16 @@ class SpiderFootDb:
         Raises:
             IOError: database I/O failed
         """
-        if self.db_type == 'sqlite':
-            qry = "INSERT OR IGNORE INTO tbl_known_assets \
-                (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes) \
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        else:
-            qry = "INSERT INTO tbl_known_assets \
-                (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes) \
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING"
+        qry = "INSERT OR IGNORE INTO tbl_known_assets \
+            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes) \
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, (target, assetType, assetValue, source,
                                        importBatch, int(time.time() * 1000), addedBy, notes))
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when adding known asset") from e
         return True
 
@@ -2792,14 +2530,9 @@ class SpiderFootDb:
         Returns:
             int: number of assets actually inserted
         """
-        if self.db_type == 'sqlite':
-            qry = "INSERT OR IGNORE INTO tbl_known_assets \
-                (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes) \
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        else:
-            qry = "INSERT INTO tbl_known_assets \
-                (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes) \
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING"
+        qry = "INSERT OR IGNORE INTO tbl_known_assets \
+            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes) \
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
 
         now = int(time.time() * 1000)
         count = 0
@@ -2813,7 +2546,7 @@ class SpiderFootDb:
                                            importBatch, now, addedBy, None))
                     count += self.dbh.rowcount if self.dbh.rowcount > 0 else 0
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when bulk adding known assets") from e
         return count
 
@@ -2835,7 +2568,7 @@ class SpiderFootDb:
                 else:
                     return False
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when removing known asset") from e
         return True
 
@@ -2852,7 +2585,7 @@ class SpiderFootDb:
                     self.dbh.execute("DELETE FROM tbl_known_assets WHERE id = ?", (int(aid),))
                     count += self.dbh.rowcount if self.dbh.rowcount > 0 else 0
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when bulk removing known assets") from e
         return count
 
@@ -2880,7 +2613,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, tuple(vals))
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when updating known asset") from e
         return True
 
@@ -2905,7 +2638,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when listing known assets") from e
 
     def knownAssetValues(self, target: str) -> dict:
@@ -2925,7 +2658,7 @@ class SpiderFootDb:
                     if atype in result:
                         result[atype].add(row[1].lower())
                 return result
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when fetching known asset values") from e
 
     def knownAssetCount(self, target: str) -> dict:
@@ -2951,7 +2684,7 @@ class SpiderFootDb:
                     elif row[1] == 'ANALYST_CONFIRMED':
                         result['analyst_confirmed'] += cnt
                 return result
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when counting known assets") from e
 
     def knownAssetMatchScanResults(self, scanId: str, target: str) -> list:
@@ -2984,7 +2717,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, (scanId,))
                 rows = self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when matching known assets") from e
 
         ip_types_set = {'IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'}
@@ -3061,21 +2794,16 @@ class SpiderFootDb:
     def assetImportHistoryAdd(self, target: str, assetType: str, fileName: str,
                               itemCount: int, importedBy: str = None) -> bool:
         """Record an asset import event."""
-        if self.db_type == 'sqlite':
-            qry = "INSERT INTO tbl_asset_import_history \
-                (target, asset_type, file_name, item_count, imported_by, date_imported) \
-                VALUES (?, ?, ?, ?, ?, ?)"
-        else:
-            qry = "INSERT INTO tbl_asset_import_history \
-                (target, asset_type, file_name, item_count, imported_by, date_imported) \
-                VALUES (%s, %s, %s, %s, %s, %s)"
+        qry = "INSERT INTO tbl_asset_import_history \
+            (target, asset_type, file_name, item_count, imported_by, date_imported) \
+            VALUES (?, ?, ?, ?, ?, ?)"
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, (target, assetType, fileName, itemCount,
                                        importedBy, int(time.time() * 1000)))
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when recording asset import") from e
         return True
 
@@ -3089,7 +2817,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, (target,))
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when listing asset imports") from e
 
     def configSet(self, optMap: dict = {}) -> bool:
@@ -3127,13 +2855,13 @@ class SpiderFootDb:
 
                 try:
                     self.dbh.execute(qry, qvals)
-                except (sqlite3.Error, psycopg2.Error) as e:
+                except sqlite3.Error as e:
                     raise IOError(
                         "SQL error encountered when storing config, aborting") from e
 
             try:
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when storing config, aborting") from e
 
@@ -3163,7 +2891,7 @@ class SpiderFootDb:
                         retval[f"{scope}:{opt}"] = val
 
                 return retval
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when fetching configuration") from e
 
@@ -3181,7 +2909,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry)
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "Unable to clear configuration from the database") from e
 
@@ -3219,13 +2947,13 @@ class SpiderFootDb:
 
                 try:
                     self.dbh.execute(qry, qvals)
-                except (sqlite3.Error, psycopg2.Error) as e:
+                except sqlite3.Error as e:
                     raise IOError(
                         "SQL error encountered when storing config, aborting") from e
 
             try:
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when storing config, aborting") from e
 
@@ -3262,7 +2990,7 @@ class SpiderFootDb:
                     else:
                         retval[f"{component}:{opt}"] = val
                 return retval
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when fetching configuration") from e
 
@@ -3375,7 +3103,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvals)
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     f"SQL error encountered when storing event data ({self.dbh})") from e
 
@@ -3407,7 +3135,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when fetching scan list") from e
 
@@ -3438,7 +3166,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     f"SQL error encountered when fetching history for scan {instanceId}") from e
 
@@ -3492,7 +3220,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when getting source element IDs") from e
 
@@ -3544,7 +3272,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when getting child element IDs") from e
 
@@ -3711,7 +3439,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "Unable to create correlation result in database") from e
 
@@ -3726,7 +3454,7 @@ class SpiderFootDb:
                 qvars = [correlationId, eventHash]
                 try:
                     self.dbh.execute(qry, qvars)
-                except (sqlite3.Error, psycopg2.Error) as e:
+                except sqlite3.Error as e:
                     raise IOError("Unable to create correlation result events in database") from e
 
             self.conn.commit()
@@ -3749,10 +3477,7 @@ class SpiderFootDb:
         with self.dbhLock:
             try:
                 # Get IDs of correlations to delete
-                if self.db_type == 'postgresql':
-                    qry = "SELECT id FROM tbl_scan_correlation_results WHERE scan_instance_id = %s AND rule_id = %s"
-                else:
-                    qry = "SELECT id FROM tbl_scan_correlation_results WHERE scan_instance_id = ? AND rule_id = ?"
+                qry = "SELECT id FROM tbl_scan_correlation_results WHERE scan_instance_id = ? AND rule_id = ?"
                 self.dbh.execute(qry, [instanceId, ruleId])
                 rows = self.dbh.fetchall()
 
@@ -3763,21 +3488,15 @@ class SpiderFootDb:
 
                 # Delete events for these correlations
                 for cid in corr_ids:
-                    if self.db_type == 'postgresql':
-                        self.dbh.execute("DELETE FROM tbl_scan_correlation_results_events WHERE correlation_id = %s", [cid])
-                    else:
-                        self.dbh.execute("DELETE FROM tbl_scan_correlation_results_events WHERE correlation_id = ?", [cid])
+                    self.dbh.execute("DELETE FROM tbl_scan_correlation_results_events WHERE correlation_id = ?", [cid])
 
                 # Delete the correlation results themselves
-                if self.db_type == 'postgresql':
-                    self.dbh.execute("DELETE FROM tbl_scan_correlation_results WHERE scan_instance_id = %s AND rule_id = %s", [instanceId, ruleId])
-                else:
-                    self.dbh.execute("DELETE FROM tbl_scan_correlation_results WHERE scan_instance_id = ? AND rule_id = ?", [instanceId, ruleId])
+                self.dbh.execute("DELETE FROM tbl_scan_correlation_results WHERE scan_instance_id = ? AND rule_id = ?", [instanceId, ruleId])
 
                 self.conn.commit()
                 return len(corr_ids)
 
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when deleting correlations by rule") from e
 
@@ -3816,7 +3535,7 @@ class SpiderFootDb:
                         'source_event_hash': row[5]
                     })
                 return sources
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when fetching event sources") from e
 
     def get_entities(self, scan_id: str, event_hash: str) -> list:
@@ -3854,7 +3573,7 @@ class SpiderFootDb:
                         'source_event_hash': row[5]
                     })
                 return entities
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when fetching entity events") from e
 
     def getLatestScanForTarget(self, target: str) -> str:
@@ -3882,7 +3601,7 @@ class SpiderFootDb:
                 self.dbh.execute(qry, [target])
                 row = self.dbh.fetchone()
                 return row[0] if row else None
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when getting latest scan for target") from e
 
     def isLatestScan(self, instanceId: str) -> dict:
@@ -3948,7 +3667,7 @@ class SpiderFootDb:
                 self.dbh.execute(qry, [instanceId])
                 row = self.dbh.fetchone()
                 return row[0] if row else 0
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when counting imported entries") from e
 
     def deleteImportedEntries(self, instanceId: str) -> int:
@@ -3988,7 +3707,7 @@ class SpiderFootDb:
                 self.conn.commit()
 
                 return count
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when deleting imported entries") from e
 
     def getImportableEntries(self, instanceId: str) -> list:
@@ -4099,7 +3818,7 @@ class SpiderFootDb:
 
                 return importable
 
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when getting importable entries") from e
 
     def importEntriesFromOlderScans(self, instanceId: str) -> dict:
@@ -4213,7 +3932,7 @@ class SpiderFootDb:
                         imported += 1
                         # Track this combination as imported
                         imported_combinations.add(entry_key)
-                    except (sqlite3.Error, psycopg2.Error):
+                    except sqlite3.Error:
                         # Entry already exists (race condition or duplicate)
                         skipped += 1
                         continue
@@ -4221,7 +3940,7 @@ class SpiderFootDb:
                 self.conn.commit()
                 return {'imported': imported, 'skipped': skipped}
 
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when importing entries") from e
 
     def deduplicateScanResults(self, instanceId: str) -> dict:
@@ -4365,7 +4084,7 @@ class SpiderFootDb:
                 self.conn.commit()
                 return {'removed': removed, 'fp_preserved': fp_preserved}
 
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when deduplicating scan results") from e
 
     def getScansByTarget(self, target: str) -> list:
@@ -4394,7 +4113,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, [target])
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error encountered when getting scans for target") from e
 
     #
@@ -4431,21 +4150,15 @@ class SpiderFootDb:
         password_hash, salt = self.hashPassword(password)
         created = int(time.time() * 1000)
 
-        if self.db_type == 'sqlite':
-            qry = "INSERT INTO tbl_users (username, password_hash, salt, display_name, active, created) VALUES (?, ?, ?, ?, 1, ?)"
-            params = (username, password_hash, salt, display_name or username, created)
-        else:
-            qry = "INSERT INTO tbl_users (username, password_hash, salt, display_name, active, created) VALUES (%s, %s, %s, %s, 1, %s)"
-            params = (username, password_hash, salt, display_name or username, created)
+        qry = "INSERT INTO tbl_users (username, password_hash, salt, display_name, active, created) VALUES (?, ?, ?, ?, 1, ?)"
+        params = (username, password_hash, salt, display_name or username, created)
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, params)
                 self.conn.commit()
                 return True
-            except (sqlite3.Error, psycopg2.Error):
-                if self.db_type == 'postgresql':
-                    self.conn.rollback()
+            except sqlite3.Error:
                 return False
 
     def userVerify(self, username: str, password: str) -> bool:
@@ -4458,10 +4171,7 @@ class SpiderFootDb:
         Returns:
             bool: True if credentials are valid
         """
-        if self.db_type == 'sqlite':
-            qry = "SELECT password_hash, salt, active FROM tbl_users WHERE username = ?"
-        else:
-            qry = "SELECT password_hash, salt, active FROM tbl_users WHERE username = %s"
+        qry = "SELECT password_hash, salt, active FROM tbl_users WHERE username = ?"
 
         with self.dbhLock:
             try:
@@ -4474,7 +4184,7 @@ class SpiderFootDb:
                     return False
                 check_hash, _ = self.hashPassword(password, salt)
                 return check_hash == stored_hash
-            except (sqlite3.Error, psycopg2.Error):
+            except sqlite3.Error:
                 return False
 
     def userUpdateLastLogin(self, username: str) -> None:
@@ -4484,18 +4194,14 @@ class SpiderFootDb:
             username (str): username
         """
         now = int(time.time() * 1000)
-        if self.db_type == 'sqlite':
-            qry = "UPDATE tbl_users SET last_login = ? WHERE username = ?"
-        else:
-            qry = "UPDATE tbl_users SET last_login = %s WHERE username = %s"
+        qry = "UPDATE tbl_users SET last_login = ? WHERE username = ?"
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, [now, username])
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error):
-                if self.db_type == 'postgresql':
-                    self.conn.rollback()
+            except sqlite3.Error:
+                pass
 
     def userGet(self, username: str) -> dict:
         """Get user details.
@@ -4506,10 +4212,7 @@ class SpiderFootDb:
         Returns:
             dict: user details or None
         """
-        if self.db_type == 'sqlite':
-            qry = "SELECT id, username, display_name, active, created, last_login FROM tbl_users WHERE username = ?"
-        else:
-            qry = "SELECT id, username, display_name, active, created, last_login FROM tbl_users WHERE username = %s"
+        qry = "SELECT id, username, display_name, active, created, last_login FROM tbl_users WHERE username = ?"
 
         with self.dbhLock:
             try:
@@ -4525,7 +4228,7 @@ class SpiderFootDb:
                     'created': row[4],
                     'last_login': row[5]
                 }
-            except (sqlite3.Error, psycopg2.Error):
+            except sqlite3.Error:
                 return None
 
     def userList(self) -> list:
@@ -4551,7 +4254,7 @@ class SpiderFootDb:
                     }
                     for row in rows
                 ]
-            except (sqlite3.Error, psycopg2.Error):
+            except sqlite3.Error:
                 return []
 
     def userCount(self) -> int:
@@ -4567,7 +4270,7 @@ class SpiderFootDb:
                 self.dbh.execute(qry)
                 row = self.dbh.fetchone()
                 return row[0] if row else 0
-            except (sqlite3.Error, psycopg2.Error):
+            except sqlite3.Error:
                 return 0
 
     def userChangePassword(self, username: str, new_password: str) -> bool:
@@ -4582,19 +4285,14 @@ class SpiderFootDb:
         """
         password_hash, salt = self.hashPassword(new_password)
 
-        if self.db_type == 'sqlite':
-            qry = "UPDATE tbl_users SET password_hash = ?, salt = ? WHERE username = ?"
-        else:
-            qry = "UPDATE tbl_users SET password_hash = %s, salt = %s WHERE username = %s"
+        qry = "UPDATE tbl_users SET password_hash = ?, salt = ? WHERE username = ?"
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, [password_hash, salt, username])
                 self.conn.commit()
                 return True
-            except (sqlite3.Error, psycopg2.Error):
-                if self.db_type == 'postgresql':
-                    self.conn.rollback()
+            except sqlite3.Error:
                 return False
 
     def userUpdate(self, username: str, display_name: str = None, active: bool = None) -> bool:
@@ -4612,11 +4310,11 @@ class SpiderFootDb:
         params = []
 
         if display_name is not None:
-            updates.append("display_name = %s" if self.db_type == 'postgresql' else "display_name = ?")
+            updates.append("display_name = ?")
             params.append(display_name)
 
         if active is not None:
-            updates.append("active = %s" if self.db_type == 'postgresql' else "active = ?")
+            updates.append("active = ?")
             params.append(1 if active else 0)
 
         if not updates:
@@ -4624,19 +4322,14 @@ class SpiderFootDb:
 
         params.append(username)
 
-        if self.db_type == 'sqlite':
-            qry = f"UPDATE tbl_users SET {', '.join(u.replace('%s', '?') for u in updates)} WHERE username = ?"
-        else:
-            qry = f"UPDATE tbl_users SET {', '.join(updates)} WHERE username = %s"
+        qry = f"UPDATE tbl_users SET {', '.join(updates)} WHERE username = ?"
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, params)
                 self.conn.commit()
                 return True
-            except (sqlite3.Error, psycopg2.Error):
-                if self.db_type == 'postgresql':
-                    self.conn.rollback()
+            except sqlite3.Error:
                 return False
 
     def userDelete(self, username: str) -> bool:
@@ -4652,19 +4345,14 @@ class SpiderFootDb:
         if username == 'admin':
             return False
 
-        if self.db_type == 'sqlite':
-            qry = "DELETE FROM tbl_users WHERE username = ?"
-        else:
-            qry = "DELETE FROM tbl_users WHERE username = %s"
+        qry = "DELETE FROM tbl_users WHERE username = ?"
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, [username])
                 self.conn.commit()
                 return self.dbh.rowcount > 0
-            except (sqlite3.Error, psycopg2.Error):
-                if self.db_type == 'postgresql':
-                    self.conn.rollback()
+            except sqlite3.Error:
                 return False
 
     #
@@ -4682,18 +4370,14 @@ class SpiderFootDb:
         """
         created = int(time.time() * 1000)
 
-        if self.db_type == 'sqlite':
-            qry = "INSERT INTO tbl_audit_log (username, action, detail, ip_address, created) VALUES (?, ?, ?, ?, ?)"
-        else:
-            qry = "INSERT INTO tbl_audit_log (username, action, detail, ip_address, created) VALUES (%s, %s, %s, %s, %s)"
+        qry = "INSERT INTO tbl_audit_log (username, action, detail, ip_address, created) VALUES (?, ?, ?, ?, ?)"
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, [username, action, detail, ip_address, created])
                 self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error):
-                if self.db_type == 'postgresql':
-                    self.conn.rollback()
+            except sqlite3.Error:
+                pass
 
     def auditLogGet(self, limit: int = 200, username: str = None, action: str = None) -> list:
         """Get audit log entries.
@@ -4710,27 +4394,18 @@ class SpiderFootDb:
         params = []
 
         if username:
-            if self.db_type == 'sqlite':
-                conditions.append("username = ?")
-            else:
-                conditions.append("username = %s")
+            conditions.append("username = ?")
             params.append(username)
 
         if action:
-            if self.db_type == 'sqlite':
-                conditions.append("action = ?")
-            else:
-                conditions.append("action = %s")
+            conditions.append("action = ?")
             params.append(action)
 
         where = ""
         if conditions:
             where = " WHERE " + " AND ".join(conditions)
 
-        if self.db_type == 'sqlite':
-            qry = f"SELECT id, username, action, detail, ip_address, created FROM tbl_audit_log{where} ORDER BY created DESC LIMIT ?"
-        else:
-            qry = f"SELECT id, username, action, detail, ip_address, created FROM tbl_audit_log{where} ORDER BY created DESC LIMIT %s"
+        qry = f"SELECT id, username, action, detail, ip_address, created FROM tbl_audit_log{where} ORDER BY created DESC LIMIT ?"
         params.append(limit)
 
         with self.dbhLock:
@@ -4748,7 +4423,7 @@ class SpiderFootDb:
                     }
                     for row in rows
                 ]
-            except (sqlite3.Error, psycopg2.Error):
+            except sqlite3.Error:
                 return []
 
     def scanFindingsList(self, instanceId: str) -> list:
@@ -4768,16 +4443,10 @@ class SpiderFootDb:
             raise TypeError(
                 f"instanceId is {type(instanceId)}; expected str()") from None
 
-        if self.db_type == 'sqlite':
-            qry = "SELECT id, priority, category, tab, item, description, recommendation, created \
-                FROM tbl_scan_findings WHERE scan_instance_id = ? ORDER BY \
-                CASE priority WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 \
-                WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 WHEN 'INFO' THEN 4 ELSE 5 END, category"
-        else:
-            qry = "SELECT id, priority, category, tab, item, description, recommendation, created \
-                FROM tbl_scan_findings WHERE scan_instance_id = %s ORDER BY \
-                CASE priority WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 \
-                WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 WHEN 'INFO' THEN 4 ELSE 5 END, category"
+        qry = "SELECT id, priority, category, tab, item, description, recommendation, created \
+            FROM tbl_scan_findings WHERE scan_instance_id = ? ORDER BY \
+            CASE priority WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 \
+            WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 WHEN 'INFO' THEN 4 ELSE 5 END, category"
 
         qvars = [instanceId]
 
@@ -4785,7 +4454,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when fetching findings list") from e
 
@@ -4813,23 +4482,15 @@ class SpiderFootDb:
         with self.dbhLock:
             try:
                 # Delete existing findings for this scan
-                if self.db_type == 'sqlite':
-                    self.dbh.execute("DELETE FROM tbl_scan_findings WHERE scan_instance_id = ?", [instanceId])
-                else:
-                    self.dbh.execute("DELETE FROM tbl_scan_findings WHERE scan_instance_id = %s", [instanceId])
+                self.dbh.execute("DELETE FROM tbl_scan_findings WHERE scan_instance_id = ?", [instanceId])
                 self.conn.commit()
 
                 # Insert new findings
                 count = 0
                 for f in findings:
-                    if self.db_type == 'sqlite':
-                        qry = "INSERT INTO tbl_scan_findings \
-                            (scan_instance_id, priority, category, tab, item, description, recommendation, created) \
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-                    else:
-                        qry = "INSERT INTO tbl_scan_findings \
-                            (scan_instance_id, priority, category, tab, item, description, recommendation, created) \
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+                    qry = "INSERT INTO tbl_scan_findings \
+                        (scan_instance_id, priority, category, tab, item, description, recommendation, created) \
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
                     self.dbh.execute(qry, [
                         instanceId,
                         str(f.get('priority', '')).upper(),
@@ -4844,7 +4505,7 @@ class SpiderFootDb:
 
                 self.conn.commit()
                 return count
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when storing findings") from e
 
@@ -4857,16 +4518,13 @@ class SpiderFootDb:
         Returns:
             int: count of findings
         """
-        if self.db_type == 'sqlite':
-            qry = "SELECT COUNT(*) FROM tbl_scan_findings WHERE scan_instance_id = ?"
-        else:
-            qry = "SELECT COUNT(*) FROM tbl_scan_findings WHERE scan_instance_id = %s"
+        qry = "SELECT COUNT(*) FROM tbl_scan_findings WHERE scan_instance_id = ?"
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, [instanceId])
                 return self.dbh.fetchone()[0]
-            except (sqlite3.Error, psycopg2.Error):
+            except sqlite3.Error:
                 return 0
 
     def scanNessusStore(self, instanceId: str, results: list, trackedFindings: set = None) -> int:
@@ -4903,10 +4561,7 @@ class SpiderFootDb:
 
         with self.dbhLock:
             try:
-                if self.db_type == 'sqlite':
-                    self.dbh.execute("DELETE FROM tbl_scan_nessus_results WHERE scan_instance_id = ?", [instanceId])
-                else:
-                    self.dbh.execute("DELETE FROM tbl_scan_nessus_results WHERE scan_instance_id = %s", [instanceId])
+                self.dbh.execute("DELETE FROM tbl_scan_nessus_results WHERE scan_instance_id = ?", [instanceId])
                 self.conn.commit()
 
                 count = 0
@@ -4917,20 +4572,12 @@ class SpiderFootDb:
                                  str(r.get('host_name', '')).lower().strip())
                     tracking_val = tracked_lookup.get(track_key, 0)
 
-                    if self.db_type == 'sqlite':
-                        qry = "INSERT INTO tbl_scan_nessus_results \
-                            (scan_instance_id, severity, severity_number, plugin_name, plugin_id, \
-                            host_ip, host_name, operating_system, description, synopsis, solution, \
-                            see_also, service_name, port, protocol, request, plugin_output, \
-                            cvss3_base_score, tracking, created) \
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                    else:
-                        qry = "INSERT INTO tbl_scan_nessus_results \
-                            (scan_instance_id, severity, severity_number, plugin_name, plugin_id, \
-                            host_ip, host_name, operating_system, description, synopsis, solution, \
-                            see_also, service_name, port, protocol, request, plugin_output, \
-                            cvss3_base_score, tracking, created) \
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                    qry = "INSERT INTO tbl_scan_nessus_results \
+                        (scan_instance_id, severity, severity_number, plugin_name, plugin_id, \
+                        host_ip, host_name, operating_system, description, synopsis, solution, \
+                        see_also, service_name, port, protocol, request, plugin_output, \
+                        cvss3_base_score, tracking, created) \
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                     self.dbh.execute(qry, [
                         instanceId,
                         str(r.get('severity', '')),
@@ -4957,7 +4604,7 @@ class SpiderFootDb:
 
                 self.conn.commit()
                 return count
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when storing Nessus results") from e
 
@@ -4978,22 +4625,13 @@ class SpiderFootDb:
             raise TypeError(
                 f"instanceId is {type(instanceId)}; expected str()") from None
 
-        if self.db_type == 'sqlite':
-            qry = "SELECT id, severity, severity_number, plugin_name, plugin_id, \
-                host_ip, host_name, operating_system, description, synopsis, solution, \
-                see_also, service_name, port, protocol, request, plugin_output, \
-                cvss3_base_score, tracking, created \
-                FROM tbl_scan_nessus_results WHERE scan_instance_id = ? ORDER BY \
-                CASE severity WHEN 'Critical' THEN 0 WHEN 'High' THEN 1 \
-                WHEN 'Medium' THEN 2 WHEN 'Low' THEN 3 WHEN 'None' THEN 4 ELSE 5 END, plugin_name"
-        else:
-            qry = "SELECT id, severity, severity_number, plugin_name, plugin_id, \
-                host_ip, host_name, operating_system, description, synopsis, solution, \
-                see_also, service_name, port, protocol, request, plugin_output, \
-                cvss3_base_score, tracking, created \
-                FROM tbl_scan_nessus_results WHERE scan_instance_id = %s ORDER BY \
-                CASE severity WHEN 'Critical' THEN 0 WHEN 'High' THEN 1 \
-                WHEN 'Medium' THEN 2 WHEN 'Low' THEN 3 WHEN 'None' THEN 4 ELSE 5 END, plugin_name"
+        qry = "SELECT id, severity, severity_number, plugin_name, plugin_id, \
+            host_ip, host_name, operating_system, description, synopsis, solution, \
+            see_also, service_name, port, protocol, request, plugin_output, \
+            cvss3_base_score, tracking, created \
+            FROM tbl_scan_nessus_results WHERE scan_instance_id = ? ORDER BY \
+            CASE severity WHEN 'Critical' THEN 0 WHEN 'High' THEN 1 \
+            WHEN 'Medium' THEN 2 WHEN 'Low' THEN 3 WHEN 'None' THEN 4 ELSE 5 END, plugin_name"
 
         qvars = [instanceId]
 
@@ -5001,7 +4639,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when fetching Nessus results list") from e
 
@@ -5014,16 +4652,13 @@ class SpiderFootDb:
         Returns:
             int: count of Nessus results
         """
-        if self.db_type == 'sqlite':
-            qry = "SELECT COUNT(*) FROM tbl_scan_nessus_results WHERE scan_instance_id = ?"
-        else:
-            qry = "SELECT COUNT(*) FROM tbl_scan_nessus_results WHERE scan_instance_id = %s"
+        qry = "SELECT COUNT(*) FROM tbl_scan_nessus_results WHERE scan_instance_id = ?"
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, [instanceId])
                 return self.dbh.fetchone()[0]
-            except (sqlite3.Error, psycopg2.Error):
+            except sqlite3.Error:
                 return 0
 
     def scanBurpStore(self, instanceId: str, results: list, trackedFindings: set = None) -> int:
@@ -5060,10 +4695,7 @@ class SpiderFootDb:
 
         with self.dbhLock:
             try:
-                if self.db_type == 'sqlite':
-                    self.dbh.execute("DELETE FROM tbl_scan_burp_results WHERE scan_instance_id = ?", [instanceId])
-                else:
-                    self.dbh.execute("DELETE FROM tbl_scan_burp_results WHERE scan_instance_id = %s", [instanceId])
+                self.dbh.execute("DELETE FROM tbl_scan_burp_results WHERE scan_instance_id = ?", [instanceId])
                 self.conn.commit()
 
                 count = 0
@@ -5074,22 +4706,13 @@ class SpiderFootDb:
                                  str(r.get('host_name', '')).lower().strip())
                     tracking_val = tracked_lookup.get(track_key, 0)
 
-                    if self.db_type == 'sqlite':
-                        qry = "INSERT INTO tbl_scan_burp_results \
-                            (scan_instance_id, severity, severity_number, host_ip, host_name, \
-                            plugin_name, issue_type, path, location, confidence, \
-                            issue_background, issue_detail, solutions, see_also, \
-                            reference_links, vulnerability_classifications, \
-                            request, response, tracking, created) \
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                    else:
-                        qry = "INSERT INTO tbl_scan_burp_results \
-                            (scan_instance_id, severity, severity_number, host_ip, host_name, \
-                            plugin_name, issue_type, path, location, confidence, \
-                            issue_background, issue_detail, solutions, see_also, \
-                            reference_links, vulnerability_classifications, \
-                            request, response, tracking, created) \
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                    qry = "INSERT INTO tbl_scan_burp_results \
+                        (scan_instance_id, severity, severity_number, host_ip, host_name, \
+                        plugin_name, issue_type, path, location, confidence, \
+                        issue_background, issue_detail, solutions, see_also, \
+                        reference_links, vulnerability_classifications, \
+                        request, response, tracking, created) \
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                     self.dbh.execute(qry, [
                         instanceId,
                         str(r.get('severity', '')),
@@ -5116,7 +4739,7 @@ class SpiderFootDb:
 
                 self.conn.commit()
                 return count
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when storing Burp results") from e
 
@@ -5168,7 +4791,7 @@ class SpiderFootDb:
         with self.dbhLock:
             try:
                 # Fetch existing records for this scan
-                ph = '?' if self.db_type == 'sqlite' else '%s'
+                ph = '?'
                 self.dbh.execute(
                     f"SELECT id, plugin_name, host_ip, host_name, issue_type, "
                     f"path, location, confidence, issue_background, issue_detail, "
@@ -5233,7 +4856,7 @@ class SpiderFootDb:
 
                 self.conn.commit()
                 return stats
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when enhancing Burp results") from e
 
@@ -5254,24 +4877,14 @@ class SpiderFootDb:
             raise TypeError(
                 f"instanceId is {type(instanceId)}; expected str()") from None
 
-        if self.db_type == 'sqlite':
-            qry = "SELECT id, severity, severity_number, host_ip, host_name, \
-                plugin_name, issue_type, path, location, confidence, \
-                issue_background, issue_detail, solutions, see_also, \
-                reference_links, vulnerability_classifications, \
-                request, response, tracking, created \
-                FROM tbl_scan_burp_results WHERE scan_instance_id = ? ORDER BY \
-                CASE severity WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 \
-                WHEN 'Low' THEN 2 WHEN 'Information' THEN 3 ELSE 4 END, plugin_name"
-        else:
-            qry = "SELECT id, severity, severity_number, host_ip, host_name, \
-                plugin_name, issue_type, path, location, confidence, \
-                issue_background, issue_detail, solutions, see_also, \
-                reference_links, vulnerability_classifications, \
-                request, response, tracking, created \
-                FROM tbl_scan_burp_results WHERE scan_instance_id = %s ORDER BY \
-                CASE severity WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 \
-                WHEN 'Low' THEN 2 WHEN 'Information' THEN 3 ELSE 4 END, plugin_name"
+        qry = "SELECT id, severity, severity_number, host_ip, host_name, \
+            plugin_name, issue_type, path, location, confidence, \
+            issue_background, issue_detail, solutions, see_also, \
+            reference_links, vulnerability_classifications, \
+            request, response, tracking, created \
+            FROM tbl_scan_burp_results WHERE scan_instance_id = ? ORDER BY \
+            CASE severity WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 \
+            WHEN 'Low' THEN 2 WHEN 'Information' THEN 3 ELSE 4 END, plugin_name"
 
         qvars = [instanceId]
 
@@ -5279,7 +4892,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvars)
                 return self.dbh.fetchall()
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when fetching Burp results list") from e
 
@@ -5292,16 +4905,13 @@ class SpiderFootDb:
         Returns:
             int: count of Burp results
         """
-        if self.db_type == 'sqlite':
-            qry = "SELECT COUNT(*) FROM tbl_scan_burp_results WHERE scan_instance_id = ?"
-        else:
-            qry = "SELECT COUNT(*) FROM tbl_scan_burp_results WHERE scan_instance_id = %s"
+        qry = "SELECT COUNT(*) FROM tbl_scan_burp_results WHERE scan_instance_id = ?"
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, [instanceId])
                 return self.dbh.fetchone()[0]
-            except (sqlite3.Error, psycopg2.Error):
+            except sqlite3.Error:
                 return 0
 
     def scanBurpEnhanced(self, instanceId: str) -> bool:
@@ -5313,20 +4923,15 @@ class SpiderFootDb:
         Returns:
             bool: True if any records have issue_detail or solutions populated
         """
-        if self.db_type == 'sqlite':
-            qry = ("SELECT COUNT(*) FROM tbl_scan_burp_results "
-                   "WHERE scan_instance_id = ? "
-                   "AND (issue_detail IS NOT NULL AND issue_detail != '')")
-        else:
-            qry = ("SELECT COUNT(*) FROM tbl_scan_burp_results "
-                   "WHERE scan_instance_id = %s "
-                   "AND (issue_detail IS NOT NULL AND issue_detail != '')")
+        qry = ("SELECT COUNT(*) FROM tbl_scan_burp_results "
+               "WHERE scan_instance_id = ? "
+               "AND (issue_detail IS NOT NULL AND issue_detail != '')")
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, [instanceId])
                 return self.dbh.fetchone()[0] > 0
-            except (sqlite3.Error, psycopg2.Error):
+            except sqlite3.Error:
                 return False
 
     def scanNessusUpdateTracking(self, instanceId: str, resultId: int, tracking: int) -> bool:
@@ -5340,7 +4945,7 @@ class SpiderFootDb:
         Returns:
             bool: success
         """
-        ph = '?' if self.db_type == 'sqlite' else '%s'
+        ph = '?'
         qry = f"UPDATE tbl_scan_nessus_results SET tracking = {ph} WHERE id = {ph} AND scan_instance_id = {ph}"
 
         with self.dbhLock:
@@ -5348,7 +4953,7 @@ class SpiderFootDb:
                 self.dbh.execute(qry, [tracking, resultId, instanceId])
                 self.conn.commit()
                 return True
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error updating Nessus tracking status") from e
 
     def scanBurpUpdateTracking(self, instanceId: str, resultId: int, tracking: int) -> bool:
@@ -5362,7 +4967,7 @@ class SpiderFootDb:
         Returns:
             bool: success
         """
-        ph = '?' if self.db_type == 'sqlite' else '%s'
+        ph = '?'
         qry = f"UPDATE tbl_scan_burp_results SET tracking = {ph} WHERE id = {ph} AND scan_instance_id = {ph}"
 
         with self.dbhLock:
@@ -5370,7 +4975,7 @@ class SpiderFootDb:
                 self.dbh.execute(qry, [tracking, resultId, instanceId])
                 self.conn.commit()
                 return True
-            except (sqlite3.Error, psycopg2.Error) as e:
+            except sqlite3.Error as e:
                 raise IOError("SQL error updating Burp tracking status") from e
 
     def scanNessusTrackedFindings(self, instanceId: str) -> set:
@@ -5385,7 +4990,7 @@ class SpiderFootDb:
         Returns:
             set: set of (plugin_name, host_ip, host_name, tracking) tuples
         """
-        ph = '?' if self.db_type == 'sqlite' else '%s'
+        ph = '?'
         qry = f"SELECT plugin_name, host_ip, host_name, tracking FROM tbl_scan_nessus_results \
             WHERE scan_instance_id = {ph} AND tracking IN (1, 2)"
 
@@ -5393,7 +4998,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, [instanceId])
                 return {(row[0], row[1], row[2], row[3]) for row in self.dbh.fetchall()}
-            except (sqlite3.Error, psycopg2.Error):
+            except sqlite3.Error:
                 return set()
 
     def scanBurpTrackedFindings(self, instanceId: str) -> set:
@@ -5408,7 +5013,7 @@ class SpiderFootDb:
         Returns:
             set: set of (plugin_name, host_ip, host_name, tracking) tuples
         """
-        ph = '?' if self.db_type == 'sqlite' else '%s'
+        ph = '?'
         qry = f"SELECT plugin_name, host_ip, host_name, tracking FROM tbl_scan_burp_results \
             WHERE scan_instance_id = {ph} AND tracking IN (1, 2)"
 
@@ -5416,5 +5021,5 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, [instanceId])
                 return {(row[0], row[1], row[2], row[3]) for row in self.dbh.fetchall()}
-            except (sqlite3.Error, psycopg2.Error):
+            except sqlite3.Error:
                 return set()

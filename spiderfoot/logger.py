@@ -106,11 +106,6 @@ class SpiderFootSqliteLogHandler(logging.Handler):
         """Create a new database handle."""
         try:
             self.dbh = SpiderFootDb(self.opts)
-            # Test the connection with a simple query
-            if hasattr(self.dbh, 'db_type') and self.dbh.db_type == 'postgresql':
-                # For PostgreSQL, test with a simple query
-                with self.dbh.dbhLock:
-                    self.dbh.dbh.execute("SELECT 1")
         except Exception as e:
             self.dbh = None
 
