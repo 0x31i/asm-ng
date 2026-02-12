@@ -5923,12 +5923,14 @@ class SpiderFootWebUi:
             return {'success': False, 'message': str(e)}
 
     @cherrypy.expose
-    def scanfindingsexport(self: 'SpiderFootWebUi', id: str, filetype: str = "xlsx") -> str:
+    def scanfindingsexport(self: 'SpiderFootWebUi', id: str, filetype: str = "xlsx", report: str = "basic") -> str:
         """Export findings and correlations from a scan.
 
         Args:
             id (str): scan ID
             filetype (str): export format (xlsx, csv)
+            report (str): 'basic' for simple two-sheet export,
+                          'full' for styled report with Executive Summary + category tabs
 
         Returns:
             str: exported data
@@ -5968,48 +5970,80 @@ class SpiderFootWebUi:
             pass
 
         if filetype.lower() in ["xlsx", "excel"]:
-            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-REPORT.xlsx"
             cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             cherrypy.response.headers['Pragma'] = "no-cache"
 
-            wb = openpyxl.Workbook()
+            wb = None
 
-            # Gather grade data and scan metadata for Executive Summary
-            grade_data = self._calculateScanGrade(dbh, id)
-            scan_instance = dbh.scanInstanceGet(id)
-            scan_info = {
-                'name': scan_instance[0] if scan_instance else '',
-                'target': scan_instance[1] if scan_instance else '',
-                'date': time.strftime(
-                    "%Y-%m-%d %H:%M:%S",
-                    time.localtime(scan_instance[2]),
-                ) if scan_instance and scan_instance[2] else '',
-            }
+            # Full report: styled with Executive Summary + category tabs
+            if report == "full":
+                cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-REPORT.xlsx"
+                try:
+                    wb = openpyxl.Workbook()
 
-            # Sheet 1: Executive Summary (reuse the default active sheet)
-            ws_summary = wb.active
-            ws_summary.title = "Executive Summary"
-            build_executive_summary(ws_summary, grade_data, scan_info)
+                    # Gather grade data and scan metadata for Executive Summary
+                    grade_data = self._calculateScanGrade(dbh, id)
+                    scan_instance = dbh.scanInstanceGet(id)
+                    scan_info = {
+                        'name': scan_instance[0] if scan_instance else '',
+                        'target': scan_instance[1] if scan_instance else '',
+                        'date': time.strftime(
+                            "%Y-%m-%d %H:%M:%S",
+                            time.localtime(scan_instance[2]),
+                        ) if scan_instance and scan_instance[2] else '',
+                    }
 
-            # Sheet 2: Findings (black tab, severity colors)
-            ws_findings = wb.create_sheet("Findings")
-            build_findings_sheet(ws_findings, findings_rows)
+                    # Sheet 1: Executive Summary (reuse the default active sheet)
+                    ws_summary = wb.active
+                    ws_summary.title = "Executive Summary"
+                    build_executive_summary(ws_summary, grade_data, scan_info)
 
-            # Sheet 3: Correlations (dark gray tab, risk colors)
-            ws_corr = wb.create_sheet("Correlations")
-            build_correlations_sheet(ws_corr, correlation_rows)
+                    # Sheet 2: Findings (black tab, severity colors)
+                    ws_findings = wb.create_sheet("Findings")
+                    build_findings_sheet(ws_findings, findings_rows)
 
-            # Sheets 4+: Category tabs ordered by weight descending
-            cat_results = grade_data.get('categories', {})
-            sorted_cats = sorted(
-                cat_results.items(),
-                key=lambda x: (-x[1].get('weight', 0), x[0]),
-            )
-            for cat_name, cat_data in sorted_cats:
-                safe_name = sanitize_sheet_name(cat_name)
-                ws_cat = wb.create_sheet(safe_name)
-                cat_color = cat_data.get('color', '#6b7280')
-                build_category_sheet(ws_cat, cat_name, cat_color, cat_data)
+                    # Sheet 3: Correlations (dark gray tab, risk colors)
+                    ws_corr = wb.create_sheet("Correlations")
+                    build_correlations_sheet(ws_corr, correlation_rows)
+
+                    # Sheets 4+: Category tabs ordered by weight descending
+                    cat_results = grade_data.get('categories', {})
+                    sorted_cats = sorted(
+                        cat_results.items(),
+                        key=lambda x: (-x[1].get('weight', 0), x[0]),
+                    )
+                    for cat_name, cat_data in sorted_cats:
+                        safe_name = sanitize_sheet_name(cat_name)
+                        ws_cat = wb.create_sheet(safe_name)
+                        cat_color = cat_data.get('color', '#6b7280')
+                        build_category_sheet(ws_cat, cat_name, cat_color, cat_data)
+
+                except Exception as e:
+                    self.log.error(f"Styled report export failed, falling back to basic: {e}", exc_info=True)
+                    wb = None  # Reset so fallback runs below
+
+            # Basic export (default) or fallback if full report failed
+            if wb is None:
+                if report != "full":
+                    cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-FINDINGS.xlsx"
+                wb = openpyxl.Workbook()
+
+                ws_findings = wb.active
+                ws_findings.title = "Findings"
+                findings_headers = ["Priority", "Category", "Tab", "Item", "Description", "Recommendation"]
+                for col_num, header in enumerate(findings_headers, 1):
+                    ws_findings.cell(row=1, column=col_num, value=header)
+                for row_num, row_data in enumerate(findings_rows, 2):
+                    for col_num, cell_value in enumerate(row_data, 1):
+                        ws_findings.cell(row=row_num, column=col_num, value=cell_value)
+
+                ws_corr = wb.create_sheet("Correlations")
+                corr_headers = ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"]
+                for col_num, header in enumerate(corr_headers, 1):
+                    ws_corr.cell(row=1, column=col_num, value=header)
+                for row_num, row_data in enumerate(correlation_rows, 2):
+                    for col_num, cell_value in enumerate(row_data, 1):
+                        ws_corr.cell(row=row_num, column=col_num, value=cell_value)
 
             with BytesIO() as f:
                 wb.save(f)

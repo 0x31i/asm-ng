@@ -3819,6 +3819,9 @@
             findingsExportHtml += "<li class='dropdown-header'>Findings & Correlations Export</li>";
             findingsExportHtml += "<li><a class='link' onClick='exportEventData(\"" + instanceId + "\", \"\", \"csv\", \"full\")'>CSV (FINDINGS.csv + CORRELATIONS.csv)</a></li>";
             findingsExportHtml += "<li><a class='link' onClick='exportEventData(\"" + instanceId + "\", \"\", \"excel\", \"full\")'>Excel (FINDINGS.xlsx - two tabs)</a></li>";
+            findingsExportHtml += "<li class='divider'></li>";
+            findingsExportHtml += "<li class='dropdown-header'>Full Report</li>";
+            findingsExportHtml += "<li><a class='link' onClick='exportReportData(\"" + instanceId + "\")'>Excel Report (Executive Summary + All Tabs)</a></li>";
             $('#export-dropdown-menu').html(findingsExportHtml);
 
             var grid = "<div id='scansummary-content'>";
@@ -7713,6 +7716,13 @@
                 }
             }
 
+            $("#loader").fadeOut(500);
+        }
+
+        function exportReportData(instanceId) {
+            $("#loader").show();
+            var efr = document.getElementById('exportframe');
+            efr.src = '${docroot}/scanfindingsexport?filetype=xlsx&report=full&id=' + instanceId;
             $("#loader").fadeOut(500);
         }
 
