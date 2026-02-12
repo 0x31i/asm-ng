@@ -186,10 +186,17 @@ def build_executive_summary(ws, grade_data: dict, scan_info: dict):
 
     # -- Category breakdown table (row 12+) --
     cat_header_row = 12
-    cat_headers = ['Category', 'Weight', 'Raw Score', 'Adj Score', 'Score', 'Grade']
-    apply_header_row(ws, cat_headers, cat_header_row)
-
     cat_results = grade_data.get('categories', {})
+
+    if not cat_results or not grade_data.get('enabled', True):
+        ws.merge_cells(f'A{cat_header_row}:F{cat_header_row}')
+        ws.cell(row=cat_header_row, column=1, value='Grading data not available for this scan.').font = Font(
+            name='Calibri', size=11, italic=True, color='FF9CA3AF',
+        )
+    else:
+        cat_headers = ['Category', 'Weight', 'Raw Score', 'Adj Score', 'Score', 'Grade']
+        apply_header_row(ws, cat_headers, cat_header_row)
+
     sorted_cats = sorted(
         cat_results.items(),
         key=lambda x: (-x[1].get('weight', 0), x[0]),
