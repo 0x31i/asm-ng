@@ -7956,7 +7956,7 @@ table.discovery-path-table td.validation-status {
 }
 
 .vuln-content {
-  min-height: 200px;
+  min-height: calc(100vh - 250px);
 }
 
 .vuln-panel {

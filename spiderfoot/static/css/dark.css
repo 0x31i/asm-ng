@@ -8518,7 +8518,7 @@ i.glyphicon-white,
 }
 
 .vuln-content {
-  min-height: 200px;
+  min-height: calc(100vh - 250px);
 }
 
 .vuln-panel {
