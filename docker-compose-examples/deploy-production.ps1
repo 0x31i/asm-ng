@@ -62,11 +62,6 @@ function Test-EnvironmentVariables {
     
     Write-Status "Validating environment configuration..."
     
-    if ($EnvVars["POSTGRES_PASSWORD"] -eq "changeme_secure_postgres_password") {
-        Write-Error "Please change the default PostgreSQL password in .env"
-        exit 1
-    }
-    
     if ($EnvVars["ELASTIC_PASSWORD"] -eq "changeme_secure_elastic_password") {
         Write-Error "Please change the default Elasticsearch password in .env"
         exit 1
@@ -88,10 +83,9 @@ function New-DataDirectories {
     
     $directories = @(
         "$($EnvVars["DATA_PATH"])/spiderfoot",
-        "$($EnvVars["DATA_PATH"])/postgres",
         "$($EnvVars["DATA_PATH"])/elasticsearch",
         "$($EnvVars["LOGS_PATH"])/spiderfoot",
-        "$($EnvVars["BACKUP_PATH"])/postgres",
+        "$($EnvVars["BACKUP_PATH"])/spiderfoot",
         $EnvVars["CERTS_PATH"]
     )
     
@@ -160,16 +154,16 @@ function Start-Deployment {
     & docker-compose -f docker-compose-prod.yml pull
     
     # Start core services
-    Write-Status "Starting core services (PostgreSQL, Elasticsearch, Redis)..."
-    & docker-compose -f docker-compose-prod.yml up -d postgres elasticsearch redis
+    Write-Status "Starting core services (Elasticsearch, Redis)..."
+    & docker-compose -f docker-compose-prod.yml up -d elasticsearch redis
     
     # Wait for services to be healthy
     Write-Status "Waiting for services to be ready..."
     Start-Sleep -Seconds 30
     
     # Start application and reverse proxy
-    Write-Status "Starting SpiderFoot application and Nginx..."
-    & docker-compose -f docker-compose-prod.yml up -d spiderfoot nginx
+    Write-Status "Starting ASM-NG application and Nginx..."
+    & docker-compose -f docker-compose-prod.yml up -d asm-ng nginx
     
     # Start monitoring stack if requested
     if ($WithMonitoring) {
@@ -233,7 +227,7 @@ function Show-DeploymentInfo {
     
     Write-Host ""
     Write-Host "Backup Commands:"
-    Write-Host "  - Manual backup: docker-compose -f docker-compose-prod.yml --profile backup run --rm postgres-backup"
+    Write-Host "  - Manual backup: Use the /dbbackup endpoint in the web UI"
     Write-Host ""
     Write-Host "Default Credentials (CHANGE THESE):"
     Write-Host "  - Grafana: admin / $($EnvVars["GRAFANA_PASSWORD"])"

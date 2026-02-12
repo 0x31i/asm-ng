@@ -10,7 +10,6 @@ class AsmNg < Formula
   license "MIT"
 
   depends_on "python@3.9"
-  depends_on "libpq" # For psycopg2-binary
 
   def install
     virtualenv_install_with_resources

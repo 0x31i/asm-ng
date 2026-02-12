@@ -32,7 +32,7 @@ ASM-NG is a ground-up transformation of SpiderFoot into a full attack surface ma
 | **Correlation Engine** | Basic YAML rules | YAML rules + single-scan IOC correlation + cross-scan historical correlation + CTI report generation |
 | **Data Import** | None | Legacy CSV, Scan Backup, Nessus XML, Burp XML/HTML, Excel findings |
 | **Export** | CSV/JSON | CSV/JSON/XLSX/GEXF with multi-scan export, vulnerability export, asset export |
-| **Database** | SQLite only | SQLite + PostgreSQL with 9 new tables and auto-migration |
+| **Database** | SQLite only | Hardened SQLite with 9 new tables, auto-migration, and built-in backup/health checks |
 | **Modules** | ~200 | 274 modules including security hardening and threat intel modules |
 | **Correlation Rules** | 37 YAML rules | 51 YAML rules + automated single-scan and cross-scan correlation |
 
@@ -318,7 +318,7 @@ Multi-format, multi-scan export capabilities for professional reporting workflow
 
 ### Database Architecture
 
-ASM-NG supports both SQLite (default) and PostgreSQL, with 9 new database tables and automatic migration on upgrade.
+ASM-NG uses a hardened SQLite database with optimized PRAGMAs, built-in backup/health checks, and 9 new database tables with automatic migration on upgrade.
 
 **New tables beyond SpiderFoot v4.0:**
 
@@ -348,7 +348,7 @@ graph TD;
     A[User] -->|Web UI| B[ASM-NG Core Engine];
     A -->|CLI| B;
     B --> C[274 Modules];
-    B --> D[Database - SQLite/PostgreSQL];
+    B --> D[Database - SQLite];
     B --> E[REST API];
     B --> F[Workspace Manager];
     B --> G[Grading Engine];
@@ -441,19 +441,11 @@ Or install via `pip install .` / `setup.py` which registers both legacy (`spider
 
 Works out of the box. Database stored at `~/.spiderfoot/spiderfoot.db`.
 
-### PostgreSQL
+### Database Health & Backup
 
-```bash
-sudo apt-get install postgresql postgresql-contrib
-
-sudo -u postgres psql
-CREATE DATABASE asm_ng;
-CREATE USER asm_ng_user WITH PASSWORD 'secure_password';
-GRANT ALL PRIVILEGES ON DATABASE asm_ng TO asm_ng_user;
-\q
-
-python3 ./sf.py --init-db postgresql://asm_ng_user:secure_password@localhost/asm_ng
-```
+ASM-NG provides built-in database health monitoring and backup capabilities via the web UI:
+- `/dbhealth` — check database integrity, file size, page counts, and WAL status
+- `/dbbackup` — create a hot backup of the database while it's in use
 
 ---
 

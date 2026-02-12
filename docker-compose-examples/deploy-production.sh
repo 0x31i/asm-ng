@@ -49,11 +49,6 @@ source .env
 validate_env() {
     print_status "Validating environment configuration..."
     
-    if [ "${POSTGRES_PASSWORD}" == "changeme_secure_postgres_password" ]; then
-        print_error "Please change the default PostgreSQL password in .env"
-        exit 1
-    fi
-    
     if [ "${ELASTIC_PASSWORD}" == "changeme_secure_elastic_password" ]; then
         print_error "Please change the default Elasticsearch password in .env"
         exit 1
@@ -72,10 +67,9 @@ create_directories() {
     print_status "Creating data directories..."
     
     mkdir -p "${DATA_PATH}/spiderfoot"
-    mkdir -p "${DATA_PATH}/postgres"
     mkdir -p "${DATA_PATH}/elasticsearch"
     mkdir -p "${LOGS_PATH}/spiderfoot"
-    mkdir -p "${BACKUP_PATH}/postgres"
+    mkdir -p "${BACKUP_PATH}/spiderfoot"
     mkdir -p "${CERTS_PATH}"
     
     # Set appropriate permissions
@@ -125,16 +119,16 @@ deploy() {
     docker-compose -f docker-compose-prod.yml pull
     
     # Start core services
-    print_status "Starting core services (PostgreSQL, Elasticsearch, Redis)..."
-    docker-compose -f docker-compose-prod.yml up -d postgres elasticsearch redis
+    print_status "Starting core services (Elasticsearch, Redis)..."
+    docker-compose -f docker-compose-prod.yml up -d elasticsearch redis
     
     # Wait for services to be healthy
     print_status "Waiting for services to be ready..."
     sleep 30
     
     # Start application and reverse proxy
-    print_status "Starting SpiderFoot application and Nginx..."
-    docker-compose -f docker-compose-prod.yml up -d spiderfoot nginx
+    print_status "Starting ASM-NG application and Nginx..."
+    docker-compose -f docker-compose-prod.yml up -d asm-ng nginx
     
     # Start monitoring stack if requested
     if [ "${1}" == "--monitoring" ]; then
@@ -192,7 +186,7 @@ show_info() {
     
     echo ""
     echo "Backup Commands:"
-    echo "  - Manual backup: docker-compose -f docker-compose-prod.yml --profile backup run --rm postgres-backup"
+    echo "  - Manual backup: Use the /dbbackup endpoint in the web UI"
     echo ""
     echo "Default Credentials (CHANGE THESE):"
     echo "  - Grafana: admin / ${GRAFANA_PASSWORD}"

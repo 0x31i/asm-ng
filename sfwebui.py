@@ -4594,6 +4594,71 @@ class SpiderFootWebUi:
         except Exception as e:
             return json.dumps(["ERROR", f"Vacuuming the database failed: {e}"]).encode('utf-8')
 
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def dbhealth(self):
+        """Get database health status.
+
+        Returns:
+            dict: database health information including file size,
+                  page counts, integrity status, and WAL info.
+        """
+        dbh = SpiderFootDb(self.config)
+        try:
+            health = dbh.dbHealth()
+
+            # Add human-readable file sizes
+            if health.get('file_size'):
+                size_mb = health['file_size'] / (1024 * 1024)
+                health['file_size_human'] = f"{size_mb:.2f} MB"
+            if health.get('wal_file_size'):
+                wal_mb = health['wal_file_size'] / (1024 * 1024)
+                health['wal_file_size_human'] = f"{wal_mb:.2f} MB"
+
+            return health
+        except Exception as e:
+            return {'status': 'error', 'error': str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def dbbackup(self):
+        """Create a backup of the database.
+
+        Creates a hot backup using SQLite's built-in backup API.
+        The backup is stored in the same directory as the database
+        with a timestamped filename.
+
+        Returns:
+            dict: backup result with file path and size.
+        """
+        dbh = SpiderFootDb(self.config)
+        try:
+            # Determine backup path
+            db_path = self.config.get('__database', '')
+            if not db_path:
+                return {'status': 'error', 'error': 'Database path not configured'}
+
+            backup_dir = os.path.dirname(db_path)
+            if not backup_dir:
+                backup_dir = '.'
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            backup_filename = f"spiderfoot_backup_{timestamp}.db"
+            backup_path = os.path.join(backup_dir, backup_filename)
+
+            result_path = dbh.backupDB(backup_path)
+            backup_size = os.path.getsize(result_path)
+            size_mb = backup_size / (1024 * 1024)
+
+            return {
+                'status': 'success',
+                'backup_path': result_path,
+                'backup_size': backup_size,
+                'backup_size_human': f"{size_mb:.2f} MB",
+                'timestamp': timestamp
+            }
+        except Exception as e:
+            return {'status': 'error', 'error': str(e)}
+
     #
     # DATA PROVIDERS
     #
