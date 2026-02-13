@@ -6085,11 +6085,12 @@ class SpiderFootWebUi:
                     except Exception as e:
                         self.log.error(f"Full report: EXT-VULNS tab failed: {e}", exc_info=True)
 
-                    # Sheet 5: WEBAPP-VULNS (Burp) - orange tab
+                    # Pre-fetch WEBAPP-VULNS (Burp) data -- sheet created later
+                    # in the event-type loop to position it at the Web App Security boundary
+                    burp_rows = []
                     try:
                         self.log.info(f"Full report: fetching Burp data for WEBAPP-VULNS tab")
                         burp_data = dbh.scanBurpList(id)
-                        burp_rows = []
                         tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
                         for row in burp_data:
                             burp_rows.append([
@@ -6112,12 +6113,9 @@ class SpiderFootWebUi:
                                 str(row[17] or ''),  # response
                                 tracking_labels.get(int(row[18] or 0), 'OPEN'),  # tracking
                             ])
-                        self.log.info(f"Full report: building WEBAPP-VULNS sheet ({len(burp_rows)} rows)")
-                        ws_burp = wb.create_sheet("WEBAPP-VULNS")
-                        used_names.add("WEBAPP-VULNS")
-                        build_burp_sheet(ws_burp, burp_rows)
+                        self.log.info(f"Full report: WEBAPP-VULNS data ready ({len(burp_rows)} rows)")
                     except Exception as e:
-                        self.log.error(f"Full report: WEBAPP-VULNS tab failed: {e}", exc_info=True)
+                        self.log.error(f"Full report: WEBAPP-VULNS data fetch failed: {e}", exc_info=True)
 
                     # Event-type data tabs (one sheet per event type, grouped by category weight order)
                     try:
@@ -6163,6 +6161,7 @@ class SpiderFootWebUi:
                         sorted_event_types = sorted(event_type_groups.keys(), key=_evt_sort_key)
 
                         self.log.info(f"Full report: building {len(sorted_event_types)} event-type data tabs")
+                        _webapp_vulns_inserted = False
                         for display_type in sorted_event_types:
                             grp = event_type_groups[display_type]
                             evt_code = grp['event_code']
@@ -6172,6 +6171,14 @@ class SpiderFootWebUi:
                             evt_grading = get_event_grading(evt_code)
                             evt_category = evt_grading.get('category', 'Information / Reference')
                             tab_color = CATEGORY_TAB_COLORS.get(evt_category, '#6b7280')
+
+                            # Insert WEBAPP-VULNS right before the first Web App Security event type
+                            if not _webapp_vulns_inserted and evt_category == 'Web App Security':
+                                self.log.info(f"Full report: inserting WEBAPP-VULNS sheet ({len(burp_rows)} rows)")
+                                ws_burp = wb.create_sheet("WEBAPP-VULNS")
+                                used_names.add("WEBAPP-VULNS")
+                                build_burp_sheet(ws_burp, burp_rows)
+                                _webapp_vulns_inserted = True
 
                             safe_name = sanitize_sheet_name(display_type)
                             original = safe_name
@@ -6183,6 +6190,13 @@ class SpiderFootWebUi:
 
                             ws_evt = wb.create_sheet(safe_name)
                             build_event_type_sheet(ws_evt, display_type, evt_rows, tab_color=tab_color)
+
+                        # Fallback: if no Web App Security events, append WEBAPP-VULNS at end
+                        if not _webapp_vulns_inserted:
+                            self.log.info(f"Full report: appending WEBAPP-VULNS sheet ({len(burp_rows)} rows)")
+                            ws_burp = wb.create_sheet("WEBAPP-VULNS")
+                            used_names.add("WEBAPP-VULNS")
+                            build_burp_sheet(ws_burp, burp_rows)
 
                     except Exception as e:
                         self.log.error(f"Full report: event-type data tabs failed: {e}", exc_info=True)

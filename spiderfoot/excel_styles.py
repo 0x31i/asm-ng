@@ -10,6 +10,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.chart import BarChart, Reference
 from openpyxl.chart.series import DataPoint
 from openpyxl.formatting.rule import DataBarRule
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 
 # ============================================================================
@@ -126,6 +127,56 @@ def apply_alternating_rows(ws, start_row: int, end_row: int):
                 # A cell with no explicit fill has fill_type=None.
                 if cell.fill.fill_type is None:
                     cell.fill = ALT_ROW_FILL
+
+
+def _make_table_name(base_name: str) -> str:
+    """Create a valid Excel table displayName from a base string.
+
+    Table names must start with a letter/underscore and contain only
+    alphanumeric characters, underscores, and periods.
+    """
+    name = ''.join(c if c.isalnum() or c == '_' else '_' for c in base_name)
+    if not name or name[0].isdigit():
+        name = f"T_{name}"
+    return name[:255]
+
+
+def add_data_table(ws, header_row: int, num_data_rows: int, num_columns: int):
+    """Add an Excel Table (ListObject) for sorting and filtering.
+
+    Creates a proper Excel table starting at the header row, which enables
+    column sorting, auto-filter dropdowns, and structured references.
+    Uses a minimal table style so our manual cell formatting is preserved.
+
+    Args:
+        ws: openpyxl Worksheet
+        header_row: 1-indexed row number where the headers are
+        num_data_rows: number of data rows (excluding the header row)
+        num_columns: total number of columns
+    """
+    if num_data_rows < 1:
+        return
+
+    try:
+        last_row = header_row + num_data_rows
+        last_col = get_column_letter(num_columns)
+        ref = f"A{header_row}:{last_col}{last_row}"
+
+        table_name = _make_table_name(ws.title)
+
+        style = TableStyleInfo(
+            name="TableStyleLight1",
+            showFirstColumn=False,
+            showLastColumn=False,
+            showRowStripes=False,
+            showColumnStripes=False,
+        )
+
+        table = Table(displayName=table_name, ref=ref)
+        table.tableStyleInfo = style
+        ws.add_table(table)
+    except Exception:
+        pass  # Non-fatal: table is cosmetic, data is still there
 
 
 # ============================================================================
@@ -528,6 +579,9 @@ def build_findings_sheet(ws, findings_rows: list):
     if findings_rows:
         apply_alternating_rows(ws, 2, len(findings_rows) + 1)
 
+    # Excel Table for sort/filter
+    add_data_table(ws, header_row=1, num_data_rows=len(findings_rows), num_columns=len(headers))
+
     col_widths = [12, 22, 18, 40, 50, 50]
     for i, w in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
@@ -571,6 +625,9 @@ def build_correlations_sheet(ws, correlation_rows: list):
 
     if correlation_rows:
         apply_alternating_rows(ws, 2, len(correlation_rows) + 1)
+
+    # Excel Table for sort/filter
+    add_data_table(ws, header_row=1, num_data_rows=len(correlation_rows), num_columns=len(headers))
 
     col_widths = [30, 25, 10, 50, 40, 12, 40]
     for i, w in enumerate(col_widths, 1):
@@ -616,6 +673,9 @@ def build_nessus_sheet(ws, nessus_rows: list):
 
     if nessus_rows:
         apply_alternating_rows(ws, 2, len(nessus_rows) + 1)
+
+    # Excel Table for sort/filter
+    add_data_table(ws, header_row=1, num_data_rows=len(nessus_rows), num_columns=len(headers))
 
     col_widths = [12, 8, 30, 10, 14, 20, 18, 50, 40, 40, 30, 12, 8, 8, 40, 40, 10, 10]
     for i, w in enumerate(col_widths, 1):
@@ -663,6 +723,9 @@ def build_burp_sheet(ws, burp_rows: list):
 
     if burp_rows:
         apply_alternating_rows(ws, 2, len(burp_rows) + 1)
+
+    # Excel Table for sort/filter
+    add_data_table(ws, header_row=1, num_data_rows=len(burp_rows), num_columns=len(headers))
 
     col_widths = [12, 8, 14, 20, 30, 14, 30, 20, 12, 50, 50, 40, 30, 30, 30, 40, 40, 10]
     for i, w in enumerate(col_widths, 1):
@@ -825,6 +888,9 @@ def build_event_type_sheet(ws, event_type_name: str, rows: list, tab_color: str 
     # Alternating rows
     if rows:
         apply_alternating_rows(ws, 3, len(rows) + 2)
+
+    # Excel Table for sort/filter (starts at row 2 header, below the title banner)
+    add_data_table(ws, header_row=2, num_data_rows=len(rows), num_columns=len(headers))
 
     # Column widths
     col_widths = [18, 20, 40, 6, 60]
