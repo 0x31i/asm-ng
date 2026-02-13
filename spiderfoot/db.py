@@ -816,6 +816,16 @@ class SpiderFootDb:
                 except sqlite3.Error:
                     pass
 
+            # Migration: Add tracking column to scan results (data type tracking)
+            try:
+                self.dbh.execute("SELECT tracking FROM tbl_scan_results LIMIT 1")
+            except sqlite3.Error:
+                try:
+                    self.dbh.execute("ALTER TABLE tbl_scan_results ADD COLUMN tracking INT NOT NULL DEFAULT 0")
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass
+
             if init:
                 for row in self.eventDetails:
                     event = row[0]
@@ -1784,7 +1794,7 @@ class SpiderFootDb:
             c.module, c.type, c.confidence, c.visibility, c.risk, c.hash, \
             c.source_event_hash, t.event_descr, t.event_type, s.scan_instance_id, \
             c.false_positive as 'fp', s.false_positive as 'parent_fp', \
-            c.imported_from_scan \
+            c.imported_from_scan, c.tracking \
             FROM tbl_scan_results c, tbl_scan_results s, tbl_event_types t "
 
         if correlationId:
@@ -5128,3 +5138,105 @@ class SpiderFootDb:
                 return {(row[0], row[1], row[2], row[3]) for row in self.dbh.fetchall()}
             except sqlite3.Error:
                 return set()
+
+    def scanEventUpdateTracking(self, instanceId: str, eventHash: str, tracking: int) -> bool:
+        """Update the tracking status for a scan result event.
+
+        Args:
+            instanceId (str): scan instance ID
+            eventHash (str): event hash
+            tracking (int): 0=OPEN, 1=CLOSED, 2=TICKETED
+
+        Returns:
+            bool: success
+        """
+        qry = "UPDATE tbl_scan_results SET tracking = ? WHERE hash = ? AND scan_instance_id = ?"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [tracking, eventHash, instanceId])
+                self.conn.commit()
+                return True
+            except sqlite3.Error as e:
+                raise IOError("SQL error updating event tracking status") from e
+
+    def scanEventResultByHash(self, instanceId: str, eventHash: str) -> tuple:
+        """Get event details by hash for cross-scan sync.
+
+        Args:
+            instanceId (str): scan instance ID
+            eventHash (str): event hash
+
+        Returns:
+            tuple: (type, data, source_data) or None
+        """
+        qry = """SELECT c.type, c.data, s.data
+            FROM tbl_scan_results c, tbl_scan_results s
+            WHERE c.hash = ? AND c.scan_instance_id = ?
+            AND c.source_event_hash = s.hash
+            AND s.scan_instance_id = c.scan_instance_id"""
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [eventHash, instanceId])
+                row = self.dbh.fetchone()
+                return row if row else None
+            except sqlite3.Error as e:
+                raise IOError("SQL error fetching event result by hash") from e
+
+    def syncTrackingAcrossScans(self, target: str, eventType: str, eventData: str, sourceData: str, tracking: int) -> int:
+        """Sync the tracking status across all scans of the same target for matching entries.
+
+        This updates the tracking column in tbl_scan_results for all entries across
+        all scans of the same target that match the given (event_type, event_data, source_data).
+
+        Args:
+            target (str): the target (seed_target value)
+            eventType (str): the event type
+            eventData (str): the event data
+            sourceData (str): the source data of the event (data from the source event)
+            tracking (int): tracking status (0=OPEN, 1=CLOSED, 2=TICKETED)
+
+        Returns:
+            int: number of rows updated
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(target, str):
+            raise TypeError(f"target is {type(target)}; expected str()") from None
+        if not isinstance(eventType, str):
+            raise TypeError(f"eventType is {type(eventType)}; expected str()") from None
+        if not isinstance(eventData, str):
+            raise TypeError(f"eventData is {type(eventData)}; expected str()") from None
+
+        if sourceData is not None:
+            qry = """UPDATE tbl_scan_results
+                SET tracking = ?
+                WHERE scan_instance_id IN (SELECT guid FROM tbl_scan_instance WHERE seed_target = ?)
+                AND type = ?
+                AND data = ?
+                AND source_event_hash IN (
+                    SELECT hash FROM tbl_scan_results src
+                    WHERE src.scan_instance_id = tbl_scan_results.scan_instance_id
+                    AND src.data = ?
+                )"""
+            params = (tracking, target, eventType, eventData, sourceData)
+        else:
+            qry = """UPDATE tbl_scan_results
+                SET tracking = ?
+                WHERE scan_instance_id IN (SELECT guid FROM tbl_scan_instance WHERE seed_target = ?)
+                AND type = ?
+                AND data = ?
+                AND source_event_hash = 'ROOT'"""
+            params = (tracking, target, eventType, eventData)
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, params)
+                rowcount = self.dbh.rowcount
+                self.conn.commit()
+                return rowcount
+            except sqlite3.Error as e:
+                raise IOError("SQL error encountered when syncing tracking across scans") from e

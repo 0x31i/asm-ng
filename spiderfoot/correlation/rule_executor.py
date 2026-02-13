@@ -117,7 +117,7 @@ class DefaultRuleExecutionStrategy(RuleExecutionStrategy):
                     LEFT JOIN tbl_scan_results sr
                         ON sr.scan_instance_id = r.scan_instance_id
                         AND sr.hash = r.source_event_hash
-                    WHERE r.scan_instance_id = ? AND r.false_positive = 0
+                    WHERE r.scan_instance_id = ? AND r.false_positive = 0 AND r.tracking = 0
                 """
                 query_params = [scan_id]
 

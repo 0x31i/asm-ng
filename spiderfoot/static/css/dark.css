@@ -9136,6 +9136,94 @@ i.glyphicon-white,
   overflow-wrap: break-word;
 }
 
+/* Data type detail grid - single column stacked layout (mirrors Nessus) */
+.data-detail-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.data-detail-grid .finding-detail-section {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.data-detail-grid .finding-detail-text {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Data detail section colors */
+.finding-detail-section.detail-identified {
+  border-left-color: #0ea5e9;
+}
+.finding-detail-section.detail-identified .finding-detail-label {
+  color: #0ea5e9;
+}
+
+.finding-detail-section.detail-confidence {
+  border-left-color: #22c55e;
+}
+.finding-detail-section.detail-confidence .finding-detail-label {
+  color: #22c55e;
+}
+
+.finding-detail-section.detail-visibility {
+  border-left-color: #a855f7;
+}
+.finding-detail-section.detail-visibility .finding-detail-label {
+  color: #a855f7;
+}
+
+.finding-detail-section.detail-risk {
+  border-left-color: #e11d48;
+}
+.finding-detail-section.detail-risk .finding-detail-label {
+  color: #e11d48;
+}
+
+.finding-detail-section.detail-event-type {
+  border-left-color: #14b8a6;
+}
+.finding-detail-section.detail-event-type .finding-detail-label {
+  color: #14b8a6;
+}
+
+.finding-detail-section.detail-event-hash {
+  border-left-color: #64748b;
+}
+.finding-detail-section.detail-event-hash .finding-detail-label {
+  color: #64748b;
+}
+
+.finding-detail-section.detail-source-module {
+  border-left-color: #f59e0b;
+}
+.finding-detail-section.detail-source-module .finding-detail-label {
+  color: #f59e0b;
+}
+
+.finding-detail-section.detail-imported-from {
+  border-left-color: #8b5cf6;
+}
+.finding-detail-section.detail-imported-from .finding-detail-label {
+  color: #8b5cf6;
+}
+
+/* Data detail row styling */
+.data-detail-row td {
+  padding: 0 !important;
+  border-top: none !important;
+}
+
+.data-event-row {
+  cursor: pointer;
+}
+
+.data-event-row.finding-expanded {
+  background-color: rgba(59, 130, 246, 0.08);
+}
+
 /* Nessus detail section colors */
 .finding-detail-section.detail-synopsis {
   border-left-color: #0ea5e9;
