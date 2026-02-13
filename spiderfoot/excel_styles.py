@@ -542,11 +542,11 @@ def build_correlations_sheet(ws, correlation_rows: list):
 
     Args:
         ws: openpyxl Worksheet
-        correlation_rows: list of [title, rule_name, risk, description, rule_logic, event_count]
+        correlation_rows: list of [title, rule_name, risk, description, rule_logic, event_count, event_types]
     """
     set_tab_color(ws, '374151')
 
-    headers = ['Correlation', 'Rule Name', 'Risk', 'Description', 'Rule Logic', 'Event Count']
+    headers = ['Correlation', 'Rule Name', 'Risk', 'Description', 'Rule Logic', 'Event Count', 'Event Types']
     apply_header_row(ws, headers)
     freeze_header(ws)
 
@@ -572,7 +572,99 @@ def build_correlations_sheet(ws, correlation_rows: list):
     if correlation_rows:
         apply_alternating_rows(ws, 2, len(correlation_rows) + 1)
 
-    col_widths = [30, 25, 10, 50, 40, 12]
+    col_widths = [30, 25, 10, 50, 40, 12, 40]
+    for i, w in enumerate(col_widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+
+# ============================================================================
+# EXT-VULNS (NESSUS) SHEET BUILDER
+# ============================================================================
+
+def build_nessus_sheet(ws, nessus_rows: list):
+    """Build the EXT-VULNS worksheet with severity color-coding and styled headers.
+
+    Args:
+        ws: openpyxl Worksheet
+        nessus_rows: list of [severity, severity_number, plugin_name, plugin_id,
+                     host_ip, host_name, operating_system, description, synopsis,
+                     solution, see_also, service_name, port, protocol, request,
+                     plugin_output, cvss3_base_score, tracking]
+    """
+    set_tab_color(ws, 'dc2626')  # red
+
+    headers = [
+        "Severity", "Severity Number", "Plugin Name", "Plugin ID",
+        "Host IP", "Host Name", "Operating System", "Description",
+        "Synopsis", "Solution", "See Also", "Service Name", "Port",
+        "Protocol", "Request", "Plugin Output", "CVSS3 Base Score", "Tracking"
+    ]
+    apply_header_row(ws, headers)
+    freeze_header(ws)
+
+    for row_num, row_data in enumerate(nessus_rows, 2):
+        for col_num, cell_value in enumerate(row_data, 1):
+            cell = ws.cell(row=row_num, column=col_num, value=str(cell_value))
+            cell.font = DATA_FONT
+            cell.alignment = DATA_ALIGNMENT
+            cell.border = THIN_BORDER
+
+        # Color-code the Severity cell (column 1)
+        severity = str(row_data[0]).upper().strip() if row_data else ''
+        if severity in SEVERITY_COLORS:
+            apply_severity_fill(ws.cell(row=row_num, column=1), severity)
+
+    if nessus_rows:
+        apply_alternating_rows(ws, 2, len(nessus_rows) + 1)
+
+    col_widths = [12, 8, 30, 10, 14, 20, 18, 50, 40, 40, 30, 12, 8, 8, 40, 40, 10, 10]
+    for i, w in enumerate(col_widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+
+# ============================================================================
+# WEBAPP-VULNS (BURP) SHEET BUILDER
+# ============================================================================
+
+def build_burp_sheet(ws, burp_rows: list):
+    """Build the WEBAPP-VULNS worksheet with severity color-coding and styled headers.
+
+    Args:
+        ws: openpyxl Worksheet
+        burp_rows: list of [severity, severity_number, host_ip, host_name,
+                   plugin_name, issue_type, path, location, confidence,
+                   issue_background, issue_detail, solutions, see_also,
+                   references, vulnerability_classifications, request,
+                   response, tracking]
+    """
+    set_tab_color(ws, 'ea580c')  # orange
+
+    headers = [
+        "Severity", "Severity Number", "Host IP", "Host Name",
+        "Plugin Name", "Issue Type", "Path", "Location", "Confidence",
+        "Issue Background", "Issue Detail", "Solutions", "See Also",
+        "References", "Vulnerability Classifications",
+        "Request", "Response", "Tracking"
+    ]
+    apply_header_row(ws, headers)
+    freeze_header(ws)
+
+    for row_num, row_data in enumerate(burp_rows, 2):
+        for col_num, cell_value in enumerate(row_data, 1):
+            cell = ws.cell(row=row_num, column=col_num, value=str(cell_value))
+            cell.font = DATA_FONT
+            cell.alignment = DATA_ALIGNMENT
+            cell.border = THIN_BORDER
+
+        # Color-code the Severity cell (column 1)
+        severity = str(row_data[0]).upper().strip() if row_data else ''
+        if severity in SEVERITY_COLORS:
+            apply_severity_fill(ws.cell(row=row_num, column=1), severity)
+
+    if burp_rows:
+        apply_alternating_rows(ws, 2, len(burp_rows) + 1)
+
+    col_widths = [12, 8, 14, 20, 30, 14, 30, 20, 12, 50, 50, 40, 30, 30, 30, 40, 40, 10]
     for i, w in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
