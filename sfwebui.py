@@ -131,7 +131,7 @@ class SpiderFootWebUi:
         if dbh_init.userCount() == 0:
             import secrets as _secrets
             default_password = _secrets.token_urlsafe(12)
-            dbh_init.userCreate('admin', default_password, display_name='Administrator')
+            dbh_init.userCreate('admin', default_password, display_name='Administrator', role='admin')
             self._default_password = default_password
             self.log.info(f"Created default admin user. Password: {default_password}")
             print("")
@@ -209,10 +209,23 @@ class SpiderFootWebUi:
         """
         return cherrypy.session.get('username')
 
+    def currentUserRole(self: 'SpiderFootWebUi') -> str:
+        """Get the role of the currently logged-in user from the session.
+
+        Returns:
+            str: 'admin' or 'analyst'
+        """
+        return cherrypy.session.get('user_role', 'analyst')
+
     def requireAuth(self: 'SpiderFootWebUi') -> None:
         """Redirect to login page if user is not authenticated."""
         if not self.currentUser():
             raise cherrypy.HTTPRedirect(f"{self.docroot}/login")
+
+    def requireAdmin(self: 'SpiderFootWebUi') -> None:
+        """Redirect to index if user is not an admin."""
+        if self.currentUserRole() != 'admin':
+            raise cherrypy.HTTPRedirect(f"{self.docroot}/")
 
     def clientIP(self: 'SpiderFootWebUi') -> str:
         """Get the client IP address from the request.
@@ -239,6 +252,7 @@ class SpiderFootWebUi:
             dbh = SpiderFootDb(self.config)
             if dbh.userVerify(username, password):
                 cherrypy.session['username'] = username
+                cherrypy.session['user_role'] = dbh.userGetRole(username)
                 dbh.userUpdateLastLogin(username)
                 dbh.auditLog(username, 'LOGIN', detail='Successful login', ip_address=self.clientIP())
                 self.log.info(f"User '{username}' logged in from {self.clientIP()}")
@@ -1819,7 +1833,8 @@ class SpiderFootWebUi:
 
         templ = Template(
             filename='spiderfoot/templates/scanlist.tmpl', lookup=self.lookup)
-        return templ.render(rerunscans=True, docroot=self.docroot, pageid="SCANLIST", version=__version__)
+        return templ.render(rerunscans=True, docroot=self.docroot, pageid="SCANLIST", version=__version__,
+                            user_role=self.currentUserRole())
 
     @cherrypy.expose
     def newscan(self: 'SpiderFootWebUi') -> str:
@@ -1834,7 +1849,8 @@ class SpiderFootWebUi:
             filename='spiderfoot/templates/newscan.tmpl', lookup=self.lookup)
         return templ.render(pageid='NEWSCAN', types=types, docroot=self.docroot,
                             modules=self.config['__modules__'], scanname="",
-                            selectedmods="", scantarget="", version=__version__)
+                            selectedmods="", scantarget="", version=__version__,
+                            user_role=self.currentUserRole())
 
     @cherrypy.expose
     def importscans(self: 'SpiderFootWebUi') -> str:
@@ -1843,10 +1859,11 @@ class SpiderFootWebUi:
         Returns:
             str: Import page HTML
         """
+        self.requireAdmin()
         templ = Template(
             filename='spiderfoot/templates/import.tmpl', lookup=self.lookup)
         return templ.render(pageid='IMPORT', docroot=self.docroot,
-                            version=__version__)
+                            version=__version__, user_role=self.currentUserRole())
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -1865,6 +1882,8 @@ class SpiderFootWebUi:
         Returns:
             dict: import results
         """
+        if self.currentUserRole() != 'admin':
+            return {'success': False, 'message': 'Unauthorized'}
         if importfile is None:
             return {'success': False, 'message': 'No file was uploaded.'}
 
@@ -2855,7 +2874,8 @@ class SpiderFootWebUi:
         return templ.render(pageid='NEWSCAN', types=types, docroot=self.docroot,
                             modules=self.config['__modules__'], selectedmods=modlist,
                             scanname=str(scanname),
-                            scantarget=str(scantarget), version=__version__)
+                            scantarget=str(scantarget), version=__version__,
+                            user_role=self.currentUserRole())
 
     @cherrypy.expose
     def index(self: 'SpiderFootWebUi') -> str:
@@ -2866,7 +2886,8 @@ class SpiderFootWebUi:
         """
         templ = Template(
             filename='spiderfoot/templates/scanlist.tmpl', lookup=self.lookup)
-        return templ.render(pageid='SCANLIST', docroot=self.docroot, version=__version__)
+        return templ.render(pageid='SCANLIST', docroot=self.docroot, version=__version__,
+                            user_role=self.currentUserRole())
 
     @cherrypy.expose
     def scaninfo(self: 'SpiderFootWebUi', id: str) -> str:
@@ -2886,7 +2907,8 @@ class SpiderFootWebUi:
         templ = Template(filename='spiderfoot/templates/scaninfo.tmpl',
                          lookup=self.lookup, input_encoding='utf-8')
         return templ.render(id=id, name=html.escape(res[0]), status=res[5], docroot=self.docroot, version=__version__,
-                            pageid="SCANLIST", current_user=self.currentUser(), seedtarget=res[1])
+                            pageid="SCANLIST", current_user=self.currentUser(), seedtarget=res[1],
+                            user_role=self.currentUserRole())
 
     @cherrypy.expose
     def opts(self: 'SpiderFootWebUi', updated: str = None) -> str:
@@ -2898,12 +2920,14 @@ class SpiderFootWebUi:
         Returns:
             str: scan options page HTML
         """
+        self.requireAdmin()
         templ = Template(
             filename='spiderfoot/templates/opts.tmpl', lookup=self.lookup)
         self.token = random.SystemRandom().randint(0, 99999999)
         current_user = self.currentUser()
         return templ.render(opts=self.config, pageid='SETTINGS', token=self.token, version=__version__,
-                            updated=updated, docroot=self.docroot, current_user=current_user)
+                            updated=updated, docroot=self.docroot, current_user=current_user,
+                            user_role=self.currentUserRole())
 
     @cherrypy.expose
     def users(self: 'SpiderFootWebUi') -> str:
@@ -2913,9 +2937,8 @@ class SpiderFootWebUi:
             str: User management page HTML or redirect
         """
         # Only admin can access user management
+        self.requireAdmin()
         current_user = self.currentUser()
-        if current_user != 'admin':
-            raise cherrypy.HTTPRedirect(f"{self.docroot}/opts")
 
         dbh = SpiderFootDb(self.config)
         users_list = dbh.userList()
@@ -2924,7 +2947,8 @@ class SpiderFootWebUi:
             filename='spiderfoot/templates/users.tmpl', lookup=self.lookup)
         return templ.render(
             pageid='USERS', docroot=self.docroot, version=__version__,
-            users=users_list, current_user=current_user)
+            users=users_list, current_user=current_user,
+            user_role=self.currentUserRole())
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -2935,8 +2959,7 @@ class SpiderFootWebUi:
             list: List of user dicts
         """
         # Only admin can list users
-        current_user = self.currentUser()
-        if current_user != 'admin':
+        if self.currentUserRole() != 'admin':
             return {'success': False, 'error': 'Unauthorized'}
 
         dbh = SpiderFootDb(self.config)
@@ -2945,20 +2968,21 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
-    def usercreate(self: 'SpiderFootWebUi', username: str, password: str, display_name: str = None) -> dict:
+    def usercreate(self: 'SpiderFootWebUi', username: str, password: str, display_name: str = None, role: str = 'analyst') -> dict:
         """Create a new user (admin only).
 
         Args:
             username (str): username
             password (str): password
             display_name (str): optional display name
+            role (str): user role ('admin' or 'analyst')
 
         Returns:
             dict: Result
         """
         # Only admin can create users
         current_user = self.currentUser()
-        if current_user != 'admin':
+        if self.currentUserRole() != 'admin':
             return {'success': False, 'error': 'Unauthorized'}
 
         if not username or not password:
@@ -2971,14 +2995,17 @@ class SpiderFootWebUi:
         if len(password) < 8:
             return {'success': False, 'error': 'Password must be at least 8 characters'}
 
+        if role not in ('admin', 'analyst'):
+            role = 'analyst'
+
         dbh = SpiderFootDb(self.config)
 
         # Check if username already exists
         if dbh.userGet(username):
             return {'success': False, 'error': 'Username already exists'}
 
-        if dbh.userCreate(username, password, display_name):
-            dbh.auditLog(current_user, 'USER_CREATE', detail=f'Created user: {username}', ip_address=self.clientIP())
+        if dbh.userCreate(username, password, display_name, role=role):
+            dbh.auditLog(current_user, 'USER_CREATE', detail=f'Created user: {username} (role: {role})', ip_address=self.clientIP())
             return {'success': True, 'message': f'User {username} created successfully'}
         else:
             return {'success': False, 'error': 'Failed to create user'}
@@ -2998,7 +3025,7 @@ class SpiderFootWebUi:
         """
         # Only admin can update users
         current_user = self.currentUser()
-        if current_user != 'admin':
+        if self.currentUserRole() != 'admin':
             return {'success': False, 'error': 'Unauthorized'}
 
         dbh = SpiderFootDb(self.config)
@@ -3031,7 +3058,7 @@ class SpiderFootWebUi:
         """
         # Only admin can delete users
         current_user = self.currentUser()
-        if current_user != 'admin':
+        if self.currentUserRole() != 'admin':
             return {'success': False, 'error': 'Unauthorized'}
 
         if username == 'admin':
@@ -3063,7 +3090,7 @@ class SpiderFootWebUi:
         """
         # Only admin can change other users' passwords
         current_user = self.currentUser()
-        if current_user != 'admin':
+        if self.currentUserRole() != 'admin':
             return {'success': False, 'error': 'Unauthorized'}
 
         if len(new_password) < 8:
@@ -3107,7 +3134,7 @@ class SpiderFootWebUi:
             filename='spiderfoot/templates/auditlog.tmpl', lookup=self.lookup)
         return templ.render(
             pageid='AUDITLOG', docroot=self.docroot, version=__version__,
-            logs=logs, users=users)
+            logs=logs, users=users, user_role=self.currentUserRole())
 
     @cherrypy.expose
     def workspaces(self: 'SpiderFootWebUi') -> str:
@@ -3118,7 +3145,190 @@ class SpiderFootWebUi:
         """
         templ = Template(
             filename='spiderfoot/templates/workspaces.tmpl', lookup=self.lookup)
-        return templ.render(pageid='WORKSPACES', docroot=self.docroot, version=__version__)
+        return templ.render(pageid='WORKSPACES', docroot=self.docroot, version=__version__,
+                            user_role=self.currentUserRole())
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def getlaunchcode(self: 'SpiderFootWebUi') -> dict:
+        """Get the current scan launch code (admin only).
+
+        Returns:
+            dict: launch code info
+        """
+        if self.currentUserRole() != 'admin':
+            return {'success': False, 'error': 'Unauthorized'}
+        dbh = SpiderFootDb(self.config)
+        code = dbh.launchCodeGet()
+        return {'success': True, 'launch_code': code}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def setlaunchcode(self: 'SpiderFootWebUi', code: str = '') -> dict:
+        """Set the scan launch code (admin only).
+
+        Args:
+            code (str): launch code string, or empty to disable
+
+        Returns:
+            dict: result
+        """
+        if self.currentUserRole() != 'admin':
+            return {'success': False, 'error': 'Unauthorized'}
+        dbh = SpiderFootDb(self.config)
+        if dbh.launchCodeSet(code):
+            dbh.auditLog(self.currentUser(), 'LAUNCH_CODE_SET',
+                         detail=f'Launch code {"set" if code else "cleared"}',
+                         ip_address=self.clientIP())
+            return {'success': True, 'message': 'Launch code updated'}
+        return {'success': False, 'error': 'Failed to update launch code'}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def checkupdate(self: 'SpiderFootWebUi') -> dict:
+        """Check for available updates from GitHub Releases (admin only).
+
+        Returns:
+            dict: update availability info
+        """
+        if self.currentUserRole() != 'admin':
+            return {'success': False, 'error': 'Unauthorized'}
+
+        import urllib.request
+        import ssl
+
+        dbh = SpiderFootDb(self.config)
+        dbh.auditLog(self.currentUser(), 'UPDATE_CHECK',
+                     detail='Checked for updates',
+                     ip_address=self.clientIP())
+
+        try:
+            api_url = "https://api.github.com/repos/0x31i/asm-ng/releases/latest"
+            req = urllib.request.Request(api_url, headers={
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': f'ASM-NG/{__version__}'
+            })
+
+            ctx = ssl.create_default_context()
+            with urllib.request.urlopen(req, context=ctx, timeout=15) as resp:
+                release_data = json.loads(resp.read().decode('utf-8'))
+
+            latest_tag = release_data.get('tag_name', '').lstrip('v')
+            current_version = __version__
+
+            # Version comparison via tuple
+            try:
+                latest_parts = tuple(int(x) for x in latest_tag.split('.'))
+                current_parts = tuple(int(x) for x in current_version.split('.'))
+                update_available = latest_parts > current_parts
+            except (ValueError, AttributeError):
+                update_available = False
+
+            return {
+                'success': True,
+                'current_version': current_version,
+                'latest_version': latest_tag,
+                'update_available': update_available,
+                'release_name': release_data.get('name', ''),
+                'release_notes': release_data.get('body', ''),
+                'release_url': release_data.get('html_url', ''),
+                'published_at': release_data.get('published_at', '')
+            }
+        except Exception as e:
+            return {'success': False, 'error': f'Failed to check for updates: {str(e)}'}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def applyupdate(self: 'SpiderFootWebUi', version: str) -> dict:
+        """Apply an update by checking out a git tag (admin only).
+
+        Args:
+            version (str): version tag to checkout
+
+        Returns:
+            dict: update result
+        """
+        if self.currentUserRole() != 'admin':
+            return {'success': False, 'error': 'Unauthorized'}
+
+        import subprocess
+
+        dbh = SpiderFootDb(self.config)
+        tag = f"v{version}" if not version.startswith('v') else version
+        steps_completed = []
+
+        try:
+            # Step 1: Backup the database
+            db_path = self.config.get('__database', '')
+            if db_path:
+                backup_dir = os.path.dirname(db_path) or '.'
+                timestamp = time.strftime("%Y%m%d_%H%M%S")
+                backup_path = os.path.join(backup_dir, f"spiderfoot_pre_update_{timestamp}.db")
+                dbh.backupDB(backup_path)
+                steps_completed.append(f"Database backed up to {backup_path}")
+
+            # Step 2: Git fetch
+            repo_dir = os.path.dirname(os.path.abspath(__file__))
+            result = subprocess.run(
+                ['git', 'fetch', 'origin', '--tags'],
+                cwd=repo_dir, capture_output=True, text=True, timeout=60
+            )
+            if result.returncode != 0:
+                return {'success': False, 'error': f'git fetch failed: {result.stderr}',
+                        'steps_completed': steps_completed}
+            steps_completed.append('Fetched latest from origin')
+
+            # Step 3: Check if tag exists
+            result = subprocess.run(
+                ['git', 'tag', '-l', tag],
+                cwd=repo_dir, capture_output=True, text=True, timeout=10
+            )
+            if tag not in result.stdout.strip().split('\n'):
+                return {'success': False, 'error': f'Tag {tag} not found',
+                        'steps_completed': steps_completed}
+
+            # Step 4: Git checkout tag
+            result = subprocess.run(
+                ['git', 'checkout', tag],
+                cwd=repo_dir, capture_output=True, text=True, timeout=30
+            )
+            if result.returncode != 0:
+                return {'success': False, 'error': f'git checkout failed: {result.stderr}',
+                        'steps_completed': steps_completed}
+            steps_completed.append(f'Checked out {tag}')
+
+            # Step 5: Check if requirements changed and pip install
+            result = subprocess.run(
+                ['git', 'diff', 'HEAD~1..HEAD', '--name-only'],
+                cwd=repo_dir, capture_output=True, text=True, timeout=10
+            )
+            if 'requirements.txt' in result.stdout:
+                pip_result = subprocess.run(
+                    ['pip', 'install', '-r', 'requirements.txt'],
+                    cwd=repo_dir, capture_output=True, text=True, timeout=120
+                )
+                if pip_result.returncode != 0:
+                    steps_completed.append(f'pip install warning: {pip_result.stderr[:200]}')
+                else:
+                    steps_completed.append('Updated dependencies from requirements.txt')
+
+            # Audit log
+            dbh.auditLog(self.currentUser(), 'UPDATE_APPLIED',
+                         detail=f'Updated to {tag}',
+                         ip_address=self.clientIP())
+
+            return {
+                'success': True,
+                'message': f'Updated to {tag}. Please restart the application for changes to take effect.',
+                'steps_completed': steps_completed,
+                'restart_required': True
+            }
+        except subprocess.TimeoutExpired:
+            return {'success': False, 'error': 'Update operation timed out',
+                    'steps_completed': steps_completed}
+        except Exception as e:
+            return {'success': False, 'error': str(e),
+                    'steps_completed': steps_completed}
 
     @cherrypy.expose
     def optsexport(self: 'SpiderFootWebUi', pattern: str = None) -> str:
@@ -3130,6 +3340,7 @@ class SpiderFootWebUi:
         Returns:
             str: Configuration settings
         """
+        self.requireAdmin()
         sf = SpiderFoot(self.config)
         conf = sf.configSerialize(self.config)
         content = ""
@@ -3156,6 +3367,7 @@ class SpiderFootWebUi:
         Returns:
             str: settings as JSON
         """
+        self.requireAdmin()
         ret = dict()
         self.token = random.SystemRandom().randint(0, 99999999)
         for opt in self.config:
@@ -3225,6 +3437,7 @@ class SpiderFootWebUi:
         Raises:
             HTTPRedirect: redirect to scan settings
         """
+        self.requireAdmin()
         if str(token) != str(self.token):
             return self.error(f"Invalid token ({token})")
 
@@ -3307,6 +3520,7 @@ class SpiderFootWebUi:
         Returns:
             str: save success as JSON
         """
+        self.requireAdmin()
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
         if str(token) != str(self.token):
@@ -4417,7 +4631,7 @@ class SpiderFootWebUi:
             return self.jsonify_error('500', str(e))
 
     @cherrypy.expose
-    def startscan(self: 'SpiderFootWebUi', scanname: str, scantarget: str, modulelist: str, typelist: str, usecase: str) -> str:
+    def startscan(self: 'SpiderFootWebUi', scanname: str, scantarget: str, modulelist: str, typelist: str, usecase: str, launch_code: str = None) -> str:
         """Initiate a scan.
 
         Args:
@@ -4426,6 +4640,7 @@ class SpiderFootWebUi:
             modulelist (str): comma separated list of modules to use
             typelist (str): selected modules based on produced event data types
             usecase (str): selected module group (passive, investigate, footprint, all)
+            launch_code (str): launch code for non-admin users
 
         Returns:
             str: start scan status as JSON
@@ -4433,6 +4648,23 @@ class SpiderFootWebUi:
         Raises:
             HTTPRedirect: redirect to new scan info page
         """
+        # Launch code check for non-admin users
+        if self.currentUserRole() != 'admin':
+            dbh_lc = SpiderFootDb(self.config)
+            stored_code = dbh_lc.launchCodeGet()
+            if not stored_code:
+                error_msg = "Scan launching is disabled. An administrator must set a launch code first."
+                if cherrypy.request.headers.get('Accept') and 'application/json' in cherrypy.request.headers.get('Accept'):
+                    cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+                    return json.dumps(["ERROR", error_msg]).encode('utf-8')
+                return self.error(error_msg)
+            if launch_code != stored_code:
+                error_msg = "Invalid launch code."
+                if cherrypy.request.headers.get('Accept') and 'application/json' in cherrypy.request.headers.get('Accept'):
+                    cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+                    return json.dumps(["ERROR", error_msg]).encode('utf-8')
+                return self.error(error_msg)
+
         scanname = self.cleanUserInput([scanname])[0]
         scantarget = self.cleanUserInput([scantarget])[0]
 
@@ -8080,7 +8312,8 @@ This is a placeholder MCP report. Integration with actual MCP server required.
                 related=related,
                 version=__version__,
                 pageid="DOCUMENTATION",
-                highlight=highlight
+                highlight=highlight,
+                user_role=self.currentUserRole()
             )
         except Exception as e:
             self.log.error("Error in documentation endpoint: %s", e, exc_info=True)
@@ -8129,7 +8362,8 @@ This is a placeholder MCP report. Integration with actual MCP server required.
                 scan_details=scan_details,
                 docroot=self.docroot,
                 version=__version__,
-                pageid="WORKSPACE_DETAILS"
+                pageid="WORKSPACE_DETAILS",
+                user_role=self.currentUserRole()
             )
             
         except Exception as e:

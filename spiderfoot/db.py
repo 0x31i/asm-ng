@@ -201,6 +201,7 @@ class SpiderFootDb:
             password_hash   VARCHAR NOT NULL, \
             salt            VARCHAR NOT NULL, \
             display_name    VARCHAR, \
+            role            VARCHAR NOT NULL DEFAULT 'analyst', \
             active          INT NOT NULL DEFAULT 1, \
             created         INT NOT NULL, \
             last_login      INT DEFAULT 0 \
@@ -495,9 +496,25 @@ class SpiderFootDb:
         self.dbh.execute("PRAGMA journal_mode=WAL")
         self.dbh.execute("PRAGMA synchronous=NORMAL")
         self.dbh.execute("PRAGMA busy_timeout=5000")
-        self.dbh.execute("PRAGMA cache_size=-64000")
+
+        # cache_size and mmap_size tuned for 32GB RAM deployments
+        # Override via env vars for different deployment sizes
+        cache_size = os.environ.get('ASMNG_SQLITE_CACHE_SIZE', '-256000')  # ~256MB
+        try:
+            int(cache_size)
+        except ValueError:
+            cache_size = '-256000'
+        self.dbh.execute(f"PRAGMA cache_size={cache_size}")
+
         self.dbh.execute("PRAGMA temp_store=MEMORY")
-        self.dbh.execute("PRAGMA mmap_size=268435456")
+
+        mmap_size = os.environ.get('ASMNG_SQLITE_MMAP_SIZE', '1073741824')  # 1GB
+        try:
+            int(mmap_size)
+        except ValueError:
+            mmap_size = '1073741824'
+        self.dbh.execute(f"PRAGMA mmap_size={mmap_size}")
+
         self.dbh.execute("PRAGMA foreign_keys=ON")
 
         # Startup integrity check
@@ -665,6 +682,21 @@ class SpiderFootDb:
                     for query in self.createSchemaQueries:
                         if "audit_log" in query:
                             self.dbh.execute(query)
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass
+
+            # Migration: Add role column to tbl_users if it doesn't exist
+            try:
+                self.dbh.execute("SELECT role FROM tbl_users LIMIT 1")
+            except sqlite3.Error:
+                try:
+                    self.dbh.execute(
+                        "ALTER TABLE tbl_users ADD COLUMN role VARCHAR NOT NULL DEFAULT 'analyst'"
+                    )
+                    self.dbh.execute(
+                        "UPDATE tbl_users SET role = 'admin' WHERE username = 'admin'"
+                    )
                     self.conn.commit()
                 except sqlite3.Error:
                     pass
@@ -4142,22 +4174,25 @@ class SpiderFootDb:
         password_hash = hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
         return password_hash, salt
 
-    def userCreate(self, username: str, password: str, display_name: str = None) -> bool:
+    def userCreate(self, username: str, password: str, display_name: str = None, role: str = 'analyst') -> bool:
         """Create a new user.
 
         Args:
             username (str): username
             password (str): plain text password (will be hashed)
             display_name (str): optional display name
+            role (str): user role ('admin' or 'analyst', default 'analyst')
 
         Returns:
             bool: True if user was created
         """
+        if role not in ('admin', 'analyst'):
+            role = 'analyst'
         password_hash, salt = self.hashPassword(password)
         created = int(time.time() * 1000)
 
-        qry = "INSERT INTO tbl_users (username, password_hash, salt, display_name, active, created) VALUES (?, ?, ?, ?, 1, ?)"
-        params = (username, password_hash, salt, display_name or username, created)
+        qry = "INSERT INTO tbl_users (username, password_hash, salt, display_name, role, active, created) VALUES (?, ?, ?, ?, ?, 1, ?)"
+        params = (username, password_hash, salt, display_name or username, role, created)
 
         with self.dbhLock:
             try:
@@ -4218,7 +4253,7 @@ class SpiderFootDb:
         Returns:
             dict: user details or None
         """
-        qry = "SELECT id, username, display_name, active, created, last_login FROM tbl_users WHERE username = ?"
+        qry = "SELECT id, username, display_name, role, active, created, last_login FROM tbl_users WHERE username = ?"
 
         with self.dbhLock:
             try:
@@ -4230,9 +4265,10 @@ class SpiderFootDb:
                     'id': row[0],
                     'username': row[1],
                     'display_name': row[2],
-                    'active': row[3],
-                    'created': row[4],
-                    'last_login': row[5]
+                    'role': row[3],
+                    'active': row[4],
+                    'created': row[5],
+                    'last_login': row[6]
                 }
             except sqlite3.Error:
                 return None
@@ -4243,7 +4279,7 @@ class SpiderFootDb:
         Returns:
             list: list of user dicts
         """
-        qry = "SELECT id, username, display_name, active, created, last_login FROM tbl_users ORDER BY username"
+        qry = "SELECT id, username, display_name, role, active, created, last_login FROM tbl_users ORDER BY username"
 
         with self.dbhLock:
             try:
@@ -4254,9 +4290,10 @@ class SpiderFootDb:
                         'id': row[0],
                         'username': row[1],
                         'display_name': row[2],
-                        'active': row[3],
-                        'created': row[4],
-                        'last_login': row[5]
+                        'role': row[3],
+                        'active': row[4],
+                        'created': row[5],
+                        'last_login': row[6]
                     }
                     for row in rows
                 ]
@@ -4278,6 +4315,25 @@ class SpiderFootDb:
                 return row[0] if row else 0
             except sqlite3.Error:
                 return 0
+
+    def userGetRole(self, username: str) -> str:
+        """Get the role of a user.
+
+        Args:
+            username (str): username
+
+        Returns:
+            str: 'admin' or 'analyst'
+        """
+        qry = "SELECT role FROM tbl_users WHERE username = ?"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [username])
+                row = self.dbh.fetchone()
+                return row[0] if row else 'analyst'
+            except sqlite3.Error:
+                return 'analyst'
 
     def userChangePassword(self, username: str, new_password: str) -> bool:
         """Change a user's password.
@@ -4431,6 +4487,45 @@ class SpiderFootDb:
                 ]
             except sqlite3.Error:
                 return []
+
+    #
+    # Launch code methods
+    #
+
+    def launchCodeGet(self) -> str:
+        """Get the scan launch code.
+
+        Returns:
+            str: launch code or empty string if not set
+        """
+        qry = "SELECT val FROM tbl_config WHERE scope = 'GLOBAL' AND opt = '__launch_code'"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry)
+                row = self.dbh.fetchone()
+                return row[0] if row else ''
+            except sqlite3.Error:
+                return ''
+
+    def launchCodeSet(self, code: str) -> bool:
+        """Set the scan launch code.
+
+        Args:
+            code (str): the launch code string, or empty to disable
+
+        Returns:
+            bool: True if set successfully
+        """
+        qry = "REPLACE INTO tbl_config (scope, opt, val) VALUES ('GLOBAL', '__launch_code', ?)"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [code])
+                self.conn.commit()
+                return True
+            except sqlite3.Error:
+                return False
 
     def scanFindingsList(self, instanceId: str) -> list:
         """Obtain a list of findings imported for a scan.

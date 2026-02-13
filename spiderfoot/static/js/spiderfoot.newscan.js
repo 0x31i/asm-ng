@@ -15,6 +15,14 @@
                 $("#"+tabs[i]+"list").val("");
             }
         }
+
+        // For non-admin users, show launch code modal instead of submitting
+        if (typeof userRole !== 'undefined' && userRole !== 'admin') {
+            $('#launch-code-error').hide();
+            $('#launch-code-input').val('');
+            $('#launchCodeModal').modal('show');
+            return false;
+        }
     }
 
     function switchTab(tabname) {
@@ -44,7 +52,26 @@ $(document).ready(function() {
     $("#moduletab").click(function() { switchTab("module"); });
     $("#btn-select-all").click(function() { selectAll(); });
     $("#btn-deselect-all").click(function() { deselectAll(); });
-    $("#btn-run-scan").click(function() { submitForm(); });
+    $("#btn-run-scan").click(function(e) {
+        submitForm();
+        // If submitForm returned false (non-admin), prevent form submission
+        if (typeof userRole !== 'undefined' && userRole !== 'admin') {
+            e.preventDefault();
+            return false;
+        }
+    });
+
+    // Launch code modal submit handler
+    $('#launch-code-submit').click(function() {
+        var code = $('#launch-code-input').val();
+        if (!code) {
+            $('#launch-code-error').text('Please enter the launch code.').show();
+            return;
+        }
+        $('#launch_code').val(code);
+        $('#launchCodeModal').modal('hide');
+        $('form.form').submit();
+    });
 
     $('#scantarget').popover({ 'html': true, 'animation': true, 'trigger': 'focus'});
 });
