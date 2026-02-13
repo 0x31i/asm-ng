@@ -38,8 +38,8 @@
       <a id='btn-findings' class="btn btn-default" onClick='viewFindings("${id}")'><i class='glyphicon glyphicon-exclamation-sign'></i>&nbsp;Findings</a>
       <a id='btn-graph' class="btn btn-default" onClick='viewVulnerabilities("${id}")'><i class='glyphicon glyphicon-asterisk'></i>&nbsp;Vulnerabilities</a>
       <a id='btn-data' class="btn btn-default" onClick='dataEventList("${id}")'><i class='glyphicon glyphicon-th-list'></i>&nbsp;Data</a>
+% if user_role == 'admin':
       <a id='btn-assets' class="btn btn-default" onClick='viewAssets("${id}")'><i class='glyphicon glyphicon-hdd'></i>&nbsp;Assets</a>
-% if current_user == 'admin':
       <a id='btn-info' class="btn btn-default" onClick='viewScanConfig("${id}")'><i class='glyphicon glyphicon-cog'></i>&nbsp;Manage</a>
 % endif
     </div>

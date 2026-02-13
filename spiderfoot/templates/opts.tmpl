@@ -19,7 +19,7 @@
         <button id="btn-opt-export" class='btn btn-info'>Export API Keys</button>
         <button id="btn-reset-settings" class='btn btn-danger'>Reset to Factory Default</button>
         <a href="${docroot}/auditlog" id="btn-activity-log" class='btn btn-default'>Activity Log</a>
-% if current_user == 'admin':
+% if user_role == 'admin':
         <a href="${docroot}/users" id="btn-user-management" class='btn btn-warning'><i class="glyphicon glyphicon-user"></i> User Management</a>
 % endif
     </div>
@@ -36,6 +36,9 @@
 <li id='tab_global' class="active"><a href="javascript:void(0)">Global</a></li>
 <li id='tab_gradeconfig'><a href='javascript:void(0)' onclick='switchTab("gradeconfig");'>Grade Configuration</a></li>
 <li id='tab_dbmanage'><a href='javascript:void(0)' onclick='switchTab("dbmanage");'>Database Management</a></li>
+% if user_role == 'admin':
+<li id='tab_updates'><a href='javascript:void(0)' onclick='switchTab("updates");'>System Updates</a></li>
+% endif
 % for mod in sorted(opts['__modules__'].keys()):
     <% keylist = dict((k, v) for k, v in opts['__modules__'][mod]['opts'].items() if not k.startswith('_')) %>
     % if len(keylist) > 0:
@@ -104,6 +107,51 @@
 % endfor
 </tbody>
 </table>
+
+% if user_role == 'admin':
+<hr>
+<h5><i class="glyphicon glyphicon-lock"></i> Scan Launch Code</h5>
+<p style="color: #888; font-size: 12px; margin-bottom: 8px;">
+Set a launch code that analysts must enter to start scans. Leave empty to disable scan launching for non-admin users.
+</p>
+<div class="input-group" style="max-width: 400px;">
+  <input type="text" id="launch-code-setting" class="form-control" placeholder="Enter launch code...">
+  <span class="input-group-btn">
+    <button type="button" class="btn btn-primary" id="btn-save-launch-code" onclick="saveLaunchCode()">Save</button>
+  </span>
+</div>
+<div id="launch-code-result" style="display:none; margin-top: 5px;"></div>
+<script>
+$(document).ready(function() {
+    $.getJSON(docroot + '/getlaunchcode', function(data) {
+        if (data.success) {
+            $('#launch-code-setting').val(data.launch_code);
+        }
+    });
+});
+
+function saveLaunchCode() {
+    var code = $('#launch-code-setting').val();
+    $.ajax({
+        url: docroot + '/setlaunchcode',
+        type: 'GET',
+        data: { code: code },
+        dataType: 'json',
+        success: function(data) {
+            var el = $('#launch-code-result');
+            el.show();
+            if (data.success) {
+                el.attr('class', 'alert alert-success').html('<strong>Saved!</strong> Launch code updated.');
+            } else {
+                el.attr('class', 'alert alert-danger').html('<strong>Error:</strong> ' + (data.error || 'Unknown error'));
+            }
+            setTimeout(function(){ el.fadeOut(); }, 3000);
+        }
+    });
+}
+</script>
+% endif
+
 </div>
 <div id='optsect_gradeconfig' class="tab-pane" style="display: none">
 <h4>Grade Configuration</h4>
@@ -510,6 +558,155 @@ function formatBytes(bytes) {
 }
 </script>
 </div>
+
+% if user_role == 'admin':
+<div id='optsect_updates' class="tab-pane" style="display: none">
+<h4>System Updates</h4>
+<p style="color: #888; margin-bottom: 15px;">
+Check for and apply updates from the ASM-NG repository.
+</p>
+
+<h5><i class="glyphicon glyphicon-info-sign"></i> Current Version</h5>
+<p><strong>${version}</strong></p>
+
+<hr>
+
+<h5><i class="glyphicon glyphicon-cloud-download"></i> Check for Updates</h5>
+<div id="update-check-result" style="display:none; margin-bottom: 10px;"></div>
+<button type="button" class="btn btn-info" id="btn-check-update" onclick="checkForUpdate()">
+<i class="glyphicon glyphicon-refresh"></i> Check for Updates
+</button>
+
+<div id="update-available-section" style="display:none; margin-top: 15px;">
+  <hr>
+  <h5><i class="glyphicon glyphicon-download"></i> Update Available</h5>
+  <table class='table table-bordered table-striped'>
+  <tbody>
+  <tr><td style="width:150px">Latest Version</td><td id="update-latest-version">-</td></tr>
+  <tr><td>Release Name</td><td id="update-release-name">-</td></tr>
+  <tr><td>Published</td><td id="update-published">-</td></tr>
+  </tbody>
+  </table>
+  <h5>Release Notes</h5>
+  <div id="update-release-notes" class="well" style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;"></div>
+  <br>
+  <div id="update-apply-result" style="display:none; margin-bottom: 10px;"></div>
+  <button type="button" class="btn btn-danger" id="btn-apply-update" onclick="applyUpdate()">
+  <i class="glyphicon glyphicon-upload"></i> Update Now
+  </button>
+  <p style="color: #888; font-size: 11px; margin-top: 5px;">
+  This will backup the database, fetch the latest code, and checkout the new version.
+  A restart will be required after the update.
+  </p>
+</div>
+
+<script>
+var _latestVersion = '';
+
+function checkForUpdate() {
+    var btn = document.getElementById('btn-check-update');
+    var resultDiv = document.getElementById('update-check-result');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="glyphicon glyphicon-refresh"></i> Checking...';
+    resultDiv.style.display = 'none';
+    document.getElementById('update-available-section').style.display = 'none';
+
+    $.ajax({
+        url: docroot + '/checkupdate',
+        type: 'GET',
+        dataType: 'json',
+        success: function(data) {
+            resultDiv.style.display = 'block';
+            if (data.success) {
+                if (data.update_available) {
+                    _latestVersion = data.latest_version;
+                    resultDiv.className = 'alert alert-warning';
+                    resultDiv.innerHTML = '<strong>Update available!</strong> ' +
+                        data.current_version + ' &rarr; ' + data.latest_version;
+
+                    document.getElementById('update-latest-version').textContent = data.latest_version;
+                    document.getElementById('update-release-name').textContent = data.release_name || '-';
+                    document.getElementById('update-published').textContent = data.published_at || '-';
+                    document.getElementById('update-release-notes').textContent = data.release_notes || 'No release notes.';
+                    document.getElementById('update-available-section').style.display = 'block';
+                } else {
+                    resultDiv.className = 'alert alert-success';
+                    resultDiv.innerHTML = '<strong>Up to date!</strong> You are running the latest version (' + data.current_version + ').';
+                }
+            } else {
+                resultDiv.className = 'alert alert-danger';
+                resultDiv.innerHTML = '<strong>Error:</strong> ' + (data.error || 'Unknown error');
+            }
+        },
+        error: function() {
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'alert alert-danger';
+            resultDiv.innerHTML = '<strong>Error:</strong> Failed to check for updates.';
+        },
+        complete: function() {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="glyphicon glyphicon-refresh"></i> Check for Updates';
+        }
+    });
+}
+
+function applyUpdate() {
+    if (!_latestVersion) return;
+    if (!confirm('Are you sure you want to update to version ' + _latestVersion + '?\n\nThe database will be backed up first. A restart will be required.')) return;
+
+    var btn = document.getElementById('btn-apply-update');
+    var resultDiv = document.getElementById('update-apply-result');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="glyphicon glyphicon-upload"></i> Updating...';
+    resultDiv.style.display = 'none';
+
+    $.ajax({
+        url: docroot + '/applyupdate',
+        type: 'GET',
+        data: { version: _latestVersion },
+        dataType: 'json',
+        timeout: 180000,
+        success: function(data) {
+            resultDiv.style.display = 'block';
+            if (data.success) {
+                resultDiv.className = 'alert alert-success';
+                var html = '<strong>Update successful!</strong><br>' + data.message + '<br><br>';
+                html += '<strong>Steps completed:</strong><ul>';
+                (data.steps_completed || []).forEach(function(s) {
+                    html += '<li>' + s + '</li>';
+                });
+                html += '</ul>';
+                if (data.restart_required) {
+                    html += '<br><div class="alert alert-warning"><strong>Restart required.</strong> Please restart the ASM-NG application for changes to take effect.</div>';
+                }
+                resultDiv.innerHTML = html;
+            } else {
+                resultDiv.className = 'alert alert-danger';
+                var html = '<strong>Update failed:</strong> ' + (data.error || 'Unknown error');
+                if (data.steps_completed && data.steps_completed.length > 0) {
+                    html += '<br><br><strong>Steps completed before failure:</strong><ul>';
+                    data.steps_completed.forEach(function(s) {
+                        html += '<li>' + s + '</li>';
+                    });
+                    html += '</ul>';
+                }
+                resultDiv.innerHTML = html;
+            }
+        },
+        error: function() {
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'alert alert-danger';
+            resultDiv.innerHTML = '<strong>Error:</strong> Update request failed. The server may have restarted.';
+        },
+        complete: function() {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="glyphicon glyphicon-upload"></i> Update Now';
+        }
+    });
+}
+</script>
+</div>
+% endif
 
 % for mod in sorted(opts['__modules__'].keys()):
     <%

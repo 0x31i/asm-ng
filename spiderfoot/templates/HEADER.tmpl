@@ -1,3 +1,7 @@
+<%
+    # Safety default for user_role if not passed
+    user_role = user_role if user_role is not UNDEFINED else 'analyst'
+%>
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -76,6 +80,7 @@
         <span class="nav-text">Workspaces</span>
       </a>
     </li>
+% if user_role == 'admin':
     <li
 % if pageid == "IMPORT":
     class="active"
@@ -96,6 +101,7 @@
         <span class="nav-text">Settings</span>
       </a>
     </li>
+% endif
   </ul>
 
   <!-- Theme Toggle -->
@@ -120,4 +126,5 @@
     <script type='text/javascript' hash="sha256-0kTZzWMEh3cdgCMVytlY1E8rg7oO13eyLa+kvyAhRmo=">sf.updateTooltips();</script>
 
     <div class="container" id="mainbody" style='padding-bottom: 50px; overflow: visible !important;'>
+
 

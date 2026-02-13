@@ -22,6 +22,14 @@
             <input type="text" class="form-control" id="newDisplayName" placeholder="Enter display name (optional)">
           </div>
           <div class="form-group">
+            <label for="newRole">Role</label>
+            <select class="form-control" id="newRole">
+              <option value="analyst">Analyst</option>
+              <option value="admin">Admin</option>
+            </select>
+            <small class="form-text text-muted">Analysts have read/annotate access only. Admins have full access.</small>
+          </div>
+          <div class="form-group">
             <label for="newPassword">Password</label>
             <input type="password" class="form-control" id="newPassword" placeholder="Enter password (min 8 characters)" required>
             <small class="form-text text-muted">Password must be at least 8 characters</small>
@@ -165,6 +173,13 @@
     border-radius: 4px;
     font-size: 0.85em;
 }
+.analyst-badge {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
 </style>
 
 <script type='text/javascript'>
@@ -196,10 +211,13 @@ $(document).ready(function() {
 
         $('#createUserBtn').prop('disabled', true).text('Creating...');
 
+        var role = $('#newRole').val() || 'analyst';
+
         $.post('${docroot}/usercreate', {
             username: username,
             password: password,
-            display_name: displayName || username
+            display_name: displayName || username,
+            role: role
         }, function(data) {
             $('#createUserBtn').prop('disabled', false).text('Create User');
 
@@ -322,15 +340,14 @@ function displayUsers(users) {
             var lastLogin = user.last_login ? new Date(user.last_login).toLocaleString() : 'Never';
             var statusClass = user.active ? 'status-active' : 'status-disabled';
             var statusText = user.active ? 'Active' : 'Disabled';
-            var isAdmin = user.username === 'admin';
+            var isAdmin = user.role === 'admin';
+            var roleText = user.role === 'admin' ? 'Admin' : 'Analyst';
+            var roleBadge = isAdmin ? '<span class="admin-badge">ADMIN</span>' : '<span class="analyst-badge">ANALYST</span>';
 
             var row = '<tr>';
-            row += '<td><strong>' + escapeHtml(user.username) + '</strong>';
-            if (isAdmin) {
-                row += ' <span class="admin-badge">ADMIN</span>';
-            }
-            row += '</td>';
+            row += '<td><strong>' + escapeHtml(user.username) + '</strong></td>';
             row += '<td>' + escapeHtml(user.display_name || user.username) + '</td>';
+            row += '<td>' + roleBadge + '</td>';
             row += '<td><span class="' + statusClass + '">' + statusText + '</span></td>';
             row += '<td>' + createdDate + '</td>';
             row += '<td>' + lastLogin + '</td>';
@@ -351,6 +368,7 @@ function displayUsers(users) {
         html += '<thead><tr>';
         html += '<th>Username</th>';
         html += '<th>Display Name</th>';
+        html += '<th>Role</th>';
         html += '<th>Status</th>';
         html += '<th>Created</th>';
         html += '<th>Last Login</th>';
