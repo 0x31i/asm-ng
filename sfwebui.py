@@ -6078,10 +6078,44 @@ class SpiderFootWebUi:
                     for col_num, cell_value in enumerate(row_data, 1):
                         ws_corr.cell(row=row_num, column=col_num, value=cell_value)
 
-            with BytesIO() as f:
-                wb.save(f)
-                f.seek(0)
-                return f.read()
+            try:
+                self.log.info("Full report: saving workbook...")
+                with BytesIO() as f:
+                    wb.save(f)
+                    f.seek(0)
+                    data = f.read()
+                self.log.info(f"Full report: saved successfully ({len(data)} bytes)")
+                return data
+            except Exception as e:
+                self.log.error(f"Full report: wb.save() failed: {e}", exc_info=True)
+                # Fall back to basic export so the user gets something
+                wb_fallback = openpyxl.Workbook()
+                ws_err = wb_fallback.active
+                ws_err.title = "Export Error"
+                ws_err['A1'].value = "Full report save failed during Excel serialization."
+                ws_err['A2'].value = f"Error: {str(e)}"
+                ws_err['A3'].value = "The styled workbook was built but could not be saved. Basic data follows."
+
+                ws_fb_findings = wb_fallback.create_sheet("Findings")
+                fb_headers = ["Priority", "Category", "Tab", "Item", "Description", "Recommendation"]
+                for col_num, header in enumerate(fb_headers, 1):
+                    ws_fb_findings.cell(row=1, column=col_num, value=header)
+                for row_num, row_data in enumerate(findings_rows, 2):
+                    for col_num, cell_value in enumerate(row_data, 1):
+                        ws_fb_findings.cell(row=row_num, column=col_num, value=str(cell_value))
+
+                ws_fb_corr = wb_fallback.create_sheet("Correlations")
+                fb_corr_headers = ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"]
+                for col_num, header in enumerate(fb_corr_headers, 1):
+                    ws_fb_corr.cell(row=1, column=col_num, value=header)
+                for row_num, row_data in enumerate(correlation_rows, 2):
+                    for col_num, cell_value in enumerate(row_data, 1):
+                        ws_fb_corr.cell(row=row_num, column=col_num, value=str(cell_value))
+
+                with BytesIO() as f:
+                    wb_fallback.save(f)
+                    f.seek(0)
+                    return f.read()
 
         if filetype.lower() == 'csv':
             import csv

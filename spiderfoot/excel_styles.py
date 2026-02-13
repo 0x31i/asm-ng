@@ -408,48 +408,52 @@ def build_executive_summary(ws, grade_data: dict, scan_info: dict,
 
         current_row += 1
 
-    # -- Data Bars on Score column --
+    # -- Data Bars on Score column (cosmetic — non-fatal if it fails) --
     if sorted_cats:
-        score_range = f"E{cat_header_row + 1}:E{current_row - 1}"
-        rule = DataBarRule(
-            start_type='num', start_value=0,
-            end_type='num', end_value=100,
-            color='FF3B82F6',
-        )
-        ws.conditional_formatting.add(score_range, rule)
+        try:
+            score_range = f"E{cat_header_row + 1}:E{current_row - 1}"
+            rule = DataBarRule(
+                start_type='num', start_value=0,
+                end_type='num', end_value=100,
+                color='3B82F6',
+            )
+            ws.conditional_formatting.add(score_range, rule)
+        except Exception:
+            pass
 
-    # -- Bar Chart: Category Scores --
+    # -- Bar Chart: Category Scores (cosmetic — non-fatal if it fails) --
     if sorted_cats:
-        chart = BarChart()
-        chart.type = "col"
-        chart.style = 10
-        chart.title = "Category Scores"
-        chart.y_axis.title = "Score"
-        chart.x_axis.title = None
-        chart.y_axis.scaling.min = 0
-        chart.y_axis.scaling.max = 100
+        try:
+            chart = BarChart()
+            chart.type = "col"
+            chart.style = 10
+            chart.title = "Category Scores"
+            chart.y_axis.title = "Score"
+            chart.y_axis.scaling.min = 0
+            chart.y_axis.scaling.max = 100
 
-        data_ref = Reference(ws, min_col=5, min_row=cat_header_row,
-                             max_row=cat_header_row + len(sorted_cats))
-        cats_ref = Reference(ws, min_col=1, min_row=cat_header_row + 1,
-                             max_row=cat_header_row + len(sorted_cats))
+            data_ref = Reference(ws, min_col=5, min_row=cat_header_row,
+                                 max_row=cat_header_row + len(sorted_cats))
+            cats_ref = Reference(ws, min_col=1, min_row=cat_header_row + 1,
+                                 max_row=cat_header_row + len(sorted_cats))
 
-        chart.add_data(data_ref, titles_from_data=True)
-        chart.set_categories(cats_ref)
-        chart.shape = 4
-        chart.width = 20
-        chart.height = 12
+            chart.add_data(data_ref, titles_from_data=True)
+            chart.set_categories(cats_ref)
+            chart.width = 20
+            chart.height = 12
 
-        # Color each bar to match its category color
-        series = chart.series[0]
-        for idx, (cat_name_c, cat_data_c) in enumerate(sorted_cats):
-            pt = DataPoint(idx=idx)
-            cat_color_hex = cat_data_c.get('color', '#6b7280').lstrip('#')
-            pt.graphicalProperties.solidFill = cat_color_hex
-            series.data_points.append(pt)
+            # Color each bar to match its category color
+            series = chart.series[0]
+            for idx, (cat_name_c, cat_data_c) in enumerate(sorted_cats):
+                pt = DataPoint(idx=idx)
+                cat_color_hex = cat_data_c.get('color', '#6b7280').lstrip('#')
+                pt.graphicalProperties.solidFill = cat_color_hex
+                series.data_points.append(pt)
 
-        chart.legend = None
-        ws.add_chart(chart, f"G{cat_section_row}")
+            chart.legend = None
+            ws.add_chart(chart, f"G{cat_section_row}")
+        except Exception:
+            pass
 
     # -- Column widths --
     ws.column_dimensions['A'].width = 28
