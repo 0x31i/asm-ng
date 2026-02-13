@@ -4366,8 +4366,8 @@ div[id*="Help"].alert-info {
 
 .sidebar-signout .signout-icon {
   font-size: 18px;
-  color: #ffffff;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.6), 0 0 20px rgba(255, 255, 255, 0.3);
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.6), 0 0 20px rgba(255, 255, 255, 0.3) !important;
   transition: color 0.25s ease, text-shadow 0.25s ease;
 }
 
@@ -4382,14 +4382,14 @@ div[id*="Help"].alert-info {
   max-width: 0;
   opacity: 0;
   margin-left: 0;
-  color: #ffffff;
+  color: #ffffff !important;
   transition: max-width 0.3s ease, opacity 0.3s ease, margin-left 0.3s ease;
 }
 
 /* Hover: icon glows red */
 .sidebar-signout:hover .signout-icon {
-  color: #dc3545;
-  text-shadow: 0 0 12px rgba(220, 53, 69, 0.7), 0 0 25px rgba(220, 53, 69, 0.4);
+  color: #dc3545 !important;
+  text-shadow: 0 0 12px rgba(220, 53, 69, 0.7), 0 0 25px rgba(220, 53, 69, 0.4) !important;
 }
 
 /* Armed (first click): solid red pill with CONFIRM SIGNOUT text */
@@ -4400,15 +4400,15 @@ div[id*="Help"].alert-info {
 }
 
 .sidebar-signout.signout-armed .signout-icon {
-  color: #ffffff;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+  color: #ffffff !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6) !important;
 }
 
 .sidebar-signout.signout-armed .signout-text {
   max-width: 150px;
   opacity: 1;
   margin-left: 8px;
-  color: #ffffff;
+  color: #ffffff !important;
   text-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
 }
 
