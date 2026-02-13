@@ -407,6 +407,32 @@ button.btn-cyan {
   text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
 }
 
+/* Full Report button - Prominent green for Executive Summary export */
+.btn-full-report {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
+  color: #ffffff !important;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 6px 14px;
+  border: none !important;
+  margin-left: 8px;
+  box-shadow: 0 0 15px rgba(22, 197, 94, 0.3);
+  transition: all 0.2s ease;
+}
+.btn-full-report:hover,
+.btn-full-report:focus {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 25px rgba(22, 197, 94, 0.5), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+.btn-full-report .glyphicon {
+  color: #ffffff !important;
+  margin-right: 4px;
+}
+
 /* Warning button - Orange gradient with glow */
 .btn-warning {
   background: linear-gradient(135deg, var(--accent-yellow) 0%, var(--accent-orange) 100%) !important;
@@ -846,6 +872,9 @@ tr.danger td {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8) !important;
   padding: 0;
   margin-top: 0;
+  z-index: 1050 !important;
+  overflow-y: auto;
+  max-height: 80vh;
 }
 
 .dropdown-menu > li > a {

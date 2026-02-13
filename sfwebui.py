@@ -460,7 +460,7 @@ class SpiderFootWebUi:
 
         for row in data:
             sheetName = "".join(
-                [c for c in str(row.pop(sheetNameIndex)) if c.upper() in allowed_sheet_chars])
+                [c for c in str(row.pop(sheetNameIndex)) if c.upper() in allowed_sheet_chars])[:31]
             try:
                 worksheet = workbook[sheetName]
             except KeyError:

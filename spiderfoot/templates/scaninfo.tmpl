@@ -95,6 +95,7 @@
               <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "analysis_correlations", true)'>Excel Analysis + Findings & Correlations</a></li>
             </ul>
         </div>
+        <button id='btn-full-report' class='btn btn-full-report' style='display:none' onClick='exportReportData("${id}")'><i class='glyphicon glyphicon-file'></i> REPORT</button>
     <div class='btn-group search-group'>
         <div id='btn-search' class='input-group'>
           <input class='form-control' id='searchvalue' type='text' placeholder='Search...' data-toggle='popover' data-html='true' data-animation='true' data-title='Usage' data-content="Supply a regular expression encapsulated in '/', e.g. <i>/searchregex/</i> or a simple wildcard search, e.g. <i>*string*</i> or an exact value, e.g. <i>string</i>.<br /><br /><b>Note</b> that the current scope is what's searched.">
@@ -1849,6 +1850,11 @@
             // Restore default export dropdown when navigating away from vulns/findings
             if (target !== 'btn-graph' && target !== 'btn-findings' && defaultExportDropdownHtml) {
                 $('#export-dropdown-menu').html(defaultExportDropdownHtml);
+            }
+
+            // Hide full report button when navigating away from findings
+            if (target !== 'btn-findings') {
+                $("#btn-full-report").hide();
             }
 
             $("#breadcrumbs").remove();
@@ -3803,6 +3809,7 @@
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
             $("#btn-export").show();
+            $("#btn-full-report").show();
             $("#btn-download-logs").hide();
             $("#btn-refresh").show();
             $("#btn-search").hide();
