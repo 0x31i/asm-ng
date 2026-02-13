@@ -46,10 +46,28 @@
 <!-- ASM-NG Navigation Menu -->
 <nav class="asm-ng-sidebar">
   <!-- Sign Out -->
-  <a id="nav-signout" class="sidebar-signout" href="${docroot}/logout" title="Sign Out">
+  <div id="nav-signout" class="sidebar-signout" title="Sign Out" onclick="signoutClick(event)">
     <i class="glyphicon glyphicon-off signout-icon"></i>
-    <span class="signout-text">SIGNOUT</span>
-  </a>
+    <span class="signout-text">CONFIRM SIGNOUT</span>
+  </div>
+  <script type="text/javascript">
+    var _signoutArmed = false, _signoutTimer = null;
+    function signoutClick(e) {
+      e.preventDefault();
+      var el = document.getElementById('nav-signout');
+      if (_signoutArmed) {
+        window.location.href = '${docroot}/logout';
+        return;
+      }
+      _signoutArmed = true;
+      el.classList.add('signout-armed');
+      clearTimeout(_signoutTimer);
+      _signoutTimer = setTimeout(function() {
+        _signoutArmed = false;
+        el.classList.remove('signout-armed');
+      }, 4000);
+    }
+  </script>
 
   <ul class="sidebar-nav">
     <li
