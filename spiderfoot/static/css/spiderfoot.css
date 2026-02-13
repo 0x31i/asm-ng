@@ -8933,3 +8933,59 @@ a.data-type-btn:hover {
   color: #1f2937 !important;
 }
 
+/* ============================================
+   REPORT GENERATION LOADING OVERLAY
+   ============================================ */
+
+@keyframes report-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@keyframes report-progress {
+  0% { width: 5%; }
+  15% { width: 20%; }
+  40% { width: 45%; }
+  65% { width: 65%; }
+  85% { width: 80%; }
+  100% { width: 92%; }
+}
+
+#report-loading-overlay .report-loading-icon {
+  font-size: 32px;
+  color: #16a34a;
+  display: block;
+  margin-bottom: 18px;
+  animation: report-pulse 2s ease-in-out infinite;
+}
+
+#report-loading-overlay .report-loading-step {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #1e293b;
+  margin-bottom: 18px;
+}
+
+#report-loading-overlay .report-loading-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: #e2e8f0;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+#report-loading-overlay .report-loading-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  animation: report-progress 25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+#report-loading-overlay .report-loading-hint {
+  font-size: 11px;
+  color: #94a3b8;
+  margin: 0;
+}
+

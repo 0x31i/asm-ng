@@ -7730,17 +7730,57 @@
         }
 
         function exportReportData(instanceId) {
-            $("#loader").show();
+            // Show the report loading overlay
+            var $overlay = $("#report-loading-overlay");
+            var $step = $("#report-loading-step");
+            var $barFill = $("#report-loading-bar-fill");
+
+            // Reset the progress bar animation
+            $barFill.css({ 'animation': 'none', 'width': '5%' });
+            // Force reflow then restart animation
+            $barFill[0].offsetHeight;
+            $barFill.css({ 'animation': '', 'width': '' });
+            $step.text("Compiling report data...");
+            $overlay.fadeIn(200);
+
+            // Cycle through status messages to indicate progress
+            var steps = [
+                { delay: 3000,  text: "Building Executive Summary..." },
+                { delay: 6000,  text: "Processing findings and correlations..." },
+                { delay: 10000, text: "Generating vulnerability tabs..." },
+                { delay: 15000, text: "Building event-type data tabs..." },
+                { delay: 22000, text: "Finalizing workbook..." },
+            ];
+            var stepTimers = [];
+            for (var i = 0; i < steps.length; i++) {
+                (function(s) {
+                    stepTimers.push(setTimeout(function() {
+                        $step.text(s.text);
+                    }, s.delay));
+                })(steps[i]);
+            }
+
+            function dismissOverlay() {
+                for (var j = 0; j < stepTimers.length; j++) {
+                    clearTimeout(stepTimers[j]);
+                }
+                $step.text("Download starting...");
+                $barFill.css({ 'animation': 'none', 'width': '100%' });
+                setTimeout(function() {
+                    $overlay.fadeOut(400);
+                }, 600);
+            }
+
             var efr = document.getElementById('exportframe');
-            // Dismiss the loader when the iframe finishes loading the download
+            // Dismiss when the iframe finishes loading the download
             $(efr).off('load.report').on('load.report', function() {
-                $("#loader").fadeOut(500);
+                dismissOverlay();
             });
             efr.src = '${docroot}/scanfindingsexport?filetype=xlsx&report=full&id=' + instanceId;
-            // Safety timeout: hide loader after 30 seconds regardless
+            // Safety timeout: hide overlay after 60 seconds regardless
             setTimeout(function() {
-                $("#loader").fadeOut(500);
-            }, 30000);
+                dismissOverlay();
+            }, 60000);
         }
 
         // View the configuration that was used for this scan
@@ -8074,6 +8114,23 @@
         checkScanLatest();
 
     </script>
+<!-- Report Generation Loading Modal -->
+<div id="report-loading-overlay" class="assets-modal-overlay" style="display:none;">
+  <div class="assets-modal" style="width: 440px;">
+    <div class="assets-modal-header">
+      <span class="assets-modal-title">GENERATING REPORT</span>
+    </div>
+    <div class="assets-modal-body" style="text-align: center; padding: 30px 20px;">
+      <i class="glyphicon glyphicon-file report-loading-icon"></i>
+      <p class="report-loading-step" id="report-loading-step">Compiling report data...</p>
+      <div class="report-loading-bar">
+        <div class="report-loading-bar-fill" id="report-loading-bar-fill"></div>
+      </div>
+      <p class="report-loading-hint">Building Executive Summary, findings, vulnerability data, and event-type tabs. This may take a moment for large scans.</p>
+    </div>
+  </div>
+</div>
+
 <!-- Correlation Progress Modal -->
 <div id="correlation-progress-modal" class="assets-modal-overlay" style="display:none;">
   <div class="assets-modal" style="width: 520px;">
