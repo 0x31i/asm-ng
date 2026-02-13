@@ -59,7 +59,9 @@ from spiderfoot.excel_styles import (
     build_findings_sheet,
     build_correlations_sheet,
     build_category_sheet,
+    build_event_type_sheet,
     sanitize_sheet_name,
+    CATEGORY_TAB_COLORS,
 )
 
 mp.set_start_method("spawn", force=True)
@@ -5970,6 +5972,10 @@ class SpiderFootWebUi:
         except Exception:
             pass
 
+        # Sort correlations by severity: CRITICAL → HIGH → MEDIUM → LOW → INFO
+        _risk_order = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'INFO': 4}
+        correlation_rows.sort(key=lambda r: _risk_order.get(str(r[2]).upper().strip(), 5))
+
         if filetype.lower() in ["xlsx", "excel"]:
             cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             cherrypy.response.headers['Pragma'] = "no-cache"
@@ -6052,6 +6058,64 @@ class SpiderFootWebUi:
                         ws_cat = wb.create_sheet(safe_name)
                         cat_color = cat_data.get('color', '#6b7280')
                         build_category_sheet(ws_cat, cat_name, cat_color, cat_data)
+
+                    # Event-type data tabs (one sheet per event type, grouped by category)
+                    try:
+                        self.log.info(f"Full report: fetching scan result events for data tabs")
+                        scan_data = dbh.scanResultEvent(id, 'ALL')
+
+                        # Get target-level FPs
+                        target = scan_instance[1] if scan_instance else None
+                        target_fps = set()
+                        if target:
+                            try:
+                                target_fps = dbh.targetFalsePositivesForTarget(target)
+                            except Exception:
+                                pass
+
+                        # Group rows by event type
+                        event_type_groups = {}
+                        for row in scan_data:
+                            if row[4] == "ROOT":
+                                continue
+                            event_type_code = str(row[4])
+                            fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], target_fps)
+                            lastseen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
+                            datafield = str(row[1]).replace("<SFURL>", "").replace("</SFURL>", "")
+                            display_type = translate_event_type(event_type_code)
+                            if display_type not in event_type_groups:
+                                event_type_groups[display_type] = {
+                                    'rows': [],
+                                    'event_code': event_type_code,
+                                }
+                            event_type_groups[display_type]['rows'].append(
+                                [lastseen, str(row[3]), str(row[2]), fp_flag, datafield])
+
+                        # Determine tab color for each event type based on its grading category
+                        self.log.info(f"Full report: building {len(event_type_groups)} event-type data tabs")
+                        for display_type in sorted(event_type_groups.keys()):
+                            grp = event_type_groups[display_type]
+                            evt_code = grp['event_code']
+                            evt_rows = grp['rows']
+
+                            # Look up category color via grade config
+                            evt_grading = get_event_grading(evt_code)
+                            evt_category = evt_grading.get('category', 'Information / Reference')
+                            tab_color = CATEGORY_TAB_COLORS.get(evt_category, '#6b7280')
+
+                            safe_name = sanitize_sheet_name(display_type)
+                            original = safe_name
+                            suffix = 2
+                            while safe_name in used_names:
+                                safe_name = f"{original[:28]}({suffix})"
+                                suffix += 1
+                            used_names.add(safe_name)
+
+                            ws_evt = wb.create_sheet(safe_name)
+                            build_event_type_sheet(ws_evt, display_type, evt_rows, tab_color=tab_color)
+
+                    except Exception as e:
+                        self.log.error(f"Full report: event-type data tabs failed: {e}", exc_info=True)
 
                     self.log.info("Full report: workbook built successfully")
 
