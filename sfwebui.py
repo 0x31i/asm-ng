@@ -6092,8 +6092,17 @@ class SpiderFootWebUi:
                                 [lastseen, str(row[3]), str(row[2]), fp_flag, datafield])
 
                         # Determine tab color for each event type based on its grading category
+                        # Sort by category weight desc, then rank asc (1=most important), then name
+                        def _evt_sort_key(display_type):
+                            grp = event_type_groups[display_type]
+                            evt_grading = get_event_grading(grp['event_code'])
+                            cat = evt_grading.get('category', 'Information / Reference')
+                            cat_weight = DEFAULT_GRADE_CATEGORIES.get(cat, {}).get('weight', 0)
+                            rank = evt_grading.get('rank', 5)
+                            return (-cat_weight, rank, display_type)
+
                         self.log.info(f"Full report: building {len(event_type_groups)} event-type data tabs")
-                        for display_type in sorted(event_type_groups.keys()):
+                        for display_type in sorted(event_type_groups.keys(), key=_evt_sort_key):
                             grp = event_type_groups[display_type]
                             evt_code = grp['event_code']
                             evt_rows = grp['rows']
