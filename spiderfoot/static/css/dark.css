@@ -4477,6 +4477,72 @@ div[id*="Help"].alert-info {
   white-space: nowrap;
 }
 
+/* Sign Out - Far left of menu (mirrors INVERT toggle on far right) */
+.sidebar-signout {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  transition: background 0.3s ease, box-shadow 0.3s ease, padding 0.3s ease;
+  z-index: 10;
+}
+
+.sidebar-signout .signout-icon {
+  font-size: 18px;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.6), 0 0 20px rgba(255, 255, 255, 0.3);
+  transition: color 0.25s ease, text-shadow 0.25s ease;
+}
+
+.sidebar-signout .signout-text {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 0;
+  opacity: 0;
+  margin-left: 0;
+  color: #ffffff;
+  transition: max-width 0.3s ease, opacity 0.3s ease, margin-left 0.3s ease;
+}
+
+/* Hover: icon glows red */
+.sidebar-signout:hover .signout-icon {
+  color: #dc3545;
+  text-shadow: 0 0 12px rgba(220, 53, 69, 0.7), 0 0 25px rgba(220, 53, 69, 0.4);
+}
+
+/* Armed (first click): solid red pill with CONFIRM SIGNOUT text */
+.sidebar-signout.signout-armed {
+  background: #dc3545;
+  box-shadow: 0 0 15px rgba(220, 53, 69, 0.6), 0 0 30px rgba(220, 53, 69, 0.3);
+  padding: 8px 16px;
+}
+
+.sidebar-signout.signout-armed .signout-icon {
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+.sidebar-signout.signout-armed .signout-text {
+  max-width: 150px;
+  opacity: 1;
+  margin-left: 8px;
+  color: #ffffff;
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
+}
+
 /* Hide old navbar */
 .asm-ng-navbar,
 .navbar-fixed-top,
