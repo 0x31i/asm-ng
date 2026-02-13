@@ -397,7 +397,7 @@
         function cycleDataTracking(evt, eventHash, currentVal) {
             evt.stopPropagation();
             var next = currentVal === 0 ? 2 : (currentVal === 2 ? 1 : 0);
-            var scanId = '${scan_id}';
+            var scanId = '${id}';
 
             sf.fetchData('${docroot}/scaneventsettracking', {'id': scanId, 'resultHash': eventHash, 'tracking': next},
                 function(data) {
