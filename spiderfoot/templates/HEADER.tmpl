@@ -1,6 +1,12 @@
 <%
-    # Safety default for user_role if not passed
-    user_role = user_role if user_role is not UNDEFINED else 'analyst'
+    try:
+        user_role
+    except NameError:
+        user_role = 'analyst'
+    try:
+        pageid
+    except NameError:
+        pageid = ''
 %>
 <!DOCTYPE html>
 <html lang="en">

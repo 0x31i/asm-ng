@@ -152,6 +152,13 @@ class SpiderFootWebUi:
                 return
             if not cherrypy.session.get('username'):
                 raise cherrypy.HTTPRedirect(f"{self.docroot}/login")
+            # Refresh user_role in session if missing (e.g. after code upgrade)
+            if not cherrypy.session.get('user_role'):
+                try:
+                    dbh = SpiderFootDb(self.config)
+                    cherrypy.session['user_role'] = dbh.userGetRole(cherrypy.session.get('username'))
+                except Exception:
+                    cherrypy.session['user_role'] = 'analyst'
 
         cherrypy.tools.auth_check = cherrypy.Tool('before_handler', check_auth)
 
@@ -348,7 +355,8 @@ class SpiderFootWebUi:
         """
         templ = Template(
             filename='spiderfoot/templates/error.tmpl', lookup=self.lookup)
-        return templ.render(message=message, docroot=self.docroot, version=__version__)
+        return templ.render(message=message, docroot=self.docroot, version=__version__,
+                            pageid='ERROR', user_role=self.currentUserRole())
 
     def cleanUserInput(self: 'SpiderFootWebUi', inputList: list) -> list:
         """Convert data to HTML entities; except quotes and ampersands.
