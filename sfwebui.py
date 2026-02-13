@@ -6120,7 +6120,6 @@ class SpiderFootWebUi:
         if filetype.lower() == 'csv':
             import csv
             import zipfile
-            from io import StringIO, BytesIO
 
             cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-FINDINGS-CSV.zip"
             cherrypy.response.headers['Content-Type'] = "application/zip"
