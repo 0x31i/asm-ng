@@ -58,7 +58,8 @@ from spiderfoot.excel_styles import (
     build_executive_summary,
     build_findings_sheet,
     build_correlations_sheet,
-    build_category_sheet,
+    build_nessus_sheet,
+    build_burp_sheet,
     build_event_type_sheet,
     sanitize_sheet_name,
     CATEGORY_TAB_COLORS,
@@ -744,6 +745,7 @@ class SpiderFootWebUi:
                         str(corr_row[5]),   # Description
                         str(corr_row[6]),   # Rule Logic
                         str(corr_row[7]),   # Event Count
+                        str(corr_row[8] or ''),  # Event Types
                     ])
             except Exception:
                 pass
@@ -755,7 +757,7 @@ class SpiderFootWebUi:
                 },
                 {
                     "name": "Correlations",
-                    "headers": ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"],
+                    "headers": ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"],
                     "rows": correlation_rows
                 }
             ]
@@ -1128,6 +1130,7 @@ class SpiderFootWebUi:
                             str(corr_row[5]),   # Description
                             str(corr_row[6]),   # Rule Logic
                             str(corr_row[7]),   # Event Count
+                            str(corr_row[8] or ''),  # Event Types
                         ])
                 except Exception:
                     pass
@@ -1139,7 +1142,7 @@ class SpiderFootWebUi:
                 },
                 {
                     "name": "Correlations",
-                    "headers": ["Scan Name", "Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"],
+                    "headers": ["Scan Name", "Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"],
                     "rows": correlation_rows
                 }
             ]
@@ -1391,6 +1394,7 @@ class SpiderFootWebUi:
                         str(corr_row[5]),   # Description
                         str(corr_row[6]),   # Rule Logic
                         str(corr_row[7]),   # Event Count
+                        str(corr_row[8] or ''),  # Event Types
                     ])
             except Exception:
                 pass
@@ -1402,7 +1406,7 @@ class SpiderFootWebUi:
                 },
                 {
                     "name": "Correlations",
-                    "headers": ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"],
+                    "headers": ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"],
                     "rows": correlation_rows
                 }
             ]
@@ -5968,6 +5972,7 @@ class SpiderFootWebUi:
                     str(corr_row[5]),   # Description
                     str(corr_row[6]),   # Rule Logic
                     str(corr_row[7]),   # Event Count
+                    str(corr_row[8] or ''),  # Event Types
                 ])
         except Exception:
             pass
@@ -6037,29 +6042,84 @@ class SpiderFootWebUi:
                     ws_corr = wb.create_sheet("Correlations")
                     build_correlations_sheet(ws_corr, correlation_rows)
 
-                    # Sheets 4+: Category tabs ordered by weight descending
+                    # Build category weight ordering for event-type tab sorting
                     cat_results = grade_data.get('categories', {})
-                    sorted_cats = sorted(
-                        cat_results.items(),
-                        key=lambda x: (-x[1].get('weight', 0), x[0]),
-                    )
-                    self.log.info(f"Full report: building {len(sorted_cats)} category tabs")
-                    used_names = {'Executive Summary', 'Findings', 'Correlations'}
-                    for cat_name, cat_data in sorted_cats:
-                        safe_name = sanitize_sheet_name(cat_name)
-                        # Deduplicate sheet names (possible after 31-char truncation)
-                        original = safe_name
-                        suffix = 2
-                        while safe_name in used_names:
-                            safe_name = f"{original[:28]}({suffix})"
-                            suffix += 1
-                        used_names.add(safe_name)
-                        self.log.info(f"Full report: creating category tab '{safe_name}'")
-                        ws_cat = wb.create_sheet(safe_name)
-                        cat_color = cat_data.get('color', '#6b7280')
-                        build_category_sheet(ws_cat, cat_name, cat_color, cat_data)
+                    _cat_weight_order = {
+                        cat_name: (-cat_data.get('weight', 0), cat_name)
+                        for cat_name, cat_data in cat_results.items()
+                    }
 
-                    # Event-type data tabs (one sheet per event type, grouped by category)
+                    used_names = {'Executive Summary', 'Findings', 'Correlations'}
+
+                    # Sheet 4: EXT-VULNS (Nessus) - red tab
+                    try:
+                        self.log.info(f"Full report: fetching Nessus data for EXT-VULNS tab")
+                        nessus_data = dbh.scanNessusList(id)
+                        nessus_rows = []
+                        tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
+                        for row in nessus_data:
+                            nessus_rows.append([
+                                str(row[1] or ''),   # severity
+                                str(row[2] or ''),   # severity_number
+                                str(row[3] or ''),   # plugin_name
+                                str(row[4] or ''),   # plugin_id
+                                str(row[5] or ''),   # host_ip
+                                str(row[6] or ''),   # host_name
+                                str(row[7] or ''),   # operating_system
+                                str(row[8] or ''),   # description
+                                str(row[9] or ''),   # synopsis
+                                str(row[10] or ''),  # solution
+                                str(row[11] or ''),  # see_also
+                                str(row[12] or ''),  # service_name
+                                str(row[13] or ''),  # port
+                                str(row[14] or ''),  # protocol
+                                str(row[15] or ''),  # request
+                                str(row[16] or ''),  # plugin_output
+                                str(row[17] or ''),  # cvss3_base_score
+                                tracking_labels.get(int(row[18] or 0), 'OPEN'),  # tracking
+                            ])
+                        self.log.info(f"Full report: building EXT-VULNS sheet ({len(nessus_rows)} rows)")
+                        ws_nessus = wb.create_sheet("EXT-VULNS")
+                        used_names.add("EXT-VULNS")
+                        build_nessus_sheet(ws_nessus, nessus_rows)
+                    except Exception as e:
+                        self.log.error(f"Full report: EXT-VULNS tab failed: {e}", exc_info=True)
+
+                    # Sheet 5: WEBAPP-VULNS (Burp) - orange tab
+                    try:
+                        self.log.info(f"Full report: fetching Burp data for WEBAPP-VULNS tab")
+                        burp_data = dbh.scanBurpList(id)
+                        burp_rows = []
+                        tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
+                        for row in burp_data:
+                            burp_rows.append([
+                                str(row[1] or ''),   # severity
+                                str(row[2] or ''),   # severity_number
+                                str(row[3] or ''),   # host_ip
+                                str(row[4] or ''),   # host_name
+                                str(row[5] or ''),   # plugin_name
+                                str(row[6] or ''),   # issue_type
+                                str(row[7] or ''),   # path
+                                str(row[8] or ''),   # location
+                                str(row[9] or ''),   # confidence
+                                str(row[10] or ''),  # issue_background
+                                str(row[11] or ''),  # issue_detail
+                                str(row[12] or ''),  # solutions
+                                str(row[13] or ''),  # see_also
+                                str(row[14] or ''),  # reference_links
+                                str(row[15] or ''),  # vulnerability_classifications
+                                str(row[16] or ''),  # request
+                                str(row[17] or ''),  # response
+                                tracking_labels.get(int(row[18] or 0), 'OPEN'),  # tracking
+                            ])
+                        self.log.info(f"Full report: building WEBAPP-VULNS sheet ({len(burp_rows)} rows)")
+                        ws_burp = wb.create_sheet("WEBAPP-VULNS")
+                        used_names.add("WEBAPP-VULNS")
+                        build_burp_sheet(ws_burp, burp_rows)
+                    except Exception as e:
+                        self.log.error(f"Full report: WEBAPP-VULNS tab failed: {e}", exc_info=True)
+
+                    # Event-type data tabs (one sheet per event type, grouped by category weight order)
                     try:
                         self.log.info(f"Full report: fetching scan result events for data tabs")
                         scan_data = dbh.scanResultEvent(id, 'ALL')
@@ -6091,9 +6151,19 @@ class SpiderFootWebUi:
                             event_type_groups[display_type]['rows'].append(
                                 [lastseen, str(row[3]), str(row[2]), fp_flag, datafield])
 
-                        # Determine tab color for each event type based on its grading category
-                        self.log.info(f"Full report: building {len(event_type_groups)} event-type data tabs")
-                        for display_type in sorted(event_type_groups.keys()):
+                        # Sort event types by category weight (descending), then alphabetically within category
+                        def _evt_sort_key(display_type):
+                            grp = event_type_groups[display_type]
+                            evt_grading = get_event_grading(grp['event_code'])
+                            evt_category = evt_grading.get('category', 'Information / Reference')
+                            # Use category weight order, falling back to (0, category_name)
+                            cat_order = _cat_weight_order.get(evt_category, (0, evt_category))
+                            return (cat_order[0], cat_order[1], display_type)
+
+                        sorted_event_types = sorted(event_type_groups.keys(), key=_evt_sort_key)
+
+                        self.log.info(f"Full report: building {len(sorted_event_types)} event-type data tabs")
+                        for display_type in sorted_event_types:
                             grp = event_type_groups[display_type]
                             evt_code = grp['event_code']
                             evt_rows = grp['rows']
@@ -6135,7 +6205,7 @@ class SpiderFootWebUi:
                         ws_findings.cell(row=row_num, column=col_num, value=cell_value)
 
                 ws_corr = wb.create_sheet("Correlations")
-                corr_headers = ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"]
+                corr_headers = ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"]
                 for col_num, header in enumerate(corr_headers, 1):
                     ws_corr.cell(row=1, column=col_num, value=header)
                 for row_num, row_data in enumerate(correlation_rows, 2):
@@ -6169,7 +6239,7 @@ class SpiderFootWebUi:
                         ws_fb_findings.cell(row=row_num, column=col_num, value=str(cell_value))
 
                 ws_fb_corr = wb_fallback.create_sheet("Correlations")
-                fb_corr_headers = ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"]
+                fb_corr_headers = ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"]
                 for col_num, header in enumerate(fb_corr_headers, 1):
                     ws_fb_corr.cell(row=1, column=col_num, value=header)
                 for row_num, row_data in enumerate(correlation_rows, 2):
@@ -6202,7 +6272,7 @@ class SpiderFootWebUi:
                 # CORRELATIONS.csv
                 corr_io = StringIO()
                 corr_writer = csv.writer(corr_io, dialect='excel')
-                corr_writer.writerow(["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count"])
+                corr_writer.writerow(["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"])
                 for row in correlation_rows:
                     corr_writer.writerow(row)
                 zf.writestr("CORRELATIONS.csv", corr_io.getvalue())
