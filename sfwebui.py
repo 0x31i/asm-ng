@@ -5979,60 +5979,81 @@ class SpiderFootWebUi:
             # Full report: styled with Executive Summary + category tabs
             if report == "full":
                 cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-REPORT.xlsx"
-                try:
-                    with warnings.catch_warnings():
-                        warnings.filterwarnings('ignore', message='Title is more than 31 characters')
+                with warnings.catch_warnings():
+                    warnings.filterwarnings('ignore', category=UserWarning)
 
-                        wb = openpyxl.Workbook()
+                    wb = openpyxl.Workbook()
 
-                        # Gather grade data and scan metadata for Executive Summary
-                        self.log.info(f"Full report: calculating grade for scan {id}")
+                    # Gather grade data (isolated error handling -- grade failure
+                    # should not prevent the entire report from generating)
+                    self.log.info(f"Full report: calculating grade for scan {id}")
+                    try:
                         grade_data = self._calculateScanGrade(dbh, id)
-                        scan_instance = dbh.scanInstanceGet(id)
-                        scan_info = {
-                            'name': scan_instance[0] if scan_instance else '',
-                            'target': scan_instance[1] if scan_instance else '',
-                            'date': time.strftime(
-                                "%Y-%m-%d %H:%M:%S",
-                                time.localtime(scan_instance[2]),
-                            ) if scan_instance and scan_instance[2] else '',
+                    except Exception as e:
+                        self.log.error(f"Full report: grade calculation failed: {e}", exc_info=True)
+                        grade_data = {
+                            'enabled': False, 'overall_grade': '-', 'overall_score': 0,
+                            'overall_grade_color': '#6b7280', 'overall_grade_bg': '#f3f4f6',
+                            'categories': {},
                         }
 
-                        # Sheet 1: Executive Summary (reuse the default active sheet)
-                        self.log.info("Full report: building Executive Summary")
-                        ws_summary = wb.active
-                        ws_summary.title = "Executive Summary"
-                        build_executive_summary(ws_summary, grade_data, scan_info)
+                    # Gather scan metadata
+                    try:
+                        scan_instance = dbh.scanInstanceGet(id)
+                    except Exception as e:
+                        self.log.error(f"Full report: scan instance lookup failed: {e}", exc_info=True)
+                        scan_instance = None
 
-                        # Sheet 2: Findings (black tab, severity colors)
-                        self.log.info(f"Full report: building Findings sheet ({len(findings_rows)} rows)")
-                        ws_findings = wb.create_sheet("Findings")
-                        build_findings_sheet(ws_findings, findings_rows)
+                    scan_info = {
+                        'name': scan_instance[0] if scan_instance else 'Unknown',
+                        'target': scan_instance[1] if scan_instance else 'Unknown',
+                        'date': time.strftime(
+                            "%Y-%m-%d %H:%M:%S",
+                            time.localtime(scan_instance[2]),
+                        ) if scan_instance and scan_instance[2] else '',
+                    }
 
-                        # Sheet 3: Correlations (dark gray tab, risk colors)
-                        self.log.info(f"Full report: building Correlations sheet ({len(correlation_rows)} rows)")
-                        ws_corr = wb.create_sheet("Correlations")
-                        build_correlations_sheet(ws_corr, correlation_rows)
+                    # Sheet 1: Executive Summary (reuse the default active sheet)
+                    self.log.info("Full report: building Executive Summary")
+                    ws_summary = wb.active
+                    ws_summary.title = "Executive Summary"
+                    build_executive_summary(ws_summary, grade_data, scan_info,
+                                            findings_rows=findings_rows,
+                                            correlation_rows=correlation_rows)
 
-                        # Sheets 4+: Category tabs ordered by weight descending
-                        cat_results = grade_data.get('categories', {})
-                        sorted_cats = sorted(
-                            cat_results.items(),
-                            key=lambda x: (-x[1].get('weight', 0), x[0]),
-                        )
-                        self.log.info(f"Full report: building {len(sorted_cats)} category tabs")
-                        for cat_name, cat_data in sorted_cats:
-                            safe_name = sanitize_sheet_name(cat_name)
-                            self.log.info(f"Full report: creating category tab '{safe_name}'")
-                            ws_cat = wb.create_sheet(safe_name)
-                            cat_color = cat_data.get('color', '#6b7280')
-                            build_category_sheet(ws_cat, cat_name, cat_color, cat_data)
+                    # Sheet 2: Findings (black tab, severity colors)
+                    self.log.info(f"Full report: building Findings sheet ({len(findings_rows)} rows)")
+                    ws_findings = wb.create_sheet("Findings")
+                    build_findings_sheet(ws_findings, findings_rows)
 
-                        self.log.info("Full report: workbook built successfully")
+                    # Sheet 3: Correlations (dark gray tab, risk colors)
+                    self.log.info(f"Full report: building Correlations sheet ({len(correlation_rows)} rows)")
+                    ws_corr = wb.create_sheet("Correlations")
+                    build_correlations_sheet(ws_corr, correlation_rows)
 
-                except Exception as e:
-                    self.log.error(f"Styled report export failed, falling back to basic: {e}", exc_info=True)
-                    wb = None  # Reset so fallback runs below
+                    # Sheets 4+: Category tabs ordered by weight descending
+                    cat_results = grade_data.get('categories', {})
+                    sorted_cats = sorted(
+                        cat_results.items(),
+                        key=lambda x: (-x[1].get('weight', 0), x[0]),
+                    )
+                    self.log.info(f"Full report: building {len(sorted_cats)} category tabs")
+                    used_names = {'Executive Summary', 'Findings', 'Correlations'}
+                    for cat_name, cat_data in sorted_cats:
+                        safe_name = sanitize_sheet_name(cat_name)
+                        # Deduplicate sheet names (possible after 31-char truncation)
+                        original = safe_name
+                        suffix = 2
+                        while safe_name in used_names:
+                            safe_name = f"{original[:28]}({suffix})"
+                            suffix += 1
+                        used_names.add(safe_name)
+                        self.log.info(f"Full report: creating category tab '{safe_name}'")
+                        ws_cat = wb.create_sheet(safe_name)
+                        cat_color = cat_data.get('color', '#6b7280')
+                        build_category_sheet(ws_cat, cat_name, cat_color, cat_data)
+
+                    self.log.info("Full report: workbook built successfully")
 
             # Basic export (default) or fallback if full report failed
             if wb is None:
