@@ -379,6 +379,226 @@
             imported: false
         };
 
+        // Data type tracking filter state
+        var dataTrackingFilterState = {
+            closed: false,
+            ticketed: false
+        };
+
+        // Get tracking badge HTML for data type events
+        function getDataTrackingBadge(tracking, eventHash) {
+            var labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'};
+            var classes = {0: 'tracking-open', 1: 'tracking-closed', 2: 'tracking-ticketed'};
+            var val = parseInt(tracking) || 0;
+            return "<span class='tracking-badge " + classes[val] + "' data-event-hash='" + eventHash + "' data-tracking='" + val + "' onclick='cycleDataTracking(event, \"" + eventHash + "\", " + val + ")'>" + labels[val] + "</span>";
+        }
+
+        // Cycle data tracking: OPEN(0) -> TICKETED(2) -> CLOSED(1) -> OPEN(0)
+        function cycleDataTracking(evt, eventHash, currentVal) {
+            evt.stopPropagation();
+            var next = currentVal === 0 ? 2 : (currentVal === 2 ? 1 : 0);
+            var scanId = '${scan_id}';
+
+            sf.fetchData('${docroot}/scaneventsettracking', {'id': scanId, 'resultHash': eventHash, 'tracking': next},
+                function(data) {
+                    if (data.success) {
+                        // Update badge in place
+                        var labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'};
+                        var classes = {0: 'tracking-open', 1: 'tracking-closed', 2: 'tracking-ticketed'};
+                        var badge = $(evt.target);
+                        badge.removeClass('tracking-open tracking-closed tracking-ticketed');
+                        badge.addClass(classes[next]);
+                        badge.text(labels[next]);
+                        badge.attr('data-tracking', next);
+                        badge.attr('onclick', "cycleDataTracking(event, '" + eventHash + "', " + next + ")");
+                        // Update stored data
+                        for (var i = 0; i < currentViewData.length; i++) {
+                            if (currentViewData[i][7] === eventHash) {
+                                currentViewData[i][15] = next;
+                            }
+                        }
+                        updateDataTrackingFilterCounts();
+                    }
+                }
+            );
+        }
+
+        // Toggle data tracking filter
+        function toggleDataTrackingFilter(type) {
+            dataTrackingFilterState[type] = !dataTrackingFilterState[type];
+            applyDataTrackingFilters();
+            // Update button states
+            var btn = $('.filter-btn-data-' + type);
+            if (dataTrackingFilterState[type]) {
+                btn.addClass('filter-btn-active');
+                btn.text(btn.attr('data-hiding-text'));
+            } else {
+                btn.removeClass('filter-btn-active');
+                btn.text(btn.attr('data-show-text'));
+            }
+        }
+
+        // Apply data tracking filters
+        function applyDataTrackingFilters() {
+            var visibleCount = 0;
+            var hiddenCount = 0;
+
+            $("#scansummary-content tbody tr").each(function() {
+                var row = $(this);
+                // Skip detail rows
+                if (row.hasClass('data-detail-row')) return;
+
+                var shouldHide = false;
+                var badge = row.find('.tracking-badge');
+
+                // Check existing client-side filters first
+                var statusSpan = row.find(".validation-status span");
+                var isImported = row.hasClass("imported-row");
+
+                if (clientFilterState.fp && statusSpan.hasClass('status-fp')) {
+                    shouldHide = true;
+                }
+                if (clientFilterState.validated && statusSpan.hasClass('status-validated')) {
+                    shouldHide = true;
+                }
+                if (clientFilterState.imported && isImported) {
+                    shouldHide = true;
+                }
+
+                // Check tracking filters
+                if (badge.length > 0) {
+                    var trackingVal = parseInt(badge.attr('data-tracking')) || 0;
+                    if (dataTrackingFilterState.closed && trackingVal === 1) {
+                        shouldHide = true;
+                    }
+                    if (dataTrackingFilterState.ticketed && trackingVal === 2) {
+                        shouldHide = true;
+                    }
+                }
+
+                if (shouldHide) {
+                    row.hide();
+                    row.next('.data-detail-row').hide();
+                    hiddenCount++;
+                } else {
+                    row.show();
+                    visibleCount++;
+                }
+            });
+
+            $(".stats-bar-left .stats-item:first-child .stats-value").text(visibleCount);
+            return visibleCount;
+        }
+
+        // Update data tracking filter counts
+        function updateDataTrackingFilterCounts() {
+            var closedCount = 0;
+            var ticketedCount = 0;
+
+            $("#scansummary-content tbody tr").each(function() {
+                var row = $(this);
+                if (row.hasClass('data-detail-row')) return;
+                var badge = row.find('.tracking-badge');
+                if (badge.length > 0) {
+                    var val = parseInt(badge.attr('data-tracking')) || 0;
+                    if (val === 1) closedCount++;
+                    if (val === 2) ticketedCount++;
+                }
+            });
+
+            // Show/hide filter buttons
+            var closedBtn = $('.filter-btn-data-closed');
+            var ticketedBtn = $('.filter-btn-data-ticketed');
+
+            if (closedCount > 0) {
+                closedBtn.show();
+                closedBtn.attr('data-show-text', 'HIDE ' + closedCount + ' CLOSED');
+                closedBtn.attr('data-hiding-text', 'HIDING ' + closedCount + ' CLOSED');
+                closedBtn.text(dataTrackingFilterState.closed ? 'HIDING ' + closedCount + ' CLOSED' : 'HIDE ' + closedCount + ' CLOSED');
+            } else {
+                closedBtn.hide();
+            }
+
+            if (ticketedCount > 0) {
+                ticketedBtn.show();
+                ticketedBtn.attr('data-show-text', 'HIDE ' + ticketedCount + ' TICKETED');
+                ticketedBtn.attr('data-hiding-text', 'HIDING ' + ticketedCount + ' TICKETED');
+                ticketedBtn.text(dataTrackingFilterState.ticketed ? 'HIDING ' + ticketedCount + ' TICKETED' : 'HIDE ' + ticketedCount + ' TICKETED');
+            } else {
+                ticketedBtn.hide();
+            }
+        }
+
+        // Build data detail HTML for expanded row
+        function buildDataDetailHtml(d) {
+            var html = '<div class="data-detail-grid">';
+
+            // Identified timestamp (moved from the column we replaced)
+            if (d[0]) {
+                html += "<div class='finding-detail-section detail-identified'>";
+                html += "<div class='finding-detail-label'>Identified</div>";
+                html += "<div class='finding-detail-text'>" + d[0] + "</div></div>";
+            }
+            // Confidence
+            if (d[4] !== undefined) {
+                html += "<div class='finding-detail-section detail-confidence'>";
+                html += "<div class='finding-detail-label'>Confidence</div>";
+                html += "<div class='finding-detail-text'>" + d[4] + "%</div></div>";
+            }
+            // Visibility
+            if (d[5] !== undefined) {
+                html += "<div class='finding-detail-section detail-visibility'>";
+                html += "<div class='finding-detail-label'>Visibility</div>";
+                html += "<div class='finding-detail-text'>" + d[5] + "%</div></div>";
+            }
+            // Risk
+            if (d[6] !== undefined) {
+                html += "<div class='finding-detail-section detail-risk'>";
+                html += "<div class='finding-detail-label'>Risk</div>";
+                html += "<div class='finding-detail-text'>" + d[6] + "</div></div>";
+            }
+            // Event Type
+            if (d[10]) {
+                html += "<div class='finding-detail-section detail-event-type'>";
+                html += "<div class='finding-detail-label'>Event Type</div>";
+                html += "<div class='finding-detail-text'>" + d[10] + "</div></div>";
+            }
+            // Event Hash
+            if (d[7]) {
+                html += "<div class='finding-detail-section detail-event-hash'>";
+                html += "<div class='finding-detail-label'>Event Hash</div>";
+                html += "<div class='finding-detail-text' style='font-family: var(--font-mono); font-size: 11px;'>" + d[7] + "</div></div>";
+            }
+            // Source Module
+            if (d[3]) {
+                html += "<div class='finding-detail-section detail-source-module'>";
+                html += "<div class='finding-detail-label'>Source Module</div>";
+                html += "<div class='finding-detail-text'>" + d[3] + "</div></div>";
+            }
+            // Imported From
+            if (d[13]) {
+                html += "<div class='finding-detail-section detail-imported-from'>";
+                html += "<div class='finding-detail-label'>Imported From</div>";
+                html += "<div class='finding-detail-text'>" + d[13] + "</div></div>";
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        // Toggle data detail row expansion
+        function toggleDataDetail(idx) {
+            var row = $('tr[data-event-idx="' + idx + '"]');
+            var detail = row.next('.data-detail-row');
+            if (row.hasClass('finding-expanded')) {
+                row.removeClass('finding-expanded');
+                detail.find('.finding-detail').slideUp(150);
+            } else {
+                row.addClass('finding-expanded');
+                detail.find('.finding-detail').slideDown(150);
+            }
+        }
+
         // Toggle client-side filter
         function toggleClientFilter(type) {
             clientFilterState[type] = !clientFilterState[type];
@@ -416,6 +636,9 @@
 
             $("#scansummary-content tbody tr").each(function() {
                 var row = $(this);
+                // Skip detail rows - they follow their parent row visibility
+                if (row.hasClass('data-detail-row')) return;
+
                 var statusSpan = row.find(".validation-status span");
                 var isImported = row.hasClass("imported-row");
 
@@ -436,8 +659,21 @@
                     shouldHide = true;
                 }
 
+                // Check data tracking filters
+                var badge = row.find('.tracking-badge');
+                if (badge.length > 0) {
+                    var trackingVal = parseInt(badge.attr('data-tracking')) || 0;
+                    if (dataTrackingFilterState.closed && trackingVal === 1) {
+                        shouldHide = true;
+                    }
+                    if (dataTrackingFilterState.ticketed && trackingVal === 2) {
+                        shouldHide = true;
+                    }
+                }
+
                 if (shouldHide) {
                     row.hide();
+                    row.next('.data-detail-row').hide();
                     hiddenCount++;
                 } else {
                     row.show();
@@ -7238,6 +7474,12 @@
                                 statsBar += "SELECT " + stats.knownAsset + " KNOWN</button>";
                             }
 
+                            // Hide Closed button (data tracking)
+                            statsBar += "<button class='filter-btn filter-btn-data-closed' style='display:none' onclick=\"toggleDataTrackingFilter('closed')\">HIDE 0 CLOSED</button>";
+
+                            // Hide Ticketed button (data tracking)
+                            statsBar += "<button class='filter-btn filter-btn-data-ticketed' style='display:none' onclick=\"toggleDataTrackingFilter('ticketed')\">HIDE 0 TICKETED</button>";
+
                             statsBar += "</div>";
                             statsBar += "</div>";
 
@@ -7249,8 +7491,11 @@
                             table += "<th " + thStyle + ">Data Element</th>";
                             table += "<th " + thStyle + ">Source Data Element</th>";
                             table += "<th " + thStyle + ">Source Module</th>";
-                            table += "<th " + thStyle + ">Identified</th>";
+                            table += "<th " + thStyle + ">Tracking</th>";
                             table += "</tr></thead><tbody>";
+
+                            // Store data for tracking operations
+                            currentViewData = data;
 
                             for (var i = 0; i < data.length; i++) {
                                 // All rows are rendered - filtering is done client-side
@@ -7259,12 +7504,12 @@
                                 // Check if this matches a known asset (index 14)
                                 var isKnownAsset = data[i][14] && data[i][14] > 0;
 
-                                var rowClasses = [];
+                                var rowClasses = ['data-event-row'];
                                 if (isImported) rowClasses.push("imported-row");
                                 if (isKnownAsset) rowClasses.push("known-asset-row");
-                                table += "<tr" + (rowClasses.length > 0 ? " class='" + rowClasses.join(" ") + "'" : "") + ">";
+                                table += "<tr class='" + rowClasses.join(" ") + "' data-event-idx='" + i + "' onclick='toggleDataDetail(" + i + ")'>";
                                 // Checkbox column (simple checkbox only, no persistence indicators)
-                                table += "<td class='text-center'><input type='checkbox' id='cb_" + data[i][7] + "'></td>";
+                                table += "<td class='text-center' onclick='event.stopPropagation()'><input type='checkbox' id='cb_" + data[i][7] + "'></td>";
 
                                 // Status column with text badges
                                 // Imported entries get a purple glow behind the status badge
@@ -7295,8 +7540,14 @@
                                 table += sf.replace_sfurltag(data[i][2]);
                                 table += "</pre><div class='pre-expand-hint'></div></td>";
                                 table += "<td><pre class='table-border-bg-inherit'>" + data[i][3];
-                                table += "</pre></td><td><pre class='table-border-bg-inherit'>" + data[i][0];
                                 table += "</pre></td>";
+                                // Tracking badge column (replaces Identified timestamp)
+                                table += "<td class='text-center'>" + getDataTrackingBadge(data[i][15], data[i][7]) + "</td>";
+                                table += "</tr>";
+
+                                // Collapsible detail row
+                                table += "<tr class='data-detail-row' style='display:none'>";
+                                table += "<td colspan='6'><div class='finding-detail' style='display:none'>" + buildDataDetailHtml(data[i]) + "</div></td>";
                                 table += "</tr>";
                             }
                             table += "</tbody></table>"
@@ -7315,13 +7566,16 @@
                                 });
                             }
 
-                            $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false }, 1: { sorter: false } } });
+                            $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false }, 1: { sorter: false }, 5: { sorter: false } }, cssChildRow: 'data-detail-row' });
 
                             // Initialize expandable pre cells
                             initExpandableCells();
 
+                            // Initialize data tracking filter counts
+                            updateDataTrackingFilterCounts();
+
                             // Apply any active client-side filters after table render
-                            if (clientFilterState.fp || clientFilterState.validated || clientFilterState.imported) {
+                            if (clientFilterState.fp || clientFilterState.validated || clientFilterState.imported || dataTrackingFilterState.closed || dataTrackingFilterState.ticketed) {
                                 applyClientSideFilters();
                             }
                             lastChecked = null;

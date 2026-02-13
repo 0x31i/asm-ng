@@ -6170,6 +6170,40 @@ class SpiderFootWebUi:
             return {'success': False, 'message': str(e)}
 
     @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scaneventsettracking(self: 'SpiderFootWebUi', id: str, resultHash: str, tracking: str) -> dict:
+        """Update tracking status for a scan result event.
+
+        Args:
+            id (str): scan instance ID
+            resultHash (str): event hash
+            tracking (str): 0=OPEN, 1=CLOSED, 2=TICKETED
+
+        Returns:
+            dict: success status
+        """
+        dbh = SpiderFootDb(self.config)
+
+        try:
+            dbh.scanEventUpdateTracking(id, resultHash, int(tracking))
+
+            # Get event details for cross-scan sync
+            eventDetails = dbh.scanEventResultByHash(id, resultHash)
+            if eventDetails:
+                scanInfo = dbh.scanInstanceGet(id)
+                target = scanInfo[1] if scanInfo else None
+                if target:
+                    dbh.syncTrackingAcrossScans(
+                        target, eventDetails[0], eventDetails[1],
+                        eventDetails[2], int(tracking)
+                    )
+
+            return {'success': True}
+        except Exception as e:
+            self.log.error(f"Error updating event tracking for scan {id}, hash {resultHash}: {e}", exc_info=True)
+            return {'success': False, 'message': str(e)}
+
+    @cherrypy.expose
     def scanfindingsexport(self: 'SpiderFootWebUi', id: str, filetype: str = "xlsx", report: str = "basic") -> str:
         """Export findings and correlations from a scan.
 
@@ -7370,7 +7404,8 @@ class SpiderFootWebUi:
                 isTargetFp,  # Index 11: target-level false positive flag
                 isTargetValidated,  # Index 12: target-level validated flag
                 row[15],  # Index 13: imported_from_scan (scan ID if imported, None otherwise)
-                isKnownAsset  # Index 14: known asset match (0=no, 1=match)
+                isKnownAsset,  # Index 14: known asset match (0=no, 1=match)
+                row[16] if len(row) > 16 else 0  # Index 15: tracking (0=OPEN, 1=CLOSED, 2=TICKETED)
             ])
 
         return retdata
