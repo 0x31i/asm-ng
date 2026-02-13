@@ -6394,40 +6394,61 @@
             detail.slideDown(150);
 
             // Only fetch events if not already loaded
-            if (eventsContainer.children().length > 0) return;
+            if (eventsContainer.data('loaded')) return;
 
             eventsContainer.html("<div style='padding: 10px; text-align: center;'><i class='glyphicon glyphicon-refresh spinning'></i> Loading events...</div>");
 
-            sf.fetchData('${docroot}/scaneventresults', { 'id': instanceId, 'correlationId': correlationId }, function(data) {
-                var table = "<table class='table corr-events-table small'>";
-                table += "<thead><tr>";
-                table += "<th>Type</th>";
-                table += "<th>Data Element</th>";
-                table += "<th>Source Data Element</th>";
-                table += "<th>Source Module</th>";
-                table += "<th>Identified</th>";
-                table += "</tr></thead><tbody>";
-
-                for (var i = 0; i < data.length; i++) {
-                    var evtType = data[i][10] || '';
-                    table += "<tr>";
-                    // Type column with link to Data
-                    if (evtType) {
-                        table += "<td><a class='finding-type-link' onclick='dataEventData(\"" + instanceId + "\", \"" + evtType.replace(/"/g, '&quot;') + "\", \"" + evtType.replace(/"/g, '&quot;') + "\", \"full\");' title='View " + evtType + " data'>" + evtType + "</a></td>";
-                    } else {
-                        table += "<td></td>";
+            $.ajax({
+                type: "POST",
+                url: '${docroot}/scaneventresults',
+                data: { 'id': instanceId, 'correlationId': correlationId },
+                dataType: "json",
+                timeout: 30000,
+                success: function(data) {
+                    if (!data || data.length === 0) {
+                        eventsContainer.html("<div style='padding: 10px; color: var(--text-muted); font-family: var(--font-mono); font-size: 11px;'><i class='glyphicon glyphicon-info-sign'></i> No event data available for this correlation. Try re-running the correlation engine.</div>");
+                        eventsContainer.data('loaded', true);
+                        return;
                     }
-                    table += "<td><pre class='table-border-bg-inherit'>";
-                    table += sf.replace_sfurltag(data[i][1]);
-                    table += "</pre></td><td><pre class='table-border-bg-inherit'>";
-                    table += sf.replace_sfurltag(data[i][2]);
-                    table += "</pre></td><td><pre class='table-border-bg-inherit'>" + data[i][3];
-                    table += "</pre></td><td><pre class='table-border-bg-inherit'>" + data[i][0];
-                    table += "</pre></td>";
-                    table += "</tr>";
+                    var table = "<table class='table corr-events-table small'>";
+                    table += "<thead><tr>";
+                    table += "<th>Type</th>";
+                    table += "<th>Data Element</th>";
+                    table += "<th>Source Data Element</th>";
+                    table += "<th>Source Module</th>";
+                    table += "<th>Identified</th>";
+                    table += "</tr></thead><tbody>";
+
+                    for (var i = 0; i < data.length; i++) {
+                        var evtType = data[i][10] || '';
+                        table += "<tr>";
+                        // Type column with link to Data
+                        if (evtType) {
+                            table += "<td><a class='finding-type-link' onclick='dataEventData(\"" + instanceId + "\", \"" + evtType.replace(/"/g, '&quot;') + "\", \"" + evtType.replace(/"/g, '&quot;') + "\", \"full\");' title='View " + evtType + " data'>" + evtType + "</a></td>";
+                        } else {
+                            table += "<td></td>";
+                        }
+                        table += "<td><pre class='table-border-bg-inherit'>";
+                        table += sf.replace_sfurltag(data[i][1]);
+                        table += "</pre></td><td><pre class='table-border-bg-inherit'>";
+                        table += sf.replace_sfurltag(data[i][2]);
+                        table += "</pre></td><td><pre class='table-border-bg-inherit'>" + data[i][3];
+                        table += "</pre></td><td><pre class='table-border-bg-inherit'>" + data[i][0];
+                        table += "</pre></td>";
+                        table += "</tr>";
+                    }
+                    table += "</tbody></table>";
+                    eventsContainer.html(table);
+                    eventsContainer.data('loaded', true);
+                },
+                error: function(xhr, status, err) {
+                    eventsContainer.html("<div style='padding: 10px; color: #dc3545; font-family: var(--font-mono); font-size: 11px;'><i class='glyphicon glyphicon-exclamation-sign'></i> Failed to load event data. Click to retry.</div>");
+                    eventsContainer.off('click.retry').on('click.retry', function() {
+                        eventsContainer.data('loaded', false);
+                        eventsContainer.html('');
+                        toggleCorrelation(instanceId, correlationId);
+                    });
                 }
-                table += "</tbody></table>";
-                eventsContainer.html(table);
             });
         }
 
@@ -7730,17 +7751,63 @@
         }
 
         function exportReportData(instanceId) {
-            $("#loader").show();
+            // Show a full-screen loading overlay while the report generates
+            var reportMsgs = [
+                "Compiling findings...",
+                "Building executive summary...",
+                "Formatting correlations...",
+                "Assembling vulnerability data...",
+                "Generating Excel workbook...",
+                "Adding styling and formatting...",
+                "Almost there..."
+            ];
+            var msgIdx = 0;
+            var overlay = $(
+                "<div class='report-loading-overlay' id='report-loading-overlay'>" +
+                "  <div class='report-loading-card'>" +
+                "    <i class='glyphicon glyphicon-file report-loading-icon spinning'></i>" +
+                "    <div class='report-loading-title'>Generating Report</div>" +
+                "    <div class='report-loading-msg' id='report-loading-msg'>" + reportMsgs[0] + "</div>" +
+                "    <div class='progress'>" +
+                "      <div class='progress-bar progress-bar-striped active' id='report-loading-bar' style='width: 10%;'></div>" +
+                "    </div>" +
+                "  </div>" +
+                "</div>"
+            );
+            $('body').append(overlay);
+
+            // Rotate messages and advance progress bar
+            var msgInterval = setInterval(function() {
+                msgIdx = (msgIdx + 1) % reportMsgs.length;
+                $('#report-loading-msg').text(reportMsgs[msgIdx]);
+                var pct = Math.min(10 + (msgIdx + 1) * 12, 90);
+                $('#report-loading-bar').css('width', pct + '%');
+            }, 2500);
+
+            function dismissOverlay() {
+                clearInterval(msgInterval);
+                $('#report-loading-bar').css('width', '100%');
+                $('#report-loading-msg').text('Done!');
+                setTimeout(function() {
+                    $('#report-loading-overlay').fadeOut(400, function() {
+                        $(this).remove();
+                    });
+                }, 600);
+            }
+
             var efr = document.getElementById('exportframe');
-            // Dismiss the loader when the iframe finishes loading the download
+            // Dismiss the overlay when the iframe finishes loading the download
             $(efr).off('load.report').on('load.report', function() {
-                $("#loader").fadeOut(500);
+                dismissOverlay();
             });
             efr.src = '${docroot}/scanfindingsexport?filetype=xlsx&report=full&id=' + instanceId;
-            // Safety timeout: hide loader after 30 seconds regardless
+
+            // Safety timeout: dismiss after 60 seconds regardless
             setTimeout(function() {
-                $("#loader").fadeOut(500);
-            }, 30000);
+                if ($('#report-loading-overlay').length) {
+                    dismissOverlay();
+                }
+            }, 60000);
         }
 
         // View the configuration that was used for this scan

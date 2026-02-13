@@ -433,6 +433,61 @@ button.btn-cyan {
   margin-right: 4px;
 }
 
+/* Report generation loading overlay */
+.report-loading-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.report-loading-card {
+  background: var(--bg-secondary, #1a1f36);
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.1));
+  border-radius: 12px;
+  padding: 40px 50px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  max-width: 420px;
+}
+.report-loading-card .report-loading-icon {
+  font-size: 36px;
+  color: #22c55e;
+  display: block;
+  margin-bottom: 18px;
+}
+.report-loading-card .report-loading-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-primary, #e2e8f0);
+  margin-bottom: 8px;
+}
+.report-loading-card .report-loading-msg {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted, #94a3b8);
+  letter-spacing: 0.3px;
+  min-height: 16px;
+}
+.report-loading-card .progress {
+  height: 6px;
+  margin: 18px auto 0;
+  max-width: 280px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.report-loading-card .progress-bar {
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  border-radius: 3px;
+  transition: width 1.5s ease;
+}
+
 /* Warning button - Orange gradient with glow */
 .btn-warning {
   background: linear-gradient(135deg, var(--accent-yellow) 0%, var(--accent-orange) 100%) !important;

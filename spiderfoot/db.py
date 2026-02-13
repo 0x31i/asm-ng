@@ -3449,28 +3449,23 @@ class SpiderFootDb:
 
             try:
                 self.dbh.execute(qry, qvars)
+
+                if isinstance(eventHashes, str):
+                    eventHashes = [eventHashes]
+
+                # Insert event hashes for this correlation (same transaction)
+                for eventHash in eventHashes:
+                    evtQry = "INSERT INTO tbl_scan_correlation_results_events (correlation_id, event_hash) VALUES (?, ?)"
+                    self.dbh.execute(evtQry, [correlation_id, eventHash])
+
+                # Commit the correlation record and all its event links atomically
                 self.conn.commit()
             except sqlite3.Error as e:
+                self.conn.rollback()
                 raise IOError(
                     "Unable to create correlation result in database") from e
 
-            correlationId = correlation_id
-
-            if isinstance(eventHashes, str):
-                eventHashes = [eventHashes]
-
-            # Insert event hashes for this correlation
-            for eventHash in eventHashes:
-                qry = "INSERT INTO tbl_scan_correlation_results_events (correlation_id, event_hash) VALUES (?, ?)"
-                qvars = [correlationId, eventHash]
-                try:
-                    self.dbh.execute(qry, qvars)
-                except sqlite3.Error as e:
-                    raise IOError("Unable to create correlation result events in database") from e
-
-            self.conn.commit()
-        
-        return str(correlationId)
+        return str(correlation_id)
 
     def deleteCorrelationsByRule(self, instanceId: str, ruleId: str) -> int:
         """Delete all correlation results for a scan that match a given rule ID.

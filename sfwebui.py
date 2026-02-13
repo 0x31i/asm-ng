@@ -7047,7 +7047,11 @@ class SpiderFootWebUi:
         try:
             data = dbh.scanResultEvent(
                 id, eventType, filterFp=filterfp, correlationId=correlationId)
-        except Exception:
+        except Exception as e:
+            self.log.warning(
+                f"scaneventresults failed for scan={id}, correlationId={correlationId}, "
+                f"eventType={eventType}: {e}"
+            )
             return retdata
 
         # Get the target for this scan to check target-level FPs and validated status
