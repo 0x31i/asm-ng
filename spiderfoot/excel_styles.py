@@ -53,6 +53,7 @@ SEVERITY_TEXT_COLORS = {
 }
 
 RISK_COLORS = {
+    'CRITICAL':  '#8b5cf6',
     'HIGH':     '#ef4444',
     'MEDIUM':   '#f59e0b',
     'LOW':      '#3b82f6',
