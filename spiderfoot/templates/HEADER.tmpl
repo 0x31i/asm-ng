@@ -1,12 +1,6 @@
 <%
-    try:
-        user_role
-    except NameError:
-        user_role = 'analyst'
-    try:
-        pageid
-    except NameError:
-        pageid = ''
+    user_role = context.get('user_role', 'analyst')
+    pageid = context.get('pageid', '')
 %>
 <!DOCTYPE html>
 <html lang="en">
