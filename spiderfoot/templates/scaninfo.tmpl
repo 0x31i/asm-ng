@@ -3816,12 +3816,15 @@
                 defaultExportDropdownHtml = $('#export-dropdown-menu').html();
             }
             var findingsExportHtml = '';
-            findingsExportHtml += "<li class='dropdown-header'>Findings & Correlations Export</li>";
+            findingsExportHtml += "<li class='dropdown-header' style='color: #16a34a; font-weight: bold; font-size: 13px;'>";
+            findingsExportHtml += "<i class='glyphicon glyphicon-file' style='margin-right: 4px;'></i> Executive Summary Report</li>";
+            findingsExportHtml += "<li><a class='link' style='font-weight: bold; color: #16a34a;' onClick='exportReportData(\"" + instanceId + "\")'>";
+            findingsExportHtml += "<i class='glyphicon glyphicon-download-alt' style='margin-right: 6px;'></i>";
+            findingsExportHtml += "Download Full Report (.xlsx)</a></li>";
+            findingsExportHtml += "<li class='divider'></li>";
+            findingsExportHtml += "<li class='dropdown-header'>Basic Export</li>";
             findingsExportHtml += "<li><a class='link' onClick='exportEventData(\"" + instanceId + "\", \"\", \"csv\", \"full\")'>CSV (FINDINGS.csv + CORRELATIONS.csv)</a></li>";
             findingsExportHtml += "<li><a class='link' onClick='exportEventData(\"" + instanceId + "\", \"\", \"excel\", \"full\")'>Excel (FINDINGS.xlsx - two tabs)</a></li>";
-            findingsExportHtml += "<li class='divider'></li>";
-            findingsExportHtml += "<li class='dropdown-header'>Full Report</li>";
-            findingsExportHtml += "<li><a class='link' onClick='exportReportData(\"" + instanceId + "\")'>Excel Report (Executive Summary + All Tabs)</a></li>";
             $('#export-dropdown-menu').html(findingsExportHtml);
 
             var grid = "<div id='scansummary-content'>";
@@ -7722,8 +7725,15 @@
         function exportReportData(instanceId) {
             $("#loader").show();
             var efr = document.getElementById('exportframe');
+            // Dismiss the loader when the iframe finishes loading the download
+            $(efr).off('load.report').on('load.report', function() {
+                $("#loader").fadeOut(500);
+            });
             efr.src = '${docroot}/scanfindingsexport?filetype=xlsx&report=full&id=' + instanceId;
-            $("#loader").fadeOut(500);
+            // Safety timeout: hide loader after 30 seconds regardless
+            setTimeout(function() {
+                $("#loader").fadeOut(500);
+            }, 30000);
         }
 
         // View the configuration that was used for this scan
