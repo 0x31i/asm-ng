@@ -151,177 +151,223 @@ def build_executive_summary(ws, grade_data: dict, scan_info: dict,
 
     set_tab_color(ws, '16a34a')
 
-    # -- Title banner row --
-    title_fill = PatternFill(start_color='FF1F2937', end_color='FF1F2937', fill_type='solid')
-    ws.merge_cells('A1:H1')
+    dark_fill = PatternFill(start_color='FF1F2937', end_color='FF1F2937', fill_type='solid')
+    subtle_border = Border(bottom=Side(style='thin', color='FFD1D5DB'))
+    section_border = Border(bottom=Side(style='medium', color='FF9CA3AF'))
+    label_font = Font(name='Calibri', size=10, bold=True, color='FF6B7280')
+    value_font = Font(name='Calibri', size=10, color='FF374151')
+
+    # ── Row 1: Title banner ──────────────────────────────────────────────
+    ws.merge_cells('A1:G1')
     title_cell = ws['A1']
     title_cell.value = 'EXECUTIVE SUMMARY'
-    title_cell.font = Font(name='Calibri', size=22, bold=True, color='FFFFFFFF')
-    title_cell.fill = title_fill
+    title_cell.font = Font(name='Calibri', size=18, bold=True, color='FFFFFFFF')
+    title_cell.fill = dark_fill
     title_cell.alignment = Alignment(horizontal='left', vertical='center')
-    ws.row_dimensions[1].height = 42
-    # Fill the entire banner row
-    for col in range(2, 9):
-        ws.cell(row=1, column=col).fill = title_fill
+    ws.row_dimensions[1].height = 36
+    for c in range(2, 8):
+        ws.cell(row=1, column=c).fill = dark_fill
 
-    # -- Scan metadata --
-    label_font = Font(name='Calibri', size=11, bold=True, color='FF374151')
-    value_font = Font(name='Calibri', size=11, color='FF6B7280')
-    meta = [
-        ('Target:', scan_info.get('target', '')),
-        ('Scan:', scan_info.get('name', '')),
-        ('Date:', scan_info.get('date', '')),
-    ]
-    for r, (label, val) in enumerate(meta, start=2):
-        ws.cell(row=r, column=1, value=label).font = label_font
-        ws.cell(row=r, column=2, value=val).font = value_font
+    # ── Row 2: Scan metadata (single row) ────────────────────────────────
+    ws.row_dimensions[2].height = 22
+    ws.cell(row=2, column=1, value='Target:').font = label_font
+    ws.cell(row=2, column=2, value=scan_info.get('target', '')).font = value_font
+    ws.cell(row=2, column=4, value='Scan:').font = label_font
+    ws.cell(row=2, column=5, value=scan_info.get('name', '')).font = value_font
+    ws.cell(row=2, column=6, value='Date:').font = label_font
+    ws.cell(row=2, column=7, value=scan_info.get('date', '')).font = value_font
+    for c in range(1, 8):
+        ws.cell(row=2, column=c).border = subtle_border
 
-    # -- Divider row --
-    ws.row_dimensions[5].height = 8
-
-    # -- Grade block (rows 6-10, columns A-B merged) --
+    # ── Rows 3-5: Grade block ────────────────────────────────────────────
     overall_grade = grade_data.get('overall_grade', '-')
     overall_score = grade_data.get('overall_score', 0)
     grade_color = grade_data.get('overall_grade_color', '#6b7280')
     grade_bg = grade_data.get('overall_grade_bg', '#f3f4f6')
 
-    ws.merge_cells('A6:B10')
-    grade_cell = ws['A6']
+    ws.row_dimensions[3].height = 8  # spacer
+
+    ws.merge_cells('A4:A6')
+    grade_cell = ws['A4']
     grade_cell.value = overall_grade
-    grade_cell.font = Font(name='Calibri', size=48, bold=True, color=hex_to_argb(grade_color))
+    grade_cell.font = Font(name='Calibri', size=36, bold=True, color=hex_to_argb(grade_color))
     grade_cell.fill = PatternFill(
         start_color=hex_to_argb(grade_bg),
         end_color=hex_to_argb(grade_bg),
         fill_type='solid',
     )
     grade_cell.alignment = Alignment(horizontal='center', vertical='center')
-    grade_border = Border(
-        left=Side(style='medium', color=hex_to_argb(grade_color)),
-        right=Side(style='medium', color=hex_to_argb(grade_color)),
-        top=Side(style='medium', color=hex_to_argb(grade_color)),
-        bottom=Side(style='medium', color=hex_to_argb(grade_color)),
+    grade_bdr = Border(
+        left=Side(style='thick', color=hex_to_argb(grade_color)),
+        right=Side(style='thick', color=hex_to_argb(grade_color)),
+        top=Side(style='thick', color=hex_to_argb(grade_color)),
+        bottom=Side(style='thick', color=hex_to_argb(grade_color)),
     )
-    grade_cell.border = grade_border
-    for row_idx in range(6, 11):
-        ws.row_dimensions[row_idx].height = 22
+    grade_cell.border = grade_bdr
+    for ri in range(4, 7):
+        ws.row_dimensions[ri].height = 22
 
-    # Score text beside the grade block
-    ws.merge_cells('C6:E6')
-    ws['C6'].value = f'Overall Score: {overall_score}'
-    ws['C6'].font = Font(name='Calibri', size=16, bold=True, color=hex_to_argb(grade_color))
-    ws['C6'].alignment = Alignment(vertical='center')
+    ws.cell(row=4, column=2, value='Overall Score').font = Font(
+        name='Calibri', size=9, color='FF9CA3AF')
+    ws.cell(row=5, column=2, value=overall_score).font = Font(
+        name='Calibri', size=20, bold=True, color=hex_to_argb(grade_color))
+    ws.cell(row=5, column=2).number_format = '0.0'
 
-    ws['C7'].value = f'Grade: {overall_grade}'
-    ws['C7'].font = Font(name='Calibri', size=12, color='FF6B7280')
+    # Per-category mini scores beside the grade
+    cat_results = grade_data.get('categories', {})
+    sorted_cats = sorted(
+        cat_results.items(),
+        key=lambda x: (-x[1].get('weight', 0), x[0]),
+    )
+    if sorted_cats:
+        col = 3
+        for cat_name, cat_data in sorted_cats:
+            if col > 7:
+                break
+            cat_c = cat_data.get('color', '#6b7280')
+            cat_g = cat_data.get('grade', '-')
+            ws.cell(row=4, column=col, value=cat_name).font = Font(
+                name='Calibri', size=8, color=hex_to_argb(cat_c))
+            ws.cell(row=4, column=col).alignment = Alignment(horizontal='center')
+            grade_badge = ws.cell(row=5, column=col, value=cat_g)
+            grade_badge.font = Font(name='Calibri', size=11, bold=True,
+                                    color=hex_to_argb(cat_data.get('grade_color', '#6b7280')))
+            grade_badge.fill = PatternFill(
+                start_color=hex_to_argb(cat_data.get('grade_bg', '#ffffff')),
+                end_color=hex_to_argb(cat_data.get('grade_bg', '#ffffff')),
+                fill_type='solid',
+            )
+            grade_badge.alignment = Alignment(horizontal='center')
+            sc = ws.cell(row=6, column=col, value=cat_data.get('score', 0))
+            sc.font = Font(name='Calibri', size=8, color='FF9CA3AF')
+            sc.number_format = '0.0'
+            sc.alignment = Alignment(horizontal='center')
+            col += 1
 
-    # -- Summary Statistics section --
-    section_font = Font(name='Calibri', size=14, bold=True, color='FF1F2937')
-    divider_fill = PatternFill(start_color='FFE5E7EB', end_color='FFE5E7EB', fill_type='solid')
+    # ── Row 7: Section divider ───────────────────────────────────────────
+    ws.row_dimensions[7].height = 6
+    for c in range(1, 8):
+        ws.cell(row=7, column=c).border = section_border
 
-    # Thin divider
-    ws.row_dimensions[11].height = 4
-    for col in range(1, 9):
-        ws.cell(row=11, column=col).fill = divider_fill
+    # ── Rows 8-12: Summary Statistics ────────────────────────────────────
+    r = 8
+    # Findings header
+    ws.merge_cells(f'A{r}:C{r}')
+    ws.cell(row=r, column=1, value='FINDINGS').font = Font(
+        name='Calibri', size=11, bold=True, color='FF1F2937')
+    ws.cell(row=r, column=1).border = Border(
+        bottom=Side(style='thin', color='FF1F2937'))
+    for c in range(2, 4):
+        ws.cell(row=r, column=c).border = Border(
+            bottom=Side(style='thin', color='FF1F2937'))
+    # Correlations header
+    ws.merge_cells(f'E{r}:G{r}')
+    ws.cell(row=r, column=5, value='CORRELATIONS').font = Font(
+        name='Calibri', size=11, bold=True, color='FF1F2937')
+    ws.cell(row=r, column=5).border = Border(
+        bottom=Side(style='thin', color='FF1F2937'))
+    for c in range(6, 8):
+        ws.cell(row=r, column=c).border = Border(
+            bottom=Side(style='thin', color='FF1F2937'))
+    ws.row_dimensions[r].height = 22
 
-    stats_header_row = 12
-    ws.merge_cells(f'A{stats_header_row}:F{stats_header_row}')
-    ws.cell(row=stats_header_row, column=1, value='SUMMARY STATISTICS').font = section_font
-    ws.row_dimensions[stats_header_row].height = 28
-
-    # Severity breakdown from findings data
+    # Severity counts for findings
     sev_counts = {'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'LOW': 0, 'INFO': 0}
     for row in findings_rows:
         sev = str(row[0]).upper().strip() if row else ''
         if sev in sev_counts:
             sev_counts[sev] += 1
 
-    # Severity label row
-    sev_label_row = stats_header_row + 1
-    ws.cell(row=sev_label_row, column=1, value='Findings by Severity:').font = Font(
-        name='Calibri', size=10, bold=True, color='FF374151')
-    col = 2
-    for sev_name in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']:
+    r = 9
+    sev_col = 1
+    for sev_name in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']:
         sev_count = sev_counts[sev_name]
-        label_cell = ws.cell(row=sev_label_row, column=col, value=sev_name)
-        label_cell.font = Font(name='Calibri', size=9, bold=True,
-                               color=hex_to_argb(SEVERITY_TEXT_COLORS[sev_name]))
-        label_cell.fill = PatternFill(
+        badge = ws.cell(row=r, column=sev_col, value=sev_name)
+        badge.font = Font(name='Calibri', size=8, bold=True,
+                          color=hex_to_argb(SEVERITY_TEXT_COLORS[sev_name]))
+        badge.fill = PatternFill(
             start_color=hex_to_argb(SEVERITY_COLORS[sev_name]),
             end_color=hex_to_argb(SEVERITY_COLORS[sev_name]),
             fill_type='solid',
         )
-        label_cell.alignment = Alignment(horizontal='center')
-        label_cell.border = Border(
-            bottom=Side(style='thin', color='FFFFFFFF'),
-        )
+        badge.alignment = Alignment(horizontal='center')
 
-        count_cell = ws.cell(row=sev_label_row + 1, column=col, value=sev_count)
-        count_cell.font = Font(name='Calibri', size=12, bold=True)
-        count_cell.alignment = Alignment(horizontal='center')
-        col += 1
+        cnt = ws.cell(row=r + 1, column=sev_col, value=sev_count)
+        cnt.font = Font(name='Calibri', size=11, bold=True, color='FF1F2937')
+        cnt.alignment = Alignment(horizontal='center')
+        sev_col += 1
 
-    # Correlations risk breakdown
-    risk_counts = {'HIGH': 0, 'MEDIUM': 0, 'LOW': 0, 'INFO': 0}
+    # INFO count (smaller, less prominent)
+    info_badge = ws.cell(row=r, column=sev_col, value='INFO')
+    info_badge.font = Font(name='Calibri', size=8, bold=True,
+                           color=hex_to_argb(SEVERITY_TEXT_COLORS['INFO']))
+    info_badge.fill = PatternFill(
+        start_color=hex_to_argb(SEVERITY_COLORS['INFO']),
+        end_color=hex_to_argb(SEVERITY_COLORS['INFO']),
+        fill_type='solid',
+    )
+    info_badge.alignment = Alignment(horizontal='center')
+    info_cnt = ws.cell(row=r + 1, column=sev_col, value=sev_counts['INFO'])
+    info_cnt.font = Font(name='Calibri', size=11, bold=True, color='FF1F2937')
+    info_cnt.alignment = Alignment(horizontal='center')
+
+    # Risk counts for correlations
+    risk_counts = {'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'LOW': 0, 'INFO': 0}
     for row in correlation_rows:
         risk = str(row[2]).upper().strip() if len(row) > 2 else ''
         if risk in risk_counts:
             risk_counts[risk] += 1
 
-    corr_label_row = sev_label_row + 3
-    ws.cell(row=corr_label_row, column=1, value='Correlations by Risk:').font = Font(
-        name='Calibri', size=10, bold=True, color='FF374151')
-    col = 2
-    for risk_name in ['HIGH', 'MEDIUM', 'LOW', 'INFO']:
+    risk_col = 5
+    for risk_name in ['CRITICAL', 'HIGH', 'MEDIUM']:
         risk_count = risk_counts[risk_name]
-        label_cell = ws.cell(row=corr_label_row, column=col, value=risk_name)
-        label_cell.font = Font(name='Calibri', size=9, bold=True, color='FFFFFFFF')
-        label_cell.fill = PatternFill(
+        badge = ws.cell(row=r, column=risk_col, value=risk_name)
+        badge.font = Font(name='Calibri', size=8, bold=True, color='FFFFFFFF')
+        badge.fill = PatternFill(
             start_color=hex_to_argb(RISK_COLORS[risk_name]),
             end_color=hex_to_argb(RISK_COLORS[risk_name]),
             fill_type='solid',
         )
-        label_cell.alignment = Alignment(horizontal='center')
+        badge.alignment = Alignment(horizontal='center')
 
-        count_cell = ws.cell(row=corr_label_row + 1, column=col, value=risk_count)
-        count_cell.font = Font(name='Calibri', size=12, bold=True)
-        count_cell.alignment = Alignment(horizontal='center')
-        col += 1
+        cnt = ws.cell(row=r + 1, column=risk_col, value=risk_count)
+        cnt.font = Font(name='Calibri', size=11, bold=True, color='FF1F2937')
+        cnt.alignment = Alignment(horizontal='center')
+        risk_col += 1
 
     # Totals row
-    total_row = corr_label_row + 3
-    ws.cell(row=total_row, column=1, value='Total Findings:').font = Font(
-        name='Calibri', size=11, bold=True, color='FF374151')
-    ws.cell(row=total_row, column=2, value=len(findings_rows)).font = Font(
-        name='Calibri', size=11, bold=True, color='FF1F2937')
-    ws.cell(row=total_row, column=3, value='Total Correlations:').font = Font(
-        name='Calibri', size=11, bold=True, color='FF374151')
-    ws.cell(row=total_row, column=4, value=len(correlation_rows)).font = Font(
-        name='Calibri', size=11, bold=True, color='FF1F2937')
+    r = 11
+    ws.cell(row=r, column=1, value='Total:').font = Font(
+        name='Calibri', size=10, bold=True, color='FF6B7280')
+    ws.cell(row=r, column=2, value=len(findings_rows)).font = Font(
+        name='Calibri', size=12, bold=True, color='FF1F2937')
+    ws.cell(row=r, column=5, value='Total:').font = Font(
+        name='Calibri', size=10, bold=True, color='FF6B7280')
+    ws.cell(row=r, column=6, value=len(correlation_rows)).font = Font(
+        name='Calibri', size=12, bold=True, color='FF1F2937')
 
-    # -- Top Risks section --
-    cat_results = grade_data.get('categories', {})
-    sorted_cats = sorted(
-        cat_results.items(),
-        key=lambda x: (-x[1].get('weight', 0), x[0]),
-    )
+    # ── Row 12: Section divider ──────────────────────────────────────────
+    r = 12
+    ws.row_dimensions[r].height = 6
+    for c in range(1, 8):
+        ws.cell(row=r, column=c).border = section_border
 
-    # Divider
-    divider_row = total_row + 1
-    ws.row_dimensions[divider_row].height = 4
-    for col in range(1, 9):
-        ws.cell(row=divider_row, column=col).fill = divider_fill
-
-    top_risks_row = divider_row + 1
-    ws.merge_cells(f'A{top_risks_row}:F{top_risks_row}')
-    ws.cell(row=top_risks_row, column=1, value='TOP RISKS').font = Font(
-        name='Calibri', size=14, bold=True, color='FFDC2626')
-    ws.row_dimensions[top_risks_row].height = 28
+    # ── Rows 13+: Top Risks ──────────────────────────────────────────────
+    r = 13
+    ws.merge_cells(f'A{r}:G{r}')
+    ws.cell(row=r, column=1, value='TOP RISKS').font = Font(
+        name='Calibri', size=11, bold=True, color='FFDC2626')
+    ws.cell(row=r, column=1).border = Border(
+        bottom=Side(style='thin', color='FFDC2626'))
+    for c in range(2, 8):
+        ws.cell(row=r, column=c).border = Border(
+            bottom=Side(style='thin', color='FFDC2626'))
+    ws.row_dimensions[r].height = 22
+    r += 1
 
     if sorted_cats:
-        # Show worst 3 (lowest scores)
         worst_cats = sorted(sorted_cats, key=lambda x: x[1].get('score', 100))[:3]
         for i, (cname, cdata) in enumerate(worst_cats):
-            r = top_risks_row + 1 + i
             cscore = cdata.get('score', 0)
             cgrade = cdata.get('grade', '-')
             ccolor = cdata.get('color', '#6b7280')
@@ -329,90 +375,107 @@ def build_executive_summary(ws, grade_data: dict, scan_info: dict,
             cgrade_bg = cdata.get('grade_bg', '#ffffff')
 
             ws.cell(row=r, column=1, value=f'{i + 1}.').font = Font(
-                name='Calibri', size=10, bold=True, color='FFDC2626')
+                name='Calibri', size=10, bold=True, color='FF9CA3AF')
             ws.cell(row=r, column=2, value=cname).font = Font(
                 name='Calibri', size=10, bold=True, color=hex_to_argb(ccolor))
-            ws.cell(row=r, column=3, value=f'Score: {cscore}').font = Font(
+            ws.cell(row=r, column=3, value=cscore).font = Font(
                 name='Calibri', size=10, color='FF6B7280')
-            risk_grade_cell = ws.cell(row=r, column=4, value=cgrade)
-            risk_grade_cell.font = Font(name='Calibri', size=10, bold=True,
-                                        color=hex_to_argb(cgrade_color))
-            risk_grade_cell.fill = PatternFill(
+            ws.cell(row=r, column=3).number_format = '0.0'
+            g_cell = ws.cell(row=r, column=4, value=cgrade)
+            g_cell.font = Font(name='Calibri', size=10, bold=True,
+                               color=hex_to_argb(cgrade_color))
+            g_cell.fill = PatternFill(
                 start_color=hex_to_argb(cgrade_bg),
                 end_color=hex_to_argb(cgrade_bg),
                 fill_type='solid',
             )
-            risk_grade_cell.alignment = Alignment(horizontal='center')
-            ws.cell(row=r, column=5, value=cdata.get('description', '')).font = Font(
-                name='Calibri', size=9, italic=True, color='FF9CA3AF')
-
-        next_row = top_risks_row + 1 + len(worst_cats)
+            g_cell.alignment = Alignment(horizontal='center')
+            desc = cdata.get('description', '')
+            if desc:
+                ws.merge_cells(start_row=r, start_column=5, end_row=r, end_column=7)
+                ws.cell(row=r, column=5, value=desc).font = Font(
+                    name='Calibri', size=8, italic=True, color='FF9CA3AF')
+            for c in range(1, 8):
+                ws.cell(row=r, column=c).border = subtle_border
+            r += 1
     else:
-        ws.cell(row=top_risks_row + 1, column=1,
-                value='No category data available.').font = Font(
+        ws.cell(row=r, column=1, value='No category data available.').font = Font(
             name='Calibri', size=10, italic=True, color='FF9CA3AF')
-        next_row = top_risks_row + 2
+        r += 1
 
-    # -- Category breakdown table --
-    # Divider
-    ws.row_dimensions[next_row].height = 4
-    for col in range(1, 9):
-        ws.cell(row=next_row, column=col).fill = divider_fill
-    next_row += 1
+    # ── Section divider ──────────────────────────────────────────────────
+    ws.row_dimensions[r].height = 6
+    for c in range(1, 8):
+        ws.cell(row=r, column=c).border = section_border
+    r += 1
 
-    cat_section_row = next_row
-    ws.merge_cells(f'A{cat_section_row}:F{cat_section_row}')
-    ws.cell(row=cat_section_row, column=1, value='CATEGORY BREAKDOWN').font = section_font
-    ws.row_dimensions[cat_section_row].height = 28
+    # ── Category Breakdown table ─────────────────────────────────────────
+    ws.merge_cells(f'A{r}:G{r}')
+    ws.cell(row=r, column=1, value='CATEGORY BREAKDOWN').font = Font(
+        name='Calibri', size=11, bold=True, color='FF1F2937')
+    ws.cell(row=r, column=1).border = Border(
+        bottom=Side(style='thin', color='FF1F2937'))
+    for c in range(2, 8):
+        ws.cell(row=r, column=c).border = Border(
+            bottom=Side(style='thin', color='FF1F2937'))
+    ws.row_dimensions[r].height = 22
+    r += 1
 
-    cat_header_row = cat_section_row + 1
-
+    cat_header_row = r
     if not cat_results or not grade_data.get('enabled', True):
-        ws.merge_cells(f'A{cat_header_row}:F{cat_header_row}')
-        ws.cell(row=cat_header_row, column=1, value='Grading data not available for this scan.').font = Font(
-            name='Calibri', size=11, italic=True, color='FF9CA3AF',
-        )
+        ws.merge_cells(f'A{r}:G{r}')
+        ws.cell(row=r, column=1, value='Grading data not available for this scan.').font = Font(
+            name='Calibri', size=10, italic=True, color='FF9CA3AF')
+        r += 1
     else:
-        cat_headers = ['Category', 'Weight', 'Raw Score', 'Adj Score', 'Score', 'Grade']
-        apply_header_row(ws, cat_headers, cat_header_row)
+        cat_headers = ['Category', 'Weight', 'Score', 'Grade', '', '', '']
+        for col_num, header_text in enumerate(cat_headers, 1):
+            if not header_text:
+                continue
+            cell = ws.cell(row=r, column=col_num, value=header_text)
+            cell.font = Font(name='Calibri', size=9, bold=True, color='FF6B7280')
+            cell.border = Border(bottom=Side(style='thin', color='FFD1D5DB'))
+        r += 1
 
-    current_row = cat_header_row + 1
-    for cat_name, cat_data in sorted_cats:
-        cat_color = cat_data.get('color', '#6b7280')
-        cat_grade_color = cat_data.get('grade_color', '#6b7280')
-        cat_grade_bg = cat_data.get('grade_bg', '#ffffff')
+        for cat_name, cat_data in sorted_cats:
+            cat_color = cat_data.get('color', '#6b7280')
+            cat_grade_color = cat_data.get('grade_color', '#6b7280')
+            cat_grade_bg = cat_data.get('grade_bg', '#ffffff')
 
-        name_cell = ws.cell(row=current_row, column=1, value=cat_name)
-        name_cell.font = Font(name='Calibri', size=10, bold=True, color=hex_to_argb(cat_color))
+            # Color indicator + name
+            name_cell = ws.cell(row=r, column=1, value=cat_name)
+            name_cell.font = Font(name='Calibri', size=10, bold=True, color=hex_to_argb(cat_color))
+            name_cell.border = Border(
+                left=Side(style='thick', color=hex_to_argb(cat_color)),
+                bottom=Side(style='thin', color='FFE5E7EB'),
+            )
 
-        ws.cell(row=current_row, column=2, value=cat_data.get('weight', 0)).number_format = '0.0'
-        ws.cell(row=current_row, column=3, value=cat_data.get('raw_score', 0)).number_format = '0.0'
-        ws.cell(row=current_row, column=4, value=cat_data.get('adj_score', 0)).number_format = '0.0'
+            ws.cell(row=r, column=2, value=cat_data.get('weight', 0)).font = DATA_FONT
+            ws.cell(row=r, column=2).number_format = '0.0'
+            ws.cell(row=r, column=2).border = subtle_border
 
-        score_cell = ws.cell(row=current_row, column=5, value=cat_data.get('score', 0))
-        score_cell.number_format = '0.0'
+            score_cell = ws.cell(row=r, column=3, value=cat_data.get('score', 0))
+            score_cell.font = Font(name='Calibri', size=10, bold=True, color='FF374151')
+            score_cell.number_format = '0.0'
+            score_cell.border = subtle_border
 
-        cat_grade_cell = ws.cell(row=current_row, column=6, value=cat_data.get('grade', '-'))
-        cat_grade_cell.font = Font(name='Calibri', size=10, bold=True, color=hex_to_argb(cat_grade_color))
-        cat_grade_cell.fill = PatternFill(
-            start_color=hex_to_argb(cat_grade_bg),
-            end_color=hex_to_argb(cat_grade_bg),
-            fill_type='solid',
-        )
-        cat_grade_cell.alignment = Alignment(horizontal='center')
+            cat_grade_cell = ws.cell(row=r, column=4, value=cat_data.get('grade', '-'))
+            cat_grade_cell.font = Font(name='Calibri', size=10, bold=True,
+                                       color=hex_to_argb(cat_grade_color))
+            cat_grade_cell.fill = PatternFill(
+                start_color=hex_to_argb(cat_grade_bg),
+                end_color=hex_to_argb(cat_grade_bg),
+                fill_type='solid',
+            )
+            cat_grade_cell.alignment = Alignment(horizontal='center')
+            cat_grade_cell.border = subtle_border
 
-        for col in range(1, 7):
-            c = ws.cell(row=current_row, column=col)
-            c.border = THIN_BORDER
-            if c.font == DEFAULT_FONT:
-                c.font = DATA_FONT
+            r += 1
 
-        current_row += 1
-
-    # -- Data Bars on Score column (cosmetic — non-fatal if it fails) --
-    if sorted_cats:
+    # Data bars on Score column (cosmetic — non-fatal)
+    if sorted_cats and r > cat_header_row + 1:
         try:
-            score_range = f"E{cat_header_row + 1}:E{current_row - 1}"
+            score_range = f"C{cat_header_row + 1}:C{r - 1}"
             rule = DataBarRule(
                 start_type='num', start_value=0,
                 end_type='num', end_value=100,
@@ -422,49 +485,14 @@ def build_executive_summary(ws, grade_data: dict, scan_info: dict,
         except Exception:
             pass
 
-    # -- Bar Chart: Category Scores (cosmetic — non-fatal if it fails) --
-    if sorted_cats:
-        try:
-            chart = BarChart()
-            chart.type = "col"
-            chart.style = 10
-            chart.title = "Category Scores"
-            chart.y_axis.title = "Score"
-            chart.y_axis.scaling.min = 0
-            chart.y_axis.scaling.max = 100
-
-            data_ref = Reference(ws, min_col=5, min_row=cat_header_row,
-                                 max_row=cat_header_row + len(sorted_cats))
-            cats_ref = Reference(ws, min_col=1, min_row=cat_header_row + 1,
-                                 max_row=cat_header_row + len(sorted_cats))
-
-            chart.add_data(data_ref, titles_from_data=True)
-            chart.set_categories(cats_ref)
-            chart.width = 20
-            chart.height = 12
-
-            # Color each bar to match its category color
-            series = chart.series[0]
-            for idx, (cat_name_c, cat_data_c) in enumerate(sorted_cats):
-                pt = DataPoint(idx=idx)
-                cat_color_hex = cat_data_c.get('color', '#6b7280').lstrip('#')
-                pt.graphicalProperties.solidFill = cat_color_hex
-                series.data_points.append(pt)
-
-            chart.legend = None
-            ws.add_chart(chart, f"G{cat_section_row}")
-        except Exception:
-            pass
-
-    # -- Column widths --
-    ws.column_dimensions['A'].width = 28
-    ws.column_dimensions['B'].width = 14
-    ws.column_dimensions['C'].width = 14
-    ws.column_dimensions['D'].width = 14
+    # ── Column widths ────────────────────────────────────────────────────
+    ws.column_dimensions['A'].width = 26
+    ws.column_dimensions['B'].width = 12
+    ws.column_dimensions['C'].width = 12
+    ws.column_dimensions['D'].width = 10
     ws.column_dimensions['E'].width = 12
-    ws.column_dimensions['F'].width = 10
-    ws.column_dimensions['G'].width = 4
-    ws.column_dimensions['H'].width = 12
+    ws.column_dimensions['F'].width = 12
+    ws.column_dimensions['G'].width = 14
 
 
 # ============================================================================
