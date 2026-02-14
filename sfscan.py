@@ -261,6 +261,25 @@ class SpiderFootScanner():
     def status(self) -> str:
         return self.__status
 
+    def __forceTerminalStatus(self, status: str) -> None:
+        """Last-resort attempt to set a terminal scan status using a fresh
+        database connection, bypassing the main db handler which may be in
+        a bad state.
+
+        Args:
+            status (str): terminal status to set (FINISHED, ABORTED, ERROR-FAILED)
+        """
+        try:
+            import sqlite3 as _sqlite3
+            _conn = _sqlite3.connect(self.__config['__database'])
+            _conn.execute(
+                "UPDATE tbl_scan_instance SET status = ?, ended = ? WHERE guid = ?",
+                (status, time.time() * 1000, self.__scanId))
+            _conn.commit()
+            _conn.close()
+        except Exception:
+            pass
+
     def __setStatus(self, status: str, started: float = None, ended: float = None) -> None:
         """Set the status of the currently running scan (if any).
 
@@ -465,7 +484,10 @@ class SpiderFootScanner():
 
         except (KeyboardInterrupt, AssertionError):
             self.__sf.status(f"Scan [{self.__scanId}] aborted.")
-            self.__setStatus("ABORTED", None, time.time() * 1000)
+            try:
+                self.__setStatus("ABORTED", None, time.time() * 1000)
+            except Exception:
+                pass
 
         except Exception as e:
             import traceback
@@ -478,9 +500,36 @@ class SpiderFootScanner():
 
         finally:
             if not failed:
-                self.__setStatus("FINISHED", None, time.time() * 1000)
-                self.runCorrelations()
+                try:
+                    self.__setStatus("FINISHED", None, time.time() * 1000)
+                except Exception as e:
+                    self.__sf.error(f"Scan [{self.__scanId}] failed to set FINISHED status: {e}")
+                    self.__forceTerminalStatus("FINISHED")
+
+                try:
+                    self.runCorrelations()
+                except Exception as e:
+                    self.__sf.error(f"Scan [{self.__scanId}] correlation processing failed: {e}")
+
                 self.__sf.status(f"Scan [{self.__scanId}] completed.")
+            else:
+                # Scan failed or was aborted - ensure it has a terminal status
+                # so the UI stops polling
+                try:
+                    scanstatus = self.__dbh.scanInstanceGet(self.__scanId)
+                    if scanstatus and scanstatus[5] not in (
+                        "FINISHED", "ABORTED", "ERROR-FAILED"
+                    ):
+                        self.__sf.error(
+                            f"Scan [{self.__scanId}] has non-terminal status "
+                            f"'{scanstatus[5]}', forcing ERROR-FAILED")
+                        try:
+                            self.__setStatus("ERROR-FAILED", None, time.time() * 1000)
+                        except Exception:
+                            self.__forceTerminalStatus("ERROR-FAILED")
+                except Exception:
+                    self.__forceTerminalStatus("ERROR-FAILED")
+
             self.__dbh.close()
 
     def runCorrelations(self) -> None:
@@ -489,17 +538,24 @@ class SpiderFootScanner():
         from spiderfoot.correlation.event_enricher import EventEnricher
         from spiderfoot.correlation.result_aggregator import ResultAggregator
 
+        rules = self.__config.get('__correlationrules__') or []
+        if not rules:
+            self.__sf.status(f"No correlation rules configured for scan {self.__scanId}, skipping.")
+            return
+
         self.__sf.status(
-            f"Running {len(self.__config['__correlationrules__'])} correlation rules on scan {self.__scanId}.")
-        rules = self.__config['__correlationrules__']
+            f"Running {len(rules)} correlation rules on scan {self.__scanId}.")
         executor = RuleExecutor(self.__dbh, rules, scan_ids=[self.__scanId])
         results = executor.run()
         # Enrich results (optional, can be expanded)
         enricher = EventEnricher(self.__dbh)
         for rule_id, result in results.items():
             if 'events' in result:
-                result['events'] = enricher.enrich_sources(self.__scanId, result['events'])
-                result['events'] = enricher.enrich_entities(self.__scanId, result['events'])
+                try:
+                    result['events'] = enricher.enrich_sources(self.__scanId, result['events'])
+                    result['events'] = enricher.enrich_entities(self.__scanId, result['events'])
+                except Exception as e:
+                    self.__sf.error(f"Scan [{self.__scanId}] event enrichment failed for rule {rule_id}: {e}")
         # Aggregate results (optional)
         aggregator = ResultAggregator()
         agg_count = aggregator.aggregate(list(results.values()), method='count')
