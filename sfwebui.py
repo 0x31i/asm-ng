@@ -5309,8 +5309,14 @@ class SpiderFootWebUi:
             result = dbh.isLatestScan(id)
 
             # Auto-import: if this is the latest scan and there are multiple scans
-            # and no entries have been imported yet, trigger import
-            if result['isLatest'] and result['scanCount'] > 1 and result['importedCount'] == 0:
+            # and no entries have been imported yet, trigger import.
+            # BUT skip if the scan is still running — the import holds a write lock
+            # that blocks the scan subprocess from updating its status.
+            scanInfo = dbh.scanInstanceGet(id)
+            scanStatus = scanInfo[5] if scanInfo else None
+            scanRunning = scanStatus not in (None, "FINISHED", "ABORTED", "ERROR-FAILED")
+
+            if result['isLatest'] and result['scanCount'] > 1 and result['importedCount'] == 0 and not scanRunning:
                 importResult = dbh.importEntriesFromOlderScans(id)
                 result['importedCount'] = importResult['imported']
                 result['importStatus'] = f"Imported {importResult['imported']} entries from previous scans"
