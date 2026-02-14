@@ -1424,7 +1424,6 @@ class SpiderFootDb:
         # Retry with backoff for transient "database is locked" errors.
         # This is critical because the web UI's import/dedup operations can
         # hold the write lock for extended periods.
-        last_error = None
         for attempt in range(4):
             with self.dbhLock:
                 try:
@@ -1432,16 +1431,17 @@ class SpiderFootDb:
                     self.conn.commit()
                     return
                 except sqlite3.OperationalError as e:
-                    last_error = e
                     if "locked" in str(e) and attempt < 3:
-                        import time
-                        time.sleep(2 ** attempt)  # 1s, 2s, 4s
-                        continue
-                    raise IOError(
-                        f"Unable to set information for the scan instance: {e}") from e
+                        pass  # will retry after sleep below
+                    else:
+                        raise IOError(
+                            f"Unable to set information for the scan instance: {e}") from e
                 except sqlite3.Error as e:
                     raise IOError(
                         f"Unable to set information for the scan instance: {e}") from e
+            # Sleep OUTSIDE the dbhLock so other threads aren't blocked
+            import time as _time
+            _time.sleep(2 ** attempt)  # 1s, 2s, 4s
 
     def scanInstanceGet(self, instanceId: str) -> list:
         """Return info about a scan instance (name, target, created, started,
