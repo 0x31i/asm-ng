@@ -5061,11 +5061,14 @@ class SpiderFootWebUi:
             "LOW": 0,
             "INFO": 0
         }
-        correlations = dbh.scanCorrelationSummary(id, by="risk")
-        if correlations:
-            for c in correlations:
-                if c[0] in riskmatrix:
-                    riskmatrix[c[0]] = c[1]
+        try:
+            correlations = dbh.scanCorrelationSummary(id, by="risk")
+            if correlations:
+                for c in correlations:
+                    if c[0] in riskmatrix:
+                        riskmatrix[c[0]] = c[1]
+        except Exception:
+            pass
 
         findingsmatrix = {
             "CRITICAL": 0,
@@ -5101,7 +5104,19 @@ class SpiderFootWebUi:
                   progressPercent, status)
         """
         dbh = SpiderFootDb(self.config)
-        return dbh.scanProgress(id)
+        try:
+            return dbh.scanProgress(id)
+        except Exception:
+            return {
+                'status': 'UNKNOWN',
+                'modulesTotal': 0,
+                'modulesWithResults': 0,
+                'modulesRunning': 0,
+                'eventsQueued': 0,
+                'totalEvents': 0,
+                'eventsPerSecond': 0.0,
+                'progressPercent': 0,
+            }
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -5127,6 +5142,9 @@ class SpiderFootWebUi:
         try:
             statusdata = dbh.scanInstanceGet(id)
         except Exception:
+            return retdata
+
+        if not statusdata:
             return retdata
 
         config_overrides = load_grade_config_overrides(self.config)
@@ -5481,19 +5499,21 @@ class SpiderFootWebUi:
                         f"Correlation data format error: missing required fields, got {len(row)} fields")
                     continue
 
-                # Extract specific fields based on their indices
+                # scanCorrelationList returns:
+                #   0: c.id, 1: c.title, 2: c.rule_id, 3: c.rule_risk,
+                #   4: c.rule_name, 5: c.rule_descr, 6: c.rule_logic,
+                #   7: event_count, 8: event_types
                 correlation_id = row[0]
                 correlation = row[1]
-                rule_name = row[2]
+                rule_id = row[2]
                 rule_risk = row[3]
-                rule_id = row[4]
+                rule_name = row[4]
                 rule_description = row[5]
-                events = row[6] if len(row) > 6 else ""
-                created = row[7] if len(row) > 7 else ""
+                event_count = row[7] if len(row) > 7 else 0
                 event_types = row[8] if len(row) > 8 else ""
 
                 retdata.append([correlation_id, correlation, rule_name, rule_risk,
-                               rule_id, rule_description, events, created, event_types])
+                               rule_id, rule_description, event_count, "", event_types])
 
         except Exception as e:
             self.log.error(
@@ -5581,17 +5601,20 @@ class SpiderFootWebUi:
                 for row in corrdata:
                     if len(row) < 6:
                         continue
+                    # scanCorrelationList returns:
+                    #   0: c.id, 1: c.title, 2: c.rule_id, 3: c.rule_risk,
+                    #   4: c.rule_name, 5: c.rule_descr, 6: c.rule_logic,
+                    #   7: event_count, 8: event_types
                     correlation_id = row[0]
                     correlation = row[1]
-                    rule_name = row[2]
+                    rule_id = row[2]
                     rule_risk = row[3]
-                    rule_id = row[4]
+                    rule_name = row[4]
                     rule_description = row[5]
-                    events = row[6] if len(row) > 6 else ""
-                    created = row[7] if len(row) > 7 else ""
+                    event_count = row[7] if len(row) > 7 else 0
                     event_types = row[8] if len(row) > 8 else ""
                     retdata.append([correlation_id, correlation, rule_name, rule_risk,
-                                   rule_id, rule_description, events, created, event_types])
+                                   rule_id, rule_description, event_count, "", event_types])
 
             self._updateCorrelationJob(job_id, progress=90, step='Preparing display...')
 
@@ -8447,15 +8470,19 @@ This is a placeholder MCP report. Integration with actual MCP server required.
                     finished_scans += 1
                     scan_correlations = dbh.scanCorrelationList(scan['scan_id'])
                     for corr in scan_correlations:
+                        # scanCorrelationList returns:
+                        #   0: id, 1: title, 2: rule_id, 3: rule_risk,
+                        #   4: rule_name, 5: rule_descr, 6: rule_logic,
+                        #   7: event_count, 8: event_types
                         correlations.append({
                             'scan_id': scan['scan_id'],
                             'correlation_id': corr[0],
                             'correlation': corr[1],
-                            'rule_name': corr[2],
+                            'rule_name': corr[4],
                             'rule_risk': corr[3],
-                            'rule_id': corr[4],
+                            'rule_id': corr[2],
                             'rule_description': corr[5],
-                            'created': corr[7] if len(corr) > 7 else ''
+                            'created': ''
                         })
             
             # Check if we have enough finished scans for correlation analysis
