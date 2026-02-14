@@ -99,7 +99,7 @@ class SpiderFootDb:
         )",
         "CREATE TABLE tbl_scan_correlation_results_events ( \
             correlation_id      VARCHAR NOT NULL REFERENCES tbl_scan_correlation_results(id), \
-            event_hash          VARCHAR NOT NULL REFERENCES tbl_scan_results(hash) \
+            event_hash          VARCHAR NOT NULL \
         )",
         "CREATE INDEX idx_scan_results_id ON tbl_scan_results (scan_instance_id)",
         "CREATE INDEX idx_scan_results_type ON tbl_scan_results (scan_instance_id, type)",
@@ -826,6 +826,37 @@ class SpiderFootDb:
                 except sqlite3.Error:
                     pass
 
+            # Migration: Fix invalid FK in tbl_scan_correlation_results_events
+            # The REFERENCES tbl_scan_results(hash) is invalid because hash is
+            # not a PRIMARY KEY or UNIQUE column, causing foreign key mismatch
+            # errors when PRAGMA foreign_keys=ON
+            try:
+                self.dbh.execute(
+                    "SELECT sql FROM sqlite_master WHERE type='table' "
+                    "AND name='tbl_scan_correlation_results_events'")
+                table_sql = self.dbh.fetchone()
+                if table_sql and 'REFERENCES tbl_scan_results' in str(table_sql[0]):
+                    self.dbh.execute(
+                        "CREATE TABLE IF NOT EXISTS tbl_scan_correlation_results_events_new ( "
+                        "correlation_id VARCHAR NOT NULL REFERENCES tbl_scan_correlation_results(id), "
+                        "event_hash VARCHAR NOT NULL)")
+                    self.dbh.execute(
+                        "INSERT OR IGNORE INTO tbl_scan_correlation_results_events_new "
+                        "SELECT correlation_id, event_hash FROM tbl_scan_correlation_results_events")
+                    self.dbh.execute("DROP TABLE tbl_scan_correlation_results_events")
+                    self.dbh.execute(
+                        "ALTER TABLE tbl_scan_correlation_results_events_new "
+                        "RENAME TO tbl_scan_correlation_results_events")
+                    self.dbh.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_scan_correlation_events "
+                        "ON tbl_scan_correlation_results_events (correlation_id)")
+                    self.dbh.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_scan_correlation_events_hash "
+                        "ON tbl_scan_correlation_results_events (event_hash)")
+                    self.conn.commit()
+            except sqlite3.Error:
+                pass
+
             if init:
                 for row in self.eventDetails:
                     event = row[0]
@@ -1370,31 +1401,33 @@ class SpiderFootDb:
                 f"instanceId is {type(instanceId)}; expected str()") from None
 
         qvars = list()
-        qry = "UPDATE tbl_scan_instance SET "
+        sets = list()
 
         if started is not None:
-            qry += " started = ?,"
+            sets.append("started = ?")
             qvars.append(started)
 
         if ended is not None:
-            qry += " ended = ?,"
+            sets.append("ended = ?")
             qvars.append(ended)
 
         if status is not None:
-            qry += " status = ?,"
+            sets.append("status = ?")
             qvars.append(status)
 
-        # guid = guid is a little hack to avoid messing with , placement above
-        qry += " guid = guid WHERE guid = ?"
+        if not sets:
+            return
+
+        qry = f"UPDATE tbl_scan_instance SET {', '.join(sets)} WHERE guid = ?"
         qvars.append(instanceId)
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, qvars)
                 self.conn.commit()
-            except sqlite3.Error:
+            except sqlite3.Error as e:
                 raise IOError(
-                    "Unable to set information for the scan instance.") from None
+                    f"Unable to set information for the scan instance: {e}") from e
 
     def scanInstanceGet(self, instanceId: str) -> list:
         """Return info about a scan instance (name, target, created, started,
@@ -2008,22 +2041,29 @@ class SpiderFootDb:
             raise TypeError(
                 f"instanceId is {type(instanceId)}; expected str()") from None
 
-        qry1 = "DELETE FROM tbl_scan_instance WHERE guid = ?"
-        qry2 = "DELETE FROM tbl_scan_config WHERE scan_instance_id = ?"
-        qry3 = "DELETE FROM tbl_scan_results WHERE scan_instance_id = ?"
-        qry4 = "DELETE FROM tbl_scan_log WHERE scan_instance_id = ?"
         qvars = [instanceId]
 
         with self.dbhLock:
             try:
-                self.dbh.execute(qry1, qvars)
-                self.dbh.execute(qry2, qvars)
-                self.dbh.execute(qry3, qvars)
-                self.dbh.execute(qry4, qvars)
+                # Delete in dependency order: deepest children first, parent last
+                # tbl_scan_correlation_results_events references both
+                # tbl_scan_correlation_results and tbl_scan_results
+                self.dbh.execute(
+                    "DELETE FROM tbl_scan_correlation_results_events WHERE correlation_id IN "
+                    "(SELECT id FROM tbl_scan_correlation_results WHERE scan_instance_id = ?)", qvars)
+                self.dbh.execute("DELETE FROM tbl_scan_correlation_results WHERE scan_instance_id = ?", qvars)
+                self.dbh.execute("DELETE FROM tbl_scan_log WHERE scan_instance_id = ?", qvars)
+                self.dbh.execute("DELETE FROM tbl_scan_config WHERE scan_instance_id = ?", qvars)
+                self.dbh.execute("DELETE FROM tbl_scan_findings WHERE scan_instance_id = ?", qvars)
+                self.dbh.execute("DELETE FROM tbl_scan_nessus_results WHERE scan_instance_id = ?", qvars)
+                self.dbh.execute("DELETE FROM tbl_scan_burp_results WHERE scan_instance_id = ?", qvars)
+                self.dbh.execute("DELETE FROM tbl_scan_results WHERE scan_instance_id = ?", qvars)
+                # Delete parent table last
+                self.dbh.execute("DELETE FROM tbl_scan_instance WHERE guid = ?", qvars)
                 self.conn.commit()
             except sqlite3.Error as e:
                 raise IOError(
-                    "SQL error encountered when deleting scan") from e
+                    f"SQL error encountered when deleting scan: {e}") from e
 
         return True
 
