@@ -495,7 +495,7 @@ class SpiderFootDb:
         # SQLite hardening PRAGMAs
         self.dbh.execute("PRAGMA journal_mode=WAL")
         self.dbh.execute("PRAGMA synchronous=NORMAL")
-        self.dbh.execute("PRAGMA busy_timeout=5000")
+        self.dbh.execute("PRAGMA busy_timeout=30000")
 
         # cache_size and mmap_size tuned for 32GB RAM deployments
         # Override via env vars for different deployment sizes
@@ -1421,13 +1421,27 @@ class SpiderFootDb:
         qry = f"UPDATE tbl_scan_instance SET {', '.join(sets)} WHERE guid = ?"
         qvars.append(instanceId)
 
-        with self.dbhLock:
-            try:
-                self.dbh.execute(qry, qvars)
-                self.conn.commit()
-            except sqlite3.Error as e:
-                raise IOError(
-                    f"Unable to set information for the scan instance: {e}") from e
+        # Retry with backoff for transient "database is locked" errors.
+        # This is critical because the web UI's import/dedup operations can
+        # hold the write lock for extended periods.
+        last_error = None
+        for attempt in range(4):
+            with self.dbhLock:
+                try:
+                    self.dbh.execute(qry, qvars)
+                    self.conn.commit()
+                    return
+                except sqlite3.OperationalError as e:
+                    last_error = e
+                    if "locked" in str(e) and attempt < 3:
+                        import time
+                        time.sleep(2 ** attempt)  # 1s, 2s, 4s
+                        continue
+                    raise IOError(
+                        f"Unable to set information for the scan instance: {e}") from e
+                except sqlite3.Error as e:
+                    raise IOError(
+                        f"Unable to set information for the scan instance: {e}") from e
 
     def scanInstanceGet(self, instanceId: str) -> list:
         """Return info about a scan instance (name, target, created, started,
@@ -3937,12 +3951,14 @@ class SpiderFootDb:
 
         imported = 0
         skipped = 0
+        batch_size = 50  # Commit every N inserts to avoid holding the write lock too long
 
         # Track already imported combinations to prevent duplicates within this batch
         imported_combinations = set()
 
         with self.dbhLock:
             try:
+                pending = 0
                 for entry in entries:
                     # Entry format: hash[0], type[1], data[2], module[3], generated[4],
                     #               confidence[5], visibility[6], risk[7], false_positive[8],
@@ -4018,6 +4034,7 @@ class SpiderFootDb:
                             risk, module, data, false_positive, mapped_source_hash, source_scan_id
                         ])
                         imported += 1
+                        pending += 1
                         # Track this combination as imported
                         imported_combinations.add(entry_key)
                     except sqlite3.Error:
@@ -4025,7 +4042,14 @@ class SpiderFootDb:
                         skipped += 1
                         continue
 
-                self.conn.commit()
+                    # Commit in batches to release the write lock periodically,
+                    # allowing other processes (e.g. scan subprocess) to write
+                    if pending >= batch_size:
+                        self.conn.commit()
+                        pending = 0
+
+                if pending > 0:
+                    self.conn.commit()
                 return {'imported': imported, 'skipped': skipped}
 
             except sqlite3.Error as e:
