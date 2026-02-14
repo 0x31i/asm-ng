@@ -468,9 +468,13 @@ class SpiderFootScanner():
             self.__setStatus("ABORTED", None, time.time() * 1000)
 
         except Exception as e:
+            import traceback
             self.__sf.error(f"Scan [{self.__scanId}] failed: {str(e)}")
-            # Remove the exc_info parameter or modify the error method to accept it
-            # self.__sf.error(f"Scan [{self.__scanId}] failed: {str(e)}", exc_info=True)
+            self.__sf.error(f"Scan [{self.__scanId}] traceback: {traceback.format_exc()}")
+            try:
+                self.__setStatus("ERROR-FAILED", None, time.time() * 1000)
+            except Exception:
+                pass
 
         finally:
             if not failed:
