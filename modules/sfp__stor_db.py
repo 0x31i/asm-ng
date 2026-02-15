@@ -76,13 +76,32 @@ class sfp__stor_db(SpiderFootPlugin):
             self.error("Database handle not available for storage")
             return
 
-        if self.opts['maxstorage'] != 0 and len(sfEvent.data) > self.opts['maxstorage']:
-            self.debug("Storing an event: " + sfEvent.eventType)
-            self.__sfdb__.scanEventStore(
-                self.getScanId(), sfEvent, self.opts['maxstorage'])
-            return
+        truncateSize = self.opts['maxstorage'] if self.opts['maxstorage'] != 0 and len(sfEvent.data) > self.opts['maxstorage'] else 0
 
         self.debug("Storing an event: " + sfEvent.eventType)
-        self.__sfdb__.scanEventStore(self.getScanId(), sfEvent)
+
+        # Retry with backoff for transient database errors (e.g. "database is locked").
+        # Without this, a single IOError propagates to threadWorker() which sets
+        # errorState=True and permanently kills all event storage for the scan.
+        import time as _time
+        max_attempts = 4
+        for attempt in range(max_attempts):
+            try:
+                if truncateSize:
+                    self.__sfdb__.scanEventStore(
+                        self.getScanId(), sfEvent, truncateSize)
+                else:
+                    self.__sfdb__.scanEventStore(self.getScanId(), sfEvent)
+                return  # success
+            except IOError as e:
+                err_str = str(e)
+                if "locked" in err_str and attempt < max_attempts - 1:
+                    _time.sleep(2 ** attempt)  # 1s, 2s, 4s
+                    continue
+                # Non-transient error or final attempt: log and drop this event
+                # but do NOT let it propagate to threadWorker() which would
+                # permanently disable storage via errorState=True
+                self.error(f"Failed to store event {sfEvent.eventType} after {attempt + 1} attempts: {e}")
+                return
 
 # End of sfp__stor_db class
