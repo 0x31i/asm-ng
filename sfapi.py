@@ -54,8 +54,6 @@ logger = logging.getLogger(__name__)
 # Security
 security = HTTPBearer(auto_error=False)
 
-mp.set_start_method("spawn", force=True)
-
 class Config:
     """Configuration management - mirrors sfwebui.py config handling"""
     def __init__(self):
