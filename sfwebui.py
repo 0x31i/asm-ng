@@ -65,7 +65,11 @@ from spiderfoot.excel_styles import (
     CATEGORY_TAB_COLORS,
 )
 
-mp.set_start_method("spawn", force=True)
+# Use a spawn context for scan subprocesses only, rather than setting it
+# globally.  The global setting forces mp.Queue() (used for logging) to use
+# heavyweight spawn-mode semaphores/pipes even for same-process threading,
+# which leaks semaphores and can crash the CherryPy web server under load.
+_spawn_ctx = mp.get_context("spawn")
 
 
 class SpiderFootWebUi:
@@ -1763,7 +1767,7 @@ class SpiderFootWebUi:
         # Start running a new scan
         scanId = SpiderFootHelpers.genScanInstanceId()
         try:
-            p = mp.Process(target=startSpiderFootScanner, args=(
+            p = _spawn_ctx.Process(target=startSpiderFootScanner, args=(
                 self.loggingQueue, scanname, scanId, scantarget, targetType, modlist, cfg))
             p.daemon = True
             p.start()
@@ -1825,7 +1829,7 @@ class SpiderFootWebUi:
             # Start running a new scan
             scanId = SpiderFootHelpers.genScanInstanceId()
             try:
-                p = mp.Process(target=startSpiderFootScanner, args=(
+                p = _spawn_ctx.Process(target=startSpiderFootScanner, args=(
                     self.loggingQueue, scanname, scanId, scantarget, targetType, modlist, cfg))
                 p.daemon = True
                 p.start()
@@ -4764,7 +4768,7 @@ class SpiderFootWebUi:
         scanId = SpiderFootHelpers.genScanInstanceId()
         
         try:
-            p = mp.Process(target=startSpiderFootScanner, args=(
+            p = _spawn_ctx.Process(target=startSpiderFootScanner, args=(
                 self.loggingQueue, scanname, scanId, scantarget, targetType, modlist, cfg))
             p.daemon = True
             p.start()
@@ -7978,7 +7982,7 @@ class SpiderFootWebUi:
                     # Use multiprocessing like the working examples
                     # startSpiderFootScanner signature: (loggingQueue, *args)
                     # where args are: (scanName, scanId, targetValue, targetType, moduleList, globalOpts)
-                    p = mp.Process(target=startSpiderFootScanner, args=(
+                    p = _spawn_ctx.Process(target=startSpiderFootScanner, args=(
                         self.loggingQueue, scan_name, scanId, target_value, target_type, modlist, cfg))
                     p.daemon = True
                     p.start()

@@ -1103,6 +1103,10 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
 
         cherrypy.quickstart(SpiderFootWebUi(
             sfWebUiConfig, sfConfig, loggingQueue), script_name=web_root, config=conf)
+
+        # If quickstart() returns normally, the engine was stopped (e.g. SIGTERM).
+        # Log this so it's visible rather than silently exiting.
+        log.warning("CherryPy engine stopped. Web server shutting down.")
     except Exception as e:
         log.critical(
             f"Unhandled exception in start_web_server: {e}", exc_info=True)
