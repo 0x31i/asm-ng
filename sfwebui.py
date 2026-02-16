@@ -4996,8 +4996,11 @@ class SpiderFootWebUi:
         Returns:
             list: scan list
         """
-        dbh = SpiderFootDb(self.config)
-        data = dbh.scanInstanceList()
+        try:
+            dbh = SpiderFootDb(self.config)
+            data = dbh.scanInstanceList()
+        except Exception:
+            return []
         retdata = []
 
         for row in data:
@@ -5045,8 +5048,11 @@ class SpiderFootWebUi:
         Returns:
             list: scan status
         """
-        dbh = SpiderFootDb(self.config)
-        data = dbh.scanInstanceGet(id)
+        try:
+            dbh = SpiderFootDb(self.config)
+            data = dbh.scanInstanceGet(id)
+        except Exception:
+            return []
 
         if not data:
             return []

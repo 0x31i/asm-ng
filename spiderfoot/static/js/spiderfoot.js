@@ -173,18 +173,58 @@ sf.stopScan = function(scan_id, callback) {
     });
 };
 
-sf.fetchData = function (url, postData, postFunc) {
+// Track recent errors to debounce notifications during transient DB contention
+sf._fetchErrorState = {
+  lastErrorTime: 0,
+  suppressUntil: 0,
+  consecutiveErrors: 0
+};
+
+sf.fetchData = function (url, postData, postFunc, _retryCount) {
+  var maxRetries = 2;
+  var attempt = _retryCount || 0;
+
   var req = $.ajax({
     type: "POST",
     url: url,
     data: postData,
     cache: false,
     dataType: "json",
+    timeout: 30000,
   });
 
-  req.done(postFunc);
+  req.done(function (data) {
+    // Reset error state on success
+    sf._fetchErrorState.consecutiveErrors = 0;
+    postFunc(data);
+  });
+
   req.fail(function (hr, status) {
-      alertify.error('<i class="glyphicon glyphicon-minus-sign"></i> <b>Error</b><br/>' + status);
+    // Retry transient failures (timeouts, server errors, connection refused)
+    if (attempt < maxRetries && (status === 'timeout' || status === 'error' || status === 'parsererror')) {
+      var delay = Math.pow(2, attempt) * 1000; // 1s, 2s
+      setTimeout(function () {
+        sf.fetchData(url, postData, postFunc, attempt + 1);
+      }, delay);
+      return;
+    }
+
+    // Debounce error notifications: suppress if we showed one in the last 5 seconds
+    var now = Date.now();
+    sf._fetchErrorState.consecutiveErrors++;
+
+    if (now < sf._fetchErrorState.suppressUntil) {
+      sf.log("Suppressed error notification for " + url + ": " + status);
+      return;
+    }
+
+    // Show the error but suppress further notifications for a period
+    // Scale suppression with consecutive errors (5s, 10s, 15s... up to 30s)
+    var suppressDuration = Math.min(sf._fetchErrorState.consecutiveErrors * 5000, 30000);
+    sf._fetchErrorState.suppressUntil = now + suppressDuration;
+    sf._fetchErrorState.lastErrorTime = now;
+
+    alertify.error('<i class="glyphicon glyphicon-minus-sign"></i> <b>Error</b><br/>' + status);
   });
 };
 
