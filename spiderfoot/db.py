@@ -37,6 +37,9 @@ class SpiderFootDb:
     # Prevent multithread access to database
     dbhLock = threading.RLock()
 
+    # Track whether schema migrations have already been applied this process
+    _migrations_done = False
+
     # Queries for creating the SpiderFoot database
     createSchemaQueries = [
         "PRAGMA journal_mode=WAL",
@@ -528,15 +531,16 @@ class SpiderFootDb:
 
         self.dbh.execute("PRAGMA foreign_keys=ON")
 
-        # Startup integrity check
+        # Startup integrity check — only on first init, not every connection
         _log = logging.getLogger(f"spiderfoot.{__name__}")
-        try:
-            self.dbh.execute("PRAGMA quick_check")
-            result = self.dbh.fetchone()
-            if result and result[0] != 'ok':
-                _log.warning(f"SQLite integrity check warning: {result[0]}")
-        except sqlite3.Error as e:
-            _log.warning(f"SQLite integrity check failed: {e}")
+        if init:
+            try:
+                self.dbh.execute("PRAGMA quick_check")
+                result = self.dbh.fetchone()
+                if result and result[0] != 'ok':
+                    _log.warning(f"SQLite integrity check warning: {result[0]}")
+            except sqlite3.Error as e:
+                _log.warning(f"SQLite integrity check failed: {e}")
 
         def __dbregex__(qry: str, data: str) -> bool:
             """SQLite doesn't support regex queries, so we create a custom
@@ -557,12 +561,22 @@ class SpiderFootDb:
                 return False
             return ret is not None
 
-        # Now we actually check to ensure the database file has the schema set
-        # up correctly.
+        # Register REGEXP function for every connection (it's per-connection)
+        self.conn.create_function("REGEXP", 2, __dbregex__)
+
+        # Schema setup and migrations only need to run once per process.
+        # Subsequent SpiderFootDb instances reuse the already-migrated schema.
+        if SpiderFootDb._migrations_done and not init:
+            return
+
         with self.dbhLock:
+            # Re-check under lock in case another thread completed migrations
+            # while we were waiting.
+            if SpiderFootDb._migrations_done and not init:
+                return
+
             try:
                 self.dbh.execute('SELECT COUNT(*) FROM tbl_scan_config')
-                self.conn.create_function("REGEXP", 2, __dbregex__)
             except sqlite3.Error:
                 init = True
                 try:
@@ -870,6 +884,9 @@ class SpiderFootDb:
                     self.conn.commit()
             except sqlite3.Error:
                 pass
+
+            # Mark migrations as complete so subsequent connections skip this block
+            SpiderFootDb._migrations_done = True
 
             if init:
                 for row in self.eventDetails:
