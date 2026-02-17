@@ -18,6 +18,7 @@ import os
 import os.path
 import random
 import signal
+import socket
 import sys
 import time
 import threading
@@ -890,6 +891,23 @@ def start_fastapi_server(sfApiConfig: dict, sfConfig: dict, loggingQueue=None) -
         api_log_level = sfApiConfig.get('log_level', 'info')
         api_reload = sfApiConfig.get('reload', False)
 
+        if not _check_port_available(api_host, int(api_port)):
+            stale_pid = _find_stale_pid(int(api_port))
+            if stale_pid:
+                log.critical(
+                    f"Port {api_port} is already in use by PID {stale_pid}. "
+                    f"Kill the stale process ('kill {stale_pid}') and try again.")
+                print(f"\nERROR: Port {api_port} is already in use by PID {stale_pid}.")
+                print(f"  Kill the stale process:  kill {stale_pid}")
+                print(f"  Then restart SpiderFoot.\n")
+            else:
+                log.critical(
+                    f"Port {api_port} on {api_host} is already in use. "
+                    f"Stop the other process or choose a different port with --api-listen.")
+                print(f"\nERROR: Port {api_port} on {api_host} is already in use.")
+                print(f"  Stop the other process or use a different port:  --api-listen {api_host}:<port>\n")
+            sys.exit(-1)
+
         log.info(f"Starting FastAPI server at {api_host}:{api_port} ...")
 
         # Check if sfapi.py exists
@@ -949,6 +967,23 @@ def start_both_servers(sfWebUiConfig: dict, sfApiConfig: dict, sfConfig: dict, l
         api_host = sfApiConfig.get('host', '127.0.0.1')
         api_port = sfApiConfig.get('port', 8001)
 
+        # Check both ports before starting either server
+        for check_host, check_port, label in [
+            (api_host, int(api_port), "API"),
+            (web_host, int(web_port), "Web UI"),
+        ]:
+            if not _check_port_available(check_host, check_port):
+                stale_pid = _find_stale_pid(check_port)
+                if stale_pid:
+                    log.critical(
+                        f"{label} port {check_port} is already in use by PID {stale_pid}.")
+                    print(f"\nERROR: {label} port {check_port} is already in use by PID {stale_pid}.")
+                    print(f"  Kill the stale process:  kill {stale_pid}\n")
+                else:
+                    log.critical(f"{label} port {check_port} on {check_host} is already in use.")
+                    print(f"\nERROR: {label} port {check_port} on {check_host} is already in use.\n")
+                sys.exit(-1)
+
         log.info(f"Starting both servers - Web UI: {web_host}:{web_port}, API: {api_host}:{api_port}")
 
         print("")
@@ -996,6 +1031,46 @@ def start_both_servers(sfWebUiConfig: dict, sfApiConfig: dict, sfConfig: dict, l
         sys.exit(-1)
 
 
+def _check_port_available(host: str, port: int) -> bool:
+    """Check whether a TCP port is available for binding.
+
+    Args:
+        host (str): host address to check
+        port (int): port number to check
+
+    Returns:
+        bool: True if the port is available
+    """
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind((host, port))
+        return True
+    except OSError:
+        return False
+
+
+def _find_stale_pid(port: int) -> int:
+    """Try to find the PID of a process holding the given port.
+
+    Args:
+        port (int): port number to look up
+
+    Returns:
+        int: PID of the process, or 0 if not found
+    """
+    import subprocess as _sp
+    try:
+        out = _sp.check_output(
+            ["lsof", "-t", "-i", f"TCP:{port}", "-sTCP:LISTEN"],
+            stderr=_sp.DEVNULL, timeout=5)
+        pids = [int(p) for p in out.decode().split() if p.strip()]
+        # Don't return our own PID
+        return next((p for p in pids if p != os.getpid()), 0)
+    except Exception:
+        return 0
+
+
 def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> None:
     """Start the web server so you can start looking at results.
 
@@ -1011,6 +1086,27 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
         web_port = sfWebUiConfig.get('port', 5001)
         web_root = sfWebUiConfig.get('root', '/')
         cors_origins = sfWebUiConfig.get('cors_origins', [])
+
+        # Pre-flight check: make sure the port is actually available before
+        # doing any heavy initialisation.  A stale SpiderFoot process (or a
+        # scan subprocess that outlived its parent) can keep the port pinned,
+        # and CherryPy's own bind error is suppressed by log.screen=False.
+        if not _check_port_available(web_host, int(web_port)):
+            stale_pid = _find_stale_pid(int(web_port))
+            if stale_pid:
+                log.critical(
+                    f"Port {web_port} is already in use by PID {stale_pid}. "
+                    f"Kill the stale process ('kill {stale_pid}') and try again.")
+                print(f"\nERROR: Port {web_port} is already in use by PID {stale_pid}.")
+                print(f"  Kill the stale process:  kill {stale_pid}")
+                print(f"  Then restart SpiderFoot.\n")
+            else:
+                log.critical(
+                    f"Port {web_port} on {web_host} is already in use. "
+                    f"Stop the other process or choose a different port with -l.")
+                print(f"\nERROR: Port {web_port} on {web_host} is already in use.")
+                print(f"  Stop the other process or use a different port:  -l {web_host}:<port>\n")
+            sys.exit(-1)
 
         # Configure sessions for authentication
         session_dir = os.path.join(SpiderFootHelpers.dataPath(), 'sessions')
@@ -1029,6 +1125,14 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
             'tools.sessions.httponly': True,
             'tools.sessions.secure': False,
         })
+
+        # Forward CherryPy's error log to Python logging so that bind
+        # failures and other engine errors are visible even with
+        # log.screen=False.
+        cherrypy_error_log = logging.getLogger("cherrypy.error")
+        if not cherrypy_error_log.handlers:
+            cherrypy_error_log.setLevel(logging.DEBUG)
+            cherrypy_error_log.addHandler(logging.StreamHandler(sys.stderr))
 
         log.info(f"Starting web server at {web_host}:{web_port} ...")
 
@@ -1107,6 +1211,8 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
         # If quickstart() returns normally, the engine was stopped (e.g. SIGTERM).
         # Log this so it's visible rather than silently exiting.
         log.warning("CherryPy engine stopped. Web server shutting down.")
+    except SystemExit:
+        raise
     except Exception as e:
         log.critical(
             f"Unhandled exception in start_web_server: {e}", exc_info=True)
