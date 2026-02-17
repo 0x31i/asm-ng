@@ -8253,7 +8253,9 @@
             }
         }
 
-        refreshSummaryInterval = setInterval(refreshSummary, 5000);
+        // Poll summary every 15s (was 5s) to reduce server load during active scans.
+        // The progress bar still updates more frequently below.
+        refreshSummaryInterval = setInterval(refreshSummary, 15000);
 
         // Scan progress bar
         var progressInterval;
@@ -8311,7 +8313,7 @@
         // Start progress polling if scan is active
         if ("${status}" == "CREATED" || "${status}" == "RUNNING" || "${status}" == "STARTING" || "${status}" == "STARTED" || "${status}" == "INITIALIZING") {
             updateScanProgress();
-            progressInterval = setInterval(updateScanProgress, 3000);
+            progressInterval = setInterval(updateScanProgress, 5000);
         }
 
         // Check if this scan is the latest for its target and handle auto-import

@@ -29,6 +29,8 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, asdict
 import hashlib
 import logging
+
+log = logging.getLogger(f"spiderfoot.{__name__}")
 import pickle
 from datetime import datetime, timedelta
 import re
@@ -158,7 +160,7 @@ class PatternRecognitionEngine:
     def _initialize_models(self):
         """Initialize ML models for pattern recognition."""
         if not HAS_ML_LIBS:
-            logging.warning("ML libraries not available, pattern recognition disabled")
+            log.warning("ML libraries not available, pattern recognition disabled")
             return
         
         try:
@@ -184,10 +186,10 @@ class PatternRecognitionEngine:
             )            
             self.feature_extractors['scaler'] = StandardScaler()
             
-            logging.info("Pattern recognition models initialized successfully")
+            log.info("Pattern recognition models initialized successfully")
             
         except Exception as e:
-            logging.error(f"Failed to initialize ML models: {e}")
+            log.error(f"Failed to initialize ML models: {e}")
     
     def extract_features(self, event_data: Dict[str, Any]) -> List[float]:
         """Extract ML features from event data."""
@@ -256,8 +258,8 @@ class PatternRecognitionEngine:
                 # Simple statistical anomaly detection
                 anomalies = []
                 
-                # If we have ML libraries, use them
-                if HAS_ML_LIBS and self.anomaly_detector:
+                # If we have ML libraries and the model has been fitted, use them
+                if HAS_ML_LIBS and self.anomaly_detector and hasattr(self.anomaly_detector, 'estimators_'):
                     predictions = self.anomaly_detector.predict(features_matrix)
                     return [pred == -1 for pred in predictions]
                 
@@ -289,7 +291,7 @@ class PatternRecognitionEngine:
                 return anomalies
                 
             except Exception as e:
-                logging.error(f"Anomaly detection failed: {e}")
+                log.error(f"Anomaly detection failed: {e}")
                 return [False] * len(events)
     
     def identify_attack_patterns(self, events: List[Dict[str, Any]]) -> List[ThreatSignature]:
@@ -940,10 +942,10 @@ class NLPThreatAnalyzer:
                 nltk.download('stopwords', quiet=True)
                 
                 self.sentiment_analyzer = SentimentIntensityAnalyzer()
-                logging.info("NLP components initialized successfully")
+                log.info("NLP components initialized successfully")
                 
             except Exception as e:
-                logging.warning(f"Failed to initialize NLP components: {e}")
+                log.warning(f"Failed to initialize NLP components: {e}")
         
         if HAS_ML_LIBS:
             try:
@@ -953,7 +955,7 @@ class NLPThreatAnalyzer:
                     ngram_range=(1, 2)
                 )
             except Exception as e:
-                logging.warning(f"Failed to initialize text vectorizer: {e}")
+                log.warning(f"Failed to initialize text vectorizer: {e}")
     
     def analyze_threat_text(self, text_data: str) -> Dict[str, Any]:
         """Analyze unstructured text for threat intelligence."""
@@ -992,7 +994,7 @@ class NLPThreatAnalyzer:
                     results['urgency_level'] = 'medium'
                     
             except Exception as e:
-                logging.warning(f"Sentiment analysis failed: {e}")
+                log.warning(f"Sentiment analysis failed: {e}")
         
         # Extract potential IOCs
         results['extracted_iocs'] = self._extract_iocs_from_text(text_data)

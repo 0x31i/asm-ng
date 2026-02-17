@@ -12,6 +12,7 @@
 
 from pathlib import Path
 import hashlib
+import logging
 import os
 import random
 import re
@@ -442,6 +443,16 @@ class SpiderFootDb:
             'Correlation - Single Scan', 0, 'DESCRIPTOR'],
         ['AI_CROSS_SCAN_CORRELATION',
             'Correlation - Cross Scan', 0, 'DESCRIPTOR'],
+        ['AI_THREAT_PREDICTION',
+            'Threat Prediction', 0, 'DESCRIPTOR'],
+        ['AI_THREAT_SIGNATURE',
+            'Threat Signature', 0, 'DESCRIPTOR'],
+        ['AI_IOC_CORRELATION',
+            'IOC Correlation', 0, 'DESCRIPTOR'],
+        ['AI_THREAT_SCORE',
+            'Threat Score', 0, 'DESCRIPTOR'],
+        ['AI_ANOMALY_DETECTED',
+            'Anomaly Detected', 0, 'DESCRIPTOR'],
     ]
 
     def __init__(self, opts: dict, init: bool = False) -> None:
@@ -518,15 +529,14 @@ class SpiderFootDb:
         self.dbh.execute("PRAGMA foreign_keys=ON")
 
         # Startup integrity check
+        _log = logging.getLogger(f"spiderfoot.{__name__}")
         try:
             self.dbh.execute("PRAGMA quick_check")
             result = self.dbh.fetchone()
             if result and result[0] != 'ok':
-                import logging
-                logging.warning(f"SQLite integrity check warning: {result[0]}")
+                _log.warning(f"SQLite integrity check warning: {result[0]}")
         except sqlite3.Error as e:
-            import logging
-            logging.warning(f"SQLite integrity check failed: {e}")
+            _log.warning(f"SQLite integrity check failed: {e}")
 
         def __dbregex__(qry: str, data: str) -> bool:
             """SQLite doesn't support regex queries, so we create a custom
@@ -701,8 +711,12 @@ class SpiderFootDb:
                 except sqlite3.Error:
                     pass
 
-            # Migration: Ensure correlation event types exist
-            for ai_type in ('AI_SINGLE_SCAN_CORRELATION', 'AI_CROSS_SCAN_CORRELATION'):
+            # Migration: Ensure AI event types exist
+            for ai_type in (
+                'AI_SINGLE_SCAN_CORRELATION', 'AI_CROSS_SCAN_CORRELATION',
+                'AI_THREAT_PREDICTION', 'AI_THREAT_SIGNATURE',
+                'AI_IOC_CORRELATION', 'AI_THREAT_SCORE', 'AI_ANOMALY_DETECTED',
+            ):
                 try:
                     self.dbh.execute("SELECT event FROM tbl_event_types WHERE event = ?", (ai_type,))
                     if not self.dbh.fetchone():
@@ -3212,7 +3226,7 @@ class SpiderFootDb:
                 self.conn.commit()
             except sqlite3.Error as e:
                 raise IOError(
-                    f"SQL error encountered when storing event data ({self.dbh})") from e
+                    f"SQL error encountered when storing event data: {e}") from e
 
     def scanInstanceList(self) -> list:
         """List all previously run scans.

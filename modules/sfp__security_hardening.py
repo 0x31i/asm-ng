@@ -36,6 +36,8 @@ from enum import Enum
 import logging
 import ipaddress
 
+log = logging.getLogger(f"spiderfoot.{__name__}")
+
 try:
     from cryptography.fernet import Fernet
     from cryptography.hazmat.primitives import hashes, serialization
@@ -134,17 +136,17 @@ class EncryptionManager:
     def _initialize_encryption(self):
         """Initialize encryption components."""
         if not HAS_CRYPTOGRAPHY:
-            logging.error("Cryptography library not available")
+            log.error("Cryptography library not available")
             return
         
         try:
             # Load or generate master key
             self.master_key = self._load_or_generate_master_key()
             self.cipher_suite = Fernet(self.master_key)
-            logging.info("Encryption manager initialized successfully")
+            log.info("Encryption manager initialized successfully")
             
         except Exception as e:
-            logging.error(f"Failed to initialize encryption: {e}")
+            log.error(f"Failed to initialize encryption: {e}")
     
     def _load_or_generate_master_key(self) -> bytes:
         """Load existing master key or generate new one."""
@@ -156,7 +158,7 @@ class EncryptionManager:
                 with open(key_file, 'rb') as f:
                     return f.read()
         except Exception as e:
-            logging.warning(f"Could not load existing key: {e}")
+            log.warning(f"Could not load existing key: {e}")
         
         # Generate new key
         key = Fernet.generate_key()
@@ -172,7 +174,7 @@ class EncryptionManager:
                 os.chmod(key_file, 0o600)
                 
         except Exception as e:
-            logging.warning(f"Could not save master key: {e}")
+            log.warning(f"Could not save master key: {e}")
         
         return key
     
@@ -186,7 +188,7 @@ class EncryptionManager:
                 encrypted = self.cipher_suite.encrypt(data.encode('utf-8'))
                 return base64.b64encode(encrypted).decode('utf-8')
             except Exception as e:
-                logging.error(f"Encryption failed: {e}")
+                log.error(f"Encryption failed: {e}")
                 return data
     
     def decrypt_data(self, encrypted_data: str) -> str:
@@ -200,7 +202,7 @@ class EncryptionManager:
                 decrypted = self.cipher_suite.decrypt(encrypted_bytes)
                 return decrypted.decode('utf-8')
             except Exception as e:
-                logging.error(f"Decryption failed: {e}")
+                log.error(f"Decryption failed: {e}")
                 return encrypted_data
     
     def hash_password(self, password: str, salt: str = None) -> Tuple[str, str]:
@@ -482,7 +484,7 @@ class SecurityAuditLogger:
             self.log_file = os.path.join(log_dir, log_filename)
             
         except Exception as e:
-            logging.error(f"Failed to initialize audit logging: {e}")
+            log.error(f"Failed to initialize audit logging: {e}")
     
     def log_security_event(self, user_id: str, action: str, resource: str, 
                           outcome: str, source_ip: str = "", user_agent: str = "",
@@ -536,7 +538,7 @@ class SecurityAuditLogger:
                 f.write(json.dumps(log_entry) + '\n')
                 
         except Exception as e:
-            logging.error(f"Failed to write audit log: {e}")
+            log.error(f"Failed to write audit log: {e}")
     
     def _calculate_risk_score(self, action: str, outcome: str, source_ip: str) -> float:
         """Calculate risk score for security event."""

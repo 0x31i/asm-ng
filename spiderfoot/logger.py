@@ -240,6 +240,12 @@ def logWorkerSetup(loggingQueue) -> 'logging.Logger':
     # Don't do this more than once
     if len(log.handlers) == 0:
         log.setLevel(logging.DEBUG)
+        # Prevent spiderfoot messages from propagating to the root logger.
+        # Without this, any code that triggers logging.basicConfig() (e.g. a
+        # module calling logging.error() directly) adds a StreamHandler to the
+        # root logger, and ALL debug messages from the spiderfoot hierarchy
+        # propagate there, flooding the terminal.
+        log.propagate = False
         queue_handler = QueueHandler(loggingQueue)
         log.addHandler(queue_handler)
     return log
