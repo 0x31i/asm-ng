@@ -5283,9 +5283,9 @@ class SpiderFootWebUi:
         for etype in ['DNS_SPF', 'DNS_TEXT']:
             if etype in event_type_counts:
                 ec = event_type_counts[etype]
-                self.log.info(f"Grade: {etype} IN scan -> unique={ec['unique']} total={ec['total']} all_total={ec['all_total']} => no fail penalty")
+                self.log.debug(f"Grade: {etype} IN scan -> unique={ec['unique']} total={ec['total']} all_total={ec['all_total']} => no fail penalty")
             else:
-                self.log.info(f"Grade: {etype} NOT in scan results -> will get fail penalty")
+                self.log.debug(f"Grade: {etype} NOT in scan results -> will get fail penalty")
 
         # Load config overrides from settings
         config_overrides = load_grade_config_overrides(self.config)
@@ -5302,20 +5302,42 @@ class SpiderFootWebUi:
         Returns a structured grade report with per-category breakdowns,
         individual event type scores, and an overall letter grade.
 
+        Grade results are cached for 30 seconds to avoid expensive
+        recalculation on every poll cycle during active scans.
+
         Args:
             id (str): scan ID
 
         Returns:
             dict: grade data with categories, overall_score, overall_grade
         """
-        dbh = SpiderFootDb(self.config)
+        # Check cache (keyed by scan ID)
+        now = time.time()
+        cache = getattr(self, '_grade_cache', {})
+        if id in cache:
+            cached_time, cached_result = cache[id]
+            if now - cached_time < 30:
+                return cached_result
 
-        # Verify scan exists
-        data = dbh.scanInstanceGet(id)
-        if not data:
-            return {'enabled': False, 'error': 'Scan not found'}
+        try:
+            dbh = SpiderFootDb(self.config)
 
-        return self._calculateScanGrade(dbh, id)
+            # Verify scan exists
+            data = dbh.scanInstanceGet(id)
+            if not data:
+                return {'enabled': False, 'error': 'Scan not found'}
+
+            result = self._calculateScanGrade(dbh, id)
+        except Exception:
+            return {'enabled': True, 'overall_grade': '-', 'overall_score': 0, 'categories': {},
+                    'error': 'Temporarily unavailable'}
+
+        # Store in cache
+        if not hasattr(self, '_grade_cache'):
+            self._grade_cache = {}
+        self._grade_cache[id] = (now, result)
+
+        return result
 
     @cherrypy.expose
     @cherrypy.tools.json_out()

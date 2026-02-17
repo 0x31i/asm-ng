@@ -1020,7 +1020,7 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
             'log.screen': False,
             'server.socket_host': web_host,
             'server.socket_port': int(web_port),
-            'server.thread_pool': 30,
+            'server.thread_pool': 20,
             'tools.sessions.on': True,
             'tools.sessions.storage_class': cherrypy.lib.sessions.FileSession,
             'tools.sessions.storage_path': session_dir,
