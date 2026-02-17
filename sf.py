@@ -1131,7 +1131,7 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
         # log.screen=False.
         cherrypy_error_log = logging.getLogger("cherrypy.error")
         if not cherrypy_error_log.handlers:
-            cherrypy_error_log.setLevel(logging.DEBUG)
+            cherrypy_error_log.setLevel(logging.WARNING)
             cherrypy_error_log.addHandler(logging.StreamHandler(sys.stderr))
 
         log.info(f"Starting web server at {web_host}:{web_port} ...")

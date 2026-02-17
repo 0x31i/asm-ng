@@ -12,6 +12,7 @@
 
 from pathlib import Path
 import hashlib
+import logging
 import os
 import random
 import re
@@ -518,15 +519,14 @@ class SpiderFootDb:
         self.dbh.execute("PRAGMA foreign_keys=ON")
 
         # Startup integrity check
+        _log = logging.getLogger(f"spiderfoot.{__name__}")
         try:
             self.dbh.execute("PRAGMA quick_check")
             result = self.dbh.fetchone()
             if result and result[0] != 'ok':
-                import logging
-                logging.warning(f"SQLite integrity check warning: {result[0]}")
+                _log.warning(f"SQLite integrity check warning: {result[0]}")
         except sqlite3.Error as e:
-            import logging
-            logging.warning(f"SQLite integrity check failed: {e}")
+            _log.warning(f"SQLite integrity check failed: {e}")
 
         def __dbregex__(qry: str, data: str) -> bool:
             """SQLite doesn't support regex queries, so we create a custom
@@ -3212,7 +3212,7 @@ class SpiderFootDb:
                 self.conn.commit()
             except sqlite3.Error as e:
                 raise IOError(
-                    f"SQL error encountered when storing event data ({self.dbh})") from e
+                    f"SQL error encountered when storing event data: {e}") from e
 
     def scanInstanceList(self) -> list:
         """List all previously run scans.
