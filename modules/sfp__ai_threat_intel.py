@@ -148,6 +148,9 @@ class CrossScanCorrelation:
 class PatternRecognitionEngine:
     """Pattern recognition for attack detection."""
     
+    # Minimum samples needed before fitting the IsolationForest model
+    MIN_TRAINING_SAMPLES = 50
+
     def __init__(self):
         self.models = {}
         self.feature_extractors = {}
@@ -155,6 +158,8 @@ class PatternRecognitionEngine:
         self.model_lock = threading.RLock()
         self.training_data = defaultdict(list)
         self.anomaly_detector = None
+        self._training_features = []
+        self._model_fitted = False
         self._initialize_models()
     
     def _initialize_models(self):
@@ -246,50 +251,62 @@ class PatternRecognitionEngine:
         """Detect anomalous patterns in events using basic statistical methods."""
         if not events:
             return []
-        
+
         with self.model_lock:
             try:
                 # Extract features for all events
                 features_matrix = [self.extract_features(event) for event in events]
-                
+
                 if not features_matrix:
                     return [False] * len(events)
-                
-                # Simple statistical anomaly detection
-                anomalies = []
-                
+
+                # Accumulate training data for the IsolationForest model
+                if HAS_ML_LIBS and self.anomaly_detector and not self._model_fitted:
+                    self._training_features.extend(features_matrix)
+                    if len(self._training_features) >= self.MIN_TRAINING_SAMPLES:
+                        try:
+                            self.anomaly_detector.fit(self._training_features)
+                            self._model_fitted = True
+                            log.info(
+                                f"IsolationForest model fitted with "
+                                f"{len(self._training_features)} samples"
+                            )
+                        except Exception as e:
+                            log.warning(f"Failed to fit IsolationForest model: {e}")
+
                 # If we have ML libraries and the model has been fitted, use them
-                if HAS_ML_LIBS and self.anomaly_detector and hasattr(self.anomaly_detector, 'estimators_'):
+                if HAS_ML_LIBS and self.anomaly_detector and self._model_fitted:
                     predictions = self.anomaly_detector.predict(features_matrix)
                     return [pred == -1 for pred in predictions]
-                
+
                 # Fallback: basic statistical outlier detection
                 if len(features_matrix) < 3:
                     return [False] * len(events)
-                
+
+                anomalies = []
                 # Calculate z-scores for each feature
                 num_features = len(features_matrix[0])
                 for event_idx, features in enumerate(features_matrix):
                     is_anomaly = False
-                    
+
                     for feature_idx in range(num_features):
                         feature_values = [f[feature_idx] for f in features_matrix]
                         if len(set(feature_values)) <= 1:  # No variance
                             continue
-                            
+
                         feature_mean = mean(feature_values)
                         feature_std = std_dev(feature_values)
-                        
+
                         if feature_std > 0:
                             z_score = abs((features[feature_idx] - feature_mean) / feature_std)
                             if z_score > 2.5:  # 2.5 standard deviations
                                 is_anomaly = True
                                 break
-                    
+
                     anomalies.append(is_anomaly)
-                
+
                 return anomalies
-                
+
             except Exception as e:
                 log.error(f"Anomaly detection failed: {e}")
                 return [False] * len(events)
