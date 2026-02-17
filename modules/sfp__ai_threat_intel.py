@@ -258,8 +258,8 @@ class PatternRecognitionEngine:
                 # Simple statistical anomaly detection
                 anomalies = []
                 
-                # If we have ML libraries, use them
-                if HAS_ML_LIBS and self.anomaly_detector:
+                # If we have ML libraries and the model has been fitted, use them
+                if HAS_ML_LIBS and self.anomaly_detector and hasattr(self.anomaly_detector, 'estimators_'):
                     predictions = self.anomaly_detector.predict(features_matrix)
                     return [pred == -1 for pred in predictions]
                 

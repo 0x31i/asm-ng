@@ -443,6 +443,16 @@ class SpiderFootDb:
             'Correlation - Single Scan', 0, 'DESCRIPTOR'],
         ['AI_CROSS_SCAN_CORRELATION',
             'Correlation - Cross Scan', 0, 'DESCRIPTOR'],
+        ['AI_THREAT_PREDICTION',
+            'Threat Prediction', 0, 'DESCRIPTOR'],
+        ['AI_THREAT_SIGNATURE',
+            'Threat Signature', 0, 'DESCRIPTOR'],
+        ['AI_IOC_CORRELATION',
+            'IOC Correlation', 0, 'DESCRIPTOR'],
+        ['AI_THREAT_SCORE',
+            'Threat Score', 0, 'DESCRIPTOR'],
+        ['AI_ANOMALY_DETECTED',
+            'Anomaly Detected', 0, 'DESCRIPTOR'],
     ]
 
     def __init__(self, opts: dict, init: bool = False) -> None:
@@ -701,8 +711,12 @@ class SpiderFootDb:
                 except sqlite3.Error:
                     pass
 
-            # Migration: Ensure correlation event types exist
-            for ai_type in ('AI_SINGLE_SCAN_CORRELATION', 'AI_CROSS_SCAN_CORRELATION'):
+            # Migration: Ensure AI event types exist
+            for ai_type in (
+                'AI_SINGLE_SCAN_CORRELATION', 'AI_CROSS_SCAN_CORRELATION',
+                'AI_THREAT_PREDICTION', 'AI_THREAT_SIGNATURE',
+                'AI_IOC_CORRELATION', 'AI_THREAT_SCORE', 'AI_ANOMALY_DETECTED',
+            ):
                 try:
                     self.dbh.execute("SELECT event FROM tbl_event_types WHERE event = ?", (ai_type,))
                     if not self.dbh.fetchone():
