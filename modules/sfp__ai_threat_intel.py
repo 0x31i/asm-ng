@@ -1215,8 +1215,10 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
 
     def _analyze_event(self, sfEvent, event_data):
         """Perform comprehensive analysis on the event."""
-        
+
         # 1. Pattern Recognition
+        if self.checkForStop():
+            return
         if hasattr(self, 'pattern_engine') and self.opts['enable_pattern_recognition']:
             try:
                 # Detect anomalies
@@ -1246,6 +1248,8 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
                 self.error(f"Pattern recognition failed: {e}")
 
         # 2. Predictive Analytics
+        if self.checkForStop():
+            return
         if hasattr(self, 'predictive_engine') and self.opts['enable_predictive_analytics']:
             try:
                 # Record this threat event
@@ -1274,6 +1278,8 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
                 self.error(f"Predictive analytics failed: {e}")
 
         # 3. IOC Correlation
+        if self.checkForStop():
+            return
         if hasattr(self, 'correlation_engine') and self.opts['enable_ioc_correlation']:
             try:
                 # Find correlations for this IOC
@@ -1294,6 +1300,8 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
                 self.error(f"IOC correlation failed: {e}")
 
         # 4. Threat Scoring
+        if self.checkForStop():
+            return
         if hasattr(self, 'scoring_engine') and self.opts['enable_threat_scoring']:
             try:
                 # Get signatures and correlations for scoring
@@ -1317,6 +1325,8 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
                 self.error(f"Threat scoring failed: {e}")
 
         # 5. NLP Analysis
+        if self.checkForStop():
+            return
         if hasattr(self, 'nlp_analyzer') and self.opts['enable_nlp_analysis']:
             try:
                 # Only analyze text-heavy events
@@ -1338,6 +1348,8 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
                 self.error(f"NLP analysis failed: {e}")
 
         # 6. Cross-Scan Correlation
+        if self.checkForStop():
+            return
         if self.opts.get('enable_cross_scan_correlation', True) and hasattr(self, '_historical_iocs'):
             try:
                 self._check_cross_scan_correlation(sfEvent, event_data)

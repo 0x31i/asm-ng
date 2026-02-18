@@ -528,6 +528,10 @@ class SpiderFootPlugin:
                 break
             prevEvent = prevEvent.sourceEvent
 
+        # Re-check stop flag before queuing to avoid feeding a stopped scan.
+        if self.checkForStop():
+            return
+
         # output to queue if applicable
         if self.outgoingEventQueue is not None:
             self.outgoingEventQueue.put(sfEvent)
@@ -562,6 +566,9 @@ class SpiderFootPlugin:
                             while 1:
                                 self.incomingEventQueue.get_nowait()
 
+    _stopCheckCounter = 0
+    _stopCheckInterval = 25  # check DB every N calls to checkForStop()
+
     def checkForStop(self) -> bool:
         """For modules to use to check for when they should give back control.
 
@@ -572,10 +579,27 @@ class SpiderFootPlugin:
         if self.errorState:
             return True
 
-        # If threading is enabled, check the _stopScanning attribute instead.
-        # This is to prevent each thread needing its own sqlite db handle.
+        # Fast path: already flagged for stop.
+        if self._stopScanning:
+            return True
+
+        # If threading is enabled, check the _stopScanning attribute first
+        # (cheap), but periodically also query the database so that an
+        # ABORT-REQUESTED status set via the web UI is honoured even when
+        # the in-memory flag has not been propagated yet.
         if self.outgoingEventQueue is not None and self.incomingEventQueue is not None:
-            return self._stopScanning
+            self._stopCheckCounter += 1
+            if self._stopCheckCounter >= self._stopCheckInterval:
+                self._stopCheckCounter = 0
+                try:
+                    scanstatus = self.__sfdb__.scanInstanceGet(
+                        self.__scanId__)
+                    if scanstatus and scanstatus[5] == "ABORT-REQUESTED":
+                        self._stopScanning = True
+                        return True
+                except Exception:
+                    pass
+            return False
 
         if not self.__scanId__:
             return False
