@@ -11,6 +11,7 @@
 # License:      MIT
 # -----------------------------------------------------------------
 import json
+import os
 import socket
 import time
 import queue
@@ -320,6 +321,12 @@ class SpiderFootScanner():
         failed = True
 
         try:
+            # Store our PID so the web UI can kill us if we get stuck
+            try:
+                self.__dbh.scanInstanceSetPid(self.__scanId, os.getpid())
+            except Exception:
+                pass  # Non-critical, don't block scan startup
+
             self.__setStatus("STARTING", time.time() * 1000, None)
             self.__sf.status(
                 f"Scan [{self.__scanId}] for '{self.__target.targetValue}' initiated.")
