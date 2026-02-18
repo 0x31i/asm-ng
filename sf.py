@@ -600,6 +600,14 @@ def main():
 
     except KeyboardInterrupt:
         log.info("Interrupted.")
+        # Gracefully stop CherryPy's engine before exiting so the atexit
+        # handler (Bus._clean_exit) doesn't race with the interpreter
+        # shutdown and throw ugly KeyboardInterrupt tracebacks.
+        try:
+            if cherrypy.engine.state == cherrypy.engine.states.STARTED:
+                cherrypy.engine.exit()
+        except Exception:
+            pass
         sys.exit(0)
     except Exception as e:
         log.critical(f"Unhandled exception in main: {e}", exc_info=True)
