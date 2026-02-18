@@ -3423,6 +3423,68 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
+    def getresourcetier(self: 'SpiderFootWebUi') -> dict:
+        """Get the current resource tuning tier (admin only).
+
+        Returns:
+            dict: current tier info
+        """
+        if self.currentUserRole() != 'admin':
+            return {'success': False, 'error': 'Unauthorized'}
+        return {
+            'success': True,
+            'tier': self.config.get('_resource_tier', 'medium'),
+        }
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def tuneresources(self: 'SpiderFootWebUi', tier: str = '') -> dict:
+        """Set the resource tuning tier (admin only).
+
+        Args:
+            tier (str): 'light', 'medium', or 'heavy'
+
+        Returns:
+            dict: result with restart_required flag
+        """
+        if self.currentUserRole() != 'admin':
+            return {'success': False, 'error': 'Unauthorized'}
+        if tier not in ('light', 'medium', 'heavy'):
+            return {'success': False, 'error': 'Invalid tier. Must be light, medium, or heavy.'}
+
+        from spiderfoot.resource_tiers import get_tier_config
+        tier_config = get_tier_config(tier)
+        old_tier_name = self.config.get('_resource_tier', 'medium')
+        old_tier_config = get_tier_config(old_tier_name)
+
+        dbh = SpiderFootDb(self.config)
+        dbh.configSet({
+            '_resource_tier': tier,
+            '_maxthreads': str(tier_config['maxthreads']),
+        })
+
+        # Update in-memory config so new DB connections use the new tier
+        self.config['_resource_tier'] = tier
+        self.config['_maxthreads'] = tier_config['maxthreads']
+
+        dbh.auditLog(
+            self.currentUser(), 'RESOURCE_TIER_CHANGE',
+            detail=f'Resource tier changed from {old_tier_name} to {tier}',
+            ip_address=self.clientIP(),
+        )
+
+        restart_required = (
+            tier_config['cherrypy_thread_pool'] != old_tier_config['cherrypy_thread_pool']
+        )
+
+        return {
+            'success': True,
+            'tier': tier,
+            'restart_required': restart_required,
+        }
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
     def checkupdate(self: 'SpiderFootWebUi') -> dict:
         """Check for available updates from GitHub Releases (admin only).
 

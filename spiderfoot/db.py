@@ -513,22 +513,25 @@ class SpiderFootDb:
         self.dbh.execute("PRAGMA synchronous=NORMAL")
         self.dbh.execute("PRAGMA busy_timeout=30000")
 
-        # cache_size and mmap_size tuned for 32GB RAM deployments
-        # Override via env vars for different deployment sizes
-        cache_size = os.environ.get('ASMNG_SQLITE_CACHE_SIZE', '-256000')  # ~256MB
+        # cache_size and mmap_size derived from the resource tier setting.
+        # Env vars still override for backward compatibility.
+        from spiderfoot.resource_tiers import get_tier_config
+        _tier = get_tier_config(opts.get('_resource_tier', 'medium'))
+
+        cache_size = os.environ.get('ASMNG_SQLITE_CACHE_SIZE', _tier['sqlite_cache_size'])
         try:
             int(cache_size)
         except ValueError:
-            cache_size = '-256000'
+            cache_size = _tier['sqlite_cache_size']
         self.dbh.execute(f"PRAGMA cache_size={cache_size}")
 
         self.dbh.execute("PRAGMA temp_store=MEMORY")
 
-        mmap_size = os.environ.get('ASMNG_SQLITE_MMAP_SIZE', '1073741824')  # 1GB
+        mmap_size = os.environ.get('ASMNG_SQLITE_MMAP_SIZE', _tier['sqlite_mmap_size'])
         try:
             int(mmap_size)
         except ValueError:
-            mmap_size = '1073741824'
+            mmap_size = _tier['sqlite_mmap_size']
         self.dbh.execute(f"PRAGMA mmap_size={mmap_size}")
 
         self.dbh.execute("PRAGMA foreign_keys=ON")
