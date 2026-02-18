@@ -8156,10 +8156,63 @@
                 table += "<div id='scan-log-content'></div>";
                 table += "</div></div>";
 
+                // Scan Actions (admin only) - override scan status
+% if user_role == 'admin':
+                table += "<div class='manage-section'>";
+                table += "<div class='manage-section-header collapsed' onclick='toggleManageSection(this)'>";
+                table += "<i class='glyphicon glyphicon-chevron-right section-chevron'></i>";
+                table += "<h4><i class='glyphicon glyphicon-wrench'></i>&nbsp;Scan Actions</h4>";
+                table += "</div>";
+                table += "<div class='manage-section-body' style='display:none'>";
+                table += "<div class='well'>";
+                table += "<h5>Override Scan Status</h5>";
+                table += "<p class='text-muted small'>Manually set the status of this scan. Use this to mark a stuck or aborted scan as FINISHED so its results are preserved, or to set any other terminal status.</p>";
+                table += "<div class='form-inline' style='margin-top: 10px;'>";
+                table += "<select id='status-override-select' class='form-control' style='width: 200px; margin-right: 10px;'>";
+                table += "<option value='FINISHED'>FINISHED</option>";
+                table += "<option value='ABORTED'>ABORTED</option>";
+                table += "<option value='ERROR-FAILED'>ERROR-FAILED</option>";
+                table += "</select>";
+                table += "<button class='btn btn-warning' onclick='overrideScanStatus(\"" + instanceId + "\")'>";
+                table += "<i class='glyphicon glyphicon-edit'></i>&nbsp;Override Status</button>";
+                table += "</div>";
+                table += "<div id='status-override-result' style='margin-top: 10px;'></div>";
+                table += "</div>";
+                table += "</div></div>";
+% endif
+
                 table += "</div>";
 
                 $("#loader").fadeOut(500);
                 $("#mainbody").append(table);
+            });
+        }
+
+        function overrideScanStatus(instanceId) {
+            var newStatus = $('#status-override-select').val();
+            if (!confirm('Are you sure you want to override the scan status to ' + newStatus + '?')) {
+                return;
+            }
+            $('#status-override-result').html('<img src="${docroot}/static/img/loader.gif"> Updating...');
+            sf.fetchData('${docroot}/scanstatusoverride', {'id': instanceId, 'status': newStatus}, function(data) {
+                if (data.success) {
+                    $('#status-override-result').html(
+                        '<div class="alert alert-success">' +
+                        '<i class="glyphicon glyphicon-ok"></i> Status changed from <b>' +
+                        data.old_status + '</b> to <b>' + data.new_status + '</b></div>'
+                    );
+                    $('#scanstatusbadge').html(data.new_status);
+                    $('#scanstatusbadge').removeClass('alert-info alert-warning alert-danger').addClass(
+                        data.new_status === 'FINISHED' ? 'alert-info' :
+                        data.new_status === 'ABORTED' ? 'alert-warning' : 'alert-danger'
+                    );
+                } else {
+                    $('#status-override-result').html(
+                        '<div class="alert alert-danger">' +
+                        '<i class="glyphicon glyphicon-exclamation-sign"></i> ' +
+                        (data.error ? data.error.message : 'Unknown error') + '</div>'
+                    );
+                }
             });
         }
 
