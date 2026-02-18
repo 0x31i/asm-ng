@@ -257,5 +257,5 @@ def stop_listener(listener: 'logging.handlers.QueueListener') -> None:
     Args:
         listener: (logging.handlers.QueueListener): Log listener
     """
-    with suppress(Exception):
+    with suppress(BaseException):
         listener.stop()

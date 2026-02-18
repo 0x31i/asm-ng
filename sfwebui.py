@@ -108,6 +108,26 @@ class SpiderFootWebUi:
 
         self.docroot = web_config.get('root', '/').rstrip('/')
 
+        # Register the auth_check CherryPy tool early, before database
+        # operations that might fail.  The closure captures 'self' by
+        # reference so self.config is resolved at request time (after it
+        # has been fully initialised below).
+        def check_auth():
+            """Before handler: redirect to login if not authenticated."""
+            path = cherrypy.request.path_info
+            if path.endswith('/login') or path.endswith('/logout') or '/static/' in path or path.endswith('/ping'):
+                return
+            if not cherrypy.session.get('username'):
+                raise cherrypy.HTTPRedirect(f"{self.docroot}/login")
+            if not cherrypy.session.get('user_role'):
+                try:
+                    dbh = SpiderFootDb(self.config)
+                    cherrypy.session['user_role'] = dbh.userGetRole(cherrypy.session.get('username'))
+                except Exception:
+                    cherrypy.session['user_role'] = 'analyst'
+
+        cherrypy.tools.auth_check = cherrypy.Tool('before_handler', check_auth)
+
         # 'config' supplied will be the defaults, let's supplement them
         # now with any configuration which may have previously been saved.
         self.defaultConfig = deepcopy(config)
@@ -146,25 +166,6 @@ class SpiderFootWebUi:
             print(f" Please change this password after first login!")
             print("*************************************************************")
             print("")
-
-        # Register a CherryPy tool to enforce auth on all requests
-        def check_auth():
-            """Before handler: redirect to login if not authenticated."""
-            path = cherrypy.request.path_info
-            # Allow access to login page, logout beacon, static files, and ping endpoint
-            if path.endswith('/login') or path.endswith('/logout') or '/static/' in path or path.endswith('/ping'):
-                return
-            if not cherrypy.session.get('username'):
-                raise cherrypy.HTTPRedirect(f"{self.docroot}/login")
-            # Refresh user_role in session if missing (e.g. after code upgrade)
-            if not cherrypy.session.get('user_role'):
-                try:
-                    dbh = SpiderFootDb(self.config)
-                    cherrypy.session['user_role'] = dbh.userGetRole(cherrypy.session.get('username'))
-                except Exception:
-                    cherrypy.session['user_role'] = 'analyst'
-
-        cherrypy.tools.auth_check = cherrypy.Tool('before_handler', check_auth)
 
         csp = (
             secure.ContentSecurityPolicy()
