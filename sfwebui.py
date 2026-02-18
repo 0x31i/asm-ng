@@ -212,6 +212,27 @@ class SpiderFootWebUi:
             "tools.response_headers.headers": header_list
         })
 
+        # Mark orphaned scans (RUNNING/STARTING/STARTED) as ABORTED on
+        # startup.  If the server is starting, no scan process can still be
+        # alive, so any "active" status in the DB is stale.
+        try:
+            dbh_cleanup = SpiderFootDb(self.config)
+            scans = dbh_cleanup.scanInstanceList()
+            active_statuses = ("RUNNING", "STARTING", "STARTED", "ABORT-REQUESTED")
+            for scan in scans:
+                if scan[6] in active_statuses:
+                    scan_id = scan[0]
+                    old_status = scan[6]
+                    dbh_cleanup.scanInstanceSet(
+                        scan_id, status="ABORTED", ended=time.time() * 1000
+                    )
+                    self.log.warning(
+                        f"Startup cleanup: marked orphaned scan {scan_id} "
+                        f"as ABORTED (was {old_status})"
+                    )
+        except Exception as e:
+            self.log.error(f"Startup cleanup of orphaned scans failed: {e}")
+
     def currentUser(self: 'SpiderFootWebUi') -> str:
         """Get the currently logged-in username from the session.
 
