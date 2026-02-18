@@ -103,7 +103,7 @@ class SpiderFootWebUi:
         if not isinstance(web_config, dict):
             raise TypeError(
                 f"web_config is {type(web_config)}; expected dict()")
-        if not config:
+        if not web_config:
             raise ValueError("web_config is empty")
 
         self.docroot = web_config.get('root', '/').rstrip('/')
