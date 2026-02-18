@@ -1080,6 +1080,60 @@ def _find_stale_pid(port: int) -> int:
         return 0
 
 
+def _verify_server_listening(host: str, port: int, url: str, log: logging.Logger,
+                             timeout: float = 5.0, retries: int = 3) -> None:
+    """Attempt a TCP connection to verify the server is accepting connections.
+
+    Args:
+        host: server bind address
+        port: server port
+        url: full URL (for display only)
+        log: logger instance
+        timeout: per-attempt timeout in seconds
+        retries: number of attempts before giving up
+    """
+    connect_host = '127.0.0.1' if host == '0.0.0.0' else host
+
+    for attempt in range(1, retries + 1):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(timeout)
+                s.connect((connect_host, port))
+            log.info(f"Server connectivity verified: {url}")
+            return
+        except OSError as e:
+            if attempt < retries:
+                log.debug(f"Connectivity check attempt {attempt}/{retries} failed: {e}")
+                time.sleep(0.5)
+            else:
+                log.warning(
+                    f"Server started but connectivity check failed after "
+                    f"{retries} attempts: {e}. The server may not be reachable "
+                    f"at {url}.")
+                print(
+                    f"\nWARNING: Server appears to have started but a "
+                    f"self-test connection to {connect_host}:{port} failed.\n"
+                    f"  Check firewall settings or try a different bind address.\n",
+                    file=sys.stderr)
+
+
+def _flush_logging_queue(loggingQueue, timeout: float = 2.0) -> None:
+    """Give the logging queue time to drain before process exit.
+
+    Args:
+        loggingQueue: the multiprocessing.Queue used for logging
+        timeout: maximum seconds to wait
+    """
+    if loggingQueue is None:
+        return
+    deadline = time.monotonic() + timeout
+    try:
+        while not loggingQueue.empty() and time.monotonic() < deadline:
+            time.sleep(0.05)
+    except Exception:
+        pass
+
+
 def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> None:
     """Start the web server so you can start looking at results.
 
@@ -1137,11 +1191,18 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
 
         # Forward CherryPy's error log to Python logging so that bind
         # failures and other engine errors are visible even with
-        # log.screen=False.
+        # log.screen=False.  Check by stream identity (not handler count)
+        # because CherryPy may have already attached its own handlers.
         cherrypy_error_log = logging.getLogger("cherrypy.error")
-        if not cherrypy_error_log.handlers:
-            cherrypy_error_log.setLevel(logging.WARNING)
-            cherrypy_error_log.addHandler(logging.StreamHandler(sys.stderr))
+        cherrypy_error_log.setLevel(logging.DEBUG)
+        _has_stderr = any(
+            isinstance(h, logging.StreamHandler) and getattr(h, 'stream', None) is sys.stderr
+            for h in cherrypy_error_log.handlers
+        )
+        if not _has_stderr:
+            _cp_stderr = logging.StreamHandler(sys.stderr)
+            _cp_stderr.setLevel(logging.WARNING)
+            cherrypy_error_log.addHandler(_cp_stderr)
 
         log.info(f"Starting web server at {web_host}:{web_port} ...")
 
@@ -1204,18 +1265,34 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
             'cors.preflight.origins': cors_origins
         })
 
-        print("")
-        print("*************************************************************")
-        print(" Use SpiderFoot by starting your web browser of choice and ")
-        print(f" browse to {url}")
-        print("*************************************************************")
-        print("")
-
         # Disable auto-reloading of content
         cherrypy.engine.autoreload.unsubscribe()
 
-        cherrypy.quickstart(SpiderFootWebUi(
-            sfWebUiConfig, sfConfig, loggingQueue), script_name=web_root, config=conf)
+        # Instantiate the web UI separately so that constructor failures
+        # are reported clearly, BEFORE the "browse to" banner is printed.
+        try:
+            web_ui = SpiderFootWebUi(sfWebUiConfig, sfConfig, loggingQueue)
+        except Exception as init_err:
+            msg = f"Failed to initialize web UI: {init_err}"
+            log.critical(msg, exc_info=True)
+            print(f"\nERROR: {msg}", file=sys.stderr)
+            _flush_logging_queue(loggingQueue)
+            sys.exit(-1)
+
+        # Print the banner and run a connectivity self-test only AFTER
+        # CherryPy has bound the socket (engine 'started' event).
+        def _on_server_ready():
+            print("")
+            print("*************************************************************")
+            print(" Use SpiderFoot by starting your web browser of choice and ")
+            print(f" browse to {url}")
+            print("*************************************************************")
+            print("")
+            _verify_server_listening(web_host, int(web_port), url, log)
+
+        cherrypy.engine.subscribe('started', _on_server_ready)
+
+        cherrypy.quickstart(web_ui, script_name=web_root, config=conf)
 
         # If quickstart() returns normally, the engine was stopped (e.g. SIGTERM).
         # Log this so it's visible rather than silently exiting.
@@ -1225,6 +1302,8 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
     except Exception as e:
         log.critical(
             f"Unhandled exception in start_web_server: {e}", exc_info=True)
+        print(f"\nERROR: Web server failed: {e}", file=sys.stderr)
+        _flush_logging_queue(loggingQueue)
         sys.exit(-1)
 
 
