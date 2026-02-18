@@ -46,7 +46,23 @@ class sfp_ai_summary(SpiderFootPlugin):
     def producedEvents(self):
         return ["THREAT_INTEL_SUMMARY"]
 
+    # Event types produced by AI/analysis modules. Processing these would
+    # create a circular dependency, so they must be skipped.
+    _AI_GENERATED_EVENT_TYPES = frozenset({
+        "AI_THREAT_SIGNATURE", "AI_THREAT_PREDICTION", "AI_IOC_CORRELATION",
+        "AI_THREAT_SCORE", "AI_ANOMALY_DETECTED", "AI_NLP_ANALYSIS",
+        "AI_CROSS_SCAN_CORRELATION", "AI_SINGLE_SCAN_CORRELATION",
+        "SECURITY_AUDIT_EVENT", "SECURITY_VIOLATION", "SUSPICIOUS_ACTIVITY",
+        "ZERO_TRUST_VIOLATION", "AUTHENTICATION_FAILURE", "AUTHORIZATION_DENIED",
+        "THREAT_INTEL_SUMMARY",
+    })
+
     def handleEvent(self, event):
+        # Skip events produced by AI/analysis modules to prevent circular
+        # dependency loops.
+        if event.eventType in self._AI_GENERATED_EVENT_TYPES:
+            return
+
         self.event_buffer.append(event)
         if self.opts.get("summary_frequency") == "periodic" and len(self.event_buffer) >= int(self.opts.get("max_events", 100)):
             self._summarize_events()

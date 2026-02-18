@@ -148,6 +148,9 @@ class CrossScanCorrelation:
 class PatternRecognitionEngine:
     """Pattern recognition for attack detection."""
     
+    # Minimum samples needed before fitting the IsolationForest model
+    MIN_TRAINING_SAMPLES = 50
+
     def __init__(self):
         self.models = {}
         self.feature_extractors = {}
@@ -155,6 +158,8 @@ class PatternRecognitionEngine:
         self.model_lock = threading.RLock()
         self.training_data = defaultdict(list)
         self.anomaly_detector = None
+        self._training_features = []
+        self._model_fitted = False
         self._initialize_models()
     
     def _initialize_models(self):
@@ -246,50 +251,62 @@ class PatternRecognitionEngine:
         """Detect anomalous patterns in events using basic statistical methods."""
         if not events:
             return []
-        
+
         with self.model_lock:
             try:
                 # Extract features for all events
                 features_matrix = [self.extract_features(event) for event in events]
-                
+
                 if not features_matrix:
                     return [False] * len(events)
-                
-                # Simple statistical anomaly detection
-                anomalies = []
-                
+
+                # Accumulate training data for the IsolationForest model
+                if HAS_ML_LIBS and self.anomaly_detector and not self._model_fitted:
+                    self._training_features.extend(features_matrix)
+                    if len(self._training_features) >= self.MIN_TRAINING_SAMPLES:
+                        try:
+                            self.anomaly_detector.fit(self._training_features)
+                            self._model_fitted = True
+                            log.info(
+                                f"IsolationForest model fitted with "
+                                f"{len(self._training_features)} samples"
+                            )
+                        except Exception as e:
+                            log.warning(f"Failed to fit IsolationForest model: {e}")
+
                 # If we have ML libraries and the model has been fitted, use them
-                if HAS_ML_LIBS and self.anomaly_detector and hasattr(self.anomaly_detector, 'estimators_'):
+                if HAS_ML_LIBS and self.anomaly_detector and self._model_fitted:
                     predictions = self.anomaly_detector.predict(features_matrix)
                     return [pred == -1 for pred in predictions]
-                
+
                 # Fallback: basic statistical outlier detection
                 if len(features_matrix) < 3:
                     return [False] * len(events)
-                
+
+                anomalies = []
                 # Calculate z-scores for each feature
                 num_features = len(features_matrix[0])
                 for event_idx, features in enumerate(features_matrix):
                     is_anomaly = False
-                    
+
                     for feature_idx in range(num_features):
                         feature_values = [f[feature_idx] for f in features_matrix]
                         if len(set(feature_values)) <= 1:  # No variance
                             continue
-                            
+
                         feature_mean = mean(feature_values)
                         feature_std = std_dev(feature_values)
-                        
+
                         if feature_std > 0:
                             z_score = abs((features[feature_idx] - feature_mean) / feature_std)
                             if z_score > 2.5:  # 2.5 standard deviations
                                 is_anomaly = True
                                 break
-                    
+
                     anomalies.append(is_anomaly)
-                
+
                 return anomalies
-                
+
             except Exception as e:
                 log.error(f"Anomaly detection failed: {e}")
                 return [False] * len(events)
@@ -1152,9 +1169,26 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
             "AI_CROSS_SCAN_CORRELATION"
         ]
 
+    # Event types produced by AI/analysis modules. Processing these would
+    # create a circular dependency (AI modules re-analysing each other's
+    # output), so they must be skipped.
+    _AI_GENERATED_EVENT_TYPES = frozenset({
+        "AI_THREAT_SIGNATURE", "AI_THREAT_PREDICTION", "AI_IOC_CORRELATION",
+        "AI_THREAT_SCORE", "AI_ANOMALY_DETECTED", "AI_NLP_ANALYSIS",
+        "AI_CROSS_SCAN_CORRELATION", "AI_SINGLE_SCAN_CORRELATION",
+        "SECURITY_AUDIT_EVENT", "SECURITY_VIOLATION", "SUSPICIOUS_ACTIVITY",
+        "ZERO_TRUST_VIOLATION", "AUTHENTICATION_FAILURE", "AUTHORIZATION_DENIED",
+        "THREAT_INTEL_SUMMARY",
+    })
+
     def handleEvent(self, sfEvent):
         """Handle events with threat analysis."""
         if self.errorState:
+            return
+
+        # Skip events produced by AI/analysis modules to prevent circular
+        # dependency loops (AI modules re-analysing each other's output).
+        if sfEvent.eventType in self._AI_GENERATED_EVENT_TYPES:
             return
 
         # Lazy load historical data on first event (when scan ID and DB are available)
@@ -1181,8 +1215,10 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
 
     def _analyze_event(self, sfEvent, event_data):
         """Perform comprehensive analysis on the event."""
-        
+
         # 1. Pattern Recognition
+        if self.checkForStop():
+            return
         if hasattr(self, 'pattern_engine') and self.opts['enable_pattern_recognition']:
             try:
                 # Detect anomalies
@@ -1212,6 +1248,8 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
                 self.error(f"Pattern recognition failed: {e}")
 
         # 2. Predictive Analytics
+        if self.checkForStop():
+            return
         if hasattr(self, 'predictive_engine') and self.opts['enable_predictive_analytics']:
             try:
                 # Record this threat event
@@ -1240,6 +1278,8 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
                 self.error(f"Predictive analytics failed: {e}")
 
         # 3. IOC Correlation
+        if self.checkForStop():
+            return
         if hasattr(self, 'correlation_engine') and self.opts['enable_ioc_correlation']:
             try:
                 # Find correlations for this IOC
@@ -1260,6 +1300,8 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
                 self.error(f"IOC correlation failed: {e}")
 
         # 4. Threat Scoring
+        if self.checkForStop():
+            return
         if hasattr(self, 'scoring_engine') and self.opts['enable_threat_scoring']:
             try:
                 # Get signatures and correlations for scoring
@@ -1283,6 +1325,8 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
                 self.error(f"Threat scoring failed: {e}")
 
         # 5. NLP Analysis
+        if self.checkForStop():
+            return
         if hasattr(self, 'nlp_analyzer') and self.opts['enable_nlp_analysis']:
             try:
                 # Only analyze text-heavy events
@@ -1304,6 +1348,8 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
                 self.error(f"NLP analysis failed: {e}")
 
         # 6. Cross-Scan Correlation
+        if self.checkForStop():
+            return
         if self.opts.get('enable_cross_scan_correlation', True) and hasattr(self, '_historical_iocs'):
             try:
                 self._check_cross_scan_correlation(sfEvent, event_data)

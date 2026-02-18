@@ -4842,6 +4842,51 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
+    def scanstatusoverride(self: 'SpiderFootWebUi', id: str, status: str) -> dict:
+        """Override the status of a scan (admin only).
+
+        Allows an administrator to manually set a scan's status, for example
+        to mark a stuck scan as FINISHED so its results are preserved.
+
+        Args:
+            id (str): scan instance ID
+            status (str): new status to set
+
+        Returns:
+            dict: JSON response with success or error
+        """
+        self.requireAuth()
+        self.requireAdmin()
+
+        valid_statuses = ("FINISHED", "ABORTED", "ERROR-FAILED")
+        if status not in valid_statuses:
+            return self.jsonify_error(
+                '400',
+                f"Invalid status '{status}'. Must be one of: {', '.join(valid_statuses)}"
+            )
+
+        if not id:
+            return self.jsonify_error('400', "No scan specified")
+
+        dbh = SpiderFootDb(self.config)
+        res = dbh.scanInstanceGet(id)
+        if not res:
+            return self.jsonify_error('404', f"Scan {id} does not exist")
+
+        old_status = res[5]
+
+        dbh.scanInstanceSet(id, status=status, ended=time.time() * 1000)
+
+        dbh.auditLog(
+            self.currentUser() or 'unknown', 'SCAN_STATUS_OVERRIDE',
+            detail=f"Overrode scan {id} status from '{old_status}' to '{status}'",
+            ip_address=self.clientIP()
+        )
+
+        return {"success": True, "old_status": old_status, "new_status": status}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
     def vacuum(self):
         """Vacuum the database."""
         dbh = SpiderFootDb(self.config)

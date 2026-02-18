@@ -456,6 +456,8 @@ class SpiderFootDb:
             'Threat Score', 0, 'DESCRIPTOR'],
         ['AI_ANOMALY_DETECTED',
             'Anomaly Detected', 0, 'DESCRIPTOR'],
+        ['AI_NLP_ANALYSIS',
+            'NLP Analysis', 0, 'DESCRIPTOR'],
     ]
 
     def __init__(self, opts: dict, init: bool = False) -> None:
@@ -730,6 +732,7 @@ class SpiderFootDb:
                 'AI_SINGLE_SCAN_CORRELATION', 'AI_CROSS_SCAN_CORRELATION',
                 'AI_THREAT_PREDICTION', 'AI_THREAT_SIGNATURE',
                 'AI_IOC_CORRELATION', 'AI_THREAT_SCORE', 'AI_ANOMALY_DETECTED',
+                'AI_NLP_ANALYSIS',
             ):
                 try:
                     self.dbh.execute("SELECT event FROM tbl_event_types WHERE event = ?", (ai_type,))

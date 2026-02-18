@@ -490,6 +490,23 @@ class SpiderFootPlugin:
         if self.checkForStop():
             return
 
+        # Guard against infinite event chains.  Walk the sourceEvent
+        # ancestry and if the chain exceeds a reasonable depth, store
+        # the event but do not propagate it to non-storage modules.
+        _MAX_EVENT_CHAIN_DEPTH = 50
+        _depth = 0
+        _ancestor = sfEvent.sourceEvent
+        while _ancestor is not None:
+            _depth += 1
+            if _depth > _MAX_EVENT_CHAIN_DEPTH:
+                storeOnly = True
+                self.sf.debug(
+                    f"Event chain depth exceeded {_MAX_EVENT_CHAIN_DEPTH} "
+                    f"for {eventName}, storing only"
+                )
+                break
+            _ancestor = _ancestor.sourceEvent
+
         # Look back to ensure the original notification for an element
         # is what's linked to children. For instance, sfp_dns may find
         # xyz.abc.com, and then sfp_ripe obtains some raw data for the
@@ -510,6 +527,10 @@ class SpiderFootPlugin:
                 storeOnly = True
                 break
             prevEvent = prevEvent.sourceEvent
+
+        # Re-check stop flag before queuing to avoid feeding a stopped scan.
+        if self.checkForStop():
+            return
 
         # output to queue if applicable
         if self.outgoingEventQueue is not None:
@@ -545,6 +566,9 @@ class SpiderFootPlugin:
                             while 1:
                                 self.incomingEventQueue.get_nowait()
 
+    _stopCheckCounter = 0
+    _stopCheckInterval = 25  # check DB every N calls to checkForStop()
+
     def checkForStop(self) -> bool:
         """For modules to use to check for when they should give back control.
 
@@ -555,10 +579,27 @@ class SpiderFootPlugin:
         if self.errorState:
             return True
 
-        # If threading is enabled, check the _stopScanning attribute instead.
-        # This is to prevent each thread needing its own sqlite db handle.
+        # Fast path: already flagged for stop.
+        if self._stopScanning:
+            return True
+
+        # If threading is enabled, check the _stopScanning attribute first
+        # (cheap), but periodically also query the database so that an
+        # ABORT-REQUESTED status set via the web UI is honoured even when
+        # the in-memory flag has not been propagated yet.
         if self.outgoingEventQueue is not None and self.incomingEventQueue is not None:
-            return self._stopScanning
+            self._stopCheckCounter += 1
+            if self._stopCheckCounter >= self._stopCheckInterval:
+                self._stopCheckCounter = 0
+                try:
+                    scanstatus = self.__sfdb__.scanInstanceGet(
+                        self.__scanId__)
+                    if scanstatus and scanstatus[5] == "ABORT-REQUESTED":
+                        self._stopScanning = True
+                        return True
+                except Exception:
+                    pass
+            return False
 
         if not self.__scanId__:
             return False

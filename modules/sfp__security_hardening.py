@@ -831,9 +831,25 @@ class sfp__security_hardening(SpiderFootPlugin):
             "AUTHORIZATION_DENIED"
         ]
 
+    # Event types produced by AI/analysis modules. Processing these would
+    # create a circular dependency, so they must be skipped.
+    _AI_GENERATED_EVENT_TYPES = frozenset({
+        "AI_THREAT_SIGNATURE", "AI_THREAT_PREDICTION", "AI_IOC_CORRELATION",
+        "AI_THREAT_SCORE", "AI_ANOMALY_DETECTED", "AI_NLP_ANALYSIS",
+        "AI_CROSS_SCAN_CORRELATION", "AI_SINGLE_SCAN_CORRELATION",
+        "SECURITY_AUDIT_EVENT", "SECURITY_VIOLATION", "SUSPICIOUS_ACTIVITY",
+        "ZERO_TRUST_VIOLATION", "AUTHENTICATION_FAILURE", "AUTHORIZATION_DENIED",
+        "THREAT_INTEL_SUMMARY",
+    })
+
     def handleEvent(self, sfEvent):
         """Handle events with security monitoring."""
         if self.errorState:
+            return
+
+        # Skip events produced by AI/analysis modules to prevent circular
+        # dependency loops.
+        if sfEvent.eventType in self._AI_GENERATED_EVENT_TYPES:
             return
 
         # Security monitoring for all events
