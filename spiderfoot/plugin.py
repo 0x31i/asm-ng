@@ -490,6 +490,23 @@ class SpiderFootPlugin:
         if self.checkForStop():
             return
 
+        # Guard against infinite event chains.  Walk the sourceEvent
+        # ancestry and if the chain exceeds a reasonable depth, store
+        # the event but do not propagate it to non-storage modules.
+        _MAX_EVENT_CHAIN_DEPTH = 50
+        _depth = 0
+        _ancestor = sfEvent.sourceEvent
+        while _ancestor is not None:
+            _depth += 1
+            if _depth > _MAX_EVENT_CHAIN_DEPTH:
+                storeOnly = True
+                self.sf.debug(
+                    f"Event chain depth exceeded {_MAX_EVENT_CHAIN_DEPTH} "
+                    f"for {eventName}, storing only"
+                )
+                break
+            _ancestor = _ancestor.sourceEvent
+
         # Look back to ensure the original notification for an element
         # is what's linked to children. For instance, sfp_dns may find
         # xyz.abc.com, and then sfp_ripe obtains some raw data for the

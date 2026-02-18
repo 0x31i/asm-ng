@@ -1169,9 +1169,26 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
             "AI_CROSS_SCAN_CORRELATION"
         ]
 
+    # Event types produced by AI/analysis modules. Processing these would
+    # create a circular dependency (AI modules re-analysing each other's
+    # output), so they must be skipped.
+    _AI_GENERATED_EVENT_TYPES = frozenset({
+        "AI_THREAT_SIGNATURE", "AI_THREAT_PREDICTION", "AI_IOC_CORRELATION",
+        "AI_THREAT_SCORE", "AI_ANOMALY_DETECTED", "AI_NLP_ANALYSIS",
+        "AI_CROSS_SCAN_CORRELATION", "AI_SINGLE_SCAN_CORRELATION",
+        "SECURITY_AUDIT_EVENT", "SECURITY_VIOLATION", "SUSPICIOUS_ACTIVITY",
+        "ZERO_TRUST_VIOLATION", "AUTHENTICATION_FAILURE", "AUTHORIZATION_DENIED",
+        "THREAT_INTEL_SUMMARY",
+    })
+
     def handleEvent(self, sfEvent):
         """Handle events with threat analysis."""
         if self.errorState:
+            return
+
+        # Skip events produced by AI/analysis modules to prevent circular
+        # dependency loops (AI modules re-analysing each other's output).
+        if sfEvent.eventType in self._AI_GENERATED_EVENT_TYPES:
             return
 
         # Lazy load historical data on first event (when scan ID and DB are available)
