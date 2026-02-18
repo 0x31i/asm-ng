@@ -888,6 +888,18 @@ class SpiderFootDb:
             except sqlite3.Error:
                 pass
 
+            # Migration: Add pid column to tbl_scan_instance for process tracking
+            try:
+                self.dbh.execute("SELECT pid FROM tbl_scan_instance LIMIT 1")
+            except sqlite3.Error:
+                try:
+                    self.dbh.execute(
+                        "ALTER TABLE tbl_scan_instance ADD COLUMN pid INTEGER DEFAULT 0"
+                    )
+                    self.conn.commit()
+                except sqlite3.Error:
+                    pass
+
             # Mark migrations as complete so subsequent connections skip this block
             SpiderFootDb._migrations_done = True
 
@@ -1476,6 +1488,53 @@ class SpiderFootDb:
             # Sleep OUTSIDE the dbhLock so other threads aren't blocked
             import time as _time
             _time.sleep(2 ** attempt)  # 1s, 2s, 4s
+
+    def scanInstanceSetPid(self, instanceId: str, pid: int) -> None:
+        """Store the OS process ID for a running scan.
+
+        Args:
+            instanceId (str): scan instance ID
+            pid (int): OS process ID of the scan subprocess
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(f"instanceId is {type(instanceId)}; expected str()") from None
+
+        qry = "UPDATE tbl_scan_instance SET pid = ? WHERE guid = ?"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (pid, instanceId))
+                self.conn.commit()
+            except sqlite3.Error as e:
+                raise IOError(f"Unable to set PID for scan instance: {e}") from e
+
+    def scanInstanceGetPid(self, instanceId: str) -> int:
+        """Get the OS process ID for a scan instance.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            int: process ID, or 0 if not set
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(f"instanceId is {type(instanceId)}; expected str()") from None
+
+        qry = "SELECT pid FROM tbl_scan_instance WHERE guid = ?"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (instanceId,))
+                row = self.dbh.fetchone()
+                return row[0] if row else 0
+            except sqlite3.Error:
+                return 0
 
     def scanInstanceGet(self, instanceId: str) -> list:
         """Return info about a scan instance (name, target, created, started,

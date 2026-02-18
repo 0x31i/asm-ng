@@ -468,8 +468,9 @@ function showlisttable(types, filter, data) {
             table += "<span class='badge alert-success'>" + data[i][8]['INFO'] + "</span>";
             table += "</td>";
             table += "<td class='text-center'>";
-            if (data[i][6] == "RUNNING" || data[i][6] == "STARTING" || data[i][6] == "STARTED" || data[i][6] == "INITIALIZING") {
-                table += "<a rel='tooltip' title='Stop Scan' href='javascript:stopScan(\"" + data[i][0] + "\");'><i class='glyphicon glyphicon-stop text-muted'></i></a>";
+            if (data[i][6] == "RUNNING" || data[i][6] == "STARTING" || data[i][6] == "STARTED" || data[i][6] == "INITIALIZING" || data[i][6] == "ABORT-REQUESTED") {
+                var stopTitle = data[i][6] == "ABORT-REQUESTED" ? "Force Stop Scan" : "Stop Scan";
+                table += "<a rel='tooltip' title='" + stopTitle + "' href='javascript:stopScan(\"" + data[i][0] + "\");'><i class='glyphicon glyphicon-stop text-muted'></i></a>";
             } else {
                 table += "<a rel='tooltip' title='Delete Scan' href='javascript:deleteScan(\"" + data[i][0] + "\");'><i class='glyphicon glyphicon-trash text-muted'></i></a>";
                 table += "&nbsp;&nbsp;<a rel='tooltip' title='Re-run Scan' href=" + docroot + "/rerunscan?id=" + data[i][0] + "><i class='glyphicon glyphicon-repeat text-muted'></i></a>";

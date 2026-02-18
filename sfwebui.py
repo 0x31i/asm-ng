@@ -82,6 +82,9 @@ class SpiderFootWebUi:
     docroot = ''
     _correlation_jobs = {}
     _correlation_jobs_lock = threading.Lock()
+    # Track scan subprocess Process objects for kill capability
+    _scan_processes = {}
+    _scan_processes_lock = threading.Lock()
 
     def __init__(self: 'SpiderFootWebUi', web_config: dict, config: dict, loggingQueue: 'logging.handlers.QueueListener' = None) -> None:
         """Initialize web server.
@@ -216,23 +219,98 @@ class SpiderFootWebUi:
         # Mark orphaned scans (RUNNING/STARTING/STARTED) as ABORTED on
         # startup.  If the server is starting, no scan process can still be
         # alive, so any "active" status in the DB is stale.
-        try:
-            dbh_cleanup = SpiderFootDb(self.config)
-            scans = dbh_cleanup.scanInstanceList()
-            active_statuses = ("RUNNING", "STARTING", "STARTED", "ABORT-REQUESTED")
-            for scan in scans:
-                if scan[6] in active_statuses:
-                    scan_id = scan[0]
-                    old_status = scan[6]
-                    dbh_cleanup.scanInstanceSet(
-                        scan_id, status="ABORTED", ended=time.time() * 1000
-                    )
+        # Kill any lingering scan processes first, then update the database.
+        active_statuses = ("RUNNING", "STARTING", "STARTED", "ABORT-REQUESTED", "INITIALIZING")
+        cleanup_done = False
+
+        for attempt in range(5):
+            try:
+                dbh_cleanup = SpiderFootDb(self.config)
+                scans = dbh_cleanup.scanInstanceList()
+                for scan in scans:
+                    if scan[6] in active_statuses:
+                        scan_id = scan[0]
+                        old_status = scan[6]
+
+                        # Try to kill any lingering scan process by PID
+                        try:
+                            pid = dbh_cleanup.scanInstanceGetPid(scan_id)
+                            if pid and pid > 1:
+                                import signal
+                                try:
+                                    os.kill(pid, 0)  # Check if alive
+                                    self.log.warning(
+                                        f"Startup cleanup: killing orphaned scan "
+                                        f"process {scan_id} (pid={pid})"
+                                    )
+                                    os.kill(pid, signal.SIGKILL)
+                                    time.sleep(0.5)
+                                except OSError:
+                                    pass  # Process already dead
+                        except Exception:
+                            pass  # PID column may not exist yet
+
+                        dbh_cleanup.scanInstanceSet(
+                            scan_id, status="ABORTED", ended=time.time() * 1000
+                        )
+                        self.log.warning(
+                            f"Startup cleanup: marked orphaned scan {scan_id} "
+                            f"as ABORTED (was {old_status})"
+                        )
+                cleanup_done = True
+                break
+            except Exception as e:
+                if attempt < 4:
                     self.log.warning(
-                        f"Startup cleanup: marked orphaned scan {scan_id} "
-                        f"as ABORTED (was {old_status})"
+                        f"Startup cleanup attempt {attempt + 1} failed: {e}, retrying..."
                     )
-        except Exception as e:
-            self.log.error(f"Startup cleanup of orphaned scans failed: {e}")
+                    time.sleep(2 ** attempt)  # 1s, 2s, 4s, 8s
+                else:
+                    self.log.error(f"Startup cleanup of orphaned scans failed: {e}")
+
+        # Last resort: use direct SQLite connection if shared handler failed
+        if not cleanup_done:
+            self.log.warning("Startup cleanup: falling back to direct SQLite connection")
+            try:
+                import sqlite3
+                db_path = self.config.get('__database')
+                if db_path:
+                    conn = sqlite3.connect(db_path, timeout=30)
+                    cursor = conn.execute(
+                        "SELECT guid, status FROM tbl_scan_instance WHERE status IN (?, ?, ?, ?, ?)",
+                        active_statuses
+                    )
+                    orphans = cursor.fetchall()
+                    for scan_id, old_status in orphans:
+                        # Kill process by PID if possible
+                        try:
+                            pid_cursor = conn.execute(
+                                "SELECT pid FROM tbl_scan_instance WHERE guid = ?",
+                                (scan_id,)
+                            )
+                            pid_row = pid_cursor.fetchone()
+                            if pid_row and pid_row[0] and pid_row[0] > 1:
+                                import signal
+                                try:
+                                    os.kill(pid_row[0], signal.SIGKILL)
+                                    time.sleep(0.5)
+                                except OSError:
+                                    pass
+                        except Exception:
+                            pass
+
+                        conn.execute(
+                            "UPDATE tbl_scan_instance SET status = 'ABORTED', ended = ? WHERE guid = ?",
+                            (time.time() * 1000, scan_id)
+                        )
+                        self.log.warning(
+                            f"Startup cleanup (direct): marked orphaned scan "
+                            f"{scan_id} as ABORTED (was {old_status})"
+                        )
+                    conn.commit()
+                    conn.close()
+            except Exception as e:
+                self.log.error(f"Startup cleanup (direct) also failed: {e}")
 
     def currentUser(self: 'SpiderFootWebUi') -> str:
         """Get the currently logged-in username from the session.
@@ -267,6 +345,124 @@ class SpiderFootWebUi:
             str: client IP address
         """
         return cherrypy.request.remote.ip
+
+    def _kill_scan_process(self: 'SpiderFootWebUi', scan_id: str) -> bool:
+        """Kill a scan subprocess by scan ID.
+
+        Tries the in-memory Process object first, then falls back to the
+        PID stored in the database.  Uses SIGTERM first, then SIGKILL.
+
+        Args:
+            scan_id (str): scan instance ID
+
+        Returns:
+            bool: True if the process was killed or is already dead
+        """
+        import signal
+
+        killed = False
+
+        # Try the in-memory Process object first
+        with self._scan_processes_lock:
+            proc = self._scan_processes.get(scan_id)
+
+        if proc is not None:
+            try:
+                if proc.is_alive():
+                    self.log.warning(f"Terminating scan process {scan_id} (pid={proc.pid})")
+                    proc.terminate()
+                    proc.join(timeout=3)
+                    if proc.is_alive():
+                        self.log.warning(f"Force-killing scan process {scan_id} (pid={proc.pid})")
+                        proc.kill()
+                        proc.join(timeout=2)
+                    killed = True
+                else:
+                    killed = True  # Already dead
+            except Exception as e:
+                self.log.error(f"Error killing scan process {scan_id} via Process object: {e}")
+
+            # Clean up the dict entry
+            with self._scan_processes_lock:
+                self._scan_processes.pop(scan_id, None)
+
+            if killed:
+                return True
+
+        # Fallback: try PID from database
+        pid = 0
+        try:
+            dbh = SpiderFootDb(self.config)
+            pid = dbh.scanInstanceGetPid(scan_id)
+        except Exception:
+            pass
+
+        if pid and pid > 1:
+            try:
+                # Check if process is alive
+                os.kill(pid, 0)
+                self.log.warning(f"Terminating scan process {scan_id} via PID {pid}")
+                os.kill(pid, signal.SIGTERM)
+                # Wait briefly for it to die
+                for _ in range(30):  # 3 seconds
+                    time.sleep(0.1)
+                    try:
+                        os.kill(pid, 0)
+                    except OSError:
+                        return True  # Process is dead
+                # Still alive, force kill
+                self.log.warning(f"Force-killing scan process {scan_id} via PID {pid}")
+                os.kill(pid, signal.SIGKILL)
+                time.sleep(0.5)
+                return True
+            except OSError:
+                return True  # Process already dead
+            except Exception as e:
+                self.log.error(f"Error killing scan process {scan_id} via PID {pid}: {e}")
+
+        return killed
+
+    def _force_scan_status(self: 'SpiderFootWebUi', scan_id: str, status: str) -> bool:
+        """Force-set a scan status using a fresh direct SQLite connection.
+
+        Bypasses the shared SpiderFootDb connection and its class-level lock.
+        Used as a last resort when the normal path fails due to a locked
+        database.
+
+        Args:
+            scan_id (str): scan instance ID
+            status (str): terminal status to set (FINISHED, ABORTED, ERROR-FAILED)
+
+        Returns:
+            bool: True if the update succeeded
+        """
+        import sqlite3
+
+        db_path = self.config.get('__database')
+        if not db_path:
+            return False
+
+        for attempt in range(5):
+            try:
+                conn = sqlite3.connect(db_path, timeout=10)
+                conn.execute(
+                    "UPDATE tbl_scan_instance SET status = ?, ended = ? WHERE guid = ?",
+                    (status, time.time() * 1000, scan_id)
+                )
+                conn.commit()
+                conn.close()
+                return True
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e) and attempt < 4:
+                    time.sleep(2 ** attempt)
+                    continue
+                self.log.error(f"_force_scan_status failed for {scan_id}: {e}")
+                return False
+            except Exception as e:
+                self.log.error(f"_force_scan_status failed for {scan_id}: {e}")
+                return False
+
+        return False
 
     @cherrypy.expose
     def login(self: 'SpiderFootWebUi', username: str = None, password: str = None) -> str:
@@ -1797,6 +1993,10 @@ class SpiderFootWebUi:
             self.log.error(f"[-] Scan [{scanId}] failed: {e}", exc_info=True)
             return self.error(f"[-] Scan [{scanId}] failed: {e}")
 
+        # Track the Process object for kill capability
+        with self._scan_processes_lock:
+            self._scan_processes[scanId] = p
+
         # Wait until the scan has initialized
         while dbh.scanInstanceGet(scanId) is None:
             self.log.info("Waiting for the scan to initialize...")
@@ -1859,6 +2059,10 @@ class SpiderFootWebUi:
                 self.log.error(
                     f"[-] Scan [{scanId}] failed: {e}", exc_info=True)
                 return self.error(f"[-] Scan [{scanId}] failed: {e}")
+
+            # Track the Process object for kill capability
+            with self._scan_processes_lock:
+                self._scan_processes[scanId] = p
 
             # Wait until the scan has initialized
             while dbh.scanInstanceGet(scanId) is None:
@@ -4798,6 +5002,10 @@ class SpiderFootWebUi:
             self.log.error(f"[-] Scan [{scanId}] failed: {e}", exc_info=True)
             return self.error(f"[-] Scan [{scanId}] failed: {e}")
 
+        # Track the Process object for kill capability
+        with self._scan_processes_lock:
+            self._scan_processes[scanId] = p
+
         # Wait until the scan has initialized
         # Check the database for the scan status results
         while dbh.scanInstanceGet(scanId) is None:
@@ -4822,6 +5030,10 @@ class SpiderFootWebUi:
     def stopscan(self: 'SpiderFootWebUi', id: str) -> str:
         """Stop a scan.
 
+        Supports graceful stop (ABORT-REQUESTED) and force-kill for stuck
+        scans.  If the scan is already in ABORT-REQUESTED state, the
+        process is killed directly and the status set to ABORTED.
+
         Args:
             id (str): comma separated list of scan IDs
 
@@ -4833,6 +5045,8 @@ class SpiderFootWebUi:
 
         dbh = SpiderFootDb(self.config)
         ids = id.split(',')
+        active_statuses = ("RUNNING", "STARTING", "STARTED", "INITIALIZING")
+        force_kill_ids = []
 
         for scan_id in ids:
             res = dbh.scanInstanceGet(scan_id)
@@ -4847,18 +5061,53 @@ class SpiderFootWebUi:
             if scan_status == "ABORTED":
                 return self.jsonify_error('400', f"Scan {scan_id} has already aborted.")
 
-            if scan_status != "RUNNING" and scan_status != "STARTING":
-                return self.jsonify_error('400', f"The running scan is currently in the state '{scan_status}', please try again later or restart SpiderFoot.")
+            if scan_status == "ERROR-FAILED":
+                return self.jsonify_error('400', f"Scan {scan_id} has already failed.")
+
+            if scan_status == "ABORT-REQUESTED":
+                # Already requested once — escalate to force kill
+                force_kill_ids.append(scan_id)
+            elif scan_status in active_statuses:
+                pass  # Will be handled below
+            else:
+                return self.jsonify_error(
+                    '400',
+                    f"The running scan is currently in the state '{scan_status}', "
+                    f"please try again later or restart SpiderFoot."
+                )
 
         for scan_id in ids:
-            dbh.scanInstanceSet(scan_id, status="ABORT-REQUESTED")
+            if scan_id in force_kill_ids:
+                # Force-kill: the scan didn't respond to ABORT-REQUESTED
+                self.log.warning(f"Force-killing stuck scan {scan_id}")
+                self._kill_scan_process(scan_id)
+                # Set ABORTED using direct connection (bypasses locked DB)
+                try:
+                    dbh.scanInstanceSet(scan_id, status="ABORTED", ended=time.time() * 1000)
+                except Exception:
+                    self._force_scan_status(scan_id, "ABORTED")
+            else:
+                # Graceful: request abort, kill process as backup
+                try:
+                    dbh.scanInstanceSet(scan_id, status="ABORT-REQUESTED")
+                except Exception:
+                    # DB is locked — kill the process and force status
+                    self.log.warning(
+                        f"Database locked while stopping scan {scan_id}, "
+                        f"killing process and forcing status"
+                    )
+                    self._kill_scan_process(scan_id)
+                    self._force_scan_status(scan_id, "ABORTED")
 
         # Audit log: scan stopped
-        dbh.auditLog(
-            self.currentUser() or 'unknown', 'SCAN_STOP',
-            detail=f"Stopped scan(s): {id}",
-            ip_address=self.clientIP()
-        )
+        try:
+            dbh.auditLog(
+                self.currentUser() or 'unknown', 'SCAN_STOP',
+                detail=f"Stopped scan(s): {id}",
+                ip_address=self.clientIP()
+            )
+        except Exception:
+            pass  # Don't fail the stop operation over audit logging
 
         return ""
 
@@ -4869,6 +5118,8 @@ class SpiderFootWebUi:
 
         Allows an administrator to manually set a scan's status, for example
         to mark a stuck scan as FINISHED so its results are preserved.
+        If the scan is in an active state, the scan process is killed first.
+        Falls back to a direct SQLite connection if the database is locked.
 
         Args:
             id (str): scan instance ID
@@ -4891,19 +5142,45 @@ class SpiderFootWebUi:
             return self.jsonify_error('400', "No scan specified")
 
         dbh = SpiderFootDb(self.config)
-        res = dbh.scanInstanceGet(id)
+
+        try:
+            res = dbh.scanInstanceGet(id)
+        except Exception:
+            res = None
+
         if not res:
             return self.jsonify_error('404', f"Scan {id} does not exist")
 
         old_status = res[5]
 
-        dbh.scanInstanceSet(id, status=status, ended=time.time() * 1000)
+        # Kill the scan process if it's in an active state
+        active_statuses = ("RUNNING", "STARTING", "STARTED", "INITIALIZING", "ABORT-REQUESTED")
+        if old_status in active_statuses:
+            self._kill_scan_process(id)
 
-        dbh.auditLog(
-            self.currentUser() or 'unknown', 'SCAN_STATUS_OVERRIDE',
-            detail=f"Overrode scan {id} status from '{old_status}' to '{status}'",
-            ip_address=self.clientIP()
-        )
+        # Try normal DB update first, fall back to direct connection
+        try:
+            dbh.scanInstanceSet(id, status=status, ended=time.time() * 1000)
+        except Exception as e:
+            self.log.warning(
+                f"scanstatusoverride: normal DB update failed for {id}: {e}, "
+                f"using direct connection"
+            )
+            if not self._force_scan_status(id, status):
+                return self.jsonify_error(
+                    '500',
+                    f"Failed to override scan status: database is locked. "
+                    f"The scan process may still be running."
+                )
+
+        try:
+            dbh.auditLog(
+                self.currentUser() or 'unknown', 'SCAN_STATUS_OVERRIDE',
+                detail=f"Overrode scan {id} status from '{old_status}' to '{status}'",
+                ip_address=self.clientIP()
+            )
+        except Exception:
+            pass  # Don't fail the override over audit logging
 
         return {"success": True, "old_status": old_status, "new_status": status}
 
@@ -8076,7 +8353,11 @@ class SpiderFootWebUi:
                     p.daemon = True
                     p.start()
                     self.log.info(f"[MULTISCAN] Successfully started process for scan {scanId}")
-                    
+
+                    # Track the Process object for kill capability
+                    with self._scan_processes_lock:
+                        self._scan_processes[scanId] = p
+
                     scan_ids.append(scanId)
                     
                     # Wait a moment for the scan to initialize in the database
