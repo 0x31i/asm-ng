@@ -37,6 +37,7 @@
 <li id='tab_gradeconfig'><a href='javascript:void(0)' onclick='switchTab("gradeconfig");'>Grade Configuration</a></li>
 <li id='tab_dbmanage'><a href='javascript:void(0)' onclick='switchTab("dbmanage");'>Database Management</a></li>
 % if user_role == 'admin':
+<li id='tab_tuneresources'><a href='javascript:void(0)' onclick='switchTab("tuneresources");'>Tune Resources</a></li>
 <li id='tab_updates'><a href='javascript:void(0)' onclick='switchTab("updates");'>System Updates</a></li>
 % endif
 % for mod in sorted(opts['__modules__'].keys()):
@@ -558,6 +559,157 @@ function formatBytes(bytes) {
 }
 </script>
 </div>
+
+% if user_role == 'admin':
+<div id='optsect_tuneresources' class="tab-pane" style="display: none">
+<h4>Tune Resources</h4>
+<p style="color: var(--text-secondary, #888); margin-bottom: 15px;">
+Adjust resource allocation based on your system's available memory.
+Controls SQLite cache sizes, memory-mapped I/O limits, and scan concurrency.
+</p>
+
+<div style="max-width: 620px; margin: 20px auto;">
+
+  <div style="text-align: center; margin-bottom: 20px;">
+    <span style="font-size: 12px; color: var(--text-muted, #999);">CURRENT SETTING</span><br>
+    <span id="tune-current-label" style="font-size: 18px; font-weight: 700; font-family: var(--font-mono, monospace);">—</span>
+  </div>
+
+  <div style="position: relative; padding: 0 10px;">
+    <input type="range" id="tune-resource-slider" min="0" max="2" step="1" value="1"
+           class="tune-slider" style="width: 100%;">
+    <div style="display: flex; justify-content: space-between; margin-top: 8px;">
+      <div class="tune-label" data-tier="0" style="text-align: left; flex: 1; cursor: pointer;">
+        <div style="font-weight: 700; font-family: var(--font-mono, monospace); font-size: 13px;">LIGHT</div>
+        <div style="font-size: 11px; color: var(--text-muted, #999);">Limited resources; 4-8GB RAM</div>
+      </div>
+      <div class="tune-label" data-tier="1" style="text-align: center; flex: 1; cursor: pointer;">
+        <div style="font-weight: 700; font-family: var(--font-mono, monospace); font-size: 13px;">MEDIUM</div>
+        <div style="font-size: 11px; color: var(--text-muted, #999);">Modest resources; 16GB RAM recommended</div>
+      </div>
+      <div class="tune-label" data-tier="2" style="text-align: right; flex: 1; cursor: pointer;">
+        <div style="font-weight: 700; font-family: var(--font-mono, monospace); font-size: 13px;">HEAVY</div>
+        <div style="font-size: 11px; color: var(--text-muted, #999);">Snappy/generous resources; 32GB RAM</div>
+      </div>
+    </div>
+  </div>
+
+  <table class='table table-bordered table-striped' style="margin-top: 25px;" id="tune-details-table">
+    <thead><tr><th>Parameter</th><th>Current</th><th>New Value</th></tr></thead>
+    <tbody>
+      <tr><td>SQLite Cache</td><td id="tune-cur-cache">—</td><td id="tune-new-cache">—</td></tr>
+      <tr><td>SQLite Memory-Mapped I/O</td><td id="tune-cur-mmap">—</td><td id="tune-new-mmap">—</td></tr>
+      <tr><td>Module Concurrency</td><td id="tune-cur-threads">—</td><td id="tune-new-threads">—</td></tr>
+      <tr><td>Web Server Threads</td><td id="tune-cur-pool">—</td><td id="tune-new-pool">—</td></tr>
+    </tbody>
+  </table>
+
+  <div style="text-align: center; margin-top: 15px;">
+    <button type="button" class="btn btn-primary" id="btn-tune-apply">
+      <i class="glyphicon glyphicon-cog"></i> Apply
+    </button>
+  </div>
+  <div id="tune-result" style="display:none; margin-top: 10px;"></div>
+</div>
+
+<script>
+(function() {
+    var TIERS = [
+        { name: 'light',  label: 'LIGHT',  cache: '~32 MB',  mmap: '128 MB', threads: 2, pool: 10 },
+        { name: 'medium', label: 'MEDIUM', cache: '~128 MB', mmap: '512 MB', threads: 3, pool: 15 },
+        { name: 'heavy',  label: 'HEAVY',  cache: '~256 MB', mmap: '1 GB',   threads: 5, pool: 20 }
+    ];
+    var NAME_TO_IDX = { 'light': 0, 'medium': 1, 'heavy': 2 };
+    var savedIdx = 1; // default medium
+
+    function updateDisplay(newIdx) {
+        var cur = TIERS[savedIdx], nw = TIERS[newIdx];
+        $('#tune-cur-cache').text(cur.cache);
+        $('#tune-new-cache').text(nw.cache);
+        $('#tune-cur-mmap').text(cur.mmap);
+        $('#tune-new-mmap').text(nw.mmap);
+        $('#tune-cur-threads').text(cur.threads);
+        $('#tune-new-threads').text(nw.threads);
+        $('#tune-cur-pool').text(cur.pool);
+        $('#tune-new-pool').text(nw.pool);
+        // Highlight changed values
+        $('#tune-details-table tbody tr').each(function() {
+            var curVal = $(this).find('td:eq(1)').text();
+            var newVal = $(this).find('td:eq(2)').text();
+            var $cell = $(this).find('td:eq(2)');
+            if (curVal !== newVal) {
+                $cell.css({'font-weight': '700', 'color': 'var(--accent-blue, #2196F3)'});
+            } else {
+                $cell.css({'font-weight': '400', 'color': ''});
+            }
+        });
+    }
+
+    $(document).ready(function() {
+        // Load current tier
+        $.getJSON(docroot + '/getresourcetier', function(data) {
+            if (data.success) {
+                var idx = NAME_TO_IDX[data.tier];
+                if (idx === undefined) idx = 1;
+                savedIdx = idx;
+                $('#tune-resource-slider').val(idx);
+                $('#tune-current-label').text(TIERS[idx].label);
+                updateDisplay(idx);
+            }
+        });
+
+        $('#tune-resource-slider').on('input change', function() {
+            updateDisplay(parseInt(this.value));
+        });
+
+        $('.tune-label').click(function() {
+            var idx = parseInt($(this).data('tier'));
+            $('#tune-resource-slider').val(idx).trigger('change');
+        });
+
+        $('#btn-tune-apply').click(function() {
+            var idx = parseInt($('#tune-resource-slider').val());
+            var tier = TIERS[idx];
+            var $btn = $(this);
+            $btn.prop('disabled', true).html('<i class="glyphicon glyphicon-cog"></i> Applying...');
+
+            $.ajax({
+                url: docroot + '/tuneresources',
+                type: 'GET',
+                data: { tier: tier.name },
+                dataType: 'json',
+                success: function(data) {
+                    var $el = $('#tune-result').show();
+                    if (data.success) {
+                        savedIdx = idx;
+                        $('#tune-current-label').text(tier.label);
+                        updateDisplay(idx);
+                        var msg = '<strong>Applied!</strong> Resource tier set to <strong>' + tier.label + '</strong>.';
+                        msg += '<br><small>SQLite tuning applies to new database connections. Module concurrency applies to new scans.</small>';
+                        if (data.restart_required) {
+                            msg += '<br><i class="glyphicon glyphicon-warning-sign"></i> <strong>Restart required</strong> for web server thread pool change to take effect.';
+                            $el.attr('class', 'alert alert-warning');
+                        } else {
+                            $el.attr('class', 'alert alert-success');
+                        }
+                        $el.html(msg);
+                    } else {
+                        $el.attr('class', 'alert alert-danger').html('<strong>Error:</strong> ' + (data.error || 'Unknown error'));
+                    }
+                },
+                error: function() {
+                    $('#tune-result').show().attr('class', 'alert alert-danger').html('<strong>Error:</strong> Failed to apply resource tier.');
+                },
+                complete: function() {
+                    $btn.prop('disabled', false).html('<i class="glyphicon glyphicon-cog"></i> Apply');
+                }
+            });
+        });
+    });
+})();
+</script>
+</div>
+% endif
 
 % if user_role == 'admin':
 <div id='optsect_updates' class="tab-pane" style="display: none">

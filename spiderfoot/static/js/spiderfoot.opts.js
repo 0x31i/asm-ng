@@ -3,7 +3,9 @@ activeTab = "global";
 function saveSettings() {
     var retarr = {}
     $(":input").each(function(i) {
-        retarr[$(this).attr('id')] = $(this).val();
+        var id = $(this).attr('id');
+        if (id && id.indexOf('tune-') === 0) return; // skip tune resources inputs
+        retarr[id] = $(this).val();
     });
 
     $("#allopts").val(JSON.stringify(retarr));
@@ -50,6 +52,7 @@ function captureOriginalValues() {
     var elements = form.querySelectorAll('input[type="text"], select');
     elements.forEach(function(el) {
         if (!el.id || el.id === 'allopts' || el.id === 'token') return;
+        if (el.id.indexOf('tune-') === 0) return; // skip tune resources inputs
         originalValues[el.id] = el.value;
     });
 }
@@ -61,6 +64,7 @@ function checkForChanges() {
     var elements = form.querySelectorAll('input[type="text"], select');
     elements.forEach(function(el) {
         if (!el.id || el.id === 'allopts' || el.id === 'token') return;
+        if (el.id.indexOf('tune-') === 0) return; // skip tune resources inputs
         if (originalValues.hasOwnProperty(el.id) && el.value !== originalValues[el.id]) {
             hasChanges = true;
         }
@@ -313,6 +317,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var elements = form.querySelectorAll('input, select');
         elements.forEach(function (el) {
             if (!el.id || el.id === 'allopts' || el.id === 'token' || el.type === 'file') return;
+            if (el.id.indexOf('tune-') === 0) return; // skip tune resources inputs
             if (el.type === 'checkbox') {
                 opts[el.id] = el.checked;
             } else if (el.tagName.toLowerCase() === 'select') {

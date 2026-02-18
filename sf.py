@@ -70,6 +70,8 @@ sfConfig = {
     '_grade_category_weights': '',
     '_grade_event_overrides': '',
     '_grade_thresholds': '',
+    # Resource tuning tier (light, medium, heavy)
+    '_resource_tier': 'medium',
 }
 sfOptdescs = {
     '_debug': "Enable debugging?",
@@ -92,6 +94,7 @@ sfOptdescs = {
     '_grade_category_weights': "JSON to override default category weights. Example: {\"Network Security\": {\"weight\": 0.9}}. Leave empty for defaults.",
     '_grade_event_overrides': "JSON to override scoring for specific event types. Example: {\"TCP_PORT_OPEN\": {\"category\": \"Network Security\", \"points\": -15, \"logic\": \"unverified_exists\"}}. Leave empty for defaults.",
     '_grade_thresholds': "JSON to override grade letter thresholds. Example: [{\"min\": 90, \"grade\": \"A\"}, {\"min\": 80, \"grade\": \"B\"}, ...]. Leave empty for defaults.",
+    '_resource_tier': "Resource tuning tier. Controls SQLite cache/mmap sizes, module concurrency, and web server threads. Options: light, medium, heavy.",
 }
 
 
@@ -1175,11 +1178,14 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
         session_dir = os.path.join(SpiderFootHelpers.dataPath(), 'sessions')
         os.makedirs(session_dir, exist_ok=True)
 
+        from spiderfoot.resource_tiers import get_tier_config
+        _tier = get_tier_config(sfConfig.get('_resource_tier', 'medium'))
+
         cherrypy.config.update({
             'log.screen': False,
             'server.socket_host': web_host,
             'server.socket_port': int(web_port),
-            'server.thread_pool': 20,
+            'server.thread_pool': _tier['cherrypy_thread_pool'],
             'tools.sessions.on': True,
             'tools.sessions.storage_class': cherrypy.lib.sessions.FileSession,
             'tools.sessions.storage_path': session_dir,
