@@ -589,7 +589,8 @@ def main():
 
             if args.api:
                 start_fastapi_server(sfApiConfig, sfConfig, loggingQueue)
-            elif args.both:                start_both_servers(sfWebUiConfig, sfApiConfig, sfConfig, loggingQueue)
+            elif args.both:
+                start_both_servers(sfWebUiConfig, sfApiConfig, sfConfig, loggingQueue)
             else:
                 start_web_server(sfWebUiConfig, sfConfig, loggingQueue)
                 
