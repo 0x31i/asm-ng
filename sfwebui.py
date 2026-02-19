@@ -719,24 +719,22 @@ class SpiderFootWebUi:
 
     @staticmethod
     def _export_filename(scan_name: str, scan_id: str, suffix: str, ext: str) -> str:
-        """Build a sanitised export filename using the scan name and a short hash.
+        """Build a sanitised export filename from the scan name.
 
-        Example: ``FHCSD-ASM-2026_01-FINDINGS-a3c8d7e1.xlsx``
+        Example: ``FHC-ASM-2026_01-FINDINGS.xlsx``
 
         Args:
-            scan_name: human-readable scan name (e.g. ``FHCSD-ASM-2026_01``)
-            scan_id:   full scan UUID / hash
-            suffix:    descriptive label (e.g. ``REPORT``, ``FINDINGS-CSV``)
+            scan_name: human-readable scan name (e.g. ``FHC-ASM-2026_01``)
+            scan_id:   unused, kept for call-site compatibility
+            suffix:    descriptive label (e.g. ``REPORT``, ``FINDINGS``)
             ext:       file extension without dot (e.g. ``xlsx``, ``csv``, ``zip``)
 
         Returns:
             str: filename safe for Content-Disposition headers
         """
         import re as _re
-        # Sanitise scan name: keep alphanumerics, hyphens, underscores, dots
         safe_name = _re.sub(r'[^\w\-.]', '_', scan_name or 'Export').strip('_') or 'Export'
-        short_id = (scan_id or 'unknown')[:8]
-        return f"{safe_name}-{suffix}-{short_id}.{ext}"
+        return f"{safe_name}-{suffix}.{ext}"
 
     def buildExcel(self: 'SpiderFootWebUi', data: list, columnNames: list, sheetNameIndex: int = 0, prepend_sheets: list = None) -> str:
         """Convert supplied raw data into Excel format.
