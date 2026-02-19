@@ -58,6 +58,9 @@ else:
 _pg_pool = None
 _pg_pool_lock = threading.Lock()
 
+# Cache the detected database type so we don't re-probe on every instantiation.
+_cached_db_type = None
+
 
 def _get_pg_pool(dsn: str):
     """Get or create the PostgreSQL connection pool (thread-safe singleton).
@@ -432,6 +435,10 @@ def _attempt_pg_auto_setup(opts: dict) -> bool:
 def detect_db_type(opts: dict) -> str:
     """Determine which database backend to use.
 
+    The result is cached after the first call so that subsequent
+    ``SpiderFootDb()`` instantiations don't re-probe PostgreSQL
+    (which would leak a file descriptor per probe).
+
     Priority:
     1. ``ASMNG_DATABASE_URL`` env var → postgresql
     2. ``ASMNG_DB_TYPE`` env var → explicit choice
@@ -442,6 +449,18 @@ def detect_db_type(opts: dict) -> str:
     Returns:
         str: ``'postgresql'`` or ``'sqlite'``
     """
+    global _cached_db_type
+    if _cached_db_type is not None:
+        return _cached_db_type
+
+    result = _detect_db_type_uncached(opts)
+    _cached_db_type = result
+    return result
+
+
+def _detect_db_type_uncached(opts: dict) -> str:
+    """Internal: perform the actual database type detection (called once)."""
+
     # 1. Explicit DSN env var
     if os.environ.get('ASMNG_DATABASE_URL'):
         return 'postgresql'
@@ -606,7 +625,20 @@ def create_pg_connection(opts: dict):
 
     dsn = _build_pg_dsn(opts)
     pool = _get_pg_pool(dsn)
-    conn = pool.getconn()
+
+    # Retry with backoff if the pool is temporarily exhausted
+    conn = None
+    for attempt in range(5):
+        try:
+            conn = pool.getconn()
+            break
+        except psycopg2.pool.PoolError:
+            if attempt < 4:
+                log.debug(f"Connection pool exhausted, retrying ({attempt + 1}/5)...")
+                _time.sleep(0.2 * (attempt + 1))
+            else:
+                raise
+
     conn.autocommit = False
     cursor = PgCursorWrapper(conn.cursor())
 
@@ -625,16 +657,10 @@ def create_connection(opts: dict):
     db_type = detect_db_type(opts)
 
     if db_type == 'postgresql':
-        try:
-            return create_pg_connection(opts)
-        except Exception as e:
-            log.warning(
-                f"Failed to connect to PostgreSQL: {e}. "
-                "Falling back to SQLite."
-            )
-            if not opts.get('__database'):
-                raise
-            return create_sqlite_connection(opts)
+        # Don't silently fall back to SQLite — that splits data across two
+        # databases and causes the exact errors the user sees.  Let
+        # connection errors propagate so they are visible.
+        return create_pg_connection(opts)
 
     return create_sqlite_connection(opts)
 

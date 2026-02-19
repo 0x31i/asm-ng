@@ -21,6 +21,10 @@ services:
     image: ghcr.io/0x31i/asm-ng:v5.2.9
     container_name: asm-ng-app
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     networks:
       - asm-ng-frontend
       - asm-ng-backend
