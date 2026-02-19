@@ -134,9 +134,9 @@ class SpiderFootWebUi:
         # 'config' supplied will be the defaults, let's supplement them
         # now with any configuration which may have previously been saved.
         self.defaultConfig = deepcopy(config)
-        dbh = SpiderFootDb(self.defaultConfig, init=True)
-        sf = SpiderFoot(self.defaultConfig)
-        self.config = sf.configUnserialize(dbh.configGet(), self.defaultConfig)
+        with SpiderFootDb(self.defaultConfig, init=True) as dbh:
+            sf = SpiderFoot(self.defaultConfig)
+            self.config = sf.configUnserialize(dbh.configGet(), self.defaultConfig)
 
         # Set up logging
         if loggingQueue is None:
@@ -154,21 +154,21 @@ class SpiderFootWebUi:
         })
 
         # Create default admin user if no users exist
-        dbh_init = SpiderFootDb(self.config, init=True)
-        if dbh_init.userCount() == 0:
-            import secrets as _secrets
-            default_password = _secrets.token_urlsafe(12)
-            dbh_init.userCreate('admin', default_password, display_name='Administrator', role='admin')
-            self._default_password = default_password
-            self.log.info(f"Created default admin user. Password: {default_password}")
-            print("")
-            print("*************************************************************")
-            print(f" Default login credentials created:")
-            print(f"   Username: admin")
-            print(f"   Password: {default_password}")
-            print(f" Please change this password after first login!")
-            print("*************************************************************")
-            print("")
+        with SpiderFootDb(self.config, init=True) as dbh_init:
+            if dbh_init.userCount() == 0:
+                import secrets as _secrets
+                default_password = _secrets.token_urlsafe(12)
+                dbh_init.userCreate('admin', default_password, display_name='Administrator', role='admin')
+                self._default_password = default_password
+                self.log.info(f"Created default admin user. Password: {default_password}")
+                print("")
+                print("*************************************************************")
+                print(f" Default login credentials created:")
+                print(f"   Username: admin")
+                print(f"   Password: {default_password}")
+                print(f" Please change this password after first login!")
+                print("*************************************************************")
+                print("")
 
         csp = (
             secure.ContentSecurityPolicy()
@@ -216,6 +216,36 @@ class SpiderFootWebUi:
             "tools.response_headers.headers": header_list
         })
 
+        # Kill orphaned multiprocessing workers from a previous run.
+        # These can hold open SQLite connections that lock the database,
+        # preventing startup cleanup from succeeding.
+        try:
+            import subprocess
+            current_pid = os.getpid()
+            db_path = self.config.get('__database', '')
+            # Derive the project directory from the DB path to identify our workers
+            project_dir = os.path.dirname(os.path.dirname(db_path)) if db_path else ''
+            if project_dir:
+                result = subprocess.run(
+                    ['pgrep', '-f', project_dir],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.stdout.strip():
+                    for pid_str in result.stdout.strip().split('\n'):
+                        try:
+                            stale_pid = int(pid_str.strip())
+                            if stale_pid != current_pid and stale_pid > 1:
+                                import signal as _sig
+                                os.kill(stale_pid, _sig.SIGKILL)
+                                self.log.warning(
+                                    f"Killed orphaned process {stale_pid} "
+                                    f"from previous run"
+                                )
+                        except (ValueError, OSError):
+                            pass
+        except Exception:
+            pass  # pgrep may not be available on all platforms
+
         # Mark orphaned scans (RUNNING/STARTING/STARTED) as ABORTED on
         # startup.  If the server is starting, no scan process can still be
         # alive, so any "active" status in the DB is stale.
@@ -225,38 +255,38 @@ class SpiderFootWebUi:
 
         for attempt in range(5):
             try:
-                dbh_cleanup = SpiderFootDb(self.config)
-                scans = dbh_cleanup.scanInstanceList()
-                for scan in scans:
-                    if scan[6] in active_statuses:
-                        scan_id = scan[0]
-                        old_status = scan[6]
+                with SpiderFootDb(self.config) as dbh_cleanup:
+                    scans = dbh_cleanup.scanInstanceList()
+                    for scan in scans:
+                        if scan[6] in active_statuses:
+                            scan_id = scan[0]
+                            old_status = scan[6]
 
-                        # Try to kill any lingering scan process by PID
-                        try:
-                            pid = dbh_cleanup.scanInstanceGetPid(scan_id)
-                            if pid and pid > 1:
-                                import signal
-                                try:
-                                    os.kill(pid, 0)  # Check if alive
-                                    self.log.warning(
-                                        f"Startup cleanup: killing orphaned scan "
-                                        f"process {scan_id} (pid={pid})"
-                                    )
-                                    os.kill(pid, signal.SIGKILL)
-                                    time.sleep(0.5)
-                                except OSError:
-                                    pass  # Process already dead
-                        except Exception:
-                            pass  # PID column may not exist yet
+                            # Try to kill any lingering scan process by PID
+                            try:
+                                pid = dbh_cleanup.scanInstanceGetPid(scan_id)
+                                if pid and pid > 1:
+                                    import signal
+                                    try:
+                                        os.kill(pid, 0)  # Check if alive
+                                        self.log.warning(
+                                            f"Startup cleanup: killing orphaned scan "
+                                            f"process {scan_id} (pid={pid})"
+                                        )
+                                        os.kill(pid, signal.SIGKILL)
+                                        time.sleep(0.5)
+                                    except OSError:
+                                        pass  # Process already dead
+                            except Exception:
+                                pass  # PID column may not exist yet
 
-                        dbh_cleanup.scanInstanceSet(
-                            scan_id, status="ABORTED", ended=time.time() * 1000
-                        )
-                        self.log.warning(
-                            f"Startup cleanup: marked orphaned scan {scan_id} "
-                            f"as ABORTED (was {old_status})"
-                        )
+                            dbh_cleanup.scanInstanceSet(
+                                scan_id, status="ABORTED", ended=time.time() * 1000
+                            )
+                            self.log.warning(
+                                f"Startup cleanup: marked orphaned scan {scan_id} "
+                                f"as ABORTED (was {old_status})"
+                            )
                 cleanup_done = True
                 break
             except Exception as e:
