@@ -121,7 +121,7 @@ class TestSpiderFootWebUi(helper.CPWebCase, SpiderFootTestBase):
 
     def test_scancorrelationsexport(self):
         with patch('sfwebui.SpiderFootDb') as mock_db:
-            mock_db.return_value.scanInstanceGet.return_value = ['scan_name']
+            mock_db.return_value.scanInstanceGet.return_value = ['scan_name', 'target']
             mock_db.return_value.scanCorrelations.return_value = [
                 ['rule_name', 'correlation', 'risk', 'description']
             ]
@@ -160,7 +160,7 @@ class TestSpiderFootWebUi(helper.CPWebCase, SpiderFootTestBase):
 
     def test_scaneventresultexportmulti(self):
         with patch('sfwebui.SpiderFootDb') as mock_db:
-            mock_db.return_value.scanInstanceGet.return_value = ['scan_name']
+            mock_db.return_value.scanInstanceGet.return_value = ['scan_name', 'target']
             # Mock data with all required 15 elements (indices 0-14)
             mock_db.return_value.scanResultEvent.return_value = [
                 [1627846261, 'data', 'source', 'type', 'ROOT',

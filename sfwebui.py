@@ -1360,9 +1360,6 @@ class SpiderFootWebUi:
                     pass  # Table may not exist in older databases
             data = data + dbh.scanResultEvent(id)
 
-        if not data:
-            return None
-
         # Build prepend sheets for analysis_correlations mode (Findings + Correlations)
         prepend_sheets = None
         if export_mode == "analysis_correlations":
@@ -1622,9 +1619,6 @@ class SpiderFootWebUi:
         # Force Excel for analysis_correlations mode (correlations tab requires .xlsx)
         if export_mode == "analysis_correlations":
             filetype = "excel"
-
-        if not data:
-            return None
 
         # Get target-level false positives for this scan
         dbh = SpiderFootDb(self.config)
