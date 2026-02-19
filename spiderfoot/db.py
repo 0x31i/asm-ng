@@ -1052,14 +1052,22 @@ class SpiderFootDb:
             pass
 
     def close(self) -> None:
-        """Close the database handle and connection."""
+        """Close the database handle and connection.
+
+        For PostgreSQL, returns the connection to the shared pool instead
+        of closing it outright.
+        """
 
         with self.dbhLock:
             if self.dbh:
                 self.dbh.close()
                 self.dbh = None
             if self.conn:
-                self.conn.close()
+                if self.db_type == 'postgresql':
+                    from spiderfoot.db_backend import return_pg_connection
+                    return_pg_connection(self.conn)
+                else:
+                    self.conn.close()
                 self.conn = None
 
     def vacuumDB(self) -> None:

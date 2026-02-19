@@ -23,6 +23,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import threading
 import time as _time
 
 log = logging.getLogger(f"spiderfoot.{__name__}")
@@ -49,6 +50,58 @@ if HAS_PSYCOPG2:
 else:
     DatabaseError = sqlite3.Error
     OperationalError = sqlite3.OperationalError
+
+
+# ---------------------------------------------------------------------------
+# PostgreSQL connection pool (singleton)
+# ---------------------------------------------------------------------------
+_pg_pool = None
+_pg_pool_lock = threading.Lock()
+
+
+def _get_pg_pool(dsn: str):
+    """Get or create the PostgreSQL connection pool (thread-safe singleton).
+
+    Pool size is configurable via ASMNG_PG_POOL_MAX env var (default 20).
+    """
+    global _pg_pool
+    if _pg_pool is not None:
+        return _pg_pool
+    with _pg_pool_lock:
+        if _pg_pool is None:
+            max_conn = int(os.environ.get('ASMNG_PG_POOL_MAX', '20'))
+            _pg_pool = psycopg2.pool.ThreadedConnectionPool(
+                minconn=2, maxconn=max_conn, dsn=dsn
+            )
+            log.info(f"PostgreSQL connection pool created (max={max_conn})")
+    return _pg_pool
+
+
+def return_pg_connection(conn) -> None:
+    """Return a PostgreSQL connection to the pool instead of closing it.
+
+    Resets connection state (rolls back any pending transaction) before
+    returning.  If the connection is broken, it is discarded from the pool.
+    """
+    global _pg_pool
+    if _pg_pool is None:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return
+    try:
+        if conn.closed:
+            _pg_pool.putconn(conn, close=True)
+        else:
+            conn.rollback()
+            conn.autocommit = False
+            _pg_pool.putconn(conn)
+    except Exception:
+        try:
+            _pg_pool.putconn(conn, close=True)
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -536,6 +589,9 @@ def create_sqlite_connection(opts: dict):
 def create_pg_connection(opts: dict):
     """Create a PostgreSQL connection and wrapped cursor.
 
+    Connections are drawn from a shared ``ThreadedConnectionPool`` so that
+    the total number of open PostgreSQL connections stays bounded.
+
     Args:
         opts: config dict.
 
@@ -549,7 +605,8 @@ def create_pg_connection(opts: dict):
         )
 
     dsn = _build_pg_dsn(opts)
-    conn = psycopg2.connect(dsn)
+    pool = _get_pg_pool(dsn)
+    conn = pool.getconn()
     conn.autocommit = False
     cursor = PgCursorWrapper(conn.cursor())
 
