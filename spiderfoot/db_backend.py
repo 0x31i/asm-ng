@@ -71,16 +71,18 @@ def _get_pg_pool(dsn: str):
     """Get or create the PostgreSQL connection pool (thread-safe singleton).
 
     Pool size is configurable via ``ASMNG_PG_POOL_MAX`` env var
-    (default **128**).  A semaphore gates access so that threads
-    block in an orderly queue when all connections are checked out,
-    instead of immediately raising ``PoolError``.
+    (default **64**).  Kept below PostgreSQL's default
+    ``max_connections`` (100) to leave headroom for admin connections,
+    the web server, and other tools.  A semaphore gates access so that
+    threads block in an orderly queue when all connections are checked
+    out, instead of immediately raising ``PoolError``.
     """
     global _pg_pool, _pg_pool_semaphore
     if _pg_pool is not None:
         return _pg_pool
     with _pg_pool_lock:
         if _pg_pool is None:
-            max_conn = int(os.environ.get('ASMNG_PG_POOL_MAX', '128'))
+            max_conn = int(os.environ.get('ASMNG_PG_POOL_MAX', '64'))
             _pg_pool = psycopg2.pool.ThreadedConnectionPool(
                 minconn=2, maxconn=max_conn, dsn=dsn
             )
