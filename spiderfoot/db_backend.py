@@ -130,6 +130,43 @@ def return_pg_connection(conn) -> None:
                 pass
 
 
+def return_pg_connection_fast(conn) -> None:
+    """Return an autocommit-mode connection to the pool (no rollback).
+
+    When the connection is in ``autocommit=True`` mode, every statement
+    commits immediately — there is never a pending transaction to roll
+    back.  Skipping the ``rollback()`` and ``autocommit = False`` calls
+    eliminates **two network round-trips** per operation.
+
+    Used by ``_PgPoolLock`` in ``db.py``, which keeps pool connections
+    in autocommit mode permanently so that the per-operation pool
+    checkout/return path is as lightweight as possible.
+    """
+    global _pg_pool, _pg_pool_semaphore
+    if _pg_pool is None:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return
+    try:
+        if conn.closed:
+            _pg_pool.putconn(conn, close=True)
+        else:
+            _pg_pool.putconn(conn)
+    except Exception:
+        try:
+            _pg_pool.putconn(conn, close=True)
+        except Exception:
+            pass
+    finally:
+        if _pg_pool_semaphore is not None:
+            try:
+                _pg_pool_semaphore.release()
+            except ValueError:
+                pass
+
+
 # ---------------------------------------------------------------------------
 # PostgreSQL cursor wrapper
 # ---------------------------------------------------------------------------
