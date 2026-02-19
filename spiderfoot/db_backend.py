@@ -58,6 +58,7 @@ else:
 # ---------------------------------------------------------------------------
 _pg_pool = None
 _pg_pool_lock = threading.Lock()
+_pg_pool_semaphore = None  # Limits concurrent pool checkout attempts
 
 # ---------------------------------------------------------------------------
 # Cached database type detection — uses a dict so no `global` declaration
@@ -69,17 +70,24 @@ _detect_cache = {}
 def _get_pg_pool(dsn: str):
     """Get or create the PostgreSQL connection pool (thread-safe singleton).
 
-    Pool size is configurable via ASMNG_PG_POOL_MAX env var (default 20).
+    Pool size is configurable via ``ASMNG_PG_POOL_MAX`` env var
+    (default **128**).  A semaphore gates access so that threads
+    block in an orderly queue when all connections are checked out,
+    instead of immediately raising ``PoolError``.
     """
-    global _pg_pool
+    global _pg_pool, _pg_pool_semaphore
     if _pg_pool is not None:
         return _pg_pool
     with _pg_pool_lock:
         if _pg_pool is None:
-            max_conn = int(os.environ.get('ASMNG_PG_POOL_MAX', '20'))
+            max_conn = int(os.environ.get('ASMNG_PG_POOL_MAX', '128'))
             _pg_pool = psycopg2.pool.ThreadedConnectionPool(
                 minconn=2, maxconn=max_conn, dsn=dsn
             )
+            # The semaphore ensures that at most *max_conn* threads can
+            # attempt pool.getconn() concurrently.  Extra threads block
+            # here instead of triggering an immediate PoolError.
+            _pg_pool_semaphore = threading.Semaphore(max_conn)
             log.info(f"PostgreSQL connection pool created (max={max_conn})")
     return _pg_pool
 
@@ -89,6 +97,7 @@ def return_pg_connection(conn) -> None:
 
     Resets connection state (rolls back any pending transaction) before
     returning.  If the connection is broken, it is discarded from the pool.
+    Also releases the pool semaphore so waiting threads can proceed.
     """
     global _pg_pool
     if _pg_pool is None:
@@ -109,6 +118,14 @@ def return_pg_connection(conn) -> None:
             _pg_pool.putconn(conn, close=True)
         except Exception:
             pass
+    finally:
+        # Release the semaphore so a waiting thread can acquire a slot.
+        if _pg_pool_semaphore is not None:
+            try:
+                _pg_pool_semaphore.release()
+            except ValueError:
+                # Semaphore released more times than acquired — ignore.
+                pass
 
 
 # ---------------------------------------------------------------------------
@@ -166,7 +183,14 @@ class PgCursorWrapper:
 
     def executemany(self, query, params_list):
         pg_query = self._convert_params(query)
-        return self._cursor.executemany(pg_query, params_list)
+        try:
+            return self._cursor.executemany(pg_query, params_list)
+        except Exception:
+            try:
+                self._cursor.connection.rollback()
+            except Exception:
+                pass
+            raise
 
     def fetchone(self):
         return self._cursor.fetchone()
@@ -647,6 +671,12 @@ def create_pg_connection(opts: dict):
     Connections are drawn from a shared ``ThreadedConnectionPool`` so that
     the total number of open PostgreSQL connections stays bounded.
 
+    A ``threading.Semaphore`` ensures that threads block in an orderly
+    queue when the pool is at capacity, rather than immediately raising
+    ``PoolError``.  This eliminates the "thundering herd" failure mode
+    where 100+ plugin modules all race for a limited number of
+    connections at scan startup.
+
     Args:
         opts: config dict.
 
@@ -662,34 +692,61 @@ def create_pg_connection(opts: dict):
     dsn = _build_pg_dsn(opts)
     pool = _get_pg_pool(dsn)
 
-    # Retry with exponential backoff + jitter if the pool is temporarily
-    # exhausted.  With lazy connection acquisition in plugin.threadWorker(),
-    # bursts are smaller, but fan-out events can still cause transient
-    # contention.
-    conn = None
+    # -------------------------------------------------------------------
+    # Acquire a connection via the semaphore-gated path.
+    #
+    # The semaphore blocks the calling thread until a pool slot is
+    # available, converting the old "fail fast + retry loop" into an
+    # orderly wait queue.  A generous timeout prevents infinite hangs
+    # if something goes wrong.  The fallback retry loop remains as a
+    # safety net in case of transient psycopg2 errors.
+    # -------------------------------------------------------------------
+    timeout = float(os.environ.get('ASMNG_PG_POOL_TIMEOUT', '120'))
     max_attempts = int(os.environ.get('ASMNG_PG_POOL_RETRY_ATTEMPTS', '8'))
     base_delay = float(os.environ.get('ASMNG_PG_POOL_RETRY_BASE_DELAY', '0.5'))
-    for attempt in range(max_attempts):
-        try:
-            conn = pool.getconn()
-            break
-        except psycopg2.pool.PoolError:
-            if attempt < max_attempts - 1:
-                delay = base_delay * (2 ** attempt)
-                # Jitter: randomize between 50%-100% of calculated delay
-                jittered = delay * (0.5 + random.random() * 0.5)
-                log.debug(
-                    f"Connection pool exhausted, retrying "
-                    f"({attempt + 1}/{max_attempts}) in {jittered:.2f}s..."
+
+    conn = None
+    acquired_semaphore = False
+
+    try:
+        # Block until a pool slot is available (or timeout)
+        if _pg_pool_semaphore is not None:
+            acquired_semaphore = _pg_pool_semaphore.acquire(timeout=timeout)
+            if not acquired_semaphore:
+                raise psycopg2.pool.PoolError(
+                    f"Timed out waiting for a database connection after "
+                    f"{timeout}s. All {pool.maxconn} connections are in use. "
+                    f"Consider increasing ASMNG_PG_POOL_MAX."
                 )
-                _time.sleep(jittered)
-            else:
-                log.error(
-                    f"Connection pool exhausted after {max_attempts} "
-                    f"attempts. Consider increasing ASMNG_PG_POOL_MAX "
-                    f"(current: {pool.maxconn})."
-                )
-                raise
+
+        # Even with the semaphore, transient pool errors can occur (e.g.
+        # broken connections being cleaned up).  Retry with backoff.
+        for attempt in range(max_attempts):
+            try:
+                conn = pool.getconn()
+                break
+            except psycopg2.pool.PoolError:
+                if attempt < max_attempts - 1:
+                    delay = base_delay * (2 ** attempt)
+                    jittered = delay * (0.5 + random.random() * 0.5)
+                    log.debug(
+                        f"Connection pool contention, retrying "
+                        f"({attempt + 1}/{max_attempts}) in {jittered:.2f}s..."
+                    )
+                    _time.sleep(jittered)
+                else:
+                    log.error(
+                        f"Connection pool exhausted after {max_attempts} "
+                        f"attempts. Consider increasing ASMNG_PG_POOL_MAX "
+                        f"(current: {pool.maxconn})."
+                    )
+                    raise
+    except Exception:
+        # If we acquired the semaphore but failed to get a connection,
+        # release the semaphore so other threads can proceed.
+        if acquired_semaphore and _pg_pool_semaphore is not None:
+            _pg_pool_semaphore.release()
+        raise
 
     conn.autocommit = False
     cursor = PgCursorWrapper(conn.cursor())
