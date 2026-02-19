@@ -157,16 +157,24 @@ class SpiderFootWebUi:
         # Create default admin user if no users exist
         with SpiderFootDb(self.config, init=True) as dbh_init:
             if dbh_init.userCount() == 0:
-                dbh_init.userCreate('admin', 'admin', display_name='Administrator', role='admin')
-                self.log.info("Created default admin user with default credentials (admin:admin)")
-                print("")
-                print("*************************************************************")
-                print(" Default login credentials created:")
-                print("   Username: admin")
-                print("   Password: admin")
-                print(" WARNING: Change this password immediately after first login!")
-                print("*************************************************************")
-                print("")
+                if dbh_init.userCreate('admin', 'admin', display_name='Administrator', role='admin'):
+                    self.log.info("Created default admin user with default credentials (admin:admin)")
+                    print("")
+                    print("*************************************************************")
+                    print(" Default login credentials created:")
+                    print("   Username: admin")
+                    print("   Password: admin")
+                    print(" WARNING: Change this password immediately after first login!")
+                    print("*************************************************************")
+                    print("")
+                else:
+                    self.log.error("FAILED to create default admin user! Check database logs.")
+                    print("")
+                    print("*************************************************************")
+                    print(" ERROR: Failed to create default admin user!")
+                    print(" Check the logs for database errors.")
+                    print("*************************************************************")
+                    print("")
 
         csp = (
             secure.ContentSecurityPolicy()
