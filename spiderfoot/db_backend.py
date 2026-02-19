@@ -330,12 +330,14 @@ def _attempt_pg_auto_setup(opts: dict) -> bool:
             _write_sentinel('success', 'PostgreSQL installed and configured')
             return True
         else:
-            stderr_snippet = (result.stderr or '')[:500]
+            # Script writes info/error messages to stdout; capture both
+            output = (result.stdout or '') + (result.stderr or '')
+            output_snippet = output.strip()[-500:]
             log.warning(
                 f"PostgreSQL auto-setup failed (exit code {result.returncode}). "
-                f"stderr: {stderr_snippet}"
+                f"Output:\n{output_snippet}"
             )
-            _write_sentinel('failed', f'Exit code {result.returncode}: {(result.stderr or "")[:200]}')
+            _write_sentinel('failed', f'Exit code {result.returncode}: {output.strip()[-200:]}')
             return False
 
     except subprocess.TimeoutExpired:

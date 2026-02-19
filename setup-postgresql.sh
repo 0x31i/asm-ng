@@ -36,7 +36,7 @@ fi
 
 info()  { echo -e "${GREEN}[+]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[!]${NC} $*"; }
-error() { echo -e "${RED}[-]${NC} $*"; }
+error() { echo -e "${RED}[-]${NC} $*" >&2; }
 
 # ---------------------------------------------------------------------------
 # Detect platform and package manager
@@ -91,7 +91,10 @@ else
             apt-get install -y -qq postgresql postgresql-client
             ;;
         brew)
-            brew install postgresql@16 2>/dev/null || brew install postgresql 2>/dev/null || true
+            brew install postgresql@16 || brew install postgresql || {
+                error "Failed to install PostgreSQL via Homebrew."
+                exit 1
+            }
             ;;
         dnf)
             dnf install -y -q postgresql-server postgresql
@@ -112,7 +115,10 @@ case "$PKG_MGR" in
     brew)
         # macOS: use brew services
         brew services start postgresql@16 2>/dev/null || \
-            brew services start postgresql 2>/dev/null || true
+            brew services start postgresql 2>/dev/null || {
+                error "Failed to start PostgreSQL via brew services."
+                exit 1
+            }
         ;;
     apt)
         systemctl enable --now postgresql 2>/dev/null || true
@@ -202,7 +208,10 @@ host    ${PG_DATABASE}   ${PG_USER}   127.0.0.1/32          scram-sha-256
         # Reload PostgreSQL to apply pg_hba.conf changes
         if [ "$OS" = "Darwin" ]; then
             brew services restart postgresql@16 2>/dev/null || \
-                brew services restart postgresql 2>/dev/null || true
+                brew services restart postgresql 2>/dev/null || {
+                    error "Failed to restart PostgreSQL via brew services."
+                    exit 1
+                }
         else
             systemctl reload postgresql 2>/dev/null || true
         fi
