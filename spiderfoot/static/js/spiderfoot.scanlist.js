@@ -99,7 +99,7 @@ function exportSelected(type) {
     ids = getSelected();
 
     if (!ids) {
-        sf.log("Error: no scan(s) selected");
+        alertify.message("Could not export scans. No scans selected.");
         return;
     }
 
