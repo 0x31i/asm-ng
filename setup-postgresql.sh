@@ -130,12 +130,10 @@ info "Starting PostgreSQL service..."
 
 case "$PKG_MGR" in
     brew)
-        # macOS: use brew services
+        # macOS: 'brew services start' returns non-zero if already running,
+        # which is not an error. The pg_isready loop below is the real check.
         brew services start postgresql@16 2>/dev/null || \
-            brew services start postgresql 2>/dev/null || {
-                error "Failed to start PostgreSQL via brew services."
-                exit 1
-            }
+            brew services start postgresql 2>/dev/null || true
         ;;
     apt)
         systemctl enable --now postgresql 2>/dev/null || true
@@ -190,20 +188,20 @@ else
 fi
 
 info "Creating database user '${PG_USER}'..."
-$PG_SUDO psql -c "CREATE USER ${PG_USER} WITH PASSWORD '${PG_PASSWORD}';" 2>/dev/null || \
+$PG_SUDO psql -d postgres -c "CREATE USER ${PG_USER} WITH PASSWORD '${PG_PASSWORD}';" 2>/dev/null || \
     warn "User '${PG_USER}' may already exist (this is OK)."
 
 info "Creating database '${PG_DATABASE}'..."
-$PG_SUDO psql -c "CREATE DATABASE ${PG_DATABASE} OWNER ${PG_USER};" 2>/dev/null || \
+$PG_SUDO psql -d postgres -c "CREATE DATABASE ${PG_DATABASE} OWNER ${PG_USER};" 2>/dev/null || \
     warn "Database '${PG_DATABASE}' may already exist (this is OK)."
 
 # Grant privileges
-$PG_SUDO psql -c "GRANT ALL PRIVILEGES ON DATABASE ${PG_DATABASE} TO ${PG_USER};" 2>/dev/null || true
+$PG_SUDO psql -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE ${PG_DATABASE} TO ${PG_USER};" 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # Step 4: Configure local password authentication
 # ---------------------------------------------------------------------------
-PG_HBA=$($PG_SUDO psql -t -c "SHOW hba_file;" 2>/dev/null | xargs)
+PG_HBA=$($PG_SUDO psql -d postgres -t -c "SHOW hba_file;" 2>/dev/null | xargs)
 
 if [ -n "$PG_HBA" ] && [ -f "$PG_HBA" ]; then
     if ! grep -q "${PG_DATABASE}" "$PG_HBA" 2>/dev/null; then
@@ -225,10 +223,7 @@ host    ${PG_DATABASE}   ${PG_USER}   127.0.0.1/32          scram-sha-256
         # Reload PostgreSQL to apply pg_hba.conf changes
         if [ "$OS" = "Darwin" ]; then
             brew services restart postgresql@16 2>/dev/null || \
-                brew services restart postgresql 2>/dev/null || {
-                    error "Failed to restart PostgreSQL via brew services."
-                    exit 1
-                }
+                brew services restart postgresql 2>/dev/null || true
         else
             systemctl reload postgresql 2>/dev/null || true
         fi
