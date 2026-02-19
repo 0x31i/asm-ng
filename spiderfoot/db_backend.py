@@ -140,9 +140,19 @@ class PgCursorWrapper:
 
     def execute(self, query, params=None):
         pg_query = self._convert_params(query)
-        if params:
-            return self._cursor.execute(pg_query, params)
-        return self._cursor.execute(pg_query)
+        try:
+            if params:
+                return self._cursor.execute(pg_query, params)
+            return self._cursor.execute(pg_query)
+        except Exception:
+            # Rollback the aborted transaction so subsequent queries on this
+            # connection don't cascade-fail with "current transaction is
+            # aborted, commands ignored until end of transaction block".
+            try:
+                self._cursor.connection.rollback()
+            except Exception:
+                pass
+            raise
 
     def executemany(self, query, params_list):
         pg_query = self._convert_params(query)

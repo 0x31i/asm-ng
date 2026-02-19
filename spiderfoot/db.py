@@ -1353,10 +1353,10 @@ class SpiderFootDb:
 
         qvars = list()
         qry = "SELECT ROUND(c.generated) AS generated, c.data, \
-            s.data as 'source_data', \
+            s.data as source_data, \
             c.module, c.type, c.confidence, c.visibility, c.risk, c.hash, \
             c.source_event_hash, t.event_descr, t.event_type, c.scan_instance_id, \
-            c.false_positive as 'fp', s.false_positive as 'parent_fp' \
+            c.false_positive as fp, s.false_positive as parent_fp \
             FROM tbl_scan_results c, tbl_scan_results s, tbl_event_types t \
             WHERE s.scan_instance_id = c.scan_instance_id AND \
             t.event = c.type AND c.source_event_hash = s.hash "
@@ -2087,10 +2087,10 @@ class SpiderFootDb:
                 f"eventType is {type(eventType)}; expected str() or list()") from None
 
         qry = "SELECT ROUND(c.generated) AS generated, c.data, \
-            s.data as 'source_data', \
+            s.data as source_data, \
             c.module, c.type, c.confidence, c.visibility, c.risk, c.hash, \
             c.source_event_hash, t.event_descr, t.event_type, s.scan_instance_id, \
-            c.false_positive as 'fp', s.false_positive as 'parent_fp', \
+            c.false_positive as fp, s.false_positive as parent_fp, \
             c.imported_from_scan, c.tracking \
             FROM tbl_scan_results c, tbl_scan_results s, tbl_event_types t "
 
@@ -3568,11 +3568,11 @@ class SpiderFootDb:
         # as other functions call both expecting the same output.
         placeholders = ','.join(['?'] * len(hashIds))
         qry = "SELECT ROUND(c.generated) AS generated, c.data, \
-            s.data as 'source_data', \
+            s.data as source_data, \
             c.module, c.type, c.confidence, c.visibility, c.risk, c.hash, \
             c.source_event_hash, t.event_descr, t.event_type, s.scan_instance_id, \
-            c.false_positive as 'fp', s.false_positive as 'parent_fp', \
-            s.type, s.module, st.event_type as 'source_entity_type' \
+            c.false_positive as fp, s.false_positive as parent_fp, \
+            s.type, s.module, st.event_type as source_entity_type \
             FROM tbl_scan_results c, tbl_scan_results s, tbl_event_types t, \
             tbl_event_types st \
             WHERE c.scan_instance_id = ? AND c.source_event_hash = s.hash AND \
@@ -3623,10 +3623,10 @@ class SpiderFootDb:
         # as other functions call both expecting the same output.
         placeholders = ','.join(['?'] * len(hashIds))
         qry = "SELECT ROUND(c.generated) AS generated, c.data, \
-            s.data as 'source_data', \
+            s.data as source_data, \
             c.module, c.type, c.confidence, c.visibility, c.risk, c.hash, \
             c.source_event_hash, t.event_descr, t.event_type, s.scan_instance_id, \
-            c.false_positive as 'fp', s.false_positive as 'parent_fp' \
+            c.false_positive as fp, s.false_positive as parent_fp \
             FROM tbl_scan_results c, tbl_scan_results s, tbl_event_types t \
             WHERE c.scan_instance_id = ? AND c.source_event_hash = s.hash AND \
             s.scan_instance_id = c.scan_instance_id AND \
