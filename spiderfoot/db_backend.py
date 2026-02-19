@@ -59,12 +59,10 @@ _pg_pool = None
 _pg_pool_lock = threading.Lock()
 
 # ---------------------------------------------------------------------------
-# Cached database type detection (singleton)
+# Cached database type detection — uses a dict so no `global` declaration
+# is needed and the cache works even under partial module initialisation.
 # ---------------------------------------------------------------------------
-_cached_db_type = None
-_db_type_lock = threading.Lock()
-# Cache the detected database type so we don't re-probe on every instantiation.
-_cached_db_type = None
+_detect_cache = {}
 
 
 def _get_pg_pool(dsn: str):
@@ -457,20 +455,14 @@ def detect_db_type(opts: dict) -> str:
     Returns:
         str: ``'postgresql'`` or ``'sqlite'``
     """
-    global _cached_db_type
+    # Fast path: return cached result (dict mutation is GIL-atomic in CPython)
+    cached = _detect_cache.get('type')
+    if cached is not None:
+        return cached
 
-    # Fast path: return cached result
-    if _cached_db_type is not None:
-        return _cached_db_type
-
-    with _db_type_lock:
-        # Double-checked locking
-        if _cached_db_type is not None:
-            return _cached_db_type
-
-        result = _detect_db_type_impl(opts)
-        _cached_db_type = result
-        return result
+    result = _detect_db_type_impl(opts)
+    _detect_cache['type'] = result
+    return result
 
 
 def _detect_db_type_impl(opts: dict) -> str:
