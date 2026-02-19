@@ -533,6 +533,13 @@ class SpiderFootDb:
             if SpiderFootDb._migrations_done and not init:
                 return
 
+            # PostgreSQL enters InFailedSqlTransaction after any query error,
+            # blocking subsequent queries until rollback.  Enable autocommit
+            # during setup/migrations so each statement is independent.
+            pg_autocommit = (self.db_type == 'postgresql')
+            if pg_autocommit:
+                self.conn.autocommit = True
+
             try:
                 self.dbh.execute('SELECT COUNT(*) FROM tbl_scan_config')
             except DatabaseError:
@@ -906,6 +913,10 @@ class SpiderFootDb:
                         self.conn.commit()
                 except DatabaseError:
                     pass
+
+            # Restore normal transaction mode after migrations
+            if pg_autocommit:
+                self.conn.autocommit = False
 
             # Mark migrations as complete so subsequent connections skip this block
             SpiderFootDb._migrations_done = True
