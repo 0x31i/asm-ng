@@ -76,7 +76,7 @@
         </div>
         <div class="btn-group" role="group">
             <button id='btn-refresh' rel="tooltip" title="Refresh" class="btn btn-success btn-default" onClick='refresh()'><i class='glyphicon glyphicon-refresh glyphicon glyphicon-white'></i></button>
-            <a id='btn-export' rel="tooltip" data-title="Export Data" class="btn btn-default dropdown-toggle download-button" data-toggle="dropdown"><i class='glyphicon glyphicon-download-alt glyphicon glyphicon-white'></i> EXPORT</a>
+            <a id='btn-export' rel="tooltip" data-title="Export Data" class="btn btn-default dropdown-toggle download-button" data-toggle="dropdown"><i class='glyphicon glyphicon-download-alt glyphicon glyphicon-white'></i></a>
             <ul id="export-dropdown-menu" class="dropdown-menu">
               <li id="export-current-type-section" style="display:none"></li>
               <li class="dropdown-header" style="color: #16a34a; font-weight: bold; font-size: 13px;">
@@ -91,8 +91,25 @@
               <li class="divider"></li>
               <li class="dropdown-header">Findings &amp; Correlations</li>
               <li>
+                <a class="link" onClick='exportFindingsXlsx("${id}")'>
+                  Excel (.xlsx) &mdash; Findings + Correlations
+                </a>
+              </li>
+              <li>
                 <a class="link" onClick='exportFindingsZip("${id}")'>
                   CSV (.zip) &mdash; FINDINGS.csv + CORRELATIONS.csv
+                </a>
+              </li>
+              <li class="divider"></li>
+              <li class="dropdown-header">Vulnerabilities</li>
+              <li>
+                <a class="link" onClick='exportVulnsXlsx("${id}")'>
+                  Excel (.xlsx) &mdash; EXT-VULNS + WEBAPP-VULNS
+                </a>
+              </li>
+              <li>
+                <a class="link" onClick='exportVulnsZip("${id}")'>
+                  CSV (.zip) &mdash; EXT-VULNS.csv + WEBAPP-VULNS.csv
                 </a>
               </li>
               <li class="divider"></li>
@@ -7968,11 +7985,35 @@
                 });
         }
 
+        // Export findings & correlations as styled Excel (Findings + Correlations tabs)
+        function exportFindingsXlsx(instanceId) {
+            _fetchAndDownload(
+                '${docroot}/scanfindingsexport?filetype=xlsx&report=basic&id=' + instanceId,
+                'SpiderFoot-Findings.xlsx'
+            );
+        }
+
         // Export findings & correlations as a ZIP (FINDINGS.csv + CORRELATIONS.csv)
         function exportFindingsZip(instanceId) {
             _fetchAndDownload(
                 '${docroot}/scanfindingsexport?filetype=csv&id=' + instanceId,
                 'SpiderFoot-Findings.zip'
+            );
+        }
+
+        // Export vulnerabilities as styled Excel (EXT-VULNS + WEBAPP-VULNS tabs)
+        function exportVulnsXlsx(instanceId) {
+            _fetchAndDownload(
+                '${docroot}/scanvulnsexport?filetype=xlsx&id=' + instanceId,
+                'VULNS.xlsx'
+            );
+        }
+
+        // Export vulnerabilities as ZIP (EXT-VULNS.csv + WEBAPP-VULNS.csv)
+        function exportVulnsZip(instanceId) {
+            _fetchAndDownload(
+                '${docroot}/scanvulnsexport?filetype=csv&id=' + instanceId,
+                'VULNS-CSV.zip'
             );
         }
 
@@ -8002,12 +8043,14 @@
                 marker.hide();
                 return;
             }
+            // Decode URL-encoded type labels (e.g. "IP%20ADDRESS" → "IP ADDRESS")
+            var displayType = decodeURIComponent(eventType);
             // Insert new items right after the hidden marker element
             var items = '';
             items += "<li class='dropdown-header export-current-type-item' style='color: #3b82f6; font-weight: bold;'>";
-            items += "<i class='glyphicon glyphicon-list-alt' style='margin-right: 4px;'></i> Current Type: " + eventType + "</li>";
-            items += "<li class='export-current-type-item'><a class='link' onClick='exportEventData(\"${id}\", currentType, \"csv\", \"full\")'>CSV &mdash; " + eventType + "</a></li>";
-            items += "<li class='export-current-type-item'><a class='link' onClick='exportEventData(\"${id}\", currentType, \"excel\", \"full\")'>Excel &mdash; " + eventType + "</a></li>";
+            items += "<i class='glyphicon glyphicon-list-alt' style='margin-right: 4px;'></i> Current Type: " + displayType + "</li>";
+            items += "<li class='export-current-type-item'><a class='link' onClick='exportEventData(\"${id}\", currentType, \"csv\", \"full\")'>CSV &mdash; " + displayType + "</a></li>";
+            items += "<li class='export-current-type-item'><a class='link' onClick='exportEventData(\"${id}\", currentType, \"excel\", \"full\")'>Excel &mdash; " + displayType + "</a></li>";
             items += "<li class='divider export-current-type-item'></li>";
             marker.after(items);
         }
