@@ -130,12 +130,10 @@ info "Starting PostgreSQL service..."
 
 case "$PKG_MGR" in
     brew)
-        # macOS: use brew services
+        # macOS: 'brew services start' returns non-zero if already running,
+        # which is not an error. The pg_isready loop below is the real check.
         brew services start postgresql@16 2>/dev/null || \
-            brew services start postgresql 2>/dev/null || {
-                error "Failed to start PostgreSQL via brew services."
-                exit 1
-            }
+            brew services start postgresql 2>/dev/null || true
         ;;
     apt)
         systemctl enable --now postgresql 2>/dev/null || true
@@ -225,10 +223,7 @@ host    ${PG_DATABASE}   ${PG_USER}   127.0.0.1/32          scram-sha-256
         # Reload PostgreSQL to apply pg_hba.conf changes
         if [ "$OS" = "Darwin" ]; then
             brew services restart postgresql@16 2>/dev/null || \
-                brew services restart postgresql 2>/dev/null || {
-                    error "Failed to restart PostgreSQL via brew services."
-                    exit 1
-                }
+                brew services restart postgresql 2>/dev/null || true
         else
             systemctl reload postgresql 2>/dev/null || true
         fi

@@ -254,11 +254,32 @@ def _attempt_pg_auto_setup(opts: dict) -> bool:
             log.debug("PG auto-setup previously succeeded; skipping re-run.")
             return False
         elif status == 'failed':
-            log.info(
-                f"PG auto-setup previously failed ({reason}). "
-                f"To retry, delete: {_get_sentinel_path()}"
+            # Check if setup script has been updated since the failure
+            script_path = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), '..', 'setup-postgresql.sh')
             )
-            return False
+            sentinel_ts = int(sentinel.get('timestamp', '0'))
+            try:
+                script_mtime = int(os.path.getmtime(script_path))
+            except OSError:
+                script_mtime = 0
+
+            if script_mtime > sentinel_ts:
+                log.info(
+                    f"PG auto-setup previously failed ({reason}) but setup "
+                    "script has been updated. Retrying..."
+                )
+                try:
+                    os.remove(_get_sentinel_path())
+                except OSError:
+                    pass
+                # Fall through to re-run setup
+            else:
+                log.info(
+                    f"PG auto-setup previously failed ({reason}). "
+                    f"To retry, delete: {_get_sentinel_path()}"
+                )
+                return False
         elif status == 'skipped':
             # Re-evaluate: conditions may have changed (e.g., code update
             # added macOS support, user installed brew, gained sudo, etc.)
