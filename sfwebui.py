@@ -63,6 +63,7 @@ from spiderfoot.excel_styles import (
     build_event_type_sheet,
     sanitize_sheet_name,
     CATEGORY_TAB_COLORS,
+    _safe_str,
 )
 
 # Use a spawn context for scan subprocesses only, rather than setting it
@@ -750,7 +751,7 @@ class SpiderFootWebUi:
 
             # Write row
             for col_num, cell_value in enumerate(row, 1):
-                worksheet.cell(row=rowNums[sheetName], column=col_num, value=str(cell_value))
+                worksheet.cell(row=rowNums[sheetName], column=col_num, value=_safe_str(cell_value))
 
             rowNums[sheetName] += 1
 
@@ -768,7 +769,7 @@ class SpiderFootWebUi:
                     ws.cell(row=1, column=col_num, value=header)
                 for row_num, row_data in enumerate(sheet_info["rows"], 2):
                     for col_num, cell_value in enumerate(row_data, 1):
-                        ws.cell(row=row_num, column=col_num, value=str(cell_value))
+                        ws.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
 
         # Save workbook
         with BytesIO() as f:
@@ -7058,7 +7059,7 @@ class SpiderFootWebUi:
                     ws_fb_findings.cell(row=1, column=col_num, value=header)
                 for row_num, row_data in enumerate(findings_rows, 2):
                     for col_num, cell_value in enumerate(row_data, 1):
-                        ws_fb_findings.cell(row=row_num, column=col_num, value=str(cell_value))
+                        ws_fb_findings.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
 
                 ws_fb_corr = wb_fallback.create_sheet("Correlations")
                 fb_corr_headers = ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"]
@@ -7066,7 +7067,7 @@ class SpiderFootWebUi:
                     ws_fb_corr.cell(row=1, column=col_num, value=header)
                 for row_num, row_data in enumerate(correlation_rows, 2):
                     for col_num, cell_value in enumerate(row_data, 1):
-                        ws_fb_corr.cell(row=row_num, column=col_num, value=str(cell_value))
+                        ws_fb_corr.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
 
                 with BytesIO() as f:
                     wb_fallback.save(f)
