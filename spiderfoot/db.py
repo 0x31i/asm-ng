@@ -550,6 +550,29 @@ class SpiderFootDb:
                     raise IOError(
                         "Tried to set up the SpiderFoot database schema, but failed") from e
 
+            # Migration: Convert PostgreSQL INT columns to BIGINT.
+            # SQLite's INT is variable-length (up to 8 bytes), but PostgreSQL's
+            # INT is strictly 32-bit (max ~2.1B).  Millisecond timestamps like
+            # int(time.time()*1000) ≈ 1.77 trillion overflow this.  Convert all
+            # existing integer columns to BIGINT so timestamps store correctly.
+            if self.db_type == 'postgresql':
+                try:
+                    self.dbh.execute(
+                        "SELECT table_name, column_name "
+                        "FROM information_schema.columns "
+                        "WHERE table_schema = 'public' "
+                        "AND data_type = 'integer'"
+                    )
+                    for row in self.dbh.fetchall():
+                        try:
+                            self.dbh.execute(
+                                f'ALTER TABLE "{row[0]}" ALTER COLUMN "{row[1]}" TYPE BIGINT'
+                            )
+                        except Exception:
+                            pass
+                except DatabaseError:
+                    pass
+
             # For users with pre 4.0 databases, add the correlation
             # tables + indexes if they don't exist.
             try:
@@ -4499,7 +4522,8 @@ class SpiderFootDb:
                 self.dbh.execute(qry, params)
                 self.conn.commit()
                 return True
-            except DatabaseError:
+            except DatabaseError as e:
+                logging.getLogger("spiderfoot.db").error(f"Failed to create user '{username}': {e}")
                 return False
 
     def userVerify(self, username: str, password: str) -> bool:

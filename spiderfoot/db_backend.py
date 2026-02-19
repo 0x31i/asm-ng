@@ -18,6 +18,7 @@ meaning the 200+ SQL queries in db.py don't need individual edits.
 
 import logging
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -607,6 +608,12 @@ def get_pg_schema_queries(sqlite_queries: list) -> list:
             'INTEGER PRIMARY KEY AUTOINCREMENT',
             'SERIAL PRIMARY KEY'
         )
+
+        # SQLite INT is variable-length (up to 8 bytes), but PostgreSQL INT
+        # is strictly 32-bit (max ~2.1 billion).  Millisecond timestamps
+        # (e.g. int(time.time() * 1000) ≈ 1.77 trillion) overflow INT.
+        # Convert all remaining INT columns to BIGINT (8-byte).
+        converted = re.sub(r'\bINT\b', 'BIGINT', converted)
 
         pg_queries.append(converted)
 
