@@ -125,8 +125,8 @@ class SpiderFootWebUi:
                 raise cherrypy.HTTPRedirect(f"{self.docroot}/login")
             if not cherrypy.session.get('user_role'):
                 try:
-                    dbh = SpiderFootDb(self.config)
-                    cherrypy.session['user_role'] = dbh.userGetRole(cherrypy.session.get('username'))
+                    with SpiderFootDb(self.config) as dbh:
+                        cherrypy.session['user_role'] = dbh.userGetRole(cherrypy.session.get('username'))
                 except Exception:
                     cherrypy.session['user_role'] = 'analyst'
 
@@ -429,8 +429,8 @@ class SpiderFootWebUi:
         # Fallback: try PID from database
         pid = 0
         try:
-            dbh = SpiderFootDb(self.config)
-            pid = dbh.scanInstanceGetPid(scan_id)
+            with SpiderFootDb(self.config) as dbh:
+                pid = dbh.scanInstanceGetPid(scan_id)
         except Exception:
             pass
 
@@ -512,20 +512,20 @@ class SpiderFootWebUi:
         error = None
 
         if cherrypy.request.method == 'POST' and username and password:
-            dbh = SpiderFootDb(self.config)
-            if dbh.userVerify(username, password):
-                cherrypy.session['username'] = username
-                cherrypy.session['user_role'] = dbh.userGetRole(username)
-                # Flag if user is using the default password
-                cherrypy.session['default_password_warning'] = dbh.userHasDefaultPassword(username)
-                dbh.userUpdateLastLogin(username)
-                dbh.auditLog(username, 'LOGIN', detail='Successful login', ip_address=self.clientIP())
-                self.log.info(f"User '{username}' logged in from {self.clientIP()}")
-                raise cherrypy.HTTPRedirect(f"{self.docroot}/")
-            else:
-                dbh.auditLog(username, 'LOGIN_FAILED', detail='Invalid credentials', ip_address=self.clientIP())
-                self.log.warning(f"Failed login attempt for user '{username}' from {self.clientIP()}")
-                error = "Invalid username or password."
+            with SpiderFootDb(self.config) as dbh:
+                if dbh.userVerify(username, password):
+                    cherrypy.session['username'] = username
+                    cherrypy.session['user_role'] = dbh.userGetRole(username)
+                    # Flag if user is using the default password
+                    cherrypy.session['default_password_warning'] = dbh.userHasDefaultPassword(username)
+                    dbh.userUpdateLastLogin(username)
+                    dbh.auditLog(username, 'LOGIN', detail='Successful login', ip_address=self.clientIP())
+                    self.log.info(f"User '{username}' logged in from {self.clientIP()}")
+                    raise cherrypy.HTTPRedirect(f"{self.docroot}/")
+                else:
+                    dbh.auditLog(username, 'LOGIN_FAILED', detail='Invalid credentials', ip_address=self.clientIP())
+                    self.log.warning(f"Failed login attempt for user '{username}' from {self.clientIP()}")
+                    error = "Invalid username or password."
 
         templ = Template(
             filename='spiderfoot/templates/login.tmpl', lookup=self.lookup)
@@ -536,9 +536,9 @@ class SpiderFootWebUi:
         """Logout the current user."""
         username = self.currentUser()
         if username:
-            dbh = SpiderFootDb(self.config)
-            dbh.auditLog(username, 'LOGOUT', ip_address=self.clientIP())
-            self.log.info(f"User '{username}' logged out")
+            with SpiderFootDb(self.config) as dbh:
+                dbh.auditLog(username, 'LOGOUT', ip_address=self.clientIP())
+                self.log.info(f"User '{username}' logged out")
         cherrypy.session.clear()
 
         raise cherrypy.HTTPRedirect(f"{self.docroot}/login")
@@ -679,29 +679,29 @@ class SpiderFootWebUi:
             value = "%"
             regex = ""
 
-        dbh = SpiderFootDb(self.config)
-        criteria = {
-            'scan_id': id or '',
-            'type': eventType or '',
-            'value': value or '',
-            'regex': regex or '',
-        }
+        with SpiderFootDb(self.config) as dbh:
+            criteria = {
+                'scan_id': id or '',
+                'type': eventType or '',
+                'value': value or '',
+                'regex': regex or '',
+            }
 
-        try:
-            data = dbh.search(criteria)
-        except Exception:
+            try:
+                data = dbh.search(criteria)
+            except Exception:
+                return retdata
+
+            for row in data:
+                lastseen = time.strftime(
+                    "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
+                escapeddata = html.escape(row[1])
+                escapedsrc = html.escape(row[2])
+                retdata.append([lastseen, escapeddata, escapedsrc,
+                                row[3], row[5], row[6], row[7], row[8], row[10],
+                                row[11], row[4], row[13], row[14]])
+
             return retdata
-
-        for row in data:
-            lastseen = time.strftime(
-                "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
-            escapeddata = html.escape(row[1])
-            escapedsrc = html.escape(row[2])
-            retdata.append([lastseen, escapeddata, escapedsrc,
-                            row[3], row[5], row[6], row[7], row[8], row[10],
-                            row[11], row[4], row[13], row[14]])
-
-        return retdata
 
     def _compute_fp_flag(self, row_fp_field, event_type, event_data, source_data, targetFps):
         """Compute the false positive flag value.
@@ -816,30 +816,30 @@ class SpiderFootWebUi:
         Returns:
             bytes: scan logs in CSV format
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            data = dbh.scanLogs(id)
-        except Exception:
-            return json.dumps(self.jsonify_error("404", "Scan ID not found")).encode("utf-8")
+            try:
+                data = dbh.scanLogs(id)
+            except Exception:
+                return json.dumps(self.jsonify_error("404", "Scan ID not found")).encode("utf-8")
 
-        if not data:
-            return json.dumps(self.jsonify_error("404", "No scan logs found")).encode("utf-8")
+            if not data:
+                return json.dumps(self.jsonify_error("404", "No scan logs found")).encode("utf-8")
 
-        scan = dbh.scanInstanceGet(id)
-        scan_name = scan[0] if scan else ''
+            scan = dbh.scanInstanceGet(id)
+            scan_name = scan[0] if scan else ''
 
-        fileobj = StringIO()
-        parser = csv.writer(fileobj, dialect=dialect)
-        parser.writerow(["Date", "Component", "Type", "Event", "Event ID"])
-        for row in data:
-            parser.writerow([str(x) for x in row])
-        fname = self._export_filename(scan_name, id, 'LOGS', 'csv')
-        cherrypy.response.headers[
-            'Content-Disposition'] = f"attachment; filename={fname}"
-        cherrypy.response.headers['Content-Type'] = "application/csv"
-        cherrypy.response.headers['Pragma'] = "no-cache"
-        return fileobj.getvalue().encode('utf-8')
+            fileobj = StringIO()
+            parser = csv.writer(fileobj, dialect=dialect)
+            parser.writerow(["Date", "Component", "Type", "Event", "Event ID"])
+            for row in data:
+                parser.writerow([str(x) for x in row])
+            fname = self._export_filename(scan_name, id, 'LOGS', 'csv')
+            cherrypy.response.headers[
+                'Content-Disposition'] = f"attachment; filename={fname}"
+            cherrypy.response.headers['Content-Type'] = "application/csv"
+            cherrypy.response.headers['Pragma'] = "no-cache"
+            return fileobj.getvalue().encode('utf-8')
 
     @cherrypy.expose
     def scancorrelationsexport(self: 'SpiderFootWebUi', id: str, filetype: str = "csv", dialect: str = "excel") -> str:
@@ -853,49 +853,49 @@ class SpiderFootWebUi:
         Returns:
             str: results in CSV, Excel, or HTML format
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            raw = dbh.scanCorrelationList(id)
-            # Transform from scanCorrelationList format to export format
-            # DB returns: [id, title, rule_id, rule_risk, rule_name, rule_descr, rule_logic, event_count, event_types]
-            # Export needs: [Rule Name, Correlation, Risk, Description]
-            data = [[row[4], row[1], row[3], row[5]] for row in raw]
-        except Exception:
-            return self.error("Scan ID not found")
+            try:
+                raw = dbh.scanCorrelationList(id)
+                # Transform from scanCorrelationList format to export format
+                # DB returns: [id, title, rule_id, rule_risk, rule_name, rule_descr, rule_logic, event_count, event_types]
+                # Export needs: [Rule Name, Correlation, Risk, Description]
+                data = [[row[4], row[1], row[3], row[5]] for row in raw]
+            except Exception:
+                return self.error("Scan ID not found")
 
-        try:
-            scan = dbh.scanInstanceGet(id)
-        except Exception:
-            return self.error("Scan ID not found")
+            try:
+                scan = dbh.scanInstanceGet(id)
+            except Exception:
+                return self.error("Scan ID not found")
 
-        headings = ["Rule Name", "Correlation", "Risk", "Description"]
-        scan_name = scan[0] if scan else ''
+            headings = ["Rule Name", "Correlation", "Risk", "Description"]
+            scan_name = scan[0] if scan else ''
 
-        if filetype.lower() in ["xlsx", "excel"]:
-            fname = self._export_filename(scan_name, id, 'CORRELATIONS', 'xlsx')
-            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
-            cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            cherrypy.response.headers['Pragma'] = "no-cache"
-            return self.buildExcel(data, headings)
+            if filetype.lower() in ["xlsx", "excel"]:
+                fname = self._export_filename(scan_name, id, 'CORRELATIONS', 'xlsx')
+                cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
+                cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                cherrypy.response.headers['Pragma'] = "no-cache"
+                return self.buildExcel(data, headings)
 
-        if filetype.lower() == 'csv':
-            fname = self._export_filename(scan_name, id, 'CORRELATIONS', 'csv')
-            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
-            cherrypy.response.headers['Content-Type'] = "application/csv"
-            cherrypy.response.headers['Pragma'] = "no-cache"
+            if filetype.lower() == 'csv':
+                fname = self._export_filename(scan_name, id, 'CORRELATIONS', 'csv')
+                cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
+                cherrypy.response.headers['Content-Type'] = "application/csv"
+                cherrypy.response.headers['Pragma'] = "no-cache"
 
-            fileobj = StringIO()
-            parser = csv.writer(fileobj, dialect=dialect)
-            parser.writerow(headings)
-            for row in data:
-                parser.writerow([str(x) for x in row])
-            return fileobj.getvalue()
+                fileobj = StringIO()
+                parser = csv.writer(fileobj, dialect=dialect)
+                parser.writerow(headings)
+                for row in data:
+                    parser.writerow([str(x) for x in row])
+                return fileobj.getvalue()
 
-        if filetype.lower() == 'html':
-            # Generate HTML report for correlations
-            scan_name = scan[0] if scan else "Unknown"
-            html_content = """<!DOCTYPE html>
+            if filetype.lower() == 'html':
+                # Generate HTML report for correlations
+                scan_name = scan[0] if scan else "Unknown"
+                html_content = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1003,137 +1003,137 @@ class SpiderFootWebUi:
             str: results in CSV, Excel, or HTML format
         """
         use_legacy = (str(legacy) == "1")
-        dbh = SpiderFootDb(self.config)
-        data = dbh.scanResultEvent(id, type)
-        filter_fps = export_mode in ("analysis", "analysis_correlations")
+        with SpiderFootDb(self.config) as dbh:
+            data = dbh.scanResultEvent(id, type)
+            filter_fps = export_mode in ("analysis", "analysis_correlations")
 
-        # Force Excel for analysis_correlations mode (correlations tab requires .xlsx)
-        if export_mode == "analysis_correlations":
-            filetype = "excel"
-
-        # Get target-level false positives for this scan
-        scanInfo = dbh.scanInstanceGet(id)
-        target = scanInfo[1] if scanInfo else None
-        targetFps = set()
-        if target:
-            try:
-                targetFps = dbh.targetFalsePositivesForTarget(target)
-            except Exception:
-                pass  # Table may not exist in older databases
-
-        # Build prepend sheets for analysis_correlations mode (Findings + Correlations)
-        prepend_sheets = None
-        if export_mode == "analysis_correlations":
-            # Findings sheet
-            findings_rows = []
-            try:
-                findings_data = dbh.scanFindingsList(id)
-                for f_row in findings_data:
-                    findings_rows.append([
-                        str(f_row[1]),   # Priority
-                        str(f_row[2]),   # Category
-                        str(f_row[3]),   # Tab
-                        str(f_row[4]),   # Item
-                        str(f_row[5]),   # Description
-                        str(f_row[6]),   # Recommendation
-                    ])
-            except Exception:
-                pass
-
-            # Correlations sheet
-            correlation_rows = []
-            try:
-                corr_data = dbh.scanCorrelationList(id)
-                for corr_row in corr_data:
-                    correlation_rows.append([
-                        str(corr_row[1]),   # Title
-                        str(corr_row[4]),   # Rule Name
-                        str(corr_row[3]),   # Risk
-                        str(corr_row[5]),   # Description
-                        str(corr_row[6]),   # Rule Logic
-                        str(corr_row[7]),   # Event Count
-                        str(corr_row[8] or ''),  # Event Types
-                    ])
-            except Exception:
-                pass
-            prepend_sheets = [
-                {
-                    "name": "Findings",
-                    "headers": ["Priority", "Category", "Tab", "Item", "Description", "Recommendation"],
-                    "rows": findings_rows
-                },
-                {
-                    "name": "Correlations",
-                    "headers": ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"],
-                    "rows": correlation_rows
-                }
-            ]
-
-        if filetype.lower() in ["xlsx", "excel"]:
-            rows = []
-            for row in data:
-                if row[4] == "ROOT":
-                    continue
-                fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
-                if filter_fps and fp_flag == 1:
-                    continue
-                lastseen = time.strftime(
-                    "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
-                datafield = str(row[1]).replace(
-                    "<SFURL>", "").replace("</SFURL>", "")
-                event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
-                rows.append([lastseen, event_type, str(row[3]),
-                            str(row[2]), fp_flag, datafield])
-
-            _scan_name = scanInfo[0] if scanInfo else ''
+            # Force Excel for analysis_correlations mode (correlations tab requires .xlsx)
             if export_mode == "analysis_correlations":
-                fname = self._export_filename(_scan_name, id, 'ANALYSIS-CORRELATIONS', 'xlsx')
-            elif export_mode == "analysis":
-                fname = self._export_filename(_scan_name, id, 'ANALYSIS', 'xlsx')
-            else:
-                fname = self._export_filename(_scan_name, id, 'DATA', 'xlsx')
-            cherrypy.response.headers[
-                'Content-Disposition'] = f"attachment; filename={fname}"
-            cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            cherrypy.response.headers['Pragma'] = "no-cache"
-            return self.buildExcel(rows, ["Updated", "Type", "Module", "Source",
-                                   "F/P", "Data"], sheetNameIndex=1,
-                                   prepend_sheets=prepend_sheets)
+                filetype = "excel"
 
-        if filetype.lower() == 'csv':
-            fileobj = StringIO()
-            parser = csv.writer(fileobj, dialect=dialect)
-            parser.writerow(
-                ["Updated", "Type", "Module", "Source", "F/P", "Data"])
-            for row in data:
-                if row[4] == "ROOT":
-                    continue
-                fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
-                if filter_fps and fp_flag == 1:
-                    continue
-                lastseen = time.strftime(
-                    "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
-                datafield = str(row[1]).replace(
-                    "<SFURL>", "").replace("</SFURL>", "")
-                event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
-                parser.writerow([lastseen, event_type, str(
-                    row[3]), str(row[2]), fp_flag, datafield])
+            # Get target-level false positives for this scan
+            scanInfo = dbh.scanInstanceGet(id)
+            target = scanInfo[1] if scanInfo else None
+            targetFps = set()
+            if target:
+                try:
+                    targetFps = dbh.targetFalsePositivesForTarget(target)
+                except Exception:
+                    pass  # Table may not exist in older databases
 
-            _scan_name = scanInfo[0] if scanInfo else ''
-            if export_mode == "analysis":
-                fname = self._export_filename(_scan_name, id, 'ANALYSIS', 'csv')
-            else:
-                fname = self._export_filename(_scan_name, id, 'DATA', 'csv')
-            cherrypy.response.headers[
-                'Content-Disposition'] = f"attachment; filename={fname}"
-            cherrypy.response.headers['Content-Type'] = "application/csv"
-            cherrypy.response.headers['Pragma'] = "no-cache"
-            return fileobj.getvalue().encode('utf-8')
+            # Build prepend sheets for analysis_correlations mode (Findings + Correlations)
+            prepend_sheets = None
+            if export_mode == "analysis_correlations":
+                # Findings sheet
+                findings_rows = []
+                try:
+                    findings_data = dbh.scanFindingsList(id)
+                    for f_row in findings_data:
+                        findings_rows.append([
+                            str(f_row[1]),   # Priority
+                            str(f_row[2]),   # Category
+                            str(f_row[3]),   # Tab
+                            str(f_row[4]),   # Item
+                            str(f_row[5]),   # Description
+                            str(f_row[6]),   # Recommendation
+                        ])
+                except Exception:
+                    pass
 
-        if filetype.lower() == 'html':
-            # Generate HTML report
-            scan_name = scanInfo[0] if scanInfo else "Unknown"
-            html_content = """<!DOCTYPE html>
+                # Correlations sheet
+                correlation_rows = []
+                try:
+                    corr_data = dbh.scanCorrelationList(id)
+                    for corr_row in corr_data:
+                        correlation_rows.append([
+                            str(corr_row[1]),   # Title
+                            str(corr_row[4]),   # Rule Name
+                            str(corr_row[3]),   # Risk
+                            str(corr_row[5]),   # Description
+                            str(corr_row[6]),   # Rule Logic
+                            str(corr_row[7]),   # Event Count
+                            str(corr_row[8] or ''),  # Event Types
+                        ])
+                except Exception:
+                    pass
+                prepend_sheets = [
+                    {
+                        "name": "Findings",
+                        "headers": ["Priority", "Category", "Tab", "Item", "Description", "Recommendation"],
+                        "rows": findings_rows
+                    },
+                    {
+                        "name": "Correlations",
+                        "headers": ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"],
+                        "rows": correlation_rows
+                    }
+                ]
+
+            if filetype.lower() in ["xlsx", "excel"]:
+                rows = []
+                for row in data:
+                    if row[4] == "ROOT":
+                        continue
+                    fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
+                    if filter_fps and fp_flag == 1:
+                        continue
+                    lastseen = time.strftime(
+                        "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
+                    datafield = str(row[1]).replace(
+                        "<SFURL>", "").replace("</SFURL>", "")
+                    event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
+                    rows.append([lastseen, event_type, str(row[3]),
+                                str(row[2]), fp_flag, datafield])
+
+                _scan_name = scanInfo[0] if scanInfo else ''
+                if export_mode == "analysis_correlations":
+                    fname = self._export_filename(_scan_name, id, 'ANALYSIS-CORRELATIONS', 'xlsx')
+                elif export_mode == "analysis":
+                    fname = self._export_filename(_scan_name, id, 'ANALYSIS', 'xlsx')
+                else:
+                    fname = self._export_filename(_scan_name, id, 'DATA', 'xlsx')
+                cherrypy.response.headers[
+                    'Content-Disposition'] = f"attachment; filename={fname}"
+                cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                cherrypy.response.headers['Pragma'] = "no-cache"
+                return self.buildExcel(rows, ["Updated", "Type", "Module", "Source",
+                                       "F/P", "Data"], sheetNameIndex=1,
+                                       prepend_sheets=prepend_sheets)
+
+            if filetype.lower() == 'csv':
+                fileobj = StringIO()
+                parser = csv.writer(fileobj, dialect=dialect)
+                parser.writerow(
+                    ["Updated", "Type", "Module", "Source", "F/P", "Data"])
+                for row in data:
+                    if row[4] == "ROOT":
+                        continue
+                    fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
+                    if filter_fps and fp_flag == 1:
+                        continue
+                    lastseen = time.strftime(
+                        "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
+                    datafield = str(row[1]).replace(
+                        "<SFURL>", "").replace("</SFURL>", "")
+                    event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
+                    parser.writerow([lastseen, event_type, str(
+                        row[3]), str(row[2]), fp_flag, datafield])
+
+                _scan_name = scanInfo[0] if scanInfo else ''
+                if export_mode == "analysis":
+                    fname = self._export_filename(_scan_name, id, 'ANALYSIS', 'csv')
+                else:
+                    fname = self._export_filename(_scan_name, id, 'DATA', 'csv')
+                cherrypy.response.headers[
+                    'Content-Disposition'] = f"attachment; filename={fname}"
+                cherrypy.response.headers['Content-Type'] = "application/csv"
+                cherrypy.response.headers['Pragma'] = "no-cache"
+                return fileobj.getvalue().encode('utf-8')
+
+            if filetype.lower() == 'html':
+                # Generate HTML report
+                scan_name = scanInfo[0] if scanInfo else "Unknown"
+                html_content = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1238,125 +1238,125 @@ class SpiderFootWebUi:
         Returns:
             str: CSV or Excel data as file download
         """
-        dbh = SpiderFootDb(self.config)
-        scan = dbh.scanInstanceGet(id)
-        _scan_name = scan[0] if scan else ''
+        with SpiderFootDb(self.config) as dbh:
+            scan = dbh.scanInstanceGet(id)
+            _scan_name = scan[0] if scan else ''
 
-        try:
-            leafSet = dbh.scanResultEvent(id, eventType)
-            [datamap, pc] = dbh.scanElementSourcesAll(id, leafSet)
-        except Exception:
+            try:
+                leafSet = dbh.scanResultEvent(id, eventType)
+                [datamap, pc] = dbh.scanElementSourcesAll(id, leafSet)
+            except Exception:
+                fname = self._export_filename(_scan_name, id, 'DISCOVERY-PATH', 'csv')
+                cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={fname}'
+                cherrypy.response.headers['Content-Type'] = 'application/csv'
+                cherrypy.response.headers['Pragma'] = 'no-cache'
+                return b''
+
+            if 'ROOT' in pc:
+                del pc['ROOT']
+            tree = SpiderFootHelpers.dataParentChildToTree(pc)
+
+            # Build leaf hash -> path (list of node dicts) by walking the tree
+            leaf_paths = {}
+
+            def walk(node, path_so_far):
+                node_name = node.get('name', '')
+                node_data = datamap.get(node_name)
+                current_path = list(path_so_far)
+                if node_data:
+                    data_str = str(node_data[1]).replace('<SFURL>', '').replace('</SFURL>', '')
+                    current_path.append({
+                        'type': str(node_data[10]) if node_data[10] else str(node_data[4]),
+                        'module': str(node_data[3]) if node_data[3] else '',
+                        'data': data_str,
+                        'is_root': str(node_data[4]) == 'ROOT'
+                    })
+
+                children = node.get('children')
+                if not children:
+                    if node_data and str(node_data[4]) != 'ROOT':
+                        leaf_paths[str(node_data[8])] = current_path
+                else:
+                    for child in children:
+                        walk(child, current_path)
+
+            if tree:
+                walk(tree, [])
+
+            # Find max path depth
+            max_depth = 0
+            for path in leaf_paths.values():
+                if len(path) > max_depth:
+                    max_depth = len(path)
+
+            if max_depth == 0:
+                max_depth = 1
+
+            # Build column headers: Status + per-node (Type, Source Module, Data)
+            column_names = ["Status"]
+            for d in range(max_depth):
+                if d == 0:
+                    prefix = "Root"
+                elif d == max_depth - 1 and max_depth > 1:
+                    prefix = "Leaf"
+                elif max_depth <= 3:
+                    prefix = "Branch"
+                else:
+                    prefix = f"Branch {d}"
+                column_names.extend([f"{prefix} Type", f"{prefix} Source Module", f"{prefix} Data"])
+
+            # Build rows in leafSet order (same as full data view)
+            rows = []
+            for leaf_row in leafSet:
+                if str(leaf_row[4]) == 'ROOT':
+                    continue
+                leaf_hash = str(leaf_row[8])
+                fp_flag = leaf_row[13]
+                status = "FALSE POSITIVE" if fp_flag == 1 else ("VALIDATED" if fp_flag == 2 else "UNVALIDATED")
+
+                path = leaf_paths.get(leaf_hash, [])
+                row = [status]
+                for d in range(max_depth):
+                    if d < len(path):
+                        node = path[d]
+                        row.extend([node['type'], node['module'], node['data']])
+                    else:
+                        row.extend(['', '', ''])
+                rows.append(row)
+
+            if filetype.lower() in ["xlsx", "excel"]:
+                # For buildExcel, prepend the leaf type as sheet name column
+                excel_rows = []
+                for i, leaf_row in enumerate(leafSet):
+                    if str(leaf_row[4]) == 'ROOT':
+                        continue
+                    leaf_hash = str(leaf_row[8])
+                    path = leaf_paths.get(leaf_hash, [])
+                    # Use the leaf's event type description as the sheet name
+                    sheet_name = str(leaf_row[10]) if leaf_row[10] else str(leaf_row[4])
+                    idx = len(excel_rows)
+                    if idx < len(rows):
+                        excel_rows.append([sheet_name] + rows[idx])
+                excel_col_names = ["_SheetName"] + column_names
+
+                fname = self._export_filename(_scan_name, id, 'DISCOVERY-PATH', 'xlsx')
+                cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={fname}'
+                cherrypy.response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                cherrypy.response.headers['Pragma'] = 'no-cache'
+                return self.buildExcel(excel_rows, excel_col_names, sheetNameIndex=0)
+
+            # Default: CSV
+            fileobj = StringIO()
+            parser = csv.writer(fileobj, dialect=dialect)
+            parser.writerow(column_names)
+            for row in rows:
+                parser.writerow(row)
+
             fname = self._export_filename(_scan_name, id, 'DISCOVERY-PATH', 'csv')
             cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={fname}'
             cherrypy.response.headers['Content-Type'] = 'application/csv'
             cherrypy.response.headers['Pragma'] = 'no-cache'
-            return b''
-
-        if 'ROOT' in pc:
-            del pc['ROOT']
-        tree = SpiderFootHelpers.dataParentChildToTree(pc)
-
-        # Build leaf hash -> path (list of node dicts) by walking the tree
-        leaf_paths = {}
-
-        def walk(node, path_so_far):
-            node_name = node.get('name', '')
-            node_data = datamap.get(node_name)
-            current_path = list(path_so_far)
-            if node_data:
-                data_str = str(node_data[1]).replace('<SFURL>', '').replace('</SFURL>', '')
-                current_path.append({
-                    'type': str(node_data[10]) if node_data[10] else str(node_data[4]),
-                    'module': str(node_data[3]) if node_data[3] else '',
-                    'data': data_str,
-                    'is_root': str(node_data[4]) == 'ROOT'
-                })
-
-            children = node.get('children')
-            if not children:
-                if node_data and str(node_data[4]) != 'ROOT':
-                    leaf_paths[str(node_data[8])] = current_path
-            else:
-                for child in children:
-                    walk(child, current_path)
-
-        if tree:
-            walk(tree, [])
-
-        # Find max path depth
-        max_depth = 0
-        for path in leaf_paths.values():
-            if len(path) > max_depth:
-                max_depth = len(path)
-
-        if max_depth == 0:
-            max_depth = 1
-
-        # Build column headers: Status + per-node (Type, Source Module, Data)
-        column_names = ["Status"]
-        for d in range(max_depth):
-            if d == 0:
-                prefix = "Root"
-            elif d == max_depth - 1 and max_depth > 1:
-                prefix = "Leaf"
-            elif max_depth <= 3:
-                prefix = "Branch"
-            else:
-                prefix = f"Branch {d}"
-            column_names.extend([f"{prefix} Type", f"{prefix} Source Module", f"{prefix} Data"])
-
-        # Build rows in leafSet order (same as full data view)
-        rows = []
-        for leaf_row in leafSet:
-            if str(leaf_row[4]) == 'ROOT':
-                continue
-            leaf_hash = str(leaf_row[8])
-            fp_flag = leaf_row[13]
-            status = "FALSE POSITIVE" if fp_flag == 1 else ("VALIDATED" if fp_flag == 2 else "UNVALIDATED")
-
-            path = leaf_paths.get(leaf_hash, [])
-            row = [status]
-            for d in range(max_depth):
-                if d < len(path):
-                    node = path[d]
-                    row.extend([node['type'], node['module'], node['data']])
-                else:
-                    row.extend(['', '', ''])
-            rows.append(row)
-
-        if filetype.lower() in ["xlsx", "excel"]:
-            # For buildExcel, prepend the leaf type as sheet name column
-            excel_rows = []
-            for i, leaf_row in enumerate(leafSet):
-                if str(leaf_row[4]) == 'ROOT':
-                    continue
-                leaf_hash = str(leaf_row[8])
-                path = leaf_paths.get(leaf_hash, [])
-                # Use the leaf's event type description as the sheet name
-                sheet_name = str(leaf_row[10]) if leaf_row[10] else str(leaf_row[4])
-                idx = len(excel_rows)
-                if idx < len(rows):
-                    excel_rows.append([sheet_name] + rows[idx])
-            excel_col_names = ["_SheetName"] + column_names
-
-            fname = self._export_filename(_scan_name, id, 'DISCOVERY-PATH', 'xlsx')
-            cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={fname}'
-            cherrypy.response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            cherrypy.response.headers['Pragma'] = 'no-cache'
-            return self.buildExcel(excel_rows, excel_col_names, sheetNameIndex=0)
-
-        # Default: CSV
-        fileobj = StringIO()
-        parser = csv.writer(fileobj, dialect=dialect)
-        parser.writerow(column_names)
-        for row in rows:
-            parser.writerow(row)
-
-        fname = self._export_filename(_scan_name, id, 'DISCOVERY-PATH', 'csv')
-        cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={fname}'
-        cherrypy.response.headers['Content-Type'] = 'application/csv'
-        cherrypy.response.headers['Pragma'] = 'no-cache'
-        return fileobj.getvalue().encode('utf-8')
+            return fileobj.getvalue().encode('utf-8')
 
     @cherrypy.expose
     def scaneventresultexportmulti(self: 'SpiderFootWebUi', ids: str, filetype: str = "csv", dialect: str = "excel", export_mode: str = "full", legacy: str = "0") -> str:
@@ -1375,162 +1375,162 @@ class SpiderFootWebUi:
             str: results in CSV, Excel, or HTML format
         """
         use_legacy = (str(legacy) == "1")
-        dbh = SpiderFootDb(self.config)
-        scaninfo = dict()
-        targetFpsPerScan = dict()  # Store target FPs per scan ID
-        data = list()
-        scan_name = ""
-        filter_fps = export_mode in ("analysis", "analysis_correlations")
+        with SpiderFootDb(self.config) as dbh:
+            scaninfo = dict()
+            targetFpsPerScan = dict()  # Store target FPs per scan ID
+            data = list()
+            scan_name = ""
+            filter_fps = export_mode in ("analysis", "analysis_correlations")
 
-        # Force Excel for analysis_correlations mode (correlations tab requires .xlsx)
-        if export_mode == "analysis_correlations":
-            filetype = "excel"
-
-        for id in ids.split(','):
-            scaninfo[id] = dbh.scanInstanceGet(id)
-            if scaninfo[id] is None:
-                continue
-            scan_name = scaninfo[id][0]
-            # Get target-level false positives for this scan
-            target = scaninfo[id][1] if scaninfo[id] else None
-            targetFpsPerScan[id] = set()
-            if target:
-                try:
-                    targetFpsPerScan[id] = dbh.targetFalsePositivesForTarget(target)
-                except Exception:
-                    pass  # Table may not exist in older databases
-            data = data + dbh.scanResultEvent(id)
-
-        # Build prepend sheets for analysis_correlations mode (Findings + Correlations)
-        prepend_sheets = None
-        if export_mode == "analysis_correlations":
-            # Findings sheet (multi-scan)
-            findings_rows = []
-            for scan_id in ids.split(','):
-                if scan_id not in scaninfo or scaninfo[scan_id] is None:
-                    continue
-                try:
-                    findings_data = dbh.scanFindingsList(scan_id)
-                    scan_name_display = scaninfo[scan_id][0] if scaninfo[scan_id] else "Unknown"
-                    for f_row in findings_data:
-                        findings_rows.append([
-                            scan_name_display,
-                            str(f_row[1]),   # Priority
-                            str(f_row[2]),   # Category
-                            str(f_row[3]),   # Tab
-                            str(f_row[4]),   # Item
-                            str(f_row[5]),   # Description
-                            str(f_row[6]),   # Recommendation
-                        ])
-                except Exception:
-                    pass
-
-            # Correlations sheet (multi-scan)
-            correlation_rows = []
-            for scan_id in ids.split(','):
-                if scan_id not in scaninfo or scaninfo[scan_id] is None:
-                    continue
-                try:
-                    corr_data = dbh.scanCorrelationList(scan_id)
-                    scan_name_display = scaninfo[scan_id][0] if scaninfo[scan_id] else "Unknown"
-                    for corr_row in corr_data:
-                        correlation_rows.append([
-                            scan_name_display,
-                            str(corr_row[1]),   # Title
-                            str(corr_row[4]),   # Rule Name
-                            str(corr_row[3]),   # Risk
-                            str(corr_row[5]),   # Description
-                            str(corr_row[6]),   # Rule Logic
-                            str(corr_row[7]),   # Event Count
-                            str(corr_row[8] or ''),  # Event Types
-                        ])
-                except Exception:
-                    pass
-            prepend_sheets = [
-                {
-                    "name": "Findings",
-                    "headers": ["Scan Name", "Priority", "Category", "Tab", "Item", "Description", "Recommendation"],
-                    "rows": findings_rows
-                },
-                {
-                    "name": "Correlations",
-                    "headers": ["Scan Name", "Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"],
-                    "rows": correlation_rows
-                }
-            ]
-
-        if filetype.lower() in ["xlsx", "excel"]:
-            rows = []
-            for row in data:
-                if row[4] == "ROOT":
-                    continue
-                scan_id = row[12]
-                targetFps = targetFpsPerScan.get(scan_id, set())
-                fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
-                if filter_fps and fp_flag == 1:
-                    continue
-                lastseen = time.strftime(
-                    "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
-                datafield = str(row[1]).replace(
-                    "<SFURL>", "").replace("</SFURL>", "")
-                event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
-                rows.append([scaninfo[row[12]][0], lastseen, event_type, str(row[3]),
-                            str(row[2]), fp_flag, datafield])
-
-            _name = scan_name if scan_name and len(ids.split(',')) == 1 else 'Multi-Scan'
-            _id = ids.split(',')[0] if ids else ''
+            # Force Excel for analysis_correlations mode (correlations tab requires .xlsx)
             if export_mode == "analysis_correlations":
-                fname = self._export_filename(_name, _id, 'ANALYSIS-CORRELATIONS', 'xlsx')
-            elif export_mode == "analysis":
-                fname = self._export_filename(_name, _id, 'ANALYSIS', 'xlsx')
-            else:
-                fname = self._export_filename(_name, _id, 'DATA', 'xlsx')
+                filetype = "excel"
 
-            cherrypy.response.headers[
-                'Content-Disposition'] = f"attachment; filename={fname}"
-            cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            cherrypy.response.headers['Pragma'] = "no-cache"
-            return self.buildExcel(rows, ["Scan Name", "Updated", "Type", "Module",
-                                   "Source", "F/P", "Data"], sheetNameIndex=2,
-                                   prepend_sheets=prepend_sheets)
+            for id in ids.split(','):
+                scaninfo[id] = dbh.scanInstanceGet(id)
+                if scaninfo[id] is None:
+                    continue
+                scan_name = scaninfo[id][0]
+                # Get target-level false positives for this scan
+                target = scaninfo[id][1] if scaninfo[id] else None
+                targetFpsPerScan[id] = set()
+                if target:
+                    try:
+                        targetFpsPerScan[id] = dbh.targetFalsePositivesForTarget(target)
+                    except Exception:
+                        pass  # Table may not exist in older databases
+                data = data + dbh.scanResultEvent(id)
 
-        if filetype.lower() == 'csv':
-            fileobj = StringIO()
-            parser = csv.writer(fileobj, dialect=dialect)
-            parser.writerow(["Scan Name", "Updated", "Type",
-                            "Module", "Source", "F/P", "Data"])
-            for row in data:
-                if row[4] == "ROOT":
-                    continue
-                scan_id = row[12]
-                targetFps = targetFpsPerScan.get(scan_id, set())
-                fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
-                if filter_fps and fp_flag == 1:
-                    continue
-                lastseen = time.strftime(
-                    "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
-                datafield = str(row[1]).replace(
-                    "<SFURL>", "").replace("</SFURL>", "")
-                event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
-                parser.writerow([scaninfo[row[12]][0], lastseen, event_type, str(row[3]),
+            # Build prepend sheets for analysis_correlations mode (Findings + Correlations)
+            prepend_sheets = None
+            if export_mode == "analysis_correlations":
+                # Findings sheet (multi-scan)
+                findings_rows = []
+                for scan_id in ids.split(','):
+                    if scan_id not in scaninfo or scaninfo[scan_id] is None:
+                        continue
+                    try:
+                        findings_data = dbh.scanFindingsList(scan_id)
+                        scan_name_display = scaninfo[scan_id][0] if scaninfo[scan_id] else "Unknown"
+                        for f_row in findings_data:
+                            findings_rows.append([
+                                scan_name_display,
+                                str(f_row[1]),   # Priority
+                                str(f_row[2]),   # Category
+                                str(f_row[3]),   # Tab
+                                str(f_row[4]),   # Item
+                                str(f_row[5]),   # Description
+                                str(f_row[6]),   # Recommendation
+                            ])
+                    except Exception:
+                        pass
+
+                # Correlations sheet (multi-scan)
+                correlation_rows = []
+                for scan_id in ids.split(','):
+                    if scan_id not in scaninfo or scaninfo[scan_id] is None:
+                        continue
+                    try:
+                        corr_data = dbh.scanCorrelationList(scan_id)
+                        scan_name_display = scaninfo[scan_id][0] if scaninfo[scan_id] else "Unknown"
+                        for corr_row in corr_data:
+                            correlation_rows.append([
+                                scan_name_display,
+                                str(corr_row[1]),   # Title
+                                str(corr_row[4]),   # Rule Name
+                                str(corr_row[3]),   # Risk
+                                str(corr_row[5]),   # Description
+                                str(corr_row[6]),   # Rule Logic
+                                str(corr_row[7]),   # Event Count
+                                str(corr_row[8] or ''),  # Event Types
+                            ])
+                    except Exception:
+                        pass
+                prepend_sheets = [
+                    {
+                        "name": "Findings",
+                        "headers": ["Scan Name", "Priority", "Category", "Tab", "Item", "Description", "Recommendation"],
+                        "rows": findings_rows
+                    },
+                    {
+                        "name": "Correlations",
+                        "headers": ["Scan Name", "Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"],
+                        "rows": correlation_rows
+                    }
+                ]
+
+            if filetype.lower() in ["xlsx", "excel"]:
+                rows = []
+                for row in data:
+                    if row[4] == "ROOT":
+                        continue
+                    scan_id = row[12]
+                    targetFps = targetFpsPerScan.get(scan_id, set())
+                    fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
+                    if filter_fps and fp_flag == 1:
+                        continue
+                    lastseen = time.strftime(
+                        "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
+                    datafield = str(row[1]).replace(
+                        "<SFURL>", "").replace("</SFURL>", "")
+                    event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
+                    rows.append([scaninfo[row[12]][0], lastseen, event_type, str(row[3]),
                                 str(row[2]), fp_flag, datafield])
 
-            _name = scan_name if scan_name and len(ids.split(',')) == 1 else 'Multi-Scan'
-            _id = ids.split(',')[0] if ids else ''
-            if export_mode == "analysis":
-                fname = self._export_filename(_name, _id, 'ANALYSIS', 'csv')
-            else:
-                fname = self._export_filename(_name, _id, 'DATA', 'csv')
+                _name = scan_name if scan_name and len(ids.split(',')) == 1 else 'Multi-Scan'
+                _id = ids.split(',')[0] if ids else ''
+                if export_mode == "analysis_correlations":
+                    fname = self._export_filename(_name, _id, 'ANALYSIS-CORRELATIONS', 'xlsx')
+                elif export_mode == "analysis":
+                    fname = self._export_filename(_name, _id, 'ANALYSIS', 'xlsx')
+                else:
+                    fname = self._export_filename(_name, _id, 'DATA', 'xlsx')
 
-            cherrypy.response.headers[
-                'Content-Disposition'] = f"attachment; filename={fname}"
-            cherrypy.response.headers['Content-Type'] = "application/csv"
-            cherrypy.response.headers['Pragma'] = "no-cache"
-            return fileobj.getvalue().encode('utf-8')
+                cherrypy.response.headers[
+                    'Content-Disposition'] = f"attachment; filename={fname}"
+                cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                cherrypy.response.headers['Pragma'] = "no-cache"
+                return self.buildExcel(rows, ["Scan Name", "Updated", "Type", "Module",
+                                       "Source", "F/P", "Data"], sheetNameIndex=2,
+                                       prepend_sheets=prepend_sheets)
 
-        if filetype.lower() == 'html':
-            # Generate HTML report
-            html_content = """<!DOCTYPE html>
+            if filetype.lower() == 'csv':
+                fileobj = StringIO()
+                parser = csv.writer(fileobj, dialect=dialect)
+                parser.writerow(["Scan Name", "Updated", "Type",
+                                "Module", "Source", "F/P", "Data"])
+                for row in data:
+                    if row[4] == "ROOT":
+                        continue
+                    scan_id = row[12]
+                    targetFps = targetFpsPerScan.get(scan_id, set())
+                    fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
+                    if filter_fps and fp_flag == 1:
+                        continue
+                    lastseen = time.strftime(
+                        "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
+                    datafield = str(row[1]).replace(
+                        "<SFURL>", "").replace("</SFURL>", "")
+                    event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
+                    parser.writerow([scaninfo[row[12]][0], lastseen, event_type, str(row[3]),
+                                    str(row[2]), fp_flag, datafield])
+
+                _name = scan_name if scan_name and len(ids.split(',')) == 1 else 'Multi-Scan'
+                _id = ids.split(',')[0] if ids else ''
+                if export_mode == "analysis":
+                    fname = self._export_filename(_name, _id, 'ANALYSIS', 'csv')
+                else:
+                    fname = self._export_filename(_name, _id, 'DATA', 'csv')
+
+                cherrypy.response.headers[
+                    'Content-Disposition'] = f"attachment; filename={fname}"
+                cherrypy.response.headers['Content-Type'] = "application/csv"
+                cherrypy.response.headers['Pragma'] = "no-cache"
+                return fileobj.getvalue().encode('utf-8')
+
+            if filetype.lower() == 'html':
+                # Generate HTML report
+                html_content = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1651,120 +1651,120 @@ class SpiderFootWebUi:
             filetype = "excel"
 
         # Get target-level false positives for this scan
-        dbh = SpiderFootDb(self.config)
-        scanInfo = dbh.scanInstanceGet(id)
-        target = scanInfo[1] if scanInfo else None
-        targetFps = set()
-        if target:
-            try:
-                targetFps = dbh.targetFalsePositivesForTarget(target)
-            except Exception:
-                pass  # Table may not exist in older databases
+        with SpiderFootDb(self.config) as dbh:
+            scanInfo = dbh.scanInstanceGet(id)
+            target = scanInfo[1] if scanInfo else None
+            targetFps = set()
+            if target:
+                try:
+                    targetFps = dbh.targetFalsePositivesForTarget(target)
+                except Exception:
+                    pass  # Table may not exist in older databases
 
-        # Build prepend sheets for analysis_correlations mode (Findings + Correlations)
-        prepend_sheets = None
-        if export_mode == "analysis_correlations":
-            # Findings sheet
-            findings_rows = []
-            try:
-                findings_data = dbh.scanFindingsList(id)
-                for f_row in findings_data:
-                    findings_rows.append([
-                        str(f_row[1]),   # Priority
-                        str(f_row[2]),   # Category
-                        str(f_row[3]),   # Tab
-                        str(f_row[4]),   # Item
-                        str(f_row[5]),   # Description
-                        str(f_row[6]),   # Recommendation
-                    ])
-            except Exception:
-                pass
-
-            # Correlations sheet
-            correlation_rows = []
-            try:
-                corr_data = dbh.scanCorrelationList(id)
-                for corr_row in corr_data:
-                    correlation_rows.append([
-                        str(corr_row[1]),   # Title
-                        str(corr_row[4]),   # Rule Name
-                        str(corr_row[3]),   # Risk
-                        str(corr_row[5]),   # Description
-                        str(corr_row[6]),   # Rule Logic
-                        str(corr_row[7]),   # Event Count
-                        str(corr_row[8] or ''),  # Event Types
-                    ])
-            except Exception:
-                pass
-            prepend_sheets = [
-                {
-                    "name": "Findings",
-                    "headers": ["Priority", "Category", "Tab", "Item", "Description", "Recommendation"],
-                    "rows": findings_rows
-                },
-                {
-                    "name": "Correlations",
-                    "headers": ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"],
-                    "rows": correlation_rows
-                }
-            ]
-
-        if filetype.lower() in ["xlsx", "excel"]:
-            rows = []
-            for row in data:
-                if row[10] == "ROOT":
-                    continue
-                fp_flag = self._compute_fp_flag(row[11], row[10], row[1], row[2], targetFps)
-                if filter_fps and fp_flag == 1:
-                    continue
-                datafield = str(row[1]).replace(
-                    "<SFURL>", "").replace("</SFURL>", "")
-                event_type = translate_event_type(str(row[10]), use_legacy=use_legacy)
-                rows.append([row[0], event_type, str(row[3]),
-                            str(row[2]), fp_flag, datafield])
-
-            _scan_name = scanInfo[0] if scanInfo else 'Search'
+            # Build prepend sheets for analysis_correlations mode (Findings + Correlations)
+            prepend_sheets = None
             if export_mode == "analysis_correlations":
-                fname = self._export_filename(_scan_name, id, 'ANALYSIS-CORRELATIONS', 'xlsx')
-            elif export_mode == "analysis":
-                fname = self._export_filename(_scan_name, id, 'ANALYSIS', 'xlsx')
-            else:
-                fname = self._export_filename(_scan_name, id, 'DATA', 'xlsx')
-            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
-            cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            cherrypy.response.headers['Pragma'] = "no-cache"
-            return self.buildExcel(rows, ["Updated", "Type", "Module", "Source",
-                                   "F/P", "Data"], sheetNameIndex=1,
-                                   prepend_sheets=prepend_sheets)
+                # Findings sheet
+                findings_rows = []
+                try:
+                    findings_data = dbh.scanFindingsList(id)
+                    for f_row in findings_data:
+                        findings_rows.append([
+                            str(f_row[1]),   # Priority
+                            str(f_row[2]),   # Category
+                            str(f_row[3]),   # Tab
+                            str(f_row[4]),   # Item
+                            str(f_row[5]),   # Description
+                            str(f_row[6]),   # Recommendation
+                        ])
+                except Exception:
+                    pass
 
-        if filetype.lower() == 'csv':
-            fileobj = StringIO()
-            parser = csv.writer(fileobj, dialect=dialect)
-            parser.writerow(
-                ["Updated", "Type", "Module", "Source", "F/P", "Data"])
-            for row in data:
-                if row[10] == "ROOT":
-                    continue
-                fp_flag = self._compute_fp_flag(row[11], row[10], row[1], row[2], targetFps)
-                if filter_fps and fp_flag == 1:
-                    continue
-                datafield = str(row[1]).replace(
-                    "<SFURL>", "").replace("</SFURL>", "")
-                event_type = translate_event_type(str(row[10]), use_legacy=use_legacy)
-                parser.writerow([row[0], event_type, str(
-                    row[3]), str(row[2]), fp_flag, datafield])
+                # Correlations sheet
+                correlation_rows = []
+                try:
+                    corr_data = dbh.scanCorrelationList(id)
+                    for corr_row in corr_data:
+                        correlation_rows.append([
+                            str(corr_row[1]),   # Title
+                            str(corr_row[4]),   # Rule Name
+                            str(corr_row[3]),   # Risk
+                            str(corr_row[5]),   # Description
+                            str(corr_row[6]),   # Rule Logic
+                            str(corr_row[7]),   # Event Count
+                            str(corr_row[8] or ''),  # Event Types
+                        ])
+                except Exception:
+                    pass
+                prepend_sheets = [
+                    {
+                        "name": "Findings",
+                        "headers": ["Priority", "Category", "Tab", "Item", "Description", "Recommendation"],
+                        "rows": findings_rows
+                    },
+                    {
+                        "name": "Correlations",
+                        "headers": ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"],
+                        "rows": correlation_rows
+                    }
+                ]
 
-            _scan_name = scanInfo[0] if scanInfo else 'Search'
-            if export_mode == "analysis":
-                fname = self._export_filename(_scan_name, id, 'ANALYSIS', 'csv')
-            else:
-                fname = self._export_filename(_scan_name, id, 'DATA', 'csv')
-            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
-            cherrypy.response.headers['Content-Type'] = "application/csv"
-            cherrypy.response.headers['Pragma'] = "no-cache"
-            return fileobj.getvalue().encode('utf-8')
+            if filetype.lower() in ["xlsx", "excel"]:
+                rows = []
+                for row in data:
+                    if row[10] == "ROOT":
+                        continue
+                    fp_flag = self._compute_fp_flag(row[11], row[10], row[1], row[2], targetFps)
+                    if filter_fps and fp_flag == 1:
+                        continue
+                    datafield = str(row[1]).replace(
+                        "<SFURL>", "").replace("</SFURL>", "")
+                    event_type = translate_event_type(str(row[10]), use_legacy=use_legacy)
+                    rows.append([row[0], event_type, str(row[3]),
+                                str(row[2]), fp_flag, datafield])
 
-        return self.error("Invalid export filetype.")
+                _scan_name = scanInfo[0] if scanInfo else 'Search'
+                if export_mode == "analysis_correlations":
+                    fname = self._export_filename(_scan_name, id, 'ANALYSIS-CORRELATIONS', 'xlsx')
+                elif export_mode == "analysis":
+                    fname = self._export_filename(_scan_name, id, 'ANALYSIS', 'xlsx')
+                else:
+                    fname = self._export_filename(_scan_name, id, 'DATA', 'xlsx')
+                cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
+                cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                cherrypy.response.headers['Pragma'] = "no-cache"
+                return self.buildExcel(rows, ["Updated", "Type", "Module", "Source",
+                                       "F/P", "Data"], sheetNameIndex=1,
+                                       prepend_sheets=prepend_sheets)
+
+            if filetype.lower() == 'csv':
+                fileobj = StringIO()
+                parser = csv.writer(fileobj, dialect=dialect)
+                parser.writerow(
+                    ["Updated", "Type", "Module", "Source", "F/P", "Data"])
+                for row in data:
+                    if row[10] == "ROOT":
+                        continue
+                    fp_flag = self._compute_fp_flag(row[11], row[10], row[1], row[2], targetFps)
+                    if filter_fps and fp_flag == 1:
+                        continue
+                    datafield = str(row[1]).replace(
+                        "<SFURL>", "").replace("</SFURL>", "")
+                    event_type = translate_event_type(str(row[10]), use_legacy=use_legacy)
+                    parser.writerow([row[0], event_type, str(
+                        row[3]), str(row[2]), fp_flag, datafield])
+
+                _scan_name = scanInfo[0] if scanInfo else 'Search'
+                if export_mode == "analysis":
+                    fname = self._export_filename(_scan_name, id, 'ANALYSIS', 'csv')
+                else:
+                    fname = self._export_filename(_scan_name, id, 'DATA', 'csv')
+                cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
+                cherrypy.response.headers['Content-Type'] = "application/csv"
+                cherrypy.response.headers['Pragma'] = "no-cache"
+                return fileobj.getvalue().encode('utf-8')
+
+            return self.error("Invalid export filetype.")
 
     @cherrypy.expose
     def scanexportjsonmulti(self: 'SpiderFootWebUi', ids: str) -> str:
@@ -1776,51 +1776,51 @@ class SpiderFootWebUi:
         Returns:
             str: results in JSON format
         """
-        dbh = SpiderFootDb(self.config)
-        scaninfo = list()
-        scan_name = ""
+        with SpiderFootDb(self.config) as dbh:
+            scaninfo = list()
+            scan_name = ""
 
-        for id in ids.split(','):
-            scan = dbh.scanInstanceGet(id)
+            for id in ids.split(','):
+                scan = dbh.scanInstanceGet(id)
 
-            if scan is None:
-                continue
-
-            scan_name = scan[0]
-
-            for row in dbh.scanResultEvent(id):
-                lastseen = time.strftime(
-                    "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
-                event_data = str(row[1]).replace(
-                    "<SFURL>", "").replace("</SFURL>", "")
-                source_data = str(row[2])
-                source_module = str(row[3])
-                event_type = row[4]
-                false_positive = row[13]
-
-                if event_type == "ROOT":
+                if scan is None:
                     continue
 
-                scaninfo.append({
-                    "data": event_data,
-                    "event_type": event_type,
-                    "module": source_module,
-                    "source_data": source_data,
-                    "false_positive": false_positive,
-                    "last_seen": lastseen,
-                    "scan_name": scan_name,
-                    "scan_target": scan[1]
-                })
+                scan_name = scan[0]
 
-        _name = scan_name if scan_name and len(ids.split(',')) == 1 else 'Multi-Scan'
-        _id = ids.split(',')[0] if ids else ''
-        fname = self._export_filename(_name, _id, 'DATA', 'json')
+                for row in dbh.scanResultEvent(id):
+                    lastseen = time.strftime(
+                        "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
+                    event_data = str(row[1]).replace(
+                        "<SFURL>", "").replace("</SFURL>", "")
+                    source_data = str(row[2])
+                    source_module = str(row[3])
+                    event_type = row[4]
+                    false_positive = row[13]
 
-        cherrypy.response.headers[
-            'Content-Disposition'] = f"attachment; filename={fname}"
-        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
-        cherrypy.response.headers['Pragma'] = "no-cache"
-        return json.dumps(scaninfo).encode('utf-8')
+                    if event_type == "ROOT":
+                        continue
+
+                    scaninfo.append({
+                        "data": event_data,
+                        "event_type": event_type,
+                        "module": source_module,
+                        "source_data": source_data,
+                        "false_positive": false_positive,
+                        "last_seen": lastseen,
+                        "scan_name": scan_name,
+                        "scan_target": scan[1]
+                    })
+
+            _name = scan_name if scan_name and len(ids.split(',')) == 1 else 'Multi-Scan'
+            _id = ids.split(',')[0] if ids else ''
+            fname = self._export_filename(_name, _id, 'DATA', 'json')
+
+            cherrypy.response.headers[
+                'Content-Disposition'] = f"attachment; filename={fname}"
+            cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+            cherrypy.response.headers['Pragma'] = "no-cache"
+            return json.dumps(scaninfo).encode('utf-8')
 
     @cherrypy.expose
     def scanviz(self: 'SpiderFootWebUi', id: str, gexf: str = "0") -> str:
@@ -1840,26 +1840,26 @@ class SpiderFootWebUi:
                 if not id:
                     return json.dumps({'nodes': [], 'edges': []}).encode('utf-8')
 
-                dbh = SpiderFootDb(self.config)
-                data = dbh.scanResultEvent(id, filterFp=True)
-                scan = dbh.scanInstanceGet(id)
+                with SpiderFootDb(self.config) as dbh:
+                    data = dbh.scanResultEvent(id, filterFp=True)
+                    scan = dbh.scanInstanceGet(id)
 
-                # DEBUG: Log data retrieval info
-                self.log.info(f"scanviz: Retrieved {len(data) if data else 0} rows for scan {id}")
-                if data and len(data) > 0:
-                    # Check event_type distribution (row[11] is t.event_type from tbl_event_types)
-                    type_counts = {}
-                    for row in data:
-                        if len(row) >= 12:
-                            event_type = row[11]
-                            type_counts[event_type] = type_counts.get(event_type, 0) + 1
-                    self.log.info(f"scanviz: Event type distribution: {type_counts}")
+                    # DEBUG: Log data retrieval info
+                    self.log.info(f"scanviz: Retrieved {len(data) if data else 0} rows for scan {id}")
+                    if data and len(data) > 0:
+                        # Check event_type distribution (row[11] is t.event_type from tbl_event_types)
+                        type_counts = {}
+                        for row in data:
+                            if len(row) >= 12:
+                                event_type = row[11]
+                                type_counts[event_type] = type_counts.get(event_type, 0) + 1
+                        self.log.info(f"scanviz: Event type distribution: {type_counts}")
 
-                if not scan:
-                    return json.dumps({'nodes': [], 'edges': []}).encode('utf-8')
+                    if not scan:
+                        return json.dumps({'nodes': [], 'edges': []}).encode('utf-8')
 
-                root = scan[1]
-                return SpiderFootHelpers.buildGraphJson([root], data).encode('utf-8')
+                    root = scan[1]
+                    return SpiderFootHelpers.buildGraphJson([root], data).encode('utf-8')
             except Exception as e:
                 self.log.error(f"scanviz JSON error: {e}")
                 return json.dumps({'nodes': [], 'edges': []}).encode('utf-8')
@@ -1869,21 +1869,21 @@ class SpiderFootWebUi:
             if not id:
                 return ""
 
-            dbh = SpiderFootDb(self.config)
-            data = dbh.scanResultEvent(id, filterFp=True)
-            scan = dbh.scanInstanceGet(id)
+            with SpiderFootDb(self.config) as dbh:
+                data = dbh.scanResultEvent(id, filterFp=True)
+                scan = dbh.scanInstanceGet(id)
 
-            if not scan:
-                return ""
+                if not scan:
+                    return ""
 
-            scan_name = scan[0]
-            root = scan[1]
-            fname = self._export_filename(scan_name, id, 'GRAPH', 'gexf')
+                scan_name = scan[0]
+                root = scan[1]
+                fname = self._export_filename(scan_name, id, 'GRAPH', 'gexf')
 
-            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
-            cherrypy.response.headers['Content-Type'] = "application/gexf"
-            cherrypy.response.headers['Pragma'] = "no-cache"
-            return SpiderFootHelpers.buildGraphGexf([root], "SpiderFoot Export", data)
+                cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
+                cherrypy.response.headers['Content-Type'] = "application/gexf"
+                cherrypy.response.headers['Pragma'] = "no-cache"
+                return SpiderFootHelpers.buildGraphGexf([root], "SpiderFoot Export", data)
         except Exception as e:
             self.log.error(f"scanviz GEXF error: {e}")
             return ""
@@ -1899,38 +1899,38 @@ class SpiderFootWebUi:
         Returns:
             str: GEXF data
         """
-        dbh = SpiderFootDb(self.config)
-        data = list()
-        roots = list()
-        scan_name = ""
+        with SpiderFootDb(self.config) as dbh:
+            data = list()
+            roots = list()
+            scan_name = ""
 
-        if not ids:
-            return None
+            if not ids:
+                return None
 
-        for id in ids.split(','):
-            scan = dbh.scanInstanceGet(id)
-            if not scan:
-                continue
-            data = data + dbh.scanResultEvent(id, filterFp=True)
-            roots.append(scan[1])
-            scan_name = scan[0]
+            for id in ids.split(','):
+                scan = dbh.scanInstanceGet(id)
+                if not scan:
+                    continue
+                data = data + dbh.scanResultEvent(id, filterFp=True)
+                roots.append(scan[1])
+                scan_name = scan[0]
 
-        if not data:
-            return None
+            if not data:
+                return None
 
-        if gexf == "0":
-            # Not implemented yet
-            return None
+            if gexf == "0":
+                # Not implemented yet
+                return None
 
-        _name = scan_name if scan_name and len(ids.split(',')) == 1 else 'Multi-Scan'
-        _id = ids.split(',')[0] if ids else ''
-        fname = self._export_filename(_name, _id, 'GRAPH', 'gexf')
+            _name = scan_name if scan_name and len(ids.split(',')) == 1 else 'Multi-Scan'
+            _id = ids.split(',')[0] if ids else ''
+            fname = self._export_filename(_name, _id, 'GRAPH', 'gexf')
 
-        cherrypy.response.headers[
-            'Content-Disposition'] = f"attachment; filename={fname}"
-        cherrypy.response.headers['Content-Type'] = "application/gexf"
-        cherrypy.response.headers['Pragma'] = "no-cache"
-        return SpiderFootHelpers.buildGraphGexf(roots, "SpiderFoot Export", data)
+            cherrypy.response.headers[
+                'Content-Disposition'] = f"attachment; filename={fname}"
+            cherrypy.response.headers['Content-Type'] = "application/gexf"
+            cherrypy.response.headers['Pragma'] = "no-cache"
+            return SpiderFootHelpers.buildGraphGexf(roots, "SpiderFoot Export", data)
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -1943,45 +1943,45 @@ class SpiderFootWebUi:
         Returns:
             dict: scan options for the specified scan
         """
-        dbh = SpiderFootDb(self.config)
-        ret = dict()
+        with SpiderFootDb(self.config) as dbh:
+            ret = dict()
 
-        meta = dbh.scanInstanceGet(id)
-        if not meta:
-            return ret
+            meta = dbh.scanInstanceGet(id)
+            if not meta:
+                return ret
 
-        if meta[3] != 0:
-            started = time.strftime(
-                "%Y-%m-%d %H:%M:%S", time.localtime(meta[3]))
-        else:
-            started = "Not yet"
-
-        if meta[4] != 0:
-            finished = time.strftime(
-                "%Y-%m-%d %H:%M:%S", time.localtime(meta[4]))
-        else:
-            finished = "Not yet"
-
-        ret['meta'] = [meta[0], meta[1], meta[2], started, finished, meta[5]]
-        ret['config'] = dbh.scanConfigGet(id)
-        ret['configdesc'] = dict()
-        for key in list(ret['config'].keys()):
-            if ':' not in key:
-                globaloptdescs = self.config['__globaloptdescs__']
-                if globaloptdescs:
-                    ret['configdesc'][key] = globaloptdescs.get(
-                        key, f"{key} (legacy)")
+            if meta[3] != 0:
+                started = time.strftime(
+                    "%Y-%m-%d %H:%M:%S", time.localtime(meta[3]))
             else:
-                [modName, modOpt] = key.split(':')
-                if modName not in list(self.config['__modules__'].keys()):
-                    continue
+                started = "Not yet"
 
-                if modOpt not in list(self.config['__modules__'][modName]['optdescs'].keys()):
-                    continue
+            if meta[4] != 0:
+                finished = time.strftime(
+                    "%Y-%m-%d %H:%M:%S", time.localtime(meta[4]))
+            else:
+                finished = "Not yet"
 
-                ret['configdesc'][key] = self.config['__modules__'][modName]['optdescs'][modOpt]
+            ret['meta'] = [meta[0], meta[1], meta[2], started, finished, meta[5]]
+            ret['config'] = dbh.scanConfigGet(id)
+            ret['configdesc'] = dict()
+            for key in list(ret['config'].keys()):
+                if ':' not in key:
+                    globaloptdescs = self.config['__globaloptdescs__']
+                    if globaloptdescs:
+                        ret['configdesc'][key] = globaloptdescs.get(
+                            key, f"{key} (legacy)")
+                else:
+                    [modName, modOpt] = key.split(':')
+                    if modName not in list(self.config['__modules__'].keys()):
+                        continue
 
-        return ret
+                    if modOpt not in list(self.config['__modules__'][modName]['optdescs'].keys()):
+                        continue
+
+                    ret['configdesc'][key] = self.config['__modules__'][modName]['optdescs'][modOpt]
+
+            return ret
 
     @cherrypy.expose
     def rerunscan(self: 'SpiderFootWebUi', id: str) -> None:
@@ -2135,14 +2135,14 @@ class SpiderFootWebUi:
         Returns:
             str: New scan page HTML
         """
-        dbh = SpiderFootDb(self.config)
-        types = dbh.eventTypes()
-        templ = Template(
-            filename='spiderfoot/templates/newscan.tmpl', lookup=self.lookup)
-        return templ.render(pageid='NEWSCAN', types=types, docroot=self.docroot,
-                            modules=self.config['__modules__'], scanname="",
-                            selectedmods="", scantarget="", version=__version__,
-                            user_role=self.currentUserRole())
+        with SpiderFootDb(self.config) as dbh:
+            types = dbh.eventTypes()
+            templ = Template(
+                filename='spiderfoot/templates/newscan.tmpl', lookup=self.lookup)
+            return templ.render(pageid='NEWSCAN', types=types, docroot=self.docroot,
+                                modules=self.config['__modules__'], scanname="",
+                                selectedmods="", scantarget="", version=__version__,
+                                user_role=self.currentUserRole())
 
     @cherrypy.expose
     def importscans(self: 'SpiderFootWebUi') -> str:
@@ -2290,156 +2290,156 @@ class SpiderFootWebUi:
             }
 
         # Actual import
-        dbh = SpiderFootDb(self.config)
-        scan_id = str(uuid.uuid4())
-        stats['scan_id'] = scan_id
+        with SpiderFootDb(self.config) as dbh:
+            scan_id = str(uuid.uuid4())
+            stats['scan_id'] = scan_id
 
-        try:
-            dbh.scanInstanceCreate(scan_id, scan_name, target)
-        except Exception as e:
-            return {'success': False, 'message': f'Failed to create scan instance: {e}'}
-
-        # Create ROOT event for web UI browse compatibility
-        try:
-            root_qry = """INSERT INTO tbl_scan_results
-                (scan_instance_id, hash, type, generated, confidence,
-                visibility, risk, module, data, false_positive, source_event_hash)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
-            root_qvals = [scan_id, 'ROOT', 'ROOT', int(time.time() * 1000),
-                          100, 100, 0, '', target, 0, 'ROOT']
-            dbh.dbh.execute(root_qry, root_qvals)
-        except Exception as e:
-            return {'success': False, 'message': f'Failed to create ROOT event: {e}'}
-
-        # Build synthetic source events so that each imported event
-        # points to the correct source data element instead of ROOT.
-        source_hash_map = {}
-        for row in rows:
             try:
-                event_type = row[col_map['type']]
-                if event_type == 'ROOT':
-                    continue
-                source_val = row[col_map['source']]
-                if source_val and source_val not in source_hash_map:
-                    src_hash_input = f"{scan_id}|SOURCE_EVENT|{source_val}"
-                    src_hash = hashlib.sha256(src_hash_input.encode('utf-8')).hexdigest()[:32]
-                    source_hash_map[source_val] = src_hash
-            except (IndexError, KeyError):
-                continue
+                dbh.scanInstanceCreate(scan_id, scan_name, target)
+            except Exception as e:
+                return {'success': False, 'message': f'Failed to create scan instance: {e}'}
 
-        # Insert synthetic source events (children of ROOT)
-        src_qry = """INSERT INTO tbl_scan_results
-            (scan_instance_id, hash, type, generated, confidence,
-            visibility, risk, module, data, false_positive, source_event_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
-        for source_val, src_hash in source_hash_map.items():
+            # Create ROOT event for web UI browse compatibility
             try:
-                src_qvals = [scan_id, src_hash, 'ROOT', int(time.time() * 1000),
-                             100, 100, 0, '', source_val, 0, 'ROOT']
-                dbh.dbh.execute(src_qry, src_qvals)
-            except Exception:
-                pass
-
-        # Import each row
-        for i, row in enumerate(rows):
-            try:
-                event_type = row[col_map['type']]
-                module = row[col_map['module']]
-                source = row[col_map['source']]
-                data = row[col_map['data']]
-
-                # Parse timestamp
-                timestamp_str = row[col_map['updated']]
-                timestamp = int(time.time() * 1000)
-                for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S", "%m/%d/%Y %H:%M:%S"]:
-                    try:
-                        dt = dt_datetime.strptime(timestamp_str.strip(), fmt)
-                        timestamp = int(dt.timestamp() * 1000)
-                        break
-                    except ValueError:
-                        continue
-
-                # Parse status flag
-                fp = 0
-                if col_map['fp'] is not None and len(row) > col_map['fp']:
-                    fp_val = row[col_map['fp']].strip().lower() if row[col_map['fp']] else ''
-                    if fp_val in ('1', 'true', 'yes', 'fp', 'false positive'):
-                        fp = 1
-                    elif fp_val in ('2', 'validated', 'valid', 'confirmed'):
-                        fp = 2
-                    elif fp_val and fp_val.isdigit():
-                        fp = int(fp_val) if int(fp_val) in (0, 1, 2) else 0
-
-                # Skip ROOT events
-                if event_type == 'ROOT':
-                    stats['rows_skipped'] += 1
-                    continue
-
-                # Generate hash
-                hash_input = f"{scan_id}|{event_type}|{data}|{source}|{time.time()}"
-                event_hash = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()[:32]
-
-                # Resolve source event hash from synthetic source events
-                source_event_hash = source_hash_map.get(source, 'ROOT')
-
-                qry = """INSERT INTO tbl_scan_results
+                root_qry = """INSERT INTO tbl_scan_results
                     (scan_instance_id, hash, type, generated, confidence,
                     visibility, risk, module, data, false_positive, source_event_hash)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
-                qvals = [scan_id, event_hash, event_type, timestamp,
-                         100, 100, 0, module, data, fp, source_event_hash]
-                dbh.dbh.execute(qry, qvals)
-
-                # Save target-level false positives
-                if fp == 1:
-                    try:
-                        fp_qry = """INSERT OR IGNORE INTO tbl_target_false_positives
-                            (target, event_type, event_data, source_data, date_added, notes)
-                            VALUES (?, ?, ?, ?, ?, ?)"""
-                        fp_qvals = [target, event_type, data, source, int(time.time() * 1000),
-                                    f'Imported via web UI: {scan_name}']
-                        dbh.dbh.execute(fp_qry, fp_qvals)
-                        stats['fps_imported'] += 1
-                    except Exception:
-                        pass
-
-                # Save target-level validated entries
-                if fp == 2:
-                    try:
-                        val_qry = """INSERT OR IGNORE INTO tbl_target_validated
-                            (target, event_type, event_data, source_data, date_added, notes)
-                            VALUES (?, ?, ?, ?, ?, ?)"""
-                        val_qvals = [target, event_type, data, source, int(time.time() * 1000),
-                                     f'Imported via web UI: {scan_name}']
-                        dbh.dbh.execute(val_qry, val_qvals)
-                        stats['validated_imported'] += 1
-                    except Exception:
-                        pass
-
-                stats['event_types'].add(event_type)
-                stats['rows_imported'] += 1
-
+                root_qvals = [scan_id, 'ROOT', 'ROOT', int(time.time() * 1000),
+                              100, 100, 0, '', target, 0, 'ROOT']
+                dbh.dbh.execute(root_qry, root_qvals)
             except Exception as e:
-                stats['errors'].append(f'Row {i + 1}: {str(e)}')
-                stats['rows_skipped'] += 1
+                return {'success': False, 'message': f'Failed to create ROOT event: {e}'}
 
-        # Commit and finalize
-        dbh.conn.commit()
-        dbh.scanInstanceSet(scan_id, status='FINISHED', ended=time.time() * 1000)
+            # Build synthetic source events so that each imported event
+            # points to the correct source data element instead of ROOT.
+            source_hash_map = {}
+            for row in rows:
+                try:
+                    event_type = row[col_map['type']]
+                    if event_type == 'ROOT':
+                        continue
+                    source_val = row[col_map['source']]
+                    if source_val and source_val not in source_hash_map:
+                        src_hash_input = f"{scan_id}|SOURCE_EVENT|{source_val}"
+                        src_hash = hashlib.sha256(src_hash_input.encode('utf-8')).hexdigest()[:32]
+                        source_hash_map[source_val] = src_hash
+                except (IndexError, KeyError):
+                    continue
 
-        return {
-            'success': True,
-            'dry_run': False,
-            'message': f'Successfully imported {stats["rows_imported"]} rows into scan "{scan_name}".',
-            'scan_id': scan_id,
-            'rows_read': stats['rows_read'],
-            'rows_imported': stats['rows_imported'],
-            'rows_skipped': stats['rows_skipped'],
-            'fps_imported': stats['fps_imported'],
-            'validated_imported': stats['validated_imported'],
-            'event_types_count': len(stats['event_types']),
-            'errors': stats['errors'],
-        }
+            # Insert synthetic source events (children of ROOT)
+            src_qry = """INSERT INTO tbl_scan_results
+                (scan_instance_id, hash, type, generated, confidence,
+                visibility, risk, module, data, false_positive, source_event_hash)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+            for source_val, src_hash in source_hash_map.items():
+                try:
+                    src_qvals = [scan_id, src_hash, 'ROOT', int(time.time() * 1000),
+                                 100, 100, 0, '', source_val, 0, 'ROOT']
+                    dbh.dbh.execute(src_qry, src_qvals)
+                except Exception:
+                    pass
+
+            # Import each row
+            for i, row in enumerate(rows):
+                try:
+                    event_type = row[col_map['type']]
+                    module = row[col_map['module']]
+                    source = row[col_map['source']]
+                    data = row[col_map['data']]
+
+                    # Parse timestamp
+                    timestamp_str = row[col_map['updated']]
+                    timestamp = int(time.time() * 1000)
+                    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S", "%m/%d/%Y %H:%M:%S"]:
+                        try:
+                            dt = dt_datetime.strptime(timestamp_str.strip(), fmt)
+                            timestamp = int(dt.timestamp() * 1000)
+                            break
+                        except ValueError:
+                            continue
+
+                    # Parse status flag
+                    fp = 0
+                    if col_map['fp'] is not None and len(row) > col_map['fp']:
+                        fp_val = row[col_map['fp']].strip().lower() if row[col_map['fp']] else ''
+                        if fp_val in ('1', 'true', 'yes', 'fp', 'false positive'):
+                            fp = 1
+                        elif fp_val in ('2', 'validated', 'valid', 'confirmed'):
+                            fp = 2
+                        elif fp_val and fp_val.isdigit():
+                            fp = int(fp_val) if int(fp_val) in (0, 1, 2) else 0
+
+                    # Skip ROOT events
+                    if event_type == 'ROOT':
+                        stats['rows_skipped'] += 1
+                        continue
+
+                    # Generate hash
+                    hash_input = f"{scan_id}|{event_type}|{data}|{source}|{time.time()}"
+                    event_hash = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()[:32]
+
+                    # Resolve source event hash from synthetic source events
+                    source_event_hash = source_hash_map.get(source, 'ROOT')
+
+                    qry = """INSERT INTO tbl_scan_results
+                        (scan_instance_id, hash, type, generated, confidence,
+                        visibility, risk, module, data, false_positive, source_event_hash)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                    qvals = [scan_id, event_hash, event_type, timestamp,
+                             100, 100, 0, module, data, fp, source_event_hash]
+                    dbh.dbh.execute(qry, qvals)
+
+                    # Save target-level false positives
+                    if fp == 1:
+                        try:
+                            fp_qry = """INSERT OR IGNORE INTO tbl_target_false_positives
+                                (target, event_type, event_data, source_data, date_added, notes)
+                                VALUES (?, ?, ?, ?, ?, ?)"""
+                            fp_qvals = [target, event_type, data, source, int(time.time() * 1000),
+                                        f'Imported via web UI: {scan_name}']
+                            dbh.dbh.execute(fp_qry, fp_qvals)
+                            stats['fps_imported'] += 1
+                        except Exception:
+                            pass
+
+                    # Save target-level validated entries
+                    if fp == 2:
+                        try:
+                            val_qry = """INSERT OR IGNORE INTO tbl_target_validated
+                                (target, event_type, event_data, source_data, date_added, notes)
+                                VALUES (?, ?, ?, ?, ?, ?)"""
+                            val_qvals = [target, event_type, data, source, int(time.time() * 1000),
+                                         f'Imported via web UI: {scan_name}']
+                            dbh.dbh.execute(val_qry, val_qvals)
+                            stats['validated_imported'] += 1
+                        except Exception:
+                            pass
+
+                    stats['event_types'].add(event_type)
+                    stats['rows_imported'] += 1
+
+                except Exception as e:
+                    stats['errors'].append(f'Row {i + 1}: {str(e)}')
+                    stats['rows_skipped'] += 1
+
+            # Commit and finalize
+            dbh.conn.commit()
+            dbh.scanInstanceSet(scan_id, status='FINISHED', ended=time.time() * 1000)
+
+            return {
+                'success': True,
+                'dry_run': False,
+                'message': f'Successfully imported {stats["rows_imported"]} rows into scan "{scan_name}".',
+                'scan_id': scan_id,
+                'rows_read': stats['rows_read'],
+                'rows_imported': stats['rows_imported'],
+                'rows_skipped': stats['rows_skipped'],
+                'fps_imported': stats['fps_imported'],
+                'validated_imported': stats['validated_imported'],
+                'event_types_count': len(stats['event_types']),
+                'errors': stats['errors'],
+            }
 
     def _processNessusImport(self, content: str, scan_name: str, target: str,
                               importfile=None, is_dry_run: bool = False,
@@ -2543,54 +2543,54 @@ class SpiderFootWebUi:
             }
 
         # Actual import
-        dbh = SpiderFootDb(self.config)
-        scan_id = existing_scan_id
+        with SpiderFootDb(self.config) as dbh:
+            scan_id = existing_scan_id
 
-        if not scan_id:
-            scan_id = str(uuid.uuid4())
+            if not scan_id:
+                scan_id = str(uuid.uuid4())
+                try:
+                    dbh.scanInstanceCreate(scan_id, scan_name, target)
+                    # Create ROOT event
+                    root_qry = """INSERT INTO tbl_scan_results
+                        (scan_instance_id, hash, type, generated, confidence,
+                        visibility, risk, module, data, false_positive, source_event_hash)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                    root_qvals = [scan_id, 'ROOT', 'ROOT', int(time.time() * 1000),
+                                  100, 100, 0, '', target, 0, 'ROOT']
+                    dbh.dbh.execute(root_qry, root_qvals)
+                    dbh.conn.commit()
+                except Exception as e:
+                    return {'success': False, 'message': f'Failed to create scan instance: {e}'}
+
+            # Preserve tracking status for existing TICKETED/CLOSED findings on reimport
+            trackedFindings = None
+            if existing_scan_id:
+                try:
+                    trackedFindings = dbh.scanNessusTrackedFindings(scan_id)
+                except Exception:
+                    pass
+
             try:
-                dbh.scanInstanceCreate(scan_id, scan_name, target)
-                # Create ROOT event
-                root_qry = """INSERT INTO tbl_scan_results
-                    (scan_instance_id, hash, type, generated, confidence,
-                    visibility, risk, module, data, false_positive, source_event_hash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
-                root_qvals = [scan_id, 'ROOT', 'ROOT', int(time.time() * 1000),
-                              100, 100, 0, '', target, 0, 'ROOT']
-                dbh.dbh.execute(root_qry, root_qvals)
-                dbh.conn.commit()
+                count = dbh.scanNessusStore(scan_id, results, trackedFindings=trackedFindings)
             except Exception as e:
-                return {'success': False, 'message': f'Failed to create scan instance: {e}'}
+                return {'success': False, 'message': f'Failed to store Nessus results: {e}'}
 
-        # Preserve tracking status for existing TICKETED/CLOSED findings on reimport
-        trackedFindings = None
-        if existing_scan_id:
-            try:
-                trackedFindings = dbh.scanNessusTrackedFindings(scan_id)
-            except Exception:
-                pass
+            if not existing_scan_id:
+                dbh.scanInstanceSet(scan_id, status='FINISHED', ended=time.time() * 1000)
 
-        try:
-            count = dbh.scanNessusStore(scan_id, results, trackedFindings=trackedFindings)
-        except Exception as e:
-            return {'success': False, 'message': f'Failed to store Nessus results: {e}'}
-
-        if not existing_scan_id:
-            dbh.scanInstanceSet(scan_id, status='FINISHED', ended=time.time() * 1000)
-
-        return {
-            'success': True,
-            'dry_run': False,
-            'message': f'Successfully imported {count} Nessus findings into scan "{scan_name}".',
-            'scan_id': scan_id,
-            'rows_read': len(results),
-            'rows_imported': count,
-            'rows_skipped': 0,
-            'fps_imported': 0,
-            'validated_imported': 0,
-            'event_types_count': len(set(r['severity'] for r in results)),
-            'errors': [],
-        }
+            return {
+                'success': True,
+                'dry_run': False,
+                'message': f'Successfully imported {count} Nessus findings into scan "{scan_name}".',
+                'scan_id': scan_id,
+                'rows_read': len(results),
+                'rows_imported': count,
+                'rows_skipped': 0,
+                'fps_imported': 0,
+                'validated_imported': 0,
+                'event_types_count': len(set(r['severity'] for r in results)),
+                'errors': [],
+            }
 
     def _processBurpImport(self, content: str, scan_name: str, target: str,
                             importfile=None, is_dry_run: bool = False,
@@ -2724,54 +2724,54 @@ class SpiderFootWebUi:
             }
 
         # Actual import
-        dbh = SpiderFootDb(self.config)
-        scan_id = existing_scan_id
+        with SpiderFootDb(self.config) as dbh:
+            scan_id = existing_scan_id
 
-        if not scan_id:
-            scan_id = str(uuid.uuid4())
+            if not scan_id:
+                scan_id = str(uuid.uuid4())
+                try:
+                    dbh.scanInstanceCreate(scan_id, scan_name, target)
+                    # Create ROOT event
+                    root_qry = """INSERT INTO tbl_scan_results
+                        (scan_instance_id, hash, type, generated, confidence,
+                        visibility, risk, module, data, false_positive, source_event_hash)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                    root_qvals = [scan_id, 'ROOT', 'ROOT', int(time.time() * 1000),
+                                  100, 100, 0, '', target, 0, 'ROOT']
+                    dbh.dbh.execute(root_qry, root_qvals)
+                    dbh.conn.commit()
+                except Exception as e:
+                    return {'success': False, 'message': f'Failed to create scan instance: {e}'}
+
+            # Preserve tracking status for existing TICKETED/CLOSED findings on reimport
+            trackedFindings = None
+            if existing_scan_id:
+                try:
+                    trackedFindings = dbh.scanBurpTrackedFindings(scan_id)
+                except Exception:
+                    pass
+
             try:
-                dbh.scanInstanceCreate(scan_id, scan_name, target)
-                # Create ROOT event
-                root_qry = """INSERT INTO tbl_scan_results
-                    (scan_instance_id, hash, type, generated, confidence,
-                    visibility, risk, module, data, false_positive, source_event_hash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
-                root_qvals = [scan_id, 'ROOT', 'ROOT', int(time.time() * 1000),
-                              100, 100, 0, '', target, 0, 'ROOT']
-                dbh.dbh.execute(root_qry, root_qvals)
-                dbh.conn.commit()
+                count = dbh.scanBurpStore(scan_id, results, trackedFindings=trackedFindings)
             except Exception as e:
-                return {'success': False, 'message': f'Failed to create scan instance: {e}'}
+                return {'success': False, 'message': f'Failed to store Burp results: {e}'}
 
-        # Preserve tracking status for existing TICKETED/CLOSED findings on reimport
-        trackedFindings = None
-        if existing_scan_id:
-            try:
-                trackedFindings = dbh.scanBurpTrackedFindings(scan_id)
-            except Exception:
-                pass
+            if not existing_scan_id:
+                dbh.scanInstanceSet(scan_id, status='FINISHED', ended=time.time() * 1000)
 
-        try:
-            count = dbh.scanBurpStore(scan_id, results, trackedFindings=trackedFindings)
-        except Exception as e:
-            return {'success': False, 'message': f'Failed to store Burp results: {e}'}
-
-        if not existing_scan_id:
-            dbh.scanInstanceSet(scan_id, status='FINISHED', ended=time.time() * 1000)
-
-        return {
-            'success': True,
-            'dry_run': False,
-            'message': f'Successfully imported {count} Burp issues into scan "{scan_name}".',
-            'scan_id': scan_id,
-            'rows_read': len(results),
-            'rows_imported': count,
-            'rows_skipped': 0,
-            'fps_imported': 0,
-            'validated_imported': 0,
-            'event_types_count': len(set(r['severity'] for r in results)),
-            'errors': [],
-        }
+            return {
+                'success': True,
+                'dry_run': False,
+                'message': f'Successfully imported {count} Burp issues into scan "{scan_name}".',
+                'scan_id': scan_id,
+                'rows_read': len(results),
+                'rows_imported': count,
+                'rows_skipped': 0,
+                'fps_imported': 0,
+                'validated_imported': 0,
+                'event_types_count': len(set(r['severity'] for r in results)),
+                'errors': [],
+            }
 
     def _processBurpHtmlEnhance(self, content: str, scan_name: str, target: str,
                                 importfile=None, is_dry_run: bool = False,
@@ -3082,42 +3082,42 @@ class SpiderFootWebUi:
                 severity_counts[sev] = severity_counts.get(sev, 0) + 1
 
             # Check how many existing records could be matched
-            dbh = SpiderFootDb(self.config)
-            existing_count = dbh.scanBurpCount(existing_scan_id)
-            html_names = set(r['plugin_name'] for r in results if r['plugin_name'])
+            with SpiderFootDb(self.config) as dbh:
+                existing_count = dbh.scanBurpCount(existing_scan_id)
+                html_names = set(r['plugin_name'] for r in results if r['plugin_name'])
+
+                return {
+                    'success': True,
+                    'dry_run': True,
+                    'message': f'Validation passed. {len(results)} issues parsed from HTML across {len(hosts_seen)} host(s). {existing_count} existing Burp records will be checked for enhancement.',
+                    'rows_read': len(results),
+                    'rows_imported': len(results),
+                    'rows_skipped': 0,
+                    'event_types_count': len(html_names),
+                    'errors': [],
+                }
+
+        # Actual enhance
+        with SpiderFootDb(self.config) as dbh:
+
+            try:
+                stats = dbh.scanBurpEnhance(existing_scan_id, results)
+            except Exception as e:
+                return {'success': False, 'message': f'Failed to enhance Burp results: {e}'}
 
             return {
                 'success': True,
-                'dry_run': True,
-                'message': f'Validation passed. {len(results)} issues parsed from HTML across {len(hosts_seen)} host(s). {existing_count} existing Burp records will be checked for enhancement.',
+                'dry_run': False,
+                'message': f'Enhanced {stats["enhanced"]} existing Burp records with HTML data. {stats["skipped"]} HTML issues had no matching XML record.',
+                'scan_id': existing_scan_id,
                 'rows_read': len(results),
-                'rows_imported': len(results),
-                'rows_skipped': 0,
-                'event_types_count': len(html_names),
+                'rows_imported': stats['enhanced'],
+                'rows_skipped': stats['skipped'],
+                'fps_imported': 0,
+                'validated_imported': 0,
+                'event_types_count': len(set(r['plugin_name'] for r in results if r['plugin_name'])),
                 'errors': [],
             }
-
-        # Actual enhance
-        dbh = SpiderFootDb(self.config)
-
-        try:
-            stats = dbh.scanBurpEnhance(existing_scan_id, results)
-        except Exception as e:
-            return {'success': False, 'message': f'Failed to enhance Burp results: {e}'}
-
-        return {
-            'success': True,
-            'dry_run': False,
-            'message': f'Enhanced {stats["enhanced"]} existing Burp records with HTML data. {stats["skipped"]} HTML issues had no matching XML record.',
-            'scan_id': existing_scan_id,
-            'rows_read': len(results),
-            'rows_imported': stats['enhanced'],
-            'rows_skipped': stats['skipped'],
-            'fps_imported': 0,
-            'validated_imported': 0,
-            'event_types_count': len(set(r['plugin_name'] for r in results if r['plugin_name'])),
-            'errors': [],
-        }
 
     @cherrypy.expose
     def clonescan(self: 'SpiderFootWebUi', id: str) -> str:
@@ -3129,45 +3129,45 @@ class SpiderFootWebUi:
         Returns:
             str: New scan page HTML pre-populated with options from cloned scan.
         """
-        dbh = SpiderFootDb(self.config)
-        types = dbh.eventTypes()
-        info = dbh.scanInstanceGet(id)
+        with SpiderFootDb(self.config) as dbh:
+            types = dbh.eventTypes()
+            info = dbh.scanInstanceGet(id)
         
-        if not info:
-            return self.error("Invalid scan ID.")
+            if not info:
+                return self.error("Invalid scan ID.")
 
-        scanconfig = dbh.scanConfigGet(id)
-        scanname = info[0]
-        scantarget = info[1]
+            scanconfig = dbh.scanConfigGet(id)
+            scanname = info[0]
+            scantarget = info[1]
         
-        # Validate that we have a valid target
-        if not scantarget:
-            return self.error(f"Scan {id} has no target defined.")
+            # Validate that we have a valid target
+            if not scantarget:
+                return self.error(f"Scan {id} has no target defined.")
         
-        targetType = None
+            targetType = None
         
-        if scanname == "" or scantarget == "" or len(scanconfig) == 0:
-            return self.error("Something went wrong internally.")
+            if scanname == "" or scantarget == "" or len(scanconfig) == 0:
+                return self.error("Something went wrong internally.")
 
-        targetType = SpiderFootHelpers.targetTypeFromString(scantarget)
-        if targetType is None:
-            # It must be a name, so wrap quotes around it
-            scantarget = "&quot;" + scantarget + "&quot;"
-            # Re-check target type after wrapping
             targetType = SpiderFootHelpers.targetTypeFromString(scantarget)
             if targetType is None:
-                self.log.error(f"Invalid target type for scan {id}: '{scantarget}' could not be recognized")
-                return self.error(f"Invalid target type for scan {id}. Could not recognize '{scantarget}' as a target SpiderFoot supports.")
+                # It must be a name, so wrap quotes around it
+                scantarget = "&quot;" + scantarget + "&quot;"
+                # Re-check target type after wrapping
+                targetType = SpiderFootHelpers.targetTypeFromString(scantarget)
+                if targetType is None:
+                    self.log.error(f"Invalid target type for scan {id}: '{scantarget}' could not be recognized")
+                    return self.error(f"Invalid target type for scan {id}. Could not recognize '{scantarget}' as a target SpiderFoot supports.")
 
-        modlist = scanconfig['_modulesenabled'].split(',')
+            modlist = scanconfig['_modulesenabled'].split(',')
 
-        templ = Template(
-            filename='spiderfoot/templates/newscan.tmpl', lookup=self.lookup)
-        return templ.render(pageid='NEWSCAN', types=types, docroot=self.docroot,
-                            modules=self.config['__modules__'], selectedmods=modlist,
-                            scanname=str(scanname),
-                            scantarget=str(scantarget), version=__version__,
-                            user_role=self.currentUserRole())
+            templ = Template(
+                filename='spiderfoot/templates/newscan.tmpl', lookup=self.lookup)
+            return templ.render(pageid='NEWSCAN', types=types, docroot=self.docroot,
+                                modules=self.config['__modules__'], selectedmods=modlist,
+                                scanname=str(scanname),
+                                scantarget=str(scantarget), version=__version__,
+                                user_role=self.currentUserRole())
 
     @cherrypy.expose
     def index(self: 'SpiderFootWebUi') -> str:
@@ -3191,16 +3191,16 @@ class SpiderFootWebUi:
         Returns:
             str: scan info page HTML
         """
-        dbh = SpiderFootDb(self.config)
-        res = dbh.scanInstanceGet(id)
-        if res is None:
-            return self.error("Scan ID not found.")
+        with SpiderFootDb(self.config) as dbh:
+            res = dbh.scanInstanceGet(id)
+            if res is None:
+                return self.error("Scan ID not found.")
 
-        templ = Template(filename='spiderfoot/templates/scaninfo.tmpl',
-                         lookup=self.lookup, input_encoding='utf-8')
-        return templ.render(id=id, name=html.escape(res[0]), status=res[5], docroot=self.docroot, version=__version__,
-                            pageid="SCANLIST", current_user=self.currentUser(), seedtarget=res[1],
-                            user_role=self.currentUserRole())
+            templ = Template(filename='spiderfoot/templates/scaninfo.tmpl',
+                             lookup=self.lookup, input_encoding='utf-8')
+            return templ.render(id=id, name=html.escape(res[0]), status=res[5], docroot=self.docroot, version=__version__,
+                                pageid="SCANLIST", current_user=self.currentUser(), seedtarget=res[1],
+                                user_role=self.currentUserRole())
 
     @cherrypy.expose
     def opts(self: 'SpiderFootWebUi', updated: str = None) -> str:
@@ -3232,15 +3232,15 @@ class SpiderFootWebUi:
         self.requireAdmin()
         current_user = self.currentUser()
 
-        dbh = SpiderFootDb(self.config)
-        users_list = dbh.userList()
+        with SpiderFootDb(self.config) as dbh:
+            users_list = dbh.userList()
 
-        templ = Template(
-            filename='spiderfoot/templates/users.tmpl', lookup=self.lookup)
-        return templ.render(
-            pageid='USERS', docroot=self.docroot, version=__version__,
-            users=users_list, current_user=current_user,
-            user_role=self.currentUserRole())
+            templ = Template(
+                filename='spiderfoot/templates/users.tmpl', lookup=self.lookup)
+            return templ.render(
+                pageid='USERS', docroot=self.docroot, version=__version__,
+                users=users_list, current_user=current_user,
+                user_role=self.currentUserRole())
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -3254,9 +3254,9 @@ class SpiderFootWebUi:
         if self.currentUserRole() != 'admin':
             return {'success': False, 'error': 'Unauthorized'}
 
-        dbh = SpiderFootDb(self.config)
-        users = dbh.userList()
-        return {'success': True, 'users': users}
+        with SpiderFootDb(self.config) as dbh:
+            users = dbh.userList()
+            return {'success': True, 'users': users}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -3290,17 +3290,17 @@ class SpiderFootWebUi:
         if role not in ('admin', 'analyst'):
             role = 'analyst'
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        # Check if username already exists
-        if dbh.userGet(username):
-            return {'success': False, 'error': 'Username already exists'}
+            # Check if username already exists
+            if dbh.userGet(username):
+                return {'success': False, 'error': 'Username already exists'}
 
-        if dbh.userCreate(username, password, display_name, role=role):
-            dbh.auditLog(current_user, 'USER_CREATE', detail=f'Created user: {username} (role: {role})', ip_address=self.clientIP())
-            return {'success': True, 'message': f'User {username} created successfully'}
-        else:
-            return {'success': False, 'error': 'Failed to create user'}
+            if dbh.userCreate(username, password, display_name, role=role):
+                dbh.auditLog(current_user, 'USER_CREATE', detail=f'Created user: {username} (role: {role})', ip_address=self.clientIP())
+                return {'success': True, 'message': f'User {username} created successfully'}
+            else:
+                return {'success': False, 'error': 'Failed to create user'}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -3320,22 +3320,22 @@ class SpiderFootWebUi:
         if self.currentUserRole() != 'admin':
             return {'success': False, 'error': 'Unauthorized'}
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        # Check if user exists
-        if not dbh.userGet(username):
-            return {'success': False, 'error': 'User not found'}
+            # Check if user exists
+            if not dbh.userGet(username):
+                return {'success': False, 'error': 'User not found'}
 
-        # Convert active string to bool if provided
-        active_bool = None
-        if active is not None:
-            active_bool = active.lower() == 'true'
+            # Convert active string to bool if provided
+            active_bool = None
+            if active is not None:
+                active_bool = active.lower() == 'true'
 
-        if dbh.userUpdate(username, display_name=display_name, active=active_bool):
-            dbh.auditLog(current_user, 'USER_UPDATE', detail=f'Updated user: {username}', ip_address=self.clientIP())
-            return {'success': True, 'message': f'User {username} updated successfully'}
-        else:
-            return {'success': False, 'error': 'Failed to update user'}
+            if dbh.userUpdate(username, display_name=display_name, active=active_bool):
+                dbh.auditLog(current_user, 'USER_UPDATE', detail=f'Updated user: {username}', ip_address=self.clientIP())
+                return {'success': True, 'message': f'User {username} updated successfully'}
+            else:
+                return {'success': False, 'error': 'Failed to update user'}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -3356,17 +3356,17 @@ class SpiderFootWebUi:
         if username == 'admin':
             return {'success': False, 'error': 'Cannot delete admin user'}
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        # Check if user exists
-        if not dbh.userGet(username):
-            return {'success': False, 'error': 'User not found'}
+            # Check if user exists
+            if not dbh.userGet(username):
+                return {'success': False, 'error': 'User not found'}
 
-        if dbh.userDelete(username):
-            dbh.auditLog(current_user, 'USER_DELETE', detail=f'Deleted user: {username}', ip_address=self.clientIP())
-            return {'success': True, 'message': f'User {username} deleted successfully'}
-        else:
-            return {'success': False, 'error': 'Failed to delete user'}
+            if dbh.userDelete(username):
+                dbh.auditLog(current_user, 'USER_DELETE', detail=f'Deleted user: {username}', ip_address=self.clientIP())
+                return {'success': True, 'message': f'User {username} deleted successfully'}
+            else:
+                return {'success': False, 'error': 'Failed to delete user'}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -3388,20 +3388,20 @@ class SpiderFootWebUi:
         if len(new_password) < 8:
             return {'success': False, 'error': 'Password must be at least 8 characters'}
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        # Check if user exists
-        if not dbh.userGet(username):
-            return {'success': False, 'error': 'User not found'}
+            # Check if user exists
+            if not dbh.userGet(username):
+                return {'success': False, 'error': 'User not found'}
 
-        if dbh.userChangePassword(username, new_password):
-            dbh.auditLog(current_user, 'USER_PASSWORD_CHANGE', detail=f'Changed password for user: {username}', ip_address=self.clientIP())
-            # Clear the default password warning if the current user changed their own password
-            if username == current_user:
-                cherrypy.session['default_password_warning'] = False
-            return {'success': True, 'message': f'Password for {username} changed successfully'}
-        else:
-            return {'success': False, 'error': 'Failed to change password'}
+            if dbh.userChangePassword(username, new_password):
+                dbh.auditLog(current_user, 'USER_PASSWORD_CHANGE', detail=f'Changed password for user: {username}', ip_address=self.clientIP())
+                # Clear the default password warning if the current user changed their own password
+                if username == current_user:
+                    cherrypy.session['default_password_warning'] = False
+                return {'success': True, 'message': f'Password for {username} changed successfully'}
+            else:
+                return {'success': False, 'error': 'Failed to change password'}
 
     @cherrypy.expose
     def auditlog(self: 'SpiderFootWebUi', action: str = None, username: str = None) -> str:
@@ -3414,22 +3414,22 @@ class SpiderFootWebUi:
         Returns:
             str: audit log page HTML
         """
-        dbh = SpiderFootDb(self.config)
-        logs = dbh.auditLogGet(limit=500, username=username, action=action)
+        with SpiderFootDb(self.config) as dbh:
+            logs = dbh.auditLogGet(limit=500, username=username, action=action)
 
-        # Format timestamps for display
-        for entry in logs:
-            entry['time_str'] = time.strftime(
-                "%Y-%m-%d %H:%M:%S", time.localtime(entry['created'] / 1000))
+            # Format timestamps for display
+            for entry in logs:
+                entry['time_str'] = time.strftime(
+                    "%Y-%m-%d %H:%M:%S", time.localtime(entry['created'] / 1000))
 
-        # Get unique usernames for filter dropdown
-        users = sorted(set(entry['username'] for entry in logs))
+            # Get unique usernames for filter dropdown
+            users = sorted(set(entry['username'] for entry in logs))
 
-        templ = Template(
-            filename='spiderfoot/templates/auditlog.tmpl', lookup=self.lookup)
-        return templ.render(
-            pageid='AUDITLOG', docroot=self.docroot, version=__version__,
-            logs=logs, users=users, user_role=self.currentUserRole())
+            templ = Template(
+                filename='spiderfoot/templates/auditlog.tmpl', lookup=self.lookup)
+            return templ.render(
+                pageid='AUDITLOG', docroot=self.docroot, version=__version__,
+                logs=logs, users=users, user_role=self.currentUserRole())
 
     @cherrypy.expose
     def workspaces(self: 'SpiderFootWebUi') -> str:
@@ -3453,9 +3453,9 @@ class SpiderFootWebUi:
         """
         if self.currentUserRole() != 'admin':
             return {'success': False, 'error': 'Unauthorized'}
-        dbh = SpiderFootDb(self.config)
-        code = dbh.launchCodeGet()
-        return {'success': True, 'launch_code': code}
+        with SpiderFootDb(self.config) as dbh:
+            code = dbh.launchCodeGet()
+            return {'success': True, 'launch_code': code}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -3470,13 +3470,13 @@ class SpiderFootWebUi:
         """
         if self.currentUserRole() != 'admin':
             return {'success': False, 'error': 'Unauthorized'}
-        dbh = SpiderFootDb(self.config)
-        if dbh.launchCodeSet(code):
-            dbh.auditLog(self.currentUser(), 'LAUNCH_CODE_SET',
-                         detail=f'Launch code {"set" if code else "cleared"}',
-                         ip_address=self.clientIP())
-            return {'success': True, 'message': 'Launch code updated'}
-        return {'success': False, 'error': 'Failed to update launch code'}
+        with SpiderFootDb(self.config) as dbh:
+            if dbh.launchCodeSet(code):
+                dbh.auditLog(self.currentUser(), 'LAUNCH_CODE_SET',
+                             detail=f'Launch code {"set" if code else "cleared"}',
+                             ip_address=self.clientIP())
+                return {'success': True, 'message': 'Launch code updated'}
+            return {'success': False, 'error': 'Failed to update launch code'}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -3514,31 +3514,31 @@ class SpiderFootWebUi:
         old_tier_name = self.config.get('_resource_tier', 'medium')
         old_tier_config = get_tier_config(old_tier_name)
 
-        dbh = SpiderFootDb(self.config)
-        dbh.configSet({
-            '_resource_tier': tier,
-            '_maxthreads': str(tier_config['maxthreads']),
-        })
+        with SpiderFootDb(self.config) as dbh:
+            dbh.configSet({
+                '_resource_tier': tier,
+                '_maxthreads': str(tier_config['maxthreads']),
+            })
 
-        # Update in-memory config so new DB connections use the new tier
-        self.config['_resource_tier'] = tier
-        self.config['_maxthreads'] = tier_config['maxthreads']
+            # Update in-memory config so new DB connections use the new tier
+            self.config['_resource_tier'] = tier
+            self.config['_maxthreads'] = tier_config['maxthreads']
 
-        dbh.auditLog(
-            self.currentUser(), 'RESOURCE_TIER_CHANGE',
-            detail=f'Resource tier changed from {old_tier_name} to {tier}',
-            ip_address=self.clientIP(),
-        )
+            dbh.auditLog(
+                self.currentUser(), 'RESOURCE_TIER_CHANGE',
+                detail=f'Resource tier changed from {old_tier_name} to {tier}',
+                ip_address=self.clientIP(),
+            )
 
-        restart_required = (
-            tier_config['cherrypy_thread_pool'] != old_tier_config['cherrypy_thread_pool']
-        )
+            restart_required = (
+                tier_config['cherrypy_thread_pool'] != old_tier_config['cherrypy_thread_pool']
+            )
 
-        return {
-            'success': True,
-            'tier': tier,
-            'restart_required': restart_required,
-        }
+            return {
+                'success': True,
+                'tier': tier,
+                'restart_required': restart_required,
+            }
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -3554,45 +3554,45 @@ class SpiderFootWebUi:
         import urllib.request
         import ssl
 
-        dbh = SpiderFootDb(self.config)
-        dbh.auditLog(self.currentUser(), 'UPDATE_CHECK',
-                     detail='Checked for updates',
-                     ip_address=self.clientIP())
+        with SpiderFootDb(self.config) as dbh:
+            dbh.auditLog(self.currentUser(), 'UPDATE_CHECK',
+                         detail='Checked for updates',
+                         ip_address=self.clientIP())
 
-        try:
-            api_url = "https://api.github.com/repos/0x31i/asm-ng/releases/latest"
-            req = urllib.request.Request(api_url, headers={
-                'Accept': 'application/vnd.github.v3+json',
-                'User-Agent': f'ASM-NG/{__version__}'
-            })
-
-            ctx = ssl.create_default_context()
-            with urllib.request.urlopen(req, context=ctx, timeout=15) as resp:
-                release_data = json.loads(resp.read().decode('utf-8'))
-
-            latest_tag = release_data.get('tag_name', '').lstrip('v')
-            current_version = __version__
-
-            # Version comparison via tuple
             try:
-                latest_parts = tuple(int(x) for x in latest_tag.split('.'))
-                current_parts = tuple(int(x) for x in current_version.split('.'))
-                update_available = latest_parts > current_parts
-            except (ValueError, AttributeError):
-                update_available = False
+                api_url = "https://api.github.com/repos/0x31i/asm-ng/releases/latest"
+                req = urllib.request.Request(api_url, headers={
+                    'Accept': 'application/vnd.github.v3+json',
+                    'User-Agent': f'ASM-NG/{__version__}'
+                })
 
-            return {
-                'success': True,
-                'current_version': current_version,
-                'latest_version': latest_tag,
-                'update_available': update_available,
-                'release_name': release_data.get('name', ''),
-                'release_notes': release_data.get('body', ''),
-                'release_url': release_data.get('html_url', ''),
-                'published_at': release_data.get('published_at', '')
-            }
-        except Exception as e:
-            return {'success': False, 'error': f'Failed to check for updates: {str(e)}'}
+                ctx = ssl.create_default_context()
+                with urllib.request.urlopen(req, context=ctx, timeout=15) as resp:
+                    release_data = json.loads(resp.read().decode('utf-8'))
+
+                latest_tag = release_data.get('tag_name', '').lstrip('v')
+                current_version = __version__
+
+                # Version comparison via tuple
+                try:
+                    latest_parts = tuple(int(x) for x in latest_tag.split('.'))
+                    current_parts = tuple(int(x) for x in current_version.split('.'))
+                    update_available = latest_parts > current_parts
+                except (ValueError, AttributeError):
+                    update_available = False
+
+                return {
+                    'success': True,
+                    'current_version': current_version,
+                    'latest_version': latest_tag,
+                    'update_available': update_available,
+                    'release_name': release_data.get('name', ''),
+                    'release_notes': release_data.get('body', ''),
+                    'release_url': release_data.get('html_url', ''),
+                    'published_at': release_data.get('published_at', '')
+                }
+            except Exception as e:
+                return {'success': False, 'error': f'Failed to check for updates: {str(e)}'}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -3610,82 +3610,82 @@ class SpiderFootWebUi:
 
         import subprocess
 
-        dbh = SpiderFootDb(self.config)
-        tag = f"v{version}" if not version.startswith('v') else version
-        steps_completed = []
+        with SpiderFootDb(self.config) as dbh:
+            tag = f"v{version}" if not version.startswith('v') else version
+            steps_completed = []
 
-        try:
-            # Step 1: Backup the database
-            db_path = self.config.get('__database', '')
-            if db_path:
-                backup_dir = os.path.dirname(db_path) or '.'
-                timestamp = time.strftime("%Y%m%d_%H%M%S")
-                backup_path = os.path.join(backup_dir, f"spiderfoot_pre_update_{timestamp}.db")
-                dbh.backupDB(backup_path)
-                steps_completed.append(f"Database backed up to {backup_path}")
+            try:
+                # Step 1: Backup the database
+                db_path = self.config.get('__database', '')
+                if db_path:
+                    backup_dir = os.path.dirname(db_path) or '.'
+                    timestamp = time.strftime("%Y%m%d_%H%M%S")
+                    backup_path = os.path.join(backup_dir, f"spiderfoot_pre_update_{timestamp}.db")
+                    dbh.backupDB(backup_path)
+                    steps_completed.append(f"Database backed up to {backup_path}")
 
-            # Step 2: Git fetch
-            repo_dir = os.path.dirname(os.path.abspath(__file__))
-            result = subprocess.run(
-                ['git', 'fetch', 'origin', '--tags'],
-                cwd=repo_dir, capture_output=True, text=True, timeout=60
-            )
-            if result.returncode != 0:
-                return {'success': False, 'error': f'git fetch failed: {result.stderr}',
-                        'steps_completed': steps_completed}
-            steps_completed.append('Fetched latest from origin')
-
-            # Step 3: Check if tag exists
-            result = subprocess.run(
-                ['git', 'tag', '-l', tag],
-                cwd=repo_dir, capture_output=True, text=True, timeout=10
-            )
-            if tag not in result.stdout.strip().split('\n'):
-                return {'success': False, 'error': f'Tag {tag} not found',
-                        'steps_completed': steps_completed}
-
-            # Step 4: Git checkout tag
-            result = subprocess.run(
-                ['git', 'checkout', tag],
-                cwd=repo_dir, capture_output=True, text=True, timeout=30
-            )
-            if result.returncode != 0:
-                return {'success': False, 'error': f'git checkout failed: {result.stderr}',
-                        'steps_completed': steps_completed}
-            steps_completed.append(f'Checked out {tag}')
-
-            # Step 5: Check if requirements changed and pip install
-            result = subprocess.run(
-                ['git', 'diff', 'HEAD~1..HEAD', '--name-only'],
-                cwd=repo_dir, capture_output=True, text=True, timeout=10
-            )
-            if 'requirements.txt' in result.stdout:
-                pip_result = subprocess.run(
-                    ['pip', 'install', '-r', 'requirements.txt'],
-                    cwd=repo_dir, capture_output=True, text=True, timeout=120
+                # Step 2: Git fetch
+                repo_dir = os.path.dirname(os.path.abspath(__file__))
+                result = subprocess.run(
+                    ['git', 'fetch', 'origin', '--tags'],
+                    cwd=repo_dir, capture_output=True, text=True, timeout=60
                 )
-                if pip_result.returncode != 0:
-                    steps_completed.append(f'pip install warning: {pip_result.stderr[:200]}')
-                else:
-                    steps_completed.append('Updated dependencies from requirements.txt')
+                if result.returncode != 0:
+                    return {'success': False, 'error': f'git fetch failed: {result.stderr}',
+                            'steps_completed': steps_completed}
+                steps_completed.append('Fetched latest from origin')
 
-            # Audit log
-            dbh.auditLog(self.currentUser(), 'UPDATE_APPLIED',
-                         detail=f'Updated to {tag}',
-                         ip_address=self.clientIP())
+                # Step 3: Check if tag exists
+                result = subprocess.run(
+                    ['git', 'tag', '-l', tag],
+                    cwd=repo_dir, capture_output=True, text=True, timeout=10
+                )
+                if tag not in result.stdout.strip().split('\n'):
+                    return {'success': False, 'error': f'Tag {tag} not found',
+                            'steps_completed': steps_completed}
 
-            return {
-                'success': True,
-                'message': f'Updated to {tag}. Please restart the application for changes to take effect.',
-                'steps_completed': steps_completed,
-                'restart_required': True
-            }
-        except subprocess.TimeoutExpired:
-            return {'success': False, 'error': 'Update operation timed out',
-                    'steps_completed': steps_completed}
-        except Exception as e:
-            return {'success': False, 'error': str(e),
-                    'steps_completed': steps_completed}
+                # Step 4: Git checkout tag
+                result = subprocess.run(
+                    ['git', 'checkout', tag],
+                    cwd=repo_dir, capture_output=True, text=True, timeout=30
+                )
+                if result.returncode != 0:
+                    return {'success': False, 'error': f'git checkout failed: {result.stderr}',
+                            'steps_completed': steps_completed}
+                steps_completed.append(f'Checked out {tag}')
+
+                # Step 5: Check if requirements changed and pip install
+                result = subprocess.run(
+                    ['git', 'diff', 'HEAD~1..HEAD', '--name-only'],
+                    cwd=repo_dir, capture_output=True, text=True, timeout=10
+                )
+                if 'requirements.txt' in result.stdout:
+                    pip_result = subprocess.run(
+                        ['pip', 'install', '-r', 'requirements.txt'],
+                        cwd=repo_dir, capture_output=True, text=True, timeout=120
+                    )
+                    if pip_result.returncode != 0:
+                        steps_completed.append(f'pip install warning: {pip_result.stderr[:200]}')
+                    else:
+                        steps_completed.append('Updated dependencies from requirements.txt')
+
+                # Audit log
+                dbh.auditLog(self.currentUser(), 'UPDATE_APPLIED',
+                             detail=f'Updated to {tag}',
+                             ip_address=self.clientIP())
+
+                return {
+                    'success': True,
+                    'message': f'Updated to {tag}. Please restart the application for changes to take effect.',
+                    'steps_completed': steps_completed,
+                    'restart_required': True
+                }
+            except subprocess.TimeoutExpired:
+                return {'success': False, 'error': 'Update operation timed out',
+                        'steps_completed': steps_completed}
+            except Exception as e:
+                return {'success': False, 'error': str(e),
+                        'steps_completed': steps_completed}
 
     @cherrypy.expose
     def optsexport(self: 'SpiderFootWebUi', pattern: str = None) -> str:
@@ -3756,28 +3756,28 @@ class SpiderFootWebUi:
         if not id:
             return self.jsonify_error('404', "No scan specified")
 
-        dbh = SpiderFootDb(self.config)
-        ids = id.split(',')
+        with SpiderFootDb(self.config) as dbh:
+            ids = id.split(',')
 
-        for scan_id in ids:
-            res = dbh.scanInstanceGet(scan_id)
-            if not res:
-                return self.jsonify_error('404', f"Scan {scan_id} does not exist")
+            for scan_id in ids:
+                res = dbh.scanInstanceGet(scan_id)
+                if not res:
+                    return self.jsonify_error('404', f"Scan {scan_id} does not exist")
 
-            if res[5] in ["RUNNING", "STARTING", "STARTED"]:
-                return self.jsonify_error('400', f"Scan {scan_id} is {res[5]}. You cannot delete running scans.")
+                if res[5] in ["RUNNING", "STARTING", "STARTED"]:
+                    return self.jsonify_error('400', f"Scan {scan_id} is {res[5]}. You cannot delete running scans.")
 
-        for scan_id in ids:
-            dbh.scanInstanceDelete(scan_id)
+            for scan_id in ids:
+                dbh.scanInstanceDelete(scan_id)
 
-        # Audit log: scan deleted
-        dbh.auditLog(
-            self.currentUser() or 'unknown', 'SCAN_DELETE',
-            detail=f"Deleted scan(s): {id}",
-            ip_address=self.clientIP()
-        )
+            # Audit log: scan deleted
+            dbh.auditLog(
+                self.currentUser() or 'unknown', 'SCAN_DELETE',
+                detail=f"Deleted scan(s): {id}",
+                ip_address=self.clientIP()
+            )
 
-        return ""
+            return ""
 
     @cherrypy.expose
     def savesettings(self: 'SpiderFootWebUi', allopts: str, token: str, configFile: 'cherrypy._cpreqbody.Part' = None) -> None:
@@ -3835,23 +3835,23 @@ class SpiderFootWebUi:
 
         # Save settings
         try:
-            dbh = SpiderFootDb(self.config)
-            useropts = json.loads(allopts)
-            cleanopts = dict()
-            for opt in list(useropts.keys()):
-                value = useropts[opt]
-                if not isinstance(value, str):
-                    value = str(value)
-                cleaned = self.cleanUserInput([value])
-                cleanopts[opt] = cleaned[0] if cleaned and len(cleaned) > 0 else ""
+            with SpiderFootDb(self.config) as dbh:
+                useropts = json.loads(allopts)
+                cleanopts = dict()
+                for opt in list(useropts.keys()):
+                    value = useropts[opt]
+                    if not isinstance(value, str):
+                        value = str(value)
+                    cleaned = self.cleanUserInput([value])
+                    cleanopts[opt] = cleaned[0] if cleaned and len(cleaned) > 0 else ""
 
-            currentopts = deepcopy(self.config)
+                currentopts = deepcopy(self.config)
 
-            # Make a new config where the user options override
-            # the current system config.
-            sf = SpiderFoot(self.config)
-            self.config = sf.configUnserialize(cleanopts, currentopts)
-            dbh.configSet(sf.configSerialize(self.config))
+                # Make a new config where the user options override
+                # the current system config.
+                sf = SpiderFoot(self.config)
+                self.config = sf.configUnserialize(cleanopts, currentopts)
+                dbh.configSet(sf.configSerialize(self.config))
         except Exception as e:
             import logging
             logging.exception("Error processing user input in savesettings")
@@ -3897,19 +3897,19 @@ class SpiderFootWebUi:
 
         # Save settings
         try:
-            dbh = SpiderFootDb(self.config)
-            useropts = json.loads(allopts)
-            cleanopts = dict()
-            for opt in list(useropts.keys()):
-                cleanopts[opt] = self.cleanUserInput([useropts[opt]])[0]
+            with SpiderFootDb(self.config) as dbh:
+                useropts = json.loads(allopts)
+                cleanopts = dict()
+                for opt in list(useropts.keys()):
+                    cleanopts[opt] = self.cleanUserInput([useropts[opt]])[0]
 
-            currentopts = deepcopy(self.config)
+                currentopts = deepcopy(self.config)
 
-            # Make a new config where the user options override
-            # the current system config.
-            sf = SpiderFoot(self.config)
-            self.config = sf.configUnserialize(cleanopts, currentopts)
-            dbh.configSet(sf.configSerialize(self.config))
+                # Make a new config where the user options override
+                # the current system config.
+                sf = SpiderFoot(self.config)
+                self.config = sf.configUnserialize(cleanopts, currentopts)
+                dbh.configSet(sf.configSerialize(self.config))
         except Exception as e:
             return json.dumps(["ERROR", f"Processing one or more of your inputs failed: {e}"]).encode('utf-8')
 
@@ -3929,9 +3929,9 @@ class SpiderFootWebUi:
             bool: success
         """
         try:
-            dbh = SpiderFootDb(self.config)
-            dbh.configClear()  # Clear it in the DB
-            self.config = deepcopy(self.defaultConfig)  # Clear in memory
+            with SpiderFootDb(self.config) as dbh:
+                dbh.configClear()  # Clear it in the DB
+                self.config = deepcopy(self.defaultConfig)  # Clear in memory
         except Exception:
             return False
 
@@ -3952,51 +3952,51 @@ class SpiderFootWebUi:
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        if fp not in ["0", "1", "2"]:
-            return json.dumps(["ERROR", "Invalid status flag. Use 0 (unvalidated), 1 (false positive), or 2 (validated)."]).encode('utf-8')
+            if fp not in ["0", "1", "2"]:
+                return json.dumps(["ERROR", "Invalid status flag. Use 0 (unvalidated), 1 (false positive), or 2 (validated)."]).encode('utf-8')
 
-        try:
-            ids = json.loads(resultids)
-        except Exception:
-            return json.dumps(["ERROR", "No IDs supplied."]).encode('utf-8')
+            try:
+                ids = json.loads(resultids)
+            except Exception:
+                return json.dumps(["ERROR", "No IDs supplied."]).encode('utf-8')
 
-        # Cannot set FPs if a scan is not completed
-        status = dbh.scanInstanceGet(id)
-        if not status:
-            return self.error(f"Invalid scan ID: {id}")
+            # Cannot set FPs if a scan is not completed
+            status = dbh.scanInstanceGet(id)
+            if not status:
+                return self.error(f"Invalid scan ID: {id}")
 
-        if status[5] not in ["ABORTED", "FINISHED", "ERROR-FAILED"]:
-            return json.dumps([
-                "WARNING",
-                "Scan must be in a finished state when setting False Positives."
-            ]).encode('utf-8')
+            if status[5] not in ["ABORTED", "FINISHED", "ERROR-FAILED"]:
+                return json.dumps([
+                    "WARNING",
+                    "Scan must be in a finished state when setting False Positives."
+                ]).encode('utf-8')
 
-        # Make sure the user doesn't set something as non-FP when the
-        # parent is set as an FP (unless force is set).
-        if fp == "0" and force != "1":
-            data = dbh.scanElementSourcesDirect(id, ids)
-            for row in data:
-                if str(row[14]) == "1":
-                    return json.dumps([
-                        "WARNING",
-                        f"Cannot unset element {id} as False Positive if a parent element is still False Positive. Use force option to override."
-                    ]).encode('utf-8')
+            # Make sure the user doesn't set something as non-FP when the
+            # parent is set as an FP (unless force is set).
+            if fp == "0" and force != "1":
+                data = dbh.scanElementSourcesDirect(id, ids)
+                for row in data:
+                    if str(row[14]) == "1":
+                        return json.dumps([
+                            "WARNING",
+                            f"Cannot unset element {id} as False Positive if a parent element is still False Positive. Use force option to override."
+                        ]).encode('utf-8')
 
-        # Set all the children as FPs too.. it's only logical afterall, right?
-        # When force unsetting, only unset the selected items, not children
-        if force == "1" and fp == "0":
-            allIds = ids
-        else:
-            childs = dbh.scanElementChildrenAll(id, ids)
-            allIds = ids + childs
+            # Set all the children as FPs too.. it's only logical afterall, right?
+            # When force unsetting, only unset the selected items, not children
+            if force == "1" and fp == "0":
+                allIds = ids
+            else:
+                childs = dbh.scanElementChildrenAll(id, ids)
+                allIds = ids + childs
 
-        ret = dbh.scanResultsUpdateFP(id, allIds, int(fp))
-        if ret:
-            return json.dumps(["SUCCESS", ""]).encode('utf-8')
+            ret = dbh.scanResultsUpdateFP(id, allIds, int(fp))
+            if ret:
+                return json.dumps(["SUCCESS", ""]).encode('utf-8')
 
-        return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
+            return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
 
     @cherrypy.expose
     def resultsetfppersist(self: 'SpiderFootWebUi', id: str, resultids: str, fp: str, persist: str = "0", force: str = "0") -> str:
@@ -4017,105 +4017,105 @@ class SpiderFootWebUi:
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        if fp not in ["0", "1", "2"]:
-            return json.dumps(["ERROR", "Invalid status flag. Use 0 (unvalidated), 1 (false positive), or 2 (validated)."]).encode('utf-8')
+            if fp not in ["0", "1", "2"]:
+                return json.dumps(["ERROR", "Invalid status flag. Use 0 (unvalidated), 1 (false positive), or 2 (validated)."]).encode('utf-8')
 
-        try:
-            ids = json.loads(resultids)
-        except Exception:
-            return json.dumps(["ERROR", "No IDs supplied."]).encode('utf-8')
+            try:
+                ids = json.loads(resultids)
+            except Exception:
+                return json.dumps(["ERROR", "No IDs supplied."]).encode('utf-8')
 
-        # Cannot set FPs if a scan is not completed
-        status = dbh.scanInstanceGet(id)
-        if not status:
-            return self.error(f"Invalid scan ID: {id}")
+            # Cannot set FPs if a scan is not completed
+            status = dbh.scanInstanceGet(id)
+            if not status:
+                return self.error(f"Invalid scan ID: {id}")
 
-        if status[5] not in ["ABORTED", "FINISHED", "ERROR-FAILED"]:
-            return json.dumps([
-                "WARNING",
-                "Scan must be in a finished state when setting False Positives."
-            ]).encode('utf-8')
+            if status[5] not in ["ABORTED", "FINISHED", "ERROR-FAILED"]:
+                return json.dumps([
+                    "WARNING",
+                    "Scan must be in a finished state when setting False Positives."
+                ]).encode('utf-8')
 
-        target = status[1]  # seed_target
+            target = status[1]  # seed_target
 
-        # Auto-enable persistence if there are multiple scans for this target
-        # This ensures FP changes always sync across all scans of the same target
-        if persist != "1":
-            scanCount = dbh.scanCountForTarget(target)
-            if scanCount > 1:
-                persist = "1"
+            # Auto-enable persistence if there are multiple scans for this target
+            # This ensures FP changes always sync across all scans of the same target
+            if persist != "1":
+                scanCount = dbh.scanCountForTarget(target)
+                if scanCount > 1:
+                    persist = "1"
 
-        # Make sure the user doesn't set something as non-FP when the
-        # parent is set as an FP (unless force is set).
-        if fp == "0" and force != "1":
-            data = dbh.scanElementSourcesDirect(id, ids)
-            for row in data:
-                if str(row[14]) == "1":
-                    return json.dumps([
-                        "WARNING",
-                        f"Cannot unset element {id} as False Positive if a parent element is still False Positive. Use force option to override."
-                    ]).encode('utf-8')
+            # Make sure the user doesn't set something as non-FP when the
+            # parent is set as an FP (unless force is set).
+            if fp == "0" and force != "1":
+                data = dbh.scanElementSourcesDirect(id, ids)
+                for row in data:
+                    if str(row[14]) == "1":
+                        return json.dumps([
+                            "WARNING",
+                            f"Cannot unset element {id} as False Positive if a parent element is still False Positive. Use force option to override."
+                        ]).encode('utf-8')
 
-        # Set all the children as FPs too.. it's only logical afterall, right?
-        # When force unsetting, only unset the selected items, not children
-        if force == "1" and fp == "0":
-            allIds = ids
-        else:
-            childs = dbh.scanElementChildrenAll(id, ids)
-            allIds = ids + childs
+            # Set all the children as FPs too.. it's only logical afterall, right?
+            # When force unsetting, only unset the selected items, not children
+            if force == "1" and fp == "0":
+                allIds = ids
+            else:
+                childs = dbh.scanElementChildrenAll(id, ids)
+                allIds = ids + childs
 
-        ret = dbh.scanResultsUpdateFP(id, allIds, int(fp))
+            ret = dbh.scanResultsUpdateFP(id, allIds, int(fp))
 
-        # Handle target-level persistence and cross-scan sync
-        if ret and persist == "1":
-            # Get the event details for each ID to persist at target level
-            events = dbh.scanResultEvent(id)
-            eventMap = {row[8]: row for row in events}  # hash -> event data
+            # Handle target-level persistence and cross-scan sync
+            if ret and persist == "1":
+                # Get the event details for each ID to persist at target level
+                events = dbh.scanResultEvent(id)
+                eventMap = {row[8]: row for row in events}  # hash -> event data
 
-            for resultId in allIds:  # Persist all marked items including children
-                if resultId in eventMap:
-                    eventData = eventMap[resultId]
-                    eventType = eventData[4]  # type
-                    data = eventData[1]  # data
-                    sourceData = eventData[2]  # source data for granular matching
+                for resultId in allIds:  # Persist all marked items including children
+                    if resultId in eventMap:
+                        eventData = eventMap[resultId]
+                        eventType = eventData[4]  # type
+                        data = eventData[1]  # data
+                        sourceData = eventData[2]  # source data for granular matching
 
-                    if fp == "1":
-                        # Mark as false positive - add to FP table, remove from validated
-                        dbh.targetFalsePositiveAdd(target, eventType, data, sourceData)
-                        dbh.targetValidatedRemove(target, eventType, data, sourceData)
-                    elif fp == "2":
-                        # Mark as validated - add to validated table, remove from FP
-                        dbh.targetValidatedAdd(target, eventType, data, sourceData)
-                        dbh.targetFalsePositiveRemove(target, eventType, data, sourceData)
-                        # Two-way sync: also add to known assets as ANALYST_CONFIRMED
-                        try:
-                            ka_type = 'domain'
-                            if eventType in ('IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'):
-                                ka_type = 'ip'
-                            elif eventType in ('HUMAN_NAME', 'USERNAME', 'EMAILADDR',
-                                               'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'):
-                                ka_type = 'employee'
-                            current_user = cherrypy.session.get('user', 'anonymous')
-                            dbh.knownAssetAdd(target, ka_type, data,
-                                              source='ANALYST_CONFIRMED', addedBy=current_user)
-                        except Exception:
-                            pass  # Non-critical - asset table may not exist on older DBs
-                    else:
-                        # Clear status - remove from both tables
-                        dbh.targetFalsePositiveRemove(target, eventType, data, sourceData)
-                        dbh.targetValidatedRemove(target, eventType, data, sourceData)
+                        if fp == "1":
+                            # Mark as false positive - add to FP table, remove from validated
+                            dbh.targetFalsePositiveAdd(target, eventType, data, sourceData)
+                            dbh.targetValidatedRemove(target, eventType, data, sourceData)
+                        elif fp == "2":
+                            # Mark as validated - add to validated table, remove from FP
+                            dbh.targetValidatedAdd(target, eventType, data, sourceData)
+                            dbh.targetFalsePositiveRemove(target, eventType, data, sourceData)
+                            # Two-way sync: also add to known assets as ANALYST_CONFIRMED
+                            try:
+                                ka_type = 'domain'
+                                if eventType in ('IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'):
+                                    ka_type = 'ip'
+                                elif eventType in ('HUMAN_NAME', 'USERNAME', 'EMAILADDR',
+                                                   'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'):
+                                    ka_type = 'employee'
+                                current_user = cherrypy.session.get('user', 'anonymous')
+                                dbh.knownAssetAdd(target, ka_type, data,
+                                                  source='ANALYST_CONFIRMED', addedBy=current_user)
+                            except Exception:
+                                pass  # Non-critical - asset table may not exist on older DBs
+                        else:
+                            # Clear status - remove from both tables
+                            dbh.targetFalsePositiveRemove(target, eventType, data, sourceData)
+                            dbh.targetValidatedRemove(target, eventType, data, sourceData)
 
-                    # Sync the scan-level FP flag across all scans of the same target
-                    # This ensures that if you change FP status on one scan, all other scans
-                    # with the same entry (same type, data, source_data) are also updated
-                    dbh.syncFalsePositiveAcrossScans(target, eventType, data, sourceData, int(fp))
+                        # Sync the scan-level FP flag across all scans of the same target
+                        # This ensures that if you change FP status on one scan, all other scans
+                        # with the same entry (same type, data, source_data) are also updated
+                        dbh.syncFalsePositiveAcrossScans(target, eventType, data, sourceData, int(fp))
 
-        if ret:
-            return json.dumps(["SUCCESS", ""]).encode('utf-8')
+            if ret:
+                return json.dumps(["SUCCESS", ""]).encode('utf-8')
 
-        return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
+            return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -4130,22 +4130,22 @@ class SpiderFootWebUi:
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        fps = dbh.targetFalsePositiveList(target)
+            fps = dbh.targetFalsePositiveList(target)
 
-        ret = []
-        for fp in fps:
-            ret.append({
-                'id': fp[0],
-                'target': fp[1],
-                'event_type': fp[2],
-                'event_data': fp[3],
-                'date_added': fp[4],
-                'notes': fp[5]
-            })
+            ret = []
+            for fp in fps:
+                ret.append({
+                    'id': fp[0],
+                    'target': fp[1],
+                    'event_type': fp[2],
+                    'event_data': fp[3],
+                    'date_added': fp[4],
+                    'notes': fp[5]
+                })
 
-        return ret
+            return ret
 
     @cherrypy.expose
     def targetfpadd(self: 'SpiderFootWebUi', target: str, event_type: str, event_data: str, notes: str = None) -> str:
@@ -4162,19 +4162,19 @@ class SpiderFootWebUi:
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        if not target or not event_type or not event_data:
-            return json.dumps(["ERROR", "Missing required parameters."]).encode('utf-8')
+            if not target or not event_type or not event_data:
+                return json.dumps(["ERROR", "Missing required parameters."]).encode('utf-8')
 
-        try:
-            ret = dbh.targetFalsePositiveAdd(target, event_type, event_data, notes)
-            if ret:
-                return json.dumps(["SUCCESS", ""]).encode('utf-8')
-        except Exception as e:
-            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+            try:
+                ret = dbh.targetFalsePositiveAdd(target, event_type, event_data, notes)
+                if ret:
+                    return json.dumps(["SUCCESS", ""]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
-        return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
+            return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
 
     @cherrypy.expose
     def targetfpremove(self: 'SpiderFootWebUi', id: str = None, target: str = None, event_type: str = None, event_data: str = None) -> str:
@@ -4193,22 +4193,22 @@ class SpiderFootWebUi:
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            if id:
-                ret = dbh.targetFalsePositiveRemoveById(int(id))
-            elif target and event_type and event_data:
-                ret = dbh.targetFalsePositiveRemove(target, event_type, event_data)
-            else:
-                return json.dumps(["ERROR", "Must provide either ID or target/event_type/event_data."]).encode('utf-8')
+            try:
+                if id:
+                    ret = dbh.targetFalsePositiveRemoveById(int(id))
+                elif target and event_type and event_data:
+                    ret = dbh.targetFalsePositiveRemove(target, event_type, event_data)
+                else:
+                    return json.dumps(["ERROR", "Must provide either ID or target/event_type/event_data."]).encode('utf-8')
 
-            if ret:
-                return json.dumps(["SUCCESS", ""]).encode('utf-8')
-        except Exception as e:
-            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+                if ret:
+                    return json.dumps(["SUCCESS", ""]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
-        return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
+            return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -4223,22 +4223,22 @@ class SpiderFootWebUi:
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        vals = dbh.targetValidatedList(target)
+            vals = dbh.targetValidatedList(target)
 
-        ret = []
-        for val in vals:
-            ret.append({
-                'id': val[0],
-                'target': val[1],
-                'event_type': val[2],
-                'event_data': val[3],
-                'date_added': val[4],
-                'notes': val[5]
-            })
+            ret = []
+            for val in vals:
+                ret.append({
+                    'id': val[0],
+                    'target': val[1],
+                    'event_type': val[2],
+                    'event_data': val[3],
+                    'date_added': val[4],
+                    'notes': val[5]
+                })
 
-        return ret
+            return ret
 
     @cherrypy.expose
     def targetvalidatedadd(self: 'SpiderFootWebUi', target: str, event_type: str, event_data: str, notes: str = None) -> str:
@@ -4255,19 +4255,19 @@ class SpiderFootWebUi:
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        if not target or not event_type or not event_data:
-            return json.dumps(["ERROR", "Missing required parameters."]).encode('utf-8')
+            if not target or not event_type or not event_data:
+                return json.dumps(["ERROR", "Missing required parameters."]).encode('utf-8')
 
-        try:
-            ret = dbh.targetValidatedAdd(target, event_type, event_data, notes)
-            if ret:
-                return json.dumps(["SUCCESS", ""]).encode('utf-8')
-        except Exception as e:
-            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+            try:
+                ret = dbh.targetValidatedAdd(target, event_type, event_data, notes)
+                if ret:
+                    return json.dumps(["SUCCESS", ""]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
-        return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
+            return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
 
     @cherrypy.expose
     def targetvalidatedremove(self: 'SpiderFootWebUi', id: str = None, target: str = None, event_type: str = None, event_data: str = None) -> str:
@@ -4286,22 +4286,22 @@ class SpiderFootWebUi:
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            if id:
-                ret = dbh.targetValidatedRemoveById(int(id))
-            elif target and event_type and event_data:
-                ret = dbh.targetValidatedRemove(target, event_type, event_data)
-            else:
-                return json.dumps(["ERROR", "Must provide either ID or target/event_type/event_data."]).encode('utf-8')
+            try:
+                if id:
+                    ret = dbh.targetValidatedRemoveById(int(id))
+                elif target and event_type and event_data:
+                    ret = dbh.targetValidatedRemove(target, event_type, event_data)
+                else:
+                    return json.dumps(["ERROR", "Must provide either ID or target/event_type/event_data."]).encode('utf-8')
 
-            if ret:
-                return json.dumps(["SUCCESS", ""]).encode('utf-8')
-        except Exception as e:
-            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+                if ret:
+                    return json.dumps(["SUCCESS", ""]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
-        return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
+            return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
 
     # -------------------------------------------------------------------
     # Known Assets endpoints
@@ -4323,25 +4323,25 @@ class SpiderFootWebUi:
         if not target:
             return json.dumps([]).encode('utf-8')
 
-        dbh = SpiderFootDb(self.config)
-        try:
-            rows = dbh.knownAssetList(target, asset_type)
-            result = []
-            for r in rows:
-                result.append({
-                    'id': r[0],
-                    'target': r[1],
-                    'asset_type': r[2],
-                    'asset_value': r[3],
-                    'source': r[4],
-                    'import_batch': r[5],
-                    'date_added': r[6],
-                    'added_by': r[7],
-                    'notes': r[8]
-                })
-            return json.dumps(result).encode('utf-8')
-        except Exception as e:
-            return json.dumps([]).encode('utf-8')
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                rows = dbh.knownAssetList(target, asset_type)
+                result = []
+                for r in rows:
+                    result.append({
+                        'id': r[0],
+                        'target': r[1],
+                        'asset_type': r[2],
+                        'asset_value': r[3],
+                        'source': r[4],
+                        'import_batch': r[5],
+                        'date_added': r[6],
+                        'added_by': r[7],
+                        'notes': r[8]
+                    })
+                return json.dumps(result).encode('utf-8')
+            except Exception as e:
+                return json.dumps([]).encode('utf-8')
 
     @cherrypy.expose
     def knownassetadd(self: 'SpiderFootWebUi', target: str = None, asset_type: str = None,
@@ -4364,13 +4364,13 @@ class SpiderFootWebUi:
             source = 'CLIENT_PROVIDED'
 
         current_user = cherrypy.session.get('user', 'anonymous')
-        dbh = SpiderFootDb(self.config)
-        try:
-            dbh.knownAssetAdd(target, asset_type, asset_value.strip(),
-                              source=source, addedBy=current_user, notes=notes)
-            return json.dumps(["SUCCESS", ""]).encode('utf-8')
-        except Exception as e:
-            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                dbh.knownAssetAdd(target, asset_type, asset_value.strip(),
+                                  source=source, addedBy=current_user, notes=notes)
+                return json.dumps(["SUCCESS", ""]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
     @cherrypy.expose
     def knownassetremove(self: 'SpiderFootWebUi', id: str = None, ids: str = None) -> str:
@@ -4385,19 +4385,19 @@ class SpiderFootWebUi:
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
-        dbh = SpiderFootDb(self.config)
-        try:
-            if ids:
-                id_list = json.loads(ids)
-                count = dbh.knownAssetRemoveBulk(id_list)
-                return json.dumps(["SUCCESS", f"Removed {count} assets."]).encode('utf-8')
-            elif id:
-                dbh.knownAssetRemove(assetId=int(id))
-                return json.dumps(["SUCCESS", ""]).encode('utf-8')
-            else:
-                return json.dumps(["ERROR", "id or ids required."]).encode('utf-8')
-        except Exception as e:
-            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                if ids:
+                    id_list = json.loads(ids)
+                    count = dbh.knownAssetRemoveBulk(id_list)
+                    return json.dumps(["SUCCESS", f"Removed {count} assets."]).encode('utf-8')
+                elif id:
+                    dbh.knownAssetRemove(assetId=int(id))
+                    return json.dumps(["SUCCESS", ""]).encode('utf-8')
+                else:
+                    return json.dumps(["ERROR", "id or ids required."]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
     @cherrypy.expose
     def knownassetupdate(self: 'SpiderFootWebUi', id: str = None,
@@ -4412,12 +4412,12 @@ class SpiderFootWebUi:
         if not id:
             return json.dumps(["ERROR", "id is required."]).encode('utf-8')
 
-        dbh = SpiderFootDb(self.config)
-        try:
-            dbh.knownAssetUpdate(int(id), notes=notes, source=source)
-            return json.dumps(["SUCCESS", ""]).encode('utf-8')
-        except Exception as e:
-            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                dbh.knownAssetUpdate(int(id), notes=notes, source=source)
+                return json.dumps(["SUCCESS", ""]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
     @cherrypy.expose
     def knownassetimport(self: 'SpiderFootWebUi', target: str = None,
@@ -4509,16 +4509,16 @@ class SpiderFootWebUi:
         if not assets:
             return json.dumps(["ERROR", "No valid entries found in file."]).encode('utf-8')
 
-        dbh = SpiderFootDb(self.config)
-        try:
-            count = dbh.knownAssetAddBulk(target, asset_type, assets,
-                                          source='CLIENT_PROVIDED',
-                                          importBatch=import_batch,
-                                          addedBy=current_user)
-            dbh.assetImportHistoryAdd(target, asset_type, file_name, count, current_user)
-            return json.dumps(["SUCCESS", f"Imported {count} new assets ({len(assets)} total in file)."]).encode('utf-8')
-        except Exception as e:
-            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                count = dbh.knownAssetAddBulk(target, asset_type, assets,
+                                              source='CLIENT_PROVIDED',
+                                              importBatch=import_batch,
+                                              addedBy=current_user)
+                dbh.assetImportHistoryAdd(target, asset_type, file_name, count, current_user)
+                return json.dumps(["SUCCESS", f"Imported {count} new assets ({len(assets)} total in file)."]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
     @cherrypy.expose
     def knownassetmatches(self: 'SpiderFootWebUi', id: str = None) -> str:
@@ -4535,37 +4535,37 @@ class SpiderFootWebUi:
         if not id:
             return json.dumps([]).encode('utf-8')
 
-        dbh = SpiderFootDb(self.config)
-        try:
-            # Get scan target
-            scan_info = dbh.scanInstanceGet(id)
-            if not scan_info:
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                # Get scan target
+                scan_info = dbh.scanInstanceGet(id)
+                if not scan_info:
+                    return json.dumps([]).encode('utf-8')
+                target = scan_info[1]  # seed_target
+
+                # Get target-level FP/validated status
+                targetFps = dbh.targetFalsePositivesForTarget(target)
+                targetValidated = dbh.targetValidatedForTarget(target)
+
+                matches = dbh.knownAssetMatchScanResults(id, target)
+
+                # Enrich matches with target-level status
+                for m in matches:
+                    m['isTargetFp'] = 0
+                    m['isTargetValidated'] = 0
+                    # Check target-level status
+                    for fp_tuple in targetFps:
+                        if fp_tuple[0] == m['type'] and fp_tuple[1] == m['data']:
+                            m['isTargetFp'] = 1
+                            break
+                    for val_tuple in targetValidated:
+                        if val_tuple[0] == m['type'] and val_tuple[1] == m['data']:
+                            m['isTargetValidated'] = 1
+                            break
+
+                return json.dumps(matches).encode('utf-8')
+            except Exception as e:
                 return json.dumps([]).encode('utf-8')
-            target = scan_info[1]  # seed_target
-
-            # Get target-level FP/validated status
-            targetFps = dbh.targetFalsePositivesForTarget(target)
-            targetValidated = dbh.targetValidatedForTarget(target)
-
-            matches = dbh.knownAssetMatchScanResults(id, target)
-
-            # Enrich matches with target-level status
-            for m in matches:
-                m['isTargetFp'] = 0
-                m['isTargetValidated'] = 0
-                # Check target-level status
-                for fp_tuple in targetFps:
-                    if fp_tuple[0] == m['type'] and fp_tuple[1] == m['data']:
-                        m['isTargetFp'] = 1
-                        break
-                for val_tuple in targetValidated:
-                    if val_tuple[0] == m['type'] and val_tuple[1] == m['data']:
-                        m['isTargetValidated'] = 1
-                        break
-
-            return json.dumps(matches).encode('utf-8')
-        except Exception as e:
-            return json.dumps([]).encode('utf-8')
 
     @cherrypy.expose
     def knownassetcount(self: 'SpiderFootWebUi', target: str = None) -> str:
@@ -4579,12 +4579,12 @@ class SpiderFootWebUi:
         if not target:
             return json.dumps({'total': 0}).encode('utf-8')
 
-        dbh = SpiderFootDb(self.config)
-        try:
-            counts = dbh.knownAssetCount(target)
-            return json.dumps(counts).encode('utf-8')
-        except Exception as e:
-            return json.dumps({'total': 0}).encode('utf-8')
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                counts = dbh.knownAssetCount(target)
+                return json.dumps(counts).encode('utf-8')
+            except Exception as e:
+                return json.dumps({'total': 0}).encode('utf-8')
 
     @cherrypy.expose
     def knownassetexport(self: 'SpiderFootWebUi', target: str = None, format: str = 'csv') -> bytes:
@@ -4596,32 +4596,32 @@ class SpiderFootWebUi:
         if not target:
             return b''
 
-        dbh = SpiderFootDb(self.config)
-        rows = dbh.knownAssetList(target)
+        with SpiderFootDb(self.config) as dbh:
+            rows = dbh.knownAssetList(target)
 
-        if format == 'excel':
-            cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            fname = self._export_filename(target, '', 'ASSETS', 'xlsx')
-            cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="{fname}"'
-            wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.title = "Known Assets"
-            ws.append(["Type", "Value", "Source", "Date Added", "Added By", "Notes"])
-            for r in rows:
-                ws.append([r[2], r[3], r[4], r[6], r[7], r[8]])
-            output = BytesIO()
-            wb.save(output)
-            return output.getvalue()
-        else:
-            cherrypy.response.headers['Content-Type'] = "text/csv; charset=utf-8"
-            fname = self._export_filename(target, '', 'ASSETS', 'csv')
-            cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="{fname}"'
-            output = StringIO()
-            writer = csv.writer(output)
-            writer.writerow(["Type", "Value", "Source", "Date Added", "Added By", "Notes"])
-            for r in rows:
-                writer.writerow([r[2], r[3], r[4], r[6], r[7], r[8]])
-            return output.getvalue().encode('utf-8')
+            if format == 'excel':
+                cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                fname = self._export_filename(target, '', 'ASSETS', 'xlsx')
+                cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="{fname}"'
+                wb = openpyxl.Workbook()
+                ws = wb.active
+                ws.title = "Known Assets"
+                ws.append(["Type", "Value", "Source", "Date Added", "Added By", "Notes"])
+                for r in rows:
+                    ws.append([r[2], r[3], r[4], r[6], r[7], r[8]])
+                output = BytesIO()
+                wb.save(output)
+                return output.getvalue()
+            else:
+                cherrypy.response.headers['Content-Type'] = "text/csv; charset=utf-8"
+                fname = self._export_filename(target, '', 'ASSETS', 'csv')
+                cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="{fname}"'
+                output = StringIO()
+                writer = csv.writer(output)
+                writer.writerow(["Type", "Value", "Source", "Date Added", "Added By", "Notes"])
+                for r in rows:
+                    writer.writerow([r[2], r[3], r[4], r[6], r[7], r[8]])
+                return output.getvalue().encode('utf-8')
 
     @cherrypy.expose
     def knownassetexportzip(self: 'SpiderFootWebUi', target: str = None) -> bytes:
@@ -4643,45 +4643,45 @@ class SpiderFootWebUi:
 
         import zipfile
 
-        dbh = SpiderFootDb(self.config)
-        rows = dbh.knownAssetList(target)
+        with SpiderFootDb(self.config) as dbh:
+            rows = dbh.knownAssetList(target)
 
-        # Separate rows by asset type
-        asset_buckets = {
-            'ip': [],
-            'domain': [],
-            'employee': [],
-        }
-        for r in rows:
-            asset_type = r[2]
-            if asset_type in asset_buckets:
-                asset_buckets[asset_type].append(r)
+            # Separate rows by asset type
+            asset_buckets = {
+                'ip': [],
+                'domain': [],
+                'employee': [],
+            }
+            for r in rows:
+                asset_type = r[2]
+                if asset_type in asset_buckets:
+                    asset_buckets[asset_type].append(r)
 
-        headers = ["Type", "Value", "Source", "Date Added", "Added By", "Notes"]
+            headers = ["Type", "Value", "Source", "Date Added", "Added By", "Notes"]
 
-        type_filenames = {
-            'ip': 'IPs.csv',
-            'domain': 'DOMAINS.csv',
-            'employee': 'EMPLOYEES.csv',
-        }
+            type_filenames = {
+                'ip': 'IPs.csv',
+                'domain': 'DOMAINS.csv',
+                'employee': 'EMPLOYEES.csv',
+            }
 
-        zip_buf = BytesIO()
-        with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-            for atype, arows in asset_buckets.items():
-                buf = StringIO()
-                writer = csv.writer(buf, dialect='excel')
-                writer.writerow(headers)
-                for r in arows:
-                    writer.writerow([r[2], r[3], r[4], r[6], r[7], r[8]])
-                zf.writestr(type_filenames[atype], buf.getvalue())
+            zip_buf = BytesIO()
+            with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for atype, arows in asset_buckets.items():
+                    buf = StringIO()
+                    writer = csv.writer(buf, dialect='excel')
+                    writer.writerow(headers)
+                    for r in arows:
+                        writer.writerow([r[2], r[3], r[4], r[6], r[7], r[8]])
+                    zf.writestr(type_filenames[atype], buf.getvalue())
 
-        zip_buf.seek(0)
+            zip_buf.seek(0)
 
-        fname = self._export_filename(target, '', 'ASSETS', 'zip')
-        cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="{fname}"'
-        cherrypy.response.headers['Content-Type'] = "application/zip"
-        cherrypy.response.headers['Pragma'] = "no-cache"
-        return zip_buf.read()
+            fname = self._export_filename(target, '', 'ASSETS', 'zip')
+            cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="{fname}"'
+            cherrypy.response.headers['Content-Type'] = "application/zip"
+            cherrypy.response.headers['Pragma'] = "no-cache"
+            return zip_buf.read()
 
     @cherrypy.expose
     def knownassetimporthistory(self: 'SpiderFootWebUi', target: str = None) -> str:
@@ -4695,23 +4695,23 @@ class SpiderFootWebUi:
         if not target:
             return json.dumps([]).encode('utf-8')
 
-        dbh = SpiderFootDb(self.config)
-        try:
-            rows = dbh.assetImportHistoryList(target)
-            result = []
-            for r in rows:
-                result.append({
-                    'id': r[0],
-                    'target': r[1],
-                    'asset_type': r[2],
-                    'file_name': r[3],
-                    'item_count': r[4],
-                    'imported_by': r[5],
-                    'date_imported': r[6]
-                })
-            return json.dumps(result).encode('utf-8')
-        except Exception:
-            return json.dumps([]).encode('utf-8')
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                rows = dbh.assetImportHistoryList(target)
+                result = []
+                for r in rows:
+                    result.append({
+                        'id': r[0],
+                        'target': r[1],
+                        'asset_type': r[2],
+                        'file_name': r[3],
+                        'item_count': r[4],
+                        'imported_by': r[5],
+                        'date_imported': r[6]
+                    })
+                return json.dumps(result).encode('utf-8')
+            except Exception:
+                return json.dumps([]).encode('utf-8')
 
     @cherrypy.expose
     def knownassetsyncverified(self: 'SpiderFootWebUi', id: str = None) -> str:
@@ -4732,76 +4732,76 @@ class SpiderFootWebUi:
         if not id:
             return json.dumps(["ERROR", "scan id is required."]).encode('utf-8')
 
-        dbh = SpiderFootDb(self.config)
-        current_user = cherrypy.session.get('user', 'anonymous')
+        with SpiderFootDb(self.config) as dbh:
+            current_user = cherrypy.session.get('user', 'anonymous')
 
-        try:
-            scan_info = dbh.scanInstanceGet(id)
-            if not scan_info:
-                return json.dumps(["ERROR", "Scan not found."]).encode('utf-8')
-            target = scan_info[1]
-
-            # Get all validated entries from this scan
-            events = dbh.scanResultEvent(id)
-            count = 0
-            ip_types = {'IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'}
-            domain_types = {'DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
-                            'CO_HOSTED_SITE', 'SIMILARDOMAIN', 'INTERNET_NAME_UNRESOLVED'}
-            employee_types = {'HUMAN_NAME', 'USERNAME', 'EMAILADDR',
-                              'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'}
-
-            for ev in events:
-                fp_flag = ev[13]  # false_positive column
-                if fp_flag != 2:
-                    continue
-                event_type = ev[4]
-                event_data = ev[1]
-                if not event_data:
-                    continue
-
-                # Determine asset type
-                asset_type = None
-                if event_type in ip_types:
-                    asset_type = 'ip'
-                elif event_type in domain_types:
-                    asset_type = 'domain'
-                elif event_type in employee_types:
-                    asset_type = 'employee'
-
-                if asset_type:
-                    try:
-                        dbh.knownAssetAdd(target, asset_type, event_data,
-                                          source='ANALYST_CONFIRMED', addedBy=current_user)
-                        count += 1
-                    except Exception:
-                        pass  # Duplicate - already exists
-
-            # Also sync from target-level validated entries
             try:
-                targetValidated = dbh.targetValidatedForTarget(target)
-                for (evt, evd, esd) in targetValidated:
-                    if not evd:
+                scan_info = dbh.scanInstanceGet(id)
+                if not scan_info:
+                    return json.dumps(["ERROR", "Scan not found."]).encode('utf-8')
+                target = scan_info[1]
+
+                # Get all validated entries from this scan
+                events = dbh.scanResultEvent(id)
+                count = 0
+                ip_types = {'IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'}
+                domain_types = {'DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
+                                'CO_HOSTED_SITE', 'SIMILARDOMAIN', 'INTERNET_NAME_UNRESOLVED'}
+                employee_types = {'HUMAN_NAME', 'USERNAME', 'EMAILADDR',
+                                  'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'}
+
+                for ev in events:
+                    fp_flag = ev[13]  # false_positive column
+                    if fp_flag != 2:
                         continue
+                    event_type = ev[4]
+                    event_data = ev[1]
+                    if not event_data:
+                        continue
+
+                    # Determine asset type
                     asset_type = None
-                    if evt in ip_types:
+                    if event_type in ip_types:
                         asset_type = 'ip'
-                    elif evt in domain_types:
+                    elif event_type in domain_types:
                         asset_type = 'domain'
-                    elif evt in employee_types:
+                    elif event_type in employee_types:
                         asset_type = 'employee'
+
                     if asset_type:
                         try:
-                            dbh.knownAssetAdd(target, asset_type, evd,
+                            dbh.knownAssetAdd(target, asset_type, event_data,
                                               source='ANALYST_CONFIRMED', addedBy=current_user)
                             count += 1
                         except Exception:
-                            pass
-            except Exception:
-                pass
+                            pass  # Duplicate - already exists
 
-            return json.dumps(["SUCCESS", f"Synced {count} verified entries to known assets."]).encode('utf-8')
-        except Exception as e:
-            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+                # Also sync from target-level validated entries
+                try:
+                    targetValidated = dbh.targetValidatedForTarget(target)
+                    for (evt, evd, esd) in targetValidated:
+                        if not evd:
+                            continue
+                        asset_type = None
+                        if evt in ip_types:
+                            asset_type = 'ip'
+                        elif evt in domain_types:
+                            asset_type = 'domain'
+                        elif evt in employee_types:
+                            asset_type = 'employee'
+                        if asset_type:
+                            try:
+                                dbh.knownAssetAdd(target, asset_type, evd,
+                                                  source='ANALYST_CONFIRMED', addedBy=current_user)
+                                count += 1
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+
+                return json.dumps(["SUCCESS", f"Synced {count} verified entries to known assets."]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
     @cherrypy.expose
     def knownassetverifymatch(self: 'SpiderFootWebUi', id: str = None,
@@ -4835,112 +4835,112 @@ class SpiderFootWebUi:
         else:
             return json.dumps(["ERROR", "result_hash or result_hashes required."]).encode('utf-8')
 
-        dbh = SpiderFootDb(self.config)
-        current_user = cherrypy.session.get('user', 'anonymous')
+        with SpiderFootDb(self.config) as dbh:
+            current_user = cherrypy.session.get('user', 'anonymous')
 
-        try:
-            scan_info = dbh.scanInstanceGet(id)
-            if not scan_info:
-                return json.dumps(["ERROR", "Scan not found."]).encode('utf-8')
-            target = scan_info[1]
+            try:
+                scan_info = dbh.scanInstanceGet(id)
+                if not scan_info:
+                    return json.dumps(["ERROR", "Scan not found."]).encode('utf-8')
+                target = scan_info[1]
 
-            # Build event map from all scan results (same pattern as resultsetfppersist)
-            events = dbh.scanResultEvent(id)
-            eventMap = {row[8]: row for row in events}  # hash -> event row
+                # Build event map from all scan results (same pattern as resultsetfppersist)
+                events = dbh.scanResultEvent(id)
+                eventMap = {row[8]: row for row in events}  # hash -> event row
 
-            if action == 'verify':
-                # Mark as validated (FP=2) in scan with children
-                childs = dbh.scanElementChildrenAll(id, hashes)
-                allIds = hashes + childs
-                dbh.scanResultsUpdateFP(id, allIds, 2)
+                if action == 'verify':
+                    # Mark as validated (FP=2) in scan with children
+                    childs = dbh.scanElementChildrenAll(id, hashes)
+                    allIds = hashes + childs
+                    dbh.scanResultsUpdateFP(id, allIds, 2)
 
-                # Persist at target level and add to known assets
-                for h in allIds:
-                    if h in eventMap:
-                        ev = eventMap[h]
-                        event_type = ev[4]
-                        event_data = ev[1]
-                        source_data = ev[2]
-                        # Persist as target validated
-                        dbh.targetValidatedAdd(target, event_type, event_data, source_data)
-                        dbh.targetFalsePositiveRemove(target, event_type, event_data, source_data)
-                        # Sync across scans
-                        dbh.syncFalsePositiveAcrossScans(target, event_type, event_data, source_data, 2)
+                    # Persist at target level and add to known assets
+                    for h in allIds:
+                        if h in eventMap:
+                            ev = eventMap[h]
+                            event_type = ev[4]
+                            event_data = ev[1]
+                            source_data = ev[2]
+                            # Persist as target validated
+                            dbh.targetValidatedAdd(target, event_type, event_data, source_data)
+                            dbh.targetFalsePositiveRemove(target, event_type, event_data, source_data)
+                            # Sync across scans
+                            dbh.syncFalsePositiveAcrossScans(target, event_type, event_data, source_data, 2)
 
-                # Add only the directly matched items (not children) to known assets
-                for h in hashes:
-                    if h in eventMap:
-                        ev = eventMap[h]
-                        event_type = ev[4]
-                        event_data = ev[1]
-                        asset_type = 'domain'
-                        if event_type in ('IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'):
-                            asset_type = 'ip'
-                        elif event_type in ('HUMAN_NAME', 'USERNAME', 'EMAILADDR',
-                                            'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'):
-                            asset_type = 'employee'
-                        dbh.knownAssetAdd(target, asset_type, event_data,
-                                          source='ANALYST_CONFIRMED', addedBy=current_user)
+                    # Add only the directly matched items (not children) to known assets
+                    for h in hashes:
+                        if h in eventMap:
+                            ev = eventMap[h]
+                            event_type = ev[4]
+                            event_data = ev[1]
+                            asset_type = 'domain'
+                            if event_type in ('IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'):
+                                asset_type = 'ip'
+                            elif event_type in ('HUMAN_NAME', 'USERNAME', 'EMAILADDR',
+                                                'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'):
+                                asset_type = 'employee'
+                            dbh.knownAssetAdd(target, asset_type, event_data,
+                                              source='ANALYST_CONFIRMED', addedBy=current_user)
 
-                return json.dumps(["SUCCESS", f"Verified {len(hashes)} items."]).encode('utf-8')
+                    return json.dumps(["SUCCESS", f"Verified {len(hashes)} items."]).encode('utf-8')
 
-            elif action == 'fp':
-                # Mark as false positive (FP=1) in scan with children
-                childs = dbh.scanElementChildrenAll(id, hashes)
-                allIds = hashes + childs
-                dbh.scanResultsUpdateFP(id, allIds, 1)
+                elif action == 'fp':
+                    # Mark as false positive (FP=1) in scan with children
+                    childs = dbh.scanElementChildrenAll(id, hashes)
+                    allIds = hashes + childs
+                    dbh.scanResultsUpdateFP(id, allIds, 1)
 
-                for h in allIds:
-                    if h in eventMap:
-                        ev = eventMap[h]
-                        dbh.targetFalsePositiveAdd(target, ev[4], ev[1], ev[2])
-                        dbh.targetValidatedRemove(target, ev[4], ev[1], ev[2])
-                        dbh.syncFalsePositiveAcrossScans(target, ev[4], ev[1], ev[2], 1)
+                    for h in allIds:
+                        if h in eventMap:
+                            ev = eventMap[h]
+                            dbh.targetFalsePositiveAdd(target, ev[4], ev[1], ev[2])
+                            dbh.targetValidatedRemove(target, ev[4], ev[1], ev[2])
+                            dbh.syncFalsePositiveAcrossScans(target, ev[4], ev[1], ev[2], 1)
 
-                return json.dumps(["SUCCESS", f"Marked {len(hashes)} as false positive."]).encode('utf-8')
+                    return json.dumps(["SUCCESS", f"Marked {len(hashes)} as false positive."]).encode('utf-8')
 
-            elif action == 'reset':
-                # Reset to pending (FP=0) in scan with children
-                childs = dbh.scanElementChildrenAll(id, hashes)
-                allIds = hashes + childs
-                dbh.scanResultsUpdateFP(id, allIds, 0)
+                elif action == 'reset':
+                    # Reset to pending (FP=0) in scan with children
+                    childs = dbh.scanElementChildrenAll(id, hashes)
+                    allIds = hashes + childs
+                    dbh.scanResultsUpdateFP(id, allIds, 0)
 
-                for h in allIds:
-                    if h in eventMap:
-                        ev = eventMap[h]
-                        event_type = ev[4]
-                        event_data = ev[1]
-                        source_data = ev[2]
-                        # Remove from both target-level tables
-                        dbh.targetValidatedRemove(target, event_type, event_data, source_data)
-                        dbh.targetFalsePositiveRemove(target, event_type, event_data, source_data)
-                        # Sync FP=0 across scans
-                        dbh.syncFalsePositiveAcrossScans(target, event_type, event_data, source_data, 0)
+                    for h in allIds:
+                        if h in eventMap:
+                            ev = eventMap[h]
+                            event_type = ev[4]
+                            event_data = ev[1]
+                            source_data = ev[2]
+                            # Remove from both target-level tables
+                            dbh.targetValidatedRemove(target, event_type, event_data, source_data)
+                            dbh.targetFalsePositiveRemove(target, event_type, event_data, source_data)
+                            # Sync FP=0 across scans
+                            dbh.syncFalsePositiveAcrossScans(target, event_type, event_data, source_data, 0)
 
-                # Remove ANALYST_CONFIRMED known assets for directly matched items
-                for h in hashes:
-                    if h in eventMap:
-                        ev = eventMap[h]
-                        event_type = ev[4]
-                        event_data = ev[1]
-                        asset_type = 'domain'
-                        if event_type in ('IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'):
-                            asset_type = 'ip'
-                        elif event_type in ('HUMAN_NAME', 'USERNAME', 'EMAILADDR',
-                                            'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'):
-                            asset_type = 'employee'
-                        dbh.knownAssetRemove(target=target, assetType=asset_type, assetValue=event_data)
+                    # Remove ANALYST_CONFIRMED known assets for directly matched items
+                    for h in hashes:
+                        if h in eventMap:
+                            ev = eventMap[h]
+                            event_type = ev[4]
+                            event_data = ev[1]
+                            asset_type = 'domain'
+                            if event_type in ('IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'):
+                                asset_type = 'ip'
+                            elif event_type in ('HUMAN_NAME', 'USERNAME', 'EMAILADDR',
+                                                'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'):
+                                asset_type = 'employee'
+                            dbh.knownAssetRemove(target=target, assetType=asset_type, assetValue=event_data)
 
-                return json.dumps(["SUCCESS", f"Reset {len(hashes)} items to pending."]).encode('utf-8')
+                    return json.dumps(["SUCCESS", f"Reset {len(hashes)} items to pending."]).encode('utf-8')
 
-            elif action == 'dismiss':
-                return json.dumps(["SUCCESS", "Dismissed."]).encode('utf-8')
+                elif action == 'dismiss':
+                    return json.dumps(["SUCCESS", "Dismissed."]).encode('utf-8')
 
-            else:
-                return json.dumps(["ERROR", f"Unknown action: {action}"]).encode('utf-8')
+                else:
+                    return json.dumps(["ERROR", f"Unknown action: {action}"]).encode('utf-8')
 
-        except Exception as e:
-            return json.dumps(["ERROR", str(e)]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -4952,14 +4952,14 @@ class SpiderFootWebUi:
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
-        dbh = SpiderFootDb(self.config)
-        types = dbh.eventTypes()
-        ret = list()
+        with SpiderFootDb(self.config) as dbh:
+            types = dbh.eventTypes()
+            ret = list()
 
-        for r in types:
-            ret.append([r[1], r[0]])
+            for r in types:
+                ret.append([r[1], r[0]])
 
-        return sorted(ret, key=itemgetter(0))
+            return sorted(ret, key=itemgetter(0))
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -5033,21 +5033,21 @@ class SpiderFootWebUi:
         Returns:
             str: query results as JSON
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        if not query:
-            return self.jsonify_error('400', "Invalid query.")
+            if not query:
+                return self.jsonify_error('400', "Invalid query.")
 
-        if not query.lower().startswith("select"):
-            return self.jsonify_error('400', "Non-SELECTs are unpredictable and not recommended.")
+            if not query.lower().startswith("select"):
+                return self.jsonify_error('400', "Non-SELECTs are unpredictable and not recommended.")
 
-        try:
-            ret = dbh.dbh.execute(query)
-            data = ret.fetchall()
-            columnNames = [c[0] for c in dbh.dbh.description]
-            return [dict(zip(columnNames, row)) for row in data]
-        except Exception as e:
-            return self.jsonify_error('500', str(e))
+            try:
+                ret = dbh.dbh.execute(query)
+                data = ret.fetchall()
+                columnNames = [c[0] for c in dbh.dbh.description]
+                return [dict(zip(columnNames, row)) for row in data]
+            except Exception as e:
+                return self.jsonify_error('500', str(e))
 
     @cherrypy.expose
     def startscan(self: 'SpiderFootWebUi', scanname: str, scantarget: str, modulelist: str, typelist: str, usecase: str, launch_code: str = None) -> str:
@@ -5113,98 +5113,98 @@ class SpiderFootWebUi:
             return self.error("Invalid target type. Could not recognize it as a target SpiderFoot supports.")
 
         # Swap the globalscantable for the database handler
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        # Snapshot the current configuration to be used by the scan
-        cfg = deepcopy(self.config)
-        sf = SpiderFoot(cfg)
+            # Snapshot the current configuration to be used by the scan
+            cfg = deepcopy(self.config)
+            sf = SpiderFoot(cfg)
 
-        modlist = list()
+            modlist = list()
 
-        # User selected modules
-        if modulelist:
-            modlist = modulelist.replace('module_', '').split(',')
+            # User selected modules
+            if modulelist:
+                modlist = modulelist.replace('module_', '').split(',')
 
-        # User selected types
-        if len(modlist) == 0 and typelist:
-            typesx = typelist.replace('type_', '').split(',')
+            # User selected types
+            if len(modlist) == 0 and typelist:
+                typesx = typelist.replace('type_', '').split(',')
 
-            # 1. Find all modules that produce the requested types
-            modlist = sf.modulesProducing(typesx)
-            newmods = deepcopy(modlist)
-            newmodcpy = deepcopy(newmods)
-
-            # 2. For each type those modules consume, get modules producing
-            while len(newmodcpy) > 0:
-                for etype in sf.eventsToModules(newmodcpy):
-                    xmods = sf.modulesProducing([etype])
-                    for mod in xmods:
-                        if mod not in modlist:
-                            modlist.append(mod)
-                            newmods.append(mod)
+                # 1. Find all modules that produce the requested types
+                modlist = sf.modulesProducing(typesx)
+                newmods = deepcopy(modlist)
                 newmodcpy = deepcopy(newmods)
-                newmods = list()
 
-        # User selected a use case
-        if len(modlist) == 0 and usecase:
-            for mod in self.config['__modules__']:
-                if usecase == 'all' or ('group' in self.config['__modules__'][mod] and
-                                        usecase in self.config['__modules__'][mod]['group']):
-                    modlist.append(mod)
+                # 2. For each type those modules consume, get modules producing
+                while len(newmodcpy) > 0:
+                    for etype in sf.eventsToModules(newmodcpy):
+                        xmods = sf.modulesProducing([etype])
+                        for mod in xmods:
+                            if mod not in modlist:
+                                modlist.append(mod)
+                                newmods.append(mod)
+                    newmodcpy = deepcopy(newmods)
+                    newmods = list()
 
-        # If we somehow got all the way through to here and still don't have any modules selected
-        if not modlist:
+            # User selected a use case
+            if len(modlist) == 0 and usecase:
+                for mod in self.config['__modules__']:
+                    if usecase == 'all' or ('group' in self.config['__modules__'][mod] and
+                                            usecase in self.config['__modules__'][mod]['group']):
+                        modlist.append(mod)
+
+            # If we somehow got all the way through to here and still don't have any modules selected
+            if not modlist:
+                if cherrypy.request.headers.get('Accept') and 'application/json' in cherrypy.request.headers.get('Accept'):
+                    cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+                    return json.dumps(["ERROR", "Incorrect usage: no modules specified for scan."]).encode('utf-8')
+
+                return self.error("Invalid request: no modules specified for scan.")
+
+            # Add our mandatory storage module
+            if "sfp__stor_db" not in modlist:
+                modlist.append("sfp__stor_db")
+            modlist.sort()        # Delete the stdout module in case it crept in
+            if "sfp__stor_stdout" in modlist:
+                modlist.remove("sfp__stor_stdout")
+
+            # Start running a new scan
+            if targetType in ["HUMAN_NAME", "USERNAME", "BITCOIN_ADDRESS"]:
+                scantarget = scantarget.replace("\"", "")
+            else:
+                scantarget = scantarget.lower()        # Start running a new scan
+            scanId = SpiderFootHelpers.genScanInstanceId()
+        
+            try:
+                p = _spawn_ctx.Process(target=startSpiderFootScanner, args=(
+                    self.loggingQueue, scanname, scanId, scantarget, targetType, modlist, cfg))
+                p.daemon = True
+                p.start()
+            except Exception as e:
+                self.log.error(f"[-] Scan [{scanId}] failed: {e}", exc_info=True)
+                return self.error(f"[-] Scan [{scanId}] failed: {e}")
+
+            # Track the Process object for kill capability
+            with self._scan_processes_lock:
+                self._scan_processes[scanId] = p
+
+            # Wait until the scan has initialized
+            # Check the database for the scan status results
+            while dbh.scanInstanceGet(scanId) is None:
+                self.log.info("Waiting for the scan to initialize...")
+                time.sleep(1)
+
+            # Audit log: scan started
+            dbh.auditLog(
+                self.currentUser() or 'unknown', 'SCAN_START',
+                detail=f"Scan '{scanname}' on target '{scantarget}' (ID: {scanId})",
+                ip_address=self.clientIP()
+            )
+
             if cherrypy.request.headers.get('Accept') and 'application/json' in cherrypy.request.headers.get('Accept'):
                 cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
-                return json.dumps(["ERROR", "Incorrect usage: no modules specified for scan."]).encode('utf-8')
+                return json.dumps(["SUCCESS", scanId]).encode('utf-8')
 
-            return self.error("Invalid request: no modules specified for scan.")
-
-        # Add our mandatory storage module
-        if "sfp__stor_db" not in modlist:
-            modlist.append("sfp__stor_db")
-        modlist.sort()        # Delete the stdout module in case it crept in
-        if "sfp__stor_stdout" in modlist:
-            modlist.remove("sfp__stor_stdout")
-
-        # Start running a new scan
-        if targetType in ["HUMAN_NAME", "USERNAME", "BITCOIN_ADDRESS"]:
-            scantarget = scantarget.replace("\"", "")
-        else:
-            scantarget = scantarget.lower()        # Start running a new scan
-        scanId = SpiderFootHelpers.genScanInstanceId()
-        
-        try:
-            p = _spawn_ctx.Process(target=startSpiderFootScanner, args=(
-                self.loggingQueue, scanname, scanId, scantarget, targetType, modlist, cfg))
-            p.daemon = True
-            p.start()
-        except Exception as e:
-            self.log.error(f"[-] Scan [{scanId}] failed: {e}", exc_info=True)
-            return self.error(f"[-] Scan [{scanId}] failed: {e}")
-
-        # Track the Process object for kill capability
-        with self._scan_processes_lock:
-            self._scan_processes[scanId] = p
-
-        # Wait until the scan has initialized
-        # Check the database for the scan status results
-        while dbh.scanInstanceGet(scanId) is None:
-            self.log.info("Waiting for the scan to initialize...")
-            time.sleep(1)
-
-        # Audit log: scan started
-        dbh.auditLog(
-            self.currentUser() or 'unknown', 'SCAN_START',
-            detail=f"Scan '{scanname}' on target '{scantarget}' (ID: {scanId})",
-            ip_address=self.clientIP()
-        )
-
-        if cherrypy.request.headers.get('Accept') and 'application/json' in cherrypy.request.headers.get('Accept'):
-            cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
-            return json.dumps(["SUCCESS", scanId]).encode('utf-8')
-
-        raise cherrypy.HTTPRedirect(f"{self.docroot}/scaninfo?id={scanId}")
+            raise cherrypy.HTTPRedirect(f"{self.docroot}/scaninfo?id={scanId}")
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -5224,73 +5224,73 @@ class SpiderFootWebUi:
         if not id:
             return self.jsonify_error('404', "No scan specified")
 
-        dbh = SpiderFootDb(self.config)
-        ids = id.split(',')
-        active_statuses = ("RUNNING", "STARTING", "STARTED", "INITIALIZING")
-        force_kill_ids = []
+        with SpiderFootDb(self.config) as dbh:
+            ids = id.split(',')
+            active_statuses = ("RUNNING", "STARTING", "STARTED", "INITIALIZING")
+            force_kill_ids = []
 
-        for scan_id in ids:
-            res = dbh.scanInstanceGet(scan_id)
-            if not res:
-                return self.jsonify_error('404', f"Scan {scan_id} does not exist")
+            for scan_id in ids:
+                res = dbh.scanInstanceGet(scan_id)
+                if not res:
+                    return self.jsonify_error('404', f"Scan {scan_id} does not exist")
 
-            scan_status = res[5]
+                scan_status = res[5]
 
-            if scan_status == "FINISHED":
-                return self.jsonify_error('400', f"Scan {scan_id} has already finished.")
+                if scan_status == "FINISHED":
+                    return self.jsonify_error('400', f"Scan {scan_id} has already finished.")
 
-            if scan_status == "ABORTED":
-                return self.jsonify_error('400', f"Scan {scan_id} has already aborted.")
+                if scan_status == "ABORTED":
+                    return self.jsonify_error('400', f"Scan {scan_id} has already aborted.")
 
-            if scan_status == "ERROR-FAILED":
-                return self.jsonify_error('400', f"Scan {scan_id} has already failed.")
+                if scan_status == "ERROR-FAILED":
+                    return self.jsonify_error('400', f"Scan {scan_id} has already failed.")
 
-            if scan_status == "ABORT-REQUESTED":
-                # Already requested once — escalate to force kill
-                force_kill_ids.append(scan_id)
-            elif scan_status in active_statuses:
-                pass  # Will be handled below
-            else:
-                return self.jsonify_error(
-                    '400',
-                    f"The running scan is currently in the state '{scan_status}', "
-                    f"please try again later or restart SpiderFoot."
-                )
-
-        for scan_id in ids:
-            if scan_id in force_kill_ids:
-                # Force-kill: the scan didn't respond to ABORT-REQUESTED
-                self.log.warning(f"Force-killing stuck scan {scan_id}")
-                self._kill_scan_process(scan_id)
-                # Set ABORTED using direct connection (bypasses locked DB)
-                try:
-                    dbh.scanInstanceSet(scan_id, status="ABORTED", ended=time.time() * 1000)
-                except Exception:
-                    self._force_scan_status(scan_id, "ABORTED")
-            else:
-                # Graceful: request abort, kill process as backup
-                try:
-                    dbh.scanInstanceSet(scan_id, status="ABORT-REQUESTED")
-                except Exception:
-                    # DB is locked — kill the process and force status
-                    self.log.warning(
-                        f"Database locked while stopping scan {scan_id}, "
-                        f"killing process and forcing status"
+                if scan_status == "ABORT-REQUESTED":
+                    # Already requested once — escalate to force kill
+                    force_kill_ids.append(scan_id)
+                elif scan_status in active_statuses:
+                    pass  # Will be handled below
+                else:
+                    return self.jsonify_error(
+                        '400',
+                        f"The running scan is currently in the state '{scan_status}', "
+                        f"please try again later or restart SpiderFoot."
                     )
+
+            for scan_id in ids:
+                if scan_id in force_kill_ids:
+                    # Force-kill: the scan didn't respond to ABORT-REQUESTED
+                    self.log.warning(f"Force-killing stuck scan {scan_id}")
                     self._kill_scan_process(scan_id)
-                    self._force_scan_status(scan_id, "ABORTED")
+                    # Set ABORTED using direct connection (bypasses locked DB)
+                    try:
+                        dbh.scanInstanceSet(scan_id, status="ABORTED", ended=time.time() * 1000)
+                    except Exception:
+                        self._force_scan_status(scan_id, "ABORTED")
+                else:
+                    # Graceful: request abort, kill process as backup
+                    try:
+                        dbh.scanInstanceSet(scan_id, status="ABORT-REQUESTED")
+                    except Exception:
+                        # DB is locked — kill the process and force status
+                        self.log.warning(
+                            f"Database locked while stopping scan {scan_id}, "
+                            f"killing process and forcing status"
+                        )
+                        self._kill_scan_process(scan_id)
+                        self._force_scan_status(scan_id, "ABORTED")
 
-        # Audit log: scan stopped
-        try:
-            dbh.auditLog(
-                self.currentUser() or 'unknown', 'SCAN_STOP',
-                detail=f"Stopped scan(s): {id}",
-                ip_address=self.clientIP()
-            )
-        except Exception:
-            pass  # Don't fail the stop operation over audit logging
+            # Audit log: scan stopped
+            try:
+                dbh.auditLog(
+                    self.currentUser() or 'unknown', 'SCAN_STOP',
+                    detail=f"Stopped scan(s): {id}",
+                    ip_address=self.clientIP()
+                )
+            except Exception:
+                pass  # Don't fail the stop operation over audit logging
 
-        return ""
+            return ""
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -5322,60 +5322,60 @@ class SpiderFootWebUi:
         if not id:
             return self.jsonify_error('400', "No scan specified")
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            res = dbh.scanInstanceGet(id)
-        except Exception:
-            res = None
+            try:
+                res = dbh.scanInstanceGet(id)
+            except Exception:
+                res = None
 
-        if not res:
-            return self.jsonify_error('404', f"Scan {id} does not exist")
+            if not res:
+                return self.jsonify_error('404', f"Scan {id} does not exist")
 
-        old_status = res[5]
+            old_status = res[5]
 
-        # Kill the scan process if it's in an active state
-        active_statuses = ("RUNNING", "STARTING", "STARTED", "INITIALIZING", "ABORT-REQUESTED")
-        if old_status in active_statuses:
-            self._kill_scan_process(id)
+            # Kill the scan process if it's in an active state
+            active_statuses = ("RUNNING", "STARTING", "STARTED", "INITIALIZING", "ABORT-REQUESTED")
+            if old_status in active_statuses:
+                self._kill_scan_process(id)
 
-        # Try normal DB update first, fall back to direct connection
-        try:
-            dbh.scanInstanceSet(id, status=status, ended=time.time() * 1000)
-        except Exception as e:
-            self.log.warning(
-                f"scanstatusoverride: normal DB update failed for {id}: {e}, "
-                f"using direct connection"
-            )
-            if not self._force_scan_status(id, status):
-                return self.jsonify_error(
-                    '500',
-                    f"Failed to override scan status: database is locked. "
-                    f"The scan process may still be running."
+            # Try normal DB update first, fall back to direct connection
+            try:
+                dbh.scanInstanceSet(id, status=status, ended=time.time() * 1000)
+            except Exception as e:
+                self.log.warning(
+                    f"scanstatusoverride: normal DB update failed for {id}: {e}, "
+                    f"using direct connection"
                 )
+                if not self._force_scan_status(id, status):
+                    return self.jsonify_error(
+                        '500',
+                        f"Failed to override scan status: database is locked. "
+                        f"The scan process may still be running."
+                    )
 
-        try:
-            dbh.auditLog(
-                self.currentUser() or 'unknown', 'SCAN_STATUS_OVERRIDE',
-                detail=f"Overrode scan {id} status from '{old_status}' to '{status}'",
-                ip_address=self.clientIP()
-            )
-        except Exception:
-            pass  # Don't fail the override over audit logging
+            try:
+                dbh.auditLog(
+                    self.currentUser() or 'unknown', 'SCAN_STATUS_OVERRIDE',
+                    detail=f"Overrode scan {id} status from '{old_status}' to '{status}'",
+                    ip_address=self.clientIP()
+                )
+            except Exception:
+                pass  # Don't fail the override over audit logging
 
-        return {"success": True, "old_status": old_status, "new_status": status}
+            return {"success": True, "old_status": old_status, "new_status": status}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def vacuum(self):
         """Vacuum the database."""
-        dbh = SpiderFootDb(self.config)
-        try:
-            if dbh.vacuumDB():
-                return json.dumps(["SUCCESS", ""]).encode('utf-8')
-            return json.dumps(["ERROR", "Vacuuming the database failed"]).encode('utf-8')
-        except Exception as e:
-            return json.dumps(["ERROR", f"Vacuuming the database failed: {e}"]).encode('utf-8')
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                if dbh.vacuumDB():
+                    return json.dumps(["SUCCESS", ""]).encode('utf-8')
+                return json.dumps(["ERROR", "Vacuuming the database failed"]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", f"Vacuuming the database failed: {e}"]).encode('utf-8')
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -5386,21 +5386,21 @@ class SpiderFootWebUi:
             dict: database health information including file size,
                   page counts, integrity status, and WAL info.
         """
-        dbh = SpiderFootDb(self.config)
-        try:
-            health = dbh.dbHealth()
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                health = dbh.dbHealth()
 
-            # Add human-readable file sizes
-            if health.get('file_size'):
-                size_mb = health['file_size'] / (1024 * 1024)
-                health['file_size_human'] = f"{size_mb:.2f} MB"
-            if health.get('wal_file_size'):
-                wal_mb = health['wal_file_size'] / (1024 * 1024)
-                health['wal_file_size_human'] = f"{wal_mb:.2f} MB"
+                # Add human-readable file sizes
+                if health.get('file_size'):
+                    size_mb = health['file_size'] / (1024 * 1024)
+                    health['file_size_human'] = f"{size_mb:.2f} MB"
+                if health.get('wal_file_size'):
+                    wal_mb = health['wal_file_size'] / (1024 * 1024)
+                    health['wal_file_size_human'] = f"{wal_mb:.2f} MB"
 
-            return health
-        except Exception as e:
-            return {'status': 'error', 'error': str(e)}
+                return health
+            except Exception as e:
+                return {'status': 'error', 'error': str(e)}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -5414,33 +5414,33 @@ class SpiderFootWebUi:
         Returns:
             dict: backup result with file path and size.
         """
-        dbh = SpiderFootDb(self.config)
-        try:
-            # Determine backup path
-            db_path = self.config.get('__database', '')
-            if not db_path:
-                return {'status': 'error', 'error': 'Database path not configured'}
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                # Determine backup path
+                db_path = self.config.get('__database', '')
+                if not db_path:
+                    return {'status': 'error', 'error': 'Database path not configured'}
 
-            backup_dir = os.path.dirname(db_path)
-            if not backup_dir:
-                backup_dir = '.'
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            backup_filename = f"spiderfoot_backup_{timestamp}.db"
-            backup_path = os.path.join(backup_dir, backup_filename)
+                backup_dir = os.path.dirname(db_path)
+                if not backup_dir:
+                    backup_dir = '.'
+                timestamp = time.strftime("%Y%m%d_%H%M%S")
+                backup_filename = f"spiderfoot_backup_{timestamp}.db"
+                backup_path = os.path.join(backup_dir, backup_filename)
 
-            result_path = dbh.backupDB(backup_path)
-            backup_size = os.path.getsize(result_path)
-            size_mb = backup_size / (1024 * 1024)
+                result_path = dbh.backupDB(backup_path)
+                backup_size = os.path.getsize(result_path)
+                size_mb = backup_size / (1024 * 1024)
 
-            return {
-                'status': 'success',
-                'backup_path': result_path,
-                'backup_size': backup_size,
-                'backup_size_human': f"{size_mb:.2f} MB",
-                'timestamp': timestamp
-            }
-        except Exception as e:
-            return {'status': 'error', 'error': str(e)}
+                return {
+                    'status': 'success',
+                    'backup_path': result_path,
+                    'backup_size': backup_size,
+                    'backup_size_human': f"{size_mb:.2f} MB",
+                    'timestamp': timestamp
+                }
+            except Exception as e:
+                return {'status': 'error', 'error': str(e)}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -5450,11 +5450,11 @@ class SpiderFootWebUi:
         Returns:
             dict: integrity check results with 'ok' status and details.
         """
-        dbh = SpiderFootDb(self.config)
-        try:
-            return dbh.integrityCheck()
-        except Exception as e:
-            return {'ok': False, 'integrity_check': [str(e)], 'foreign_key_check': []}
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                return dbh.integrityCheck()
+            except Exception as e:
+                return {'ok': False, 'integrity_check': [str(e)], 'foreign_key_check': []}
 
     #
     # DATA PROVIDERS
@@ -5474,21 +5474,21 @@ class SpiderFootWebUi:
         Returns:
             list: scan log
         """
-        dbh = SpiderFootDb(self.config)
-        retdata = []
+        with SpiderFootDb(self.config) as dbh:
+            retdata = []
 
-        try:
-            data = dbh.scanLogs(id, limit, rowId, reverse)
-        except Exception:
+            try:
+                data = dbh.scanLogs(id, limit, rowId, reverse)
+            except Exception:
+                return retdata
+
+            for row in data:
+                generated = time.strftime(
+                    "%Y-%m-%d %H:%M:%S", time.localtime(row[0] / 1000))
+                retdata.append([generated, row[1], row[2],
+                               html.escape(row[3]), row[4]])
+
             return retdata
-
-        for row in data:
-            generated = time.strftime(
-                "%Y-%m-%d %H:%M:%S", time.localtime(row[0] / 1000))
-            retdata.append([generated, row[1], row[2],
-                           html.escape(row[3]), row[4]])
-
-        return retdata
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -5502,20 +5502,20 @@ class SpiderFootWebUi:
         Returns:
             list: scan errors
         """
-        dbh = SpiderFootDb(self.config)
-        retdata = []
+        with SpiderFootDb(self.config) as dbh:
+            retdata = []
 
-        try:
-            data = dbh.scanErrors(id, limit)
-        except Exception:
+            try:
+                data = dbh.scanErrors(id, limit)
+            except Exception:
+                return retdata
+
+            for row in data:
+                generated = time.strftime(
+                    "%Y-%m-%d %H:%M:%S", time.localtime(row[0] / 1000))
+                retdata.append([generated, row[1], html.escape(str(row[2]))])
+
             return retdata
-
-        for row in data:
-            generated = time.strftime(
-                "%Y-%m-%d %H:%M:%S", time.localtime(row[0] / 1000))
-            retdata.append([generated, row[1], html.escape(str(row[2]))])
-
-        return retdata
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -5526,8 +5526,8 @@ class SpiderFootWebUi:
             list: scan list
         """
         try:
-            dbh = SpiderFootDb(self.config)
-            data = dbh.scanInstanceList()
+            with SpiderFootDb(self.config) as dbh:
+                data = dbh.scanInstanceList()
         except Exception:
             return []
         retdata = []
@@ -5578,8 +5578,8 @@ class SpiderFootWebUi:
             list: scan status
         """
         try:
-            dbh = SpiderFootDb(self.config)
-            data = dbh.scanInstanceGet(id)
+            with SpiderFootDb(self.config) as dbh:
+                data = dbh.scanInstanceGet(id)
         except Exception:
             return []
 
@@ -5638,20 +5638,20 @@ class SpiderFootWebUi:
             dict: progress info (modulesTotal, modulesWithResults,
                   progressPercent, status)
         """
-        dbh = SpiderFootDb(self.config)
-        try:
-            return dbh.scanProgress(id)
-        except Exception:
-            return {
-                'status': 'UNKNOWN',
-                'modulesTotal': 0,
-                'modulesWithResults': 0,
-                'modulesRunning': 0,
-                'eventsQueued': 0,
-                'totalEvents': 0,
-                'eventsPerSecond': 0.0,
-                'progressPercent': 0,
-            }
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                return dbh.scanProgress(id)
+            except Exception:
+                return {
+                    'status': 'UNKNOWN',
+                    'modulesTotal': 0,
+                    'modulesWithResults': 0,
+                    'modulesRunning': 0,
+                    'eventsQueued': 0,
+                    'totalEvents': 0,
+                    'eventsPerSecond': 0.0,
+                    'progressPercent': 0,
+                }
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -5667,40 +5667,40 @@ class SpiderFootWebUi:
         """
         retdata = []
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            scandata = dbh.scanResultSummary(id, by)
-        except Exception:
+            try:
+                scandata = dbh.scanResultSummary(id, by)
+            except Exception:
+                return retdata
+
+            try:
+                statusdata = dbh.scanInstanceGet(id)
+            except Exception:
+                return retdata
+
+            if not statusdata:
+                return retdata
+
+            config_overrides = load_grade_config_overrides(self.config)
+            overrides = config_overrides.get('event_overrides')
+
+            for row in scandata:
+                if row[0] == "ROOT":
+                    continue
+                lastseen = time.strftime(
+                    "%Y-%m-%d %H:%M:%S", time.localtime(row[2]))
+                grading = get_event_grading(row[0], overrides)
+                category = grading.get('category', 'Information / Reference')
+                rank = grading.get('rank', 5)
+                cat_meta = DEFAULT_GRADE_CATEGORIES.get(category, {})
+                color = cat_meta.get('color', '#6b7280')
+                weight = cat_meta.get('weight', 0.0)
+                retdata.append([row[0], row[1], lastseen,
+                               row[3], row[4], statusdata[5],
+                               category, color, rank, weight])
+
             return retdata
-
-        try:
-            statusdata = dbh.scanInstanceGet(id)
-        except Exception:
-            return retdata
-
-        if not statusdata:
-            return retdata
-
-        config_overrides = load_grade_config_overrides(self.config)
-        overrides = config_overrides.get('event_overrides')
-
-        for row in scandata:
-            if row[0] == "ROOT":
-                continue
-            lastseen = time.strftime(
-                "%Y-%m-%d %H:%M:%S", time.localtime(row[2]))
-            grading = get_event_grading(row[0], overrides)
-            category = grading.get('category', 'Information / Reference')
-            rank = grading.get('rank', 5)
-            cat_meta = DEFAULT_GRADE_CATEGORIES.get(category, {})
-            color = cat_meta.get('color', '#6b7280')
-            weight = cat_meta.get('weight', 0.0)
-            retdata.append([row[0], row[1], lastseen,
-                           row[3], row[4], statusdata[5],
-                           category, color, rank, weight])
-
-        return retdata
 
     def _calculateScanGrade(self, dbh, scan_id: str) -> dict:
         """Calculate the overall grade for a scan based on its event type results.
@@ -5845,14 +5845,14 @@ class SpiderFootWebUi:
                 return cached_result
 
         try:
-            dbh = SpiderFootDb(self.config)
+            with SpiderFootDb(self.config) as dbh:
 
-            # Verify scan exists
-            data = dbh.scanInstanceGet(id)
-            if not data:
-                return {'enabled': False, 'error': 'Scan not found'}
+                # Verify scan exists
+                data = dbh.scanInstanceGet(id)
+                if not data:
+                    return {'enabled': False, 'error': 'Scan not found'}
 
-            result = self._calculateScanGrade(dbh, id)
+                result = self._calculateScanGrade(dbh, id)
         except Exception:
             return {'enabled': True, 'overall_grade': '-', 'overall_score': 0, 'categories': {},
                     'error': 'Temporarily unavailable'}
@@ -5878,35 +5878,35 @@ class SpiderFootWebUi:
         Returns:
             dict: {isLatest: bool, scanCount: int, importedCount: int, importStatus: str}
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            result = dbh.isLatestScan(id)
+            try:
+                result = dbh.isLatestScan(id)
 
-            # Auto-import: if this is the latest scan and there are multiple scans
-            # and no entries have been imported yet, trigger import.
-            # BUT skip if the scan is still running — the import holds a write lock
-            # that blocks the scan subprocess from updating its status.
-            scanInfo = dbh.scanInstanceGet(id)
-            scanStatus = scanInfo[5] if scanInfo else None
-            scanRunning = scanStatus not in (None, "FINISHED", "ABORTED", "ERROR-FAILED")
+                # Auto-import: if this is the latest scan and there are multiple scans
+                # and no entries have been imported yet, trigger import.
+                # BUT skip if the scan is still running — the import holds a write lock
+                # that blocks the scan subprocess from updating its status.
+                scanInfo = dbh.scanInstanceGet(id)
+                scanStatus = scanInfo[5] if scanInfo else None
+                scanRunning = scanStatus not in (None, "FINISHED", "ABORTED", "ERROR-FAILED")
 
-            if result['isLatest'] and result['scanCount'] > 1 and result['importedCount'] == 0 and not scanRunning:
-                importResult = dbh.importEntriesFromOlderScans(id)
-                result['importedCount'] = importResult['imported']
-                result['importStatus'] = f"Imported {importResult['imported']} entries from previous scans"
-                # Deduplicate after auto-import
-                if importResult['imported'] > 0:
-                    try:
-                        dbh.deduplicateScanResults(id)
-                    except Exception:
-                        pass
-            else:
-                result['importStatus'] = 'already_imported' if result['importedCount'] > 0 else 'not_applicable'
+                if result['isLatest'] and result['scanCount'] > 1 and result['importedCount'] == 0 and not scanRunning:
+                    importResult = dbh.importEntriesFromOlderScans(id)
+                    result['importedCount'] = importResult['imported']
+                    result['importStatus'] = f"Imported {importResult['imported']} entries from previous scans"
+                    # Deduplicate after auto-import
+                    if importResult['imported'] > 0:
+                        try:
+                            dbh.deduplicateScanResults(id)
+                        except Exception:
+                            pass
+                else:
+                    result['importStatus'] = 'already_imported' if result['importedCount'] > 0 else 'not_applicable'
 
-            return result
-        except Exception as e:
-            return {'isLatest': False, 'scanCount': 0, 'importedCount': 0, 'importStatus': f'error: {str(e)}'}
+                return result
+            except Exception as e:
+                return {'isLatest': False, 'scanCount': 0, 'importedCount': 0, 'importStatus': f'error: {str(e)}'}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -5919,32 +5919,32 @@ class SpiderFootWebUi:
         Returns:
             dict: {success: bool, imported: int, skipped: int, message: str}
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            # Check if this is a valid scan
-            scanInfo = dbh.scanInstanceGet(id)
-            if not scanInfo:
-                return {'success': False, 'imported': 0, 'skipped': 0, 'message': 'Scan not found'}
+            try:
+                # Check if this is a valid scan
+                scanInfo = dbh.scanInstanceGet(id)
+                if not scanInfo:
+                    return {'success': False, 'imported': 0, 'skipped': 0, 'message': 'Scan not found'}
 
-            # Perform the import
-            result = dbh.importEntriesFromOlderScans(id)
+                # Perform the import
+                result = dbh.importEntriesFromOlderScans(id)
 
-            # Deduplicate after import to remove any cross-scan duplicates
-            dedup = dbh.deduplicateScanResults(id)
+                # Deduplicate after import to remove any cross-scan duplicates
+                dedup = dbh.deduplicateScanResults(id)
 
-            return {
-                'success': True,
-                'imported': result['imported'],
-                'skipped': result['skipped'],
-                'dedup_removed': dedup['removed'],
-                'message': (
-                    f"Imported {result['imported']} entries, skipped {result['skipped']} duplicates. "
-                    f"Deduplication removed {dedup['removed']} additional duplicate(s)."
-                )
-            }
-        except Exception as e:
-            return {'success': False, 'imported': 0, 'skipped': 0, 'message': f'Error: {str(e)}'}
+                return {
+                    'success': True,
+                    'imported': result['imported'],
+                    'skipped': result['skipped'],
+                    'dedup_removed': dedup['removed'],
+                    'message': (
+                        f"Imported {result['imported']} entries, skipped {result['skipped']} duplicates. "
+                        f"Deduplication removed {dedup['removed']} additional duplicate(s)."
+                    )
+                }
+            except Exception as e:
+                return {'success': False, 'imported': 0, 'skipped': 0, 'message': f'Error: {str(e)}'}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -5957,36 +5957,36 @@ class SpiderFootWebUi:
         Returns:
             dict: {success: bool, deleted: int, imported: int, skipped: int, message: str}
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            # Check if this is a valid scan
-            scanInfo = dbh.scanInstanceGet(id)
-            if not scanInfo:
-                return {'success': False, 'deleted': 0, 'imported': 0, 'skipped': 0, 'message': 'Scan not found'}
+            try:
+                # Check if this is a valid scan
+                scanInfo = dbh.scanInstanceGet(id)
+                if not scanInfo:
+                    return {'success': False, 'deleted': 0, 'imported': 0, 'skipped': 0, 'message': 'Scan not found'}
 
-            # Delete existing imported entries
-            deleted = dbh.deleteImportedEntries(id)
+                # Delete existing imported entries
+                deleted = dbh.deleteImportedEntries(id)
 
-            # Re-import from older scans
-            result = dbh.importEntriesFromOlderScans(id)
+                # Re-import from older scans
+                result = dbh.importEntriesFromOlderScans(id)
 
-            # Deduplicate after re-import
-            dedup = dbh.deduplicateScanResults(id)
+                # Deduplicate after re-import
+                dedup = dbh.deduplicateScanResults(id)
 
-            return {
-                'success': True,
-                'deleted': deleted,
-                'imported': result['imported'],
-                'skipped': result['skipped'],
-                'dedup_removed': dedup['removed'],
-                'message': (
-                    f"Deleted {deleted} old imports, imported {result['imported']} entries fresh. "
-                    f"Deduplication removed {dedup['removed']} additional duplicate(s)."
-                )
-            }
-        except Exception as e:
-            return {'success': False, 'deleted': 0, 'imported': 0, 'skipped': 0, 'message': f'Error: {str(e)}'}
+                return {
+                    'success': True,
+                    'deleted': deleted,
+                    'imported': result['imported'],
+                    'skipped': result['skipped'],
+                    'dedup_removed': dedup['removed'],
+                    'message': (
+                        f"Deleted {deleted} old imports, imported {result['imported']} entries fresh. "
+                        f"Deduplication removed {dedup['removed']} additional duplicate(s)."
+                    )
+                }
+            except Exception as e:
+                return {'success': False, 'deleted': 0, 'imported': 0, 'skipped': 0, 'message': f'Error: {str(e)}'}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -6002,29 +6002,29 @@ class SpiderFootWebUi:
         Returns:
             dict: {success: bool, removed: int, fp_preserved: int, message: str}
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            scanInfo = dbh.scanInstanceGet(id)
-            if not scanInfo:
+            try:
+                scanInfo = dbh.scanInstanceGet(id)
+                if not scanInfo:
+                    return {'success': False, 'removed': 0, 'fp_preserved': 0,
+                            'message': 'Scan not found'}
+
+                result = dbh.deduplicateScanResults(id)
+
+                return {
+                    'success': True,
+                    'removed': result['removed'],
+                    'fp_preserved': result['fp_preserved'],
+                    'message': (
+                        f"Removed {result['removed']} duplicate(s). "
+                        f"Preserved FP status on {result['fp_preserved']} kept row(s)."
+                    )
+                }
+            except Exception as e:
+                self.log.error(f"Error deduplicating scan: {e}", exc_info=True)
                 return {'success': False, 'removed': 0, 'fp_preserved': 0,
-                        'message': 'Scan not found'}
-
-            result = dbh.deduplicateScanResults(id)
-
-            return {
-                'success': True,
-                'removed': result['removed'],
-                'fp_preserved': result['fp_preserved'],
-                'message': (
-                    f"Removed {result['removed']} duplicate(s). "
-                    f"Preserved FP status on {result['fp_preserved']} kept row(s)."
-                )
-            }
-        except Exception as e:
-            self.log.error(f"Error deduplicating scan: {e}", exc_info=True)
-            return {'success': False, 'removed': 0, 'fp_preserved': 0,
-                    'message': f'Error: {str(e)}'}
+                        'message': f'Error: {str(e)}'}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -6038,46 +6038,46 @@ class SpiderFootWebUi:
             list: correlation result list or error message
         """
         retdata = []
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            self.log.debug(f"Fetching correlations for scan {id}")
-            corrdata = dbh.scanCorrelationList(id)
-            self.log.debug(f"Found {len(corrdata)} correlations")
+            try:
+                self.log.debug(f"Fetching correlations for scan {id}")
+                corrdata = dbh.scanCorrelationList(id)
+                self.log.debug(f"Found {len(corrdata)} correlations")
 
-            if not corrdata:
-                self.log.debug(f"No correlations found for scan {id}")
-                return retdata
+                if not corrdata:
+                    self.log.debug(f"No correlations found for scan {id}")
+                    return retdata
 
-            for row in corrdata:
-                # Check if we have a valid row of data
-                if len(row) < 6:  # Need at least 6 elements to extract all required fields
-                    self.log.error(
-                        f"Correlation data format error: missing required fields, got {len(row)} fields")
-                    continue
+                for row in corrdata:
+                    # Check if we have a valid row of data
+                    if len(row) < 6:  # Need at least 6 elements to extract all required fields
+                        self.log.error(
+                            f"Correlation data format error: missing required fields, got {len(row)} fields")
+                        continue
 
-                # scanCorrelationList returns:
-                #   0: c.id, 1: c.title, 2: c.rule_id, 3: c.rule_risk,
-                #   4: c.rule_name, 5: c.rule_descr, 6: c.rule_logic,
-                #   7: event_count, 8: event_types
-                correlation_id = row[0]
-                correlation = row[1]
-                rule_id = row[2]
-                rule_risk = row[3]
-                rule_name = row[4]
-                rule_description = row[5]
-                event_count = row[7] if len(row) > 7 else 0
-                event_types = row[8] if len(row) > 8 else ""
+                    # scanCorrelationList returns:
+                    #   0: c.id, 1: c.title, 2: c.rule_id, 3: c.rule_risk,
+                    #   4: c.rule_name, 5: c.rule_descr, 6: c.rule_logic,
+                    #   7: event_count, 8: event_types
+                    correlation_id = row[0]
+                    correlation = row[1]
+                    rule_id = row[2]
+                    rule_risk = row[3]
+                    rule_name = row[4]
+                    rule_description = row[5]
+                    event_count = row[7] if len(row) > 7 else 0
+                    event_types = row[8] if len(row) > 8 else ""
 
-                retdata.append([correlation_id, correlation, rule_name, rule_risk,
-                               rule_id, rule_description, event_count, "", event_types])
+                    retdata.append([correlation_id, correlation, rule_name, rule_risk,
+                                   rule_id, rule_description, event_count, "", event_types])
 
-        except Exception as e:
-            self.log.error(
-                f"Error fetching correlations for scan {id}: {e}", exc_info=True)
-            # Return empty list on error
+            except Exception as e:
+                self.log.error(
+                    f"Error fetching correlations for scan {id}: {e}", exc_info=True)
+                # Return empty list on error
 
-        return retdata
+            return retdata
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -6148,41 +6148,41 @@ class SpiderFootWebUi:
         try:
             self._updateCorrelationJob(job_id, progress=10, step='Querying the database...')
 
-            dbh = SpiderFootDb(self.config)
-            corrdata = dbh.scanCorrelationList(scan_id)
+            with SpiderFootDb(self.config) as dbh:
+                corrdata = dbh.scanCorrelationList(scan_id)
 
-            self._updateCorrelationJob(job_id, progress=60, step='Processing results...')
+                self._updateCorrelationJob(job_id, progress=60, step='Processing results...')
 
-            retdata = []
-            if corrdata:
-                for row in corrdata:
-                    if len(row) < 6:
-                        continue
-                    # scanCorrelationList returns:
-                    #   0: c.id, 1: c.title, 2: c.rule_id, 3: c.rule_risk,
-                    #   4: c.rule_name, 5: c.rule_descr, 6: c.rule_logic,
-                    #   7: event_count, 8: event_types
-                    correlation_id = row[0]
-                    correlation = row[1]
-                    rule_id = row[2]
-                    rule_risk = row[3]
-                    rule_name = row[4]
-                    rule_description = row[5]
-                    event_count = row[7] if len(row) > 7 else 0
-                    event_types = row[8] if len(row) > 8 else ""
-                    retdata.append([correlation_id, correlation, rule_name, rule_risk,
-                                   rule_id, rule_description, event_count, "", event_types])
+                retdata = []
+                if corrdata:
+                    for row in corrdata:
+                        if len(row) < 6:
+                            continue
+                        # scanCorrelationList returns:
+                        #   0: c.id, 1: c.title, 2: c.rule_id, 3: c.rule_risk,
+                        #   4: c.rule_name, 5: c.rule_descr, 6: c.rule_logic,
+                        #   7: event_count, 8: event_types
+                        correlation_id = row[0]
+                        correlation = row[1]
+                        rule_id = row[2]
+                        rule_risk = row[3]
+                        rule_name = row[4]
+                        rule_description = row[5]
+                        event_count = row[7] if len(row) > 7 else 0
+                        event_types = row[8] if len(row) > 8 else ""
+                        retdata.append([correlation_id, correlation, rule_name, rule_risk,
+                                       rule_id, rule_description, event_count, "", event_types])
 
-            self._updateCorrelationJob(job_id, progress=90, step='Preparing display...')
+                self._updateCorrelationJob(job_id, progress=90, step='Preparing display...')
 
-            self._updateCorrelationJob(
-                job_id,
-                status='complete',
-                progress=100,
-                step='Complete',
-                result=retdata,
-                completed_at=time.time()
-            )
+                self._updateCorrelationJob(
+                    job_id,
+                    status='complete',
+                    progress=100,
+                    step='Complete',
+                    result=retdata,
+                    completed_at=time.time()
+                )
 
         except Exception as e:
             self.log.error(f"Correlation load worker error: {e}", exc_info=True)
@@ -6206,14 +6206,14 @@ class SpiderFootWebUi:
         Returns:
             list: findings data
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            data = dbh.scanFindingsList(id)
-            return [list(row) for row in data]
-        except Exception as e:
-            self.log.error(f"Error fetching findings for scan {id}: {e}", exc_info=True)
-            return []
+            try:
+                data = dbh.scanFindingsList(id)
+                return [list(row) for row in data]
+            except Exception as e:
+                self.log.error(f"Error fetching findings for scan {id}: {e}", exc_info=True)
+                return []
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -6226,14 +6226,14 @@ class SpiderFootWebUi:
         Returns:
             dict: count of findings
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            count = dbh.scanFindingsCount(id)
-            return {'success': True, 'count': count}
-        except Exception as e:
-            self.log.error(f"Error counting findings for scan {id}: {e}", exc_info=True)
-            return {'success': False, 'count': 0}
+            try:
+                count = dbh.scanFindingsCount(id)
+                return {'success': True, 'count': count}
+            except Exception as e:
+                self.log.error(f"Error counting findings for scan {id}: {e}", exc_info=True)
+                return {'success': False, 'count': 0}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -6305,14 +6305,14 @@ class SpiderFootWebUi:
             if not findings:
                 return {'success': False, 'message': 'No valid findings found in the Excel file.'}
 
-            dbh = SpiderFootDb(self.config)
-            count = dbh.scanFindingsStore(id, findings)
+            with SpiderFootDb(self.config) as dbh:
+                count = dbh.scanFindingsStore(id, findings)
 
-            return {
-                'success': True,
-                'count': count,
-                'message': f'Successfully imported {count} findings.'
-            }
+                return {
+                    'success': True,
+                    'count': count,
+                    'message': f'Successfully imported {count} findings.'
+                }
 
         except Exception as e:
             self.log.error(f"Error importing findings: {e}", exc_info=True)
@@ -6329,14 +6329,14 @@ class SpiderFootWebUi:
         Returns:
             dict: count of Nessus results
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            count = dbh.scanNessusCount(id)
-            return {'success': True, 'count': count}
-        except Exception as e:
-            self.log.error(f"Error counting Nessus results for scan {id}: {e}", exc_info=True)
-            return {'success': False, 'count': 0}
+            try:
+                count = dbh.scanNessusCount(id)
+                return {'success': True, 'count': count}
+            except Exception as e:
+                self.log.error(f"Error counting Nessus results for scan {id}: {e}", exc_info=True)
+                return {'success': False, 'count': 0}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -6349,37 +6349,37 @@ class SpiderFootWebUi:
         Returns:
             dict: Nessus results
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            rows = dbh.scanNessusList(id)
-            results = []
-            for row in rows:
-                results.append({
-                    'id': row[0],
-                    'severity': row[1],
-                    'severity_number': row[2],
-                    'plugin_name': row[3],
-                    'plugin_id': row[4],
-                    'host_ip': row[5],
-                    'host_name': row[6],
-                    'operating_system': row[7],
-                    'description': row[8],
-                    'synopsis': row[9],
-                    'solution': row[10],
-                    'see_also': row[11],
-                    'service_name': row[12],
-                    'port': row[13],
-                    'protocol': row[14],
-                    'request': row[15],
-                    'plugin_output': row[16],
-                    'cvss3_base_score': row[17],
-                    'tracking': row[18],
-                })
-            return {'success': True, 'results': results}
-        except Exception as e:
-            self.log.error(f"Error listing Nessus results for scan {id}: {e}", exc_info=True)
-            return {'success': False, 'results': []}
+            try:
+                rows = dbh.scanNessusList(id)
+                results = []
+                for row in rows:
+                    results.append({
+                        'id': row[0],
+                        'severity': row[1],
+                        'severity_number': row[2],
+                        'plugin_name': row[3],
+                        'plugin_id': row[4],
+                        'host_ip': row[5],
+                        'host_name': row[6],
+                        'operating_system': row[7],
+                        'description': row[8],
+                        'synopsis': row[9],
+                        'solution': row[10],
+                        'see_also': row[11],
+                        'service_name': row[12],
+                        'port': row[13],
+                        'protocol': row[14],
+                        'request': row[15],
+                        'plugin_output': row[16],
+                        'cvss3_base_score': row[17],
+                        'tracking': row[18],
+                    })
+                return {'success': True, 'results': results}
+            except Exception as e:
+                self.log.error(f"Error listing Nessus results for scan {id}: {e}", exc_info=True)
+                return {'success': False, 'results': []}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -6422,14 +6422,14 @@ class SpiderFootWebUi:
         Returns:
             dict: count of Burp results
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            count = dbh.scanBurpCount(id)
-            return {'success': True, 'count': count}
-        except Exception as e:
-            self.log.error(f"Error counting Burp results for scan {id}: {e}", exc_info=True)
-            return {'success': False, 'count': 0}
+            try:
+                count = dbh.scanBurpCount(id)
+                return {'success': True, 'count': count}
+            except Exception as e:
+                self.log.error(f"Error counting Burp results for scan {id}: {e}", exc_info=True)
+                return {'success': False, 'count': 0}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -6442,14 +6442,14 @@ class SpiderFootWebUi:
         Returns:
             dict: whether HTML enhancement has been applied
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            enhanced = dbh.scanBurpEnhanced(id)
-            return {'success': True, 'enhanced': enhanced}
-        except Exception as e:
-            self.log.error(f"Error checking Burp enhanced state for scan {id}: {e}", exc_info=True)
-            return {'success': False, 'enhanced': False}
+            try:
+                enhanced = dbh.scanBurpEnhanced(id)
+                return {'success': True, 'enhanced': enhanced}
+            except Exception as e:
+                self.log.error(f"Error checking Burp enhanced state for scan {id}: {e}", exc_info=True)
+                return {'success': False, 'enhanced': False}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -6462,37 +6462,37 @@ class SpiderFootWebUi:
         Returns:
             dict: Burp results
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            rows = dbh.scanBurpList(id)
-            results = []
-            for row in rows:
-                results.append({
-                    'id': row[0],
-                    'severity': row[1],
-                    'severity_number': row[2],
-                    'host_ip': row[3],
-                    'host_name': row[4],
-                    'plugin_name': row[5],
-                    'issue_type': row[6],
-                    'path': row[7],
-                    'location': row[8],
-                    'confidence': row[9],
-                    'issue_background': row[10],
-                    'issue_detail': row[11],
-                    'solutions': row[12],
-                    'see_also': row[13],
-                    'references': row[14],
-                    'vulnerability_classifications': row[15],
-                    'request': row[16],
-                    'response': row[17],
-                    'tracking': row[18],
-                })
-            return {'success': True, 'results': results}
-        except Exception as e:
-            self.log.error(f"Error listing Burp results for scan {id}: {e}", exc_info=True)
-            return {'success': False, 'results': []}
+            try:
+                rows = dbh.scanBurpList(id)
+                results = []
+                for row in rows:
+                    results.append({
+                        'id': row[0],
+                        'severity': row[1],
+                        'severity_number': row[2],
+                        'host_ip': row[3],
+                        'host_name': row[4],
+                        'plugin_name': row[5],
+                        'issue_type': row[6],
+                        'path': row[7],
+                        'location': row[8],
+                        'confidence': row[9],
+                        'issue_background': row[10],
+                        'issue_detail': row[11],
+                        'solutions': row[12],
+                        'see_also': row[13],
+                        'references': row[14],
+                        'vulnerability_classifications': row[15],
+                        'request': row[16],
+                        'response': row[17],
+                        'tracking': row[18],
+                    })
+                return {'success': True, 'results': results}
+            except Exception as e:
+                self.log.error(f"Error listing Burp results for scan {id}: {e}", exc_info=True)
+                return {'success': False, 'results': []}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -6572,140 +6572,140 @@ class SpiderFootWebUi:
         Returns:
             bytes: exported file data
         """
-        dbh = SpiderFootDb(self.config)
-        scan = dbh.scanInstanceGet(id)
-        _scan_name = scan[0] if scan else ''
+        with SpiderFootDb(self.config) as dbh:
+            scan = dbh.scanInstanceGet(id)
+            _scan_name = scan[0] if scan else ''
 
-        # --- Nessus data ---
-        nessus_headers = [
-            "Severity", "Severity Number", "Plugin Name", "Plugin ID",
-            "Host IP", "Host Name", "Operating System", "Description",
-            "Synopsis", "Solution", "See Also", "Service Name", "Port",
-            "Protocol", "Request", "Plugin Output", "CVSS3 Base Score", "Tracking"
-        ]
-        nessus_rows = []
-        try:
-            rows = dbh.scanNessusList(id)
-            tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
-            for row in rows:
-                nessus_rows.append([
-                    str(row[1] or ''),   # severity
-                    str(row[2] or ''),   # severity_number
-                    str(row[3] or ''),   # plugin_name
-                    str(row[4] or ''),   # plugin_id
-                    str(row[5] or ''),   # host_ip
-                    str(row[6] or ''),   # host_name
-                    str(row[7] or ''),   # operating_system
-                    str(row[8] or ''),   # description
-                    str(row[9] or ''),   # synopsis
-                    str(row[10] or ''),  # solution
-                    str(row[11] or ''),  # see_also
-                    str(row[12] or ''),  # service_name
-                    str(row[13] or ''),  # port
-                    str(row[14] or ''),  # protocol
-                    str(row[15] or ''),  # request
-                    str(row[16] or ''),  # plugin_output
-                    str(row[17] or ''),  # cvss3_base_score
-                    tracking_labels.get(int(row[18] or 0), 'OPEN'),  # tracking
-                ])
-        except Exception:
-            pass
+            # --- Nessus data ---
+            nessus_headers = [
+                "Severity", "Severity Number", "Plugin Name", "Plugin ID",
+                "Host IP", "Host Name", "Operating System", "Description",
+                "Synopsis", "Solution", "See Also", "Service Name", "Port",
+                "Protocol", "Request", "Plugin Output", "CVSS3 Base Score", "Tracking"
+            ]
+            nessus_rows = []
+            try:
+                rows = dbh.scanNessusList(id)
+                tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
+                for row in rows:
+                    nessus_rows.append([
+                        str(row[1] or ''),   # severity
+                        str(row[2] or ''),   # severity_number
+                        str(row[3] or ''),   # plugin_name
+                        str(row[4] or ''),   # plugin_id
+                        str(row[5] or ''),   # host_ip
+                        str(row[6] or ''),   # host_name
+                        str(row[7] or ''),   # operating_system
+                        str(row[8] or ''),   # description
+                        str(row[9] or ''),   # synopsis
+                        str(row[10] or ''),  # solution
+                        str(row[11] or ''),  # see_also
+                        str(row[12] or ''),  # service_name
+                        str(row[13] or ''),  # port
+                        str(row[14] or ''),  # protocol
+                        str(row[15] or ''),  # request
+                        str(row[16] or ''),  # plugin_output
+                        str(row[17] or ''),  # cvss3_base_score
+                        tracking_labels.get(int(row[18] or 0), 'OPEN'),  # tracking
+                    ])
+            except Exception:
+                pass
 
-        # --- Burp data ---
-        burp_headers = [
-            "Severity", "Severity Number", "Host IP", "Host Name",
-            "Plugin Name", "Issue Type", "Path", "Location", "Confidence",
-            "Issue Background", "Issue Detail", "Solutions", "See Also",
-            "References", "Vulnerability Classifications",
-            "Request", "Response", "Tracking"
-        ]
-        burp_rows = []
-        try:
-            rows = dbh.scanBurpList(id)
-            tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
-            for row in rows:
-                burp_rows.append([
-                    str(row[1] or ''),   # severity
-                    str(row[2] or ''),   # severity_number
-                    str(row[3] or ''),   # host_ip
-                    str(row[4] or ''),   # host_name
-                    str(row[5] or ''),   # plugin_name
-                    str(row[6] or ''),   # issue_type
-                    str(row[7] or ''),   # path
-                    str(row[8] or ''),   # location
-                    str(row[9] or ''),   # confidence
-                    str(row[10] or ''),  # issue_background
-                    str(row[11] or ''),  # issue_detail
-                    str(row[12] or ''),  # solutions
-                    str(row[13] or ''),  # see_also
-                    str(row[14] or ''),  # reference_links
-                    str(row[15] or ''),  # vulnerability_classifications
-                    str(row[16] or ''),  # request
-                    str(row[17] or ''),  # response
-                    tracking_labels.get(int(row[18] or 0), 'OPEN'),  # tracking
-                ])
-        except Exception:
-            pass
+            # --- Burp data ---
+            burp_headers = [
+                "Severity", "Severity Number", "Host IP", "Host Name",
+                "Plugin Name", "Issue Type", "Path", "Location", "Confidence",
+                "Issue Background", "Issue Detail", "Solutions", "See Also",
+                "References", "Vulnerability Classifications",
+                "Request", "Response", "Tracking"
+            ]
+            burp_rows = []
+            try:
+                rows = dbh.scanBurpList(id)
+                tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
+                for row in rows:
+                    burp_rows.append([
+                        str(row[1] or ''),   # severity
+                        str(row[2] or ''),   # severity_number
+                        str(row[3] or ''),   # host_ip
+                        str(row[4] or ''),   # host_name
+                        str(row[5] or ''),   # plugin_name
+                        str(row[6] or ''),   # issue_type
+                        str(row[7] or ''),   # path
+                        str(row[8] or ''),   # location
+                        str(row[9] or ''),   # confidence
+                        str(row[10] or ''),  # issue_background
+                        str(row[11] or ''),  # issue_detail
+                        str(row[12] or ''),  # solutions
+                        str(row[13] or ''),  # see_also
+                        str(row[14] or ''),  # reference_links
+                        str(row[15] or ''),  # vulnerability_classifications
+                        str(row[16] or ''),  # request
+                        str(row[17] or ''),  # response
+                        tracking_labels.get(int(row[18] or 0), 'OPEN'),  # tracking
+                    ])
+            except Exception:
+                pass
 
-        if filetype.lower() in ["xlsx", "excel"]:
-            fname = self._export_filename(_scan_name, id, 'VULNS', 'xlsx')
-            cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={fname}'
-            cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            cherrypy.response.headers['Pragma'] = "no-cache"
+            if filetype.lower() in ["xlsx", "excel"]:
+                fname = self._export_filename(_scan_name, id, 'VULNS', 'xlsx')
+                cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={fname}'
+                cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                cherrypy.response.headers['Pragma'] = "no-cache"
 
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=UserWarning)
-                wb = openpyxl.Workbook()
+                with warnings.catch_warnings():
+                    warnings.filterwarnings('ignore', category=UserWarning)
+                    wb = openpyxl.Workbook()
 
-                # EXT-VULNS sheet (Nessus) — styled with severity colors
-                ws_nessus = wb.active
-                ws_nessus.title = "EXT-VULNS"
-                build_nessus_sheet(ws_nessus, nessus_rows)
+                    # EXT-VULNS sheet (Nessus) — styled with severity colors
+                    ws_nessus = wb.active
+                    ws_nessus.title = "EXT-VULNS"
+                    build_nessus_sheet(ws_nessus, nessus_rows)
 
-                # WEBAPP-VULNS sheet (Burp) — styled with severity colors
-                ws_burp = wb.create_sheet("WEBAPP-VULNS")
-                build_burp_sheet(ws_burp, burp_rows)
+                    # WEBAPP-VULNS sheet (Burp) — styled with severity colors
+                    ws_burp = wb.create_sheet("WEBAPP-VULNS")
+                    build_burp_sheet(ws_burp, burp_rows)
 
-            with BytesIO() as f:
-                wb.save(f)
-                f.seek(0)
-                return f.read()
+                with BytesIO() as f:
+                    wb.save(f)
+                    f.seek(0)
+                    return f.read()
 
-        if filetype.lower() == 'csv':
-            import csv
-            import zipfile
-            from io import StringIO, BytesIO
+            if filetype.lower() == 'csv':
+                import csv
+                import zipfile
+                from io import StringIO, BytesIO
 
-            # Build EXT-VULNS.csv
-            nessus_buf = StringIO()
-            nessus_writer = csv.writer(nessus_buf, dialect='excel')
-            nessus_writer.writerow(nessus_headers)
-            for row in nessus_rows:
-                nessus_writer.writerow(row)
-            nessus_csv = nessus_buf.getvalue()
+                # Build EXT-VULNS.csv
+                nessus_buf = StringIO()
+                nessus_writer = csv.writer(nessus_buf, dialect='excel')
+                nessus_writer.writerow(nessus_headers)
+                for row in nessus_rows:
+                    nessus_writer.writerow(row)
+                nessus_csv = nessus_buf.getvalue()
 
-            # Build WEBAPP-VULNS.csv
-            burp_buf = StringIO()
-            burp_writer = csv.writer(burp_buf, dialect='excel')
-            burp_writer.writerow(burp_headers)
-            for row in burp_rows:
-                burp_writer.writerow(row)
-            burp_csv = burp_buf.getvalue()
+                # Build WEBAPP-VULNS.csv
+                burp_buf = StringIO()
+                burp_writer = csv.writer(burp_buf, dialect='excel')
+                burp_writer.writerow(burp_headers)
+                for row in burp_rows:
+                    burp_writer.writerow(row)
+                burp_csv = burp_buf.getvalue()
 
-            # Package into zip
-            zip_buf = BytesIO()
-            with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-                zf.writestr('EXT-VULNS.csv', nessus_csv)
-                zf.writestr('WEBAPP-VULNS.csv', burp_csv)
-            zip_buf.seek(0)
+                # Package into zip
+                zip_buf = BytesIO()
+                with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+                    zf.writestr('EXT-VULNS.csv', nessus_csv)
+                    zf.writestr('WEBAPP-VULNS.csv', burp_csv)
+                zip_buf.seek(0)
 
-            fname = self._export_filename(_scan_name, id, 'VULNS', 'zip')
-            cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={fname}'
-            cherrypy.response.headers['Content-Type'] = "application/zip"
-            cherrypy.response.headers['Pragma'] = "no-cache"
-            return zip_buf.read()
+                fname = self._export_filename(_scan_name, id, 'VULNS', 'zip')
+                cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={fname}'
+                cherrypy.response.headers['Content-Type'] = "application/zip"
+                cherrypy.response.headers['Pragma'] = "no-cache"
+                return zip_buf.read()
 
-        return self.error("Invalid export file type.")
+            return self.error("Invalid export file type.")
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -6720,14 +6720,14 @@ class SpiderFootWebUi:
         Returns:
             dict: success status
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            dbh.scanNessusUpdateTracking(id, int(resultId), int(tracking))
-            return {'success': True}
-        except Exception as e:
-            self.log.error(f"Error updating Nessus tracking for scan {id}, result {resultId}: {e}", exc_info=True)
-            return {'success': False, 'message': str(e)}
+            try:
+                dbh.scanNessusUpdateTracking(id, int(resultId), int(tracking))
+                return {'success': True}
+            except Exception as e:
+                self.log.error(f"Error updating Nessus tracking for scan {id}, result {resultId}: {e}", exc_info=True)
+                return {'success': False, 'message': str(e)}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -6742,14 +6742,14 @@ class SpiderFootWebUi:
         Returns:
             dict: success status
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            dbh.scanBurpUpdateTracking(id, int(resultId), int(tracking))
-            return {'success': True}
-        except Exception as e:
-            self.log.error(f"Error updating Burp tracking for scan {id}, result {resultId}: {e}", exc_info=True)
-            return {'success': False, 'message': str(e)}
+            try:
+                dbh.scanBurpUpdateTracking(id, int(resultId), int(tracking))
+                return {'success': True}
+            except Exception as e:
+                self.log.error(f"Error updating Burp tracking for scan {id}, result {resultId}: {e}", exc_info=True)
+                return {'success': False, 'message': str(e)}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -6764,26 +6764,26 @@ class SpiderFootWebUi:
         Returns:
             dict: success status
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            dbh.scanEventUpdateTracking(id, resultHash, int(tracking))
+            try:
+                dbh.scanEventUpdateTracking(id, resultHash, int(tracking))
 
-            # Get event details for cross-scan sync
-            eventDetails = dbh.scanEventResultByHash(id, resultHash)
-            if eventDetails:
-                scanInfo = dbh.scanInstanceGet(id)
-                target = scanInfo[1] if scanInfo else None
-                if target:
-                    dbh.syncTrackingAcrossScans(
-                        target, eventDetails[0], eventDetails[1],
-                        eventDetails[2], int(tracking)
-                    )
+                # Get event details for cross-scan sync
+                eventDetails = dbh.scanEventResultByHash(id, resultHash)
+                if eventDetails:
+                    scanInfo = dbh.scanInstanceGet(id)
+                    target = scanInfo[1] if scanInfo else None
+                    if target:
+                        dbh.syncTrackingAcrossScans(
+                            target, eventDetails[0], eventDetails[1],
+                            eventDetails[2], int(tracking)
+                        )
 
-            return {'success': True}
-        except Exception as e:
-            self.log.error(f"Error updating event tracking for scan {id}, hash {resultHash}: {e}", exc_info=True)
-            return {'success': False, 'message': str(e)}
+                return {'success': True}
+            except Exception as e:
+                self.log.error(f"Error updating event tracking for scan {id}, hash {resultHash}: {e}", exc_info=True)
+                return {'success': False, 'message': str(e)}
 
     @cherrypy.expose
     def scanfindingsexport(self: 'SpiderFootWebUi', id: str, filetype: str = "xlsx", report: str = "basic") -> str:
@@ -6798,353 +6798,353 @@ class SpiderFootWebUi:
         Returns:
             str: exported data
         """
-        dbh = SpiderFootDb(self.config)
-        _scan = dbh.scanInstanceGet(id)
-        _scan_name = _scan[0] if _scan else ''
+        with SpiderFootDb(self.config) as dbh:
+            _scan = dbh.scanInstanceGet(id)
+            _scan_name = _scan[0] if _scan else ''
 
-        # Get findings
-        findings_rows = []
-        try:
-            findings_data = dbh.scanFindingsList(id)
-            for row in findings_data:
-                findings_rows.append([
-                    str(row[1]),  # Priority
-                    str(row[2]),  # Category
-                    str(row[3]),  # Tab
-                    str(row[4]),  # Item
-                    str(row[5]),  # Description
-                    str(row[6]),  # Recommendation
-                ])
-        except Exception:
-            pass
+            # Get findings
+            findings_rows = []
+            try:
+                findings_data = dbh.scanFindingsList(id)
+                for row in findings_data:
+                    findings_rows.append([
+                        str(row[1]),  # Priority
+                        str(row[2]),  # Category
+                        str(row[3]),  # Tab
+                        str(row[4]),  # Item
+                        str(row[5]),  # Description
+                        str(row[6]),  # Recommendation
+                    ])
+            except Exception:
+                pass
 
-        # Get correlations
-        correlation_rows = []
-        try:
-            corr_data = dbh.scanCorrelationList(id)
-            for corr_row in corr_data:
-                correlation_rows.append([
-                    str(corr_row[1]),   # Title
-                    str(corr_row[4]),   # Rule Name
-                    str(corr_row[3]),   # Risk
-                    str(corr_row[5]),   # Description
-                    str(corr_row[6]),   # Rule Logic
-                    str(corr_row[7]),   # Event Count
-                    str(corr_row[8] or ''),  # Event Types
-                ])
-        except Exception:
-            pass
+            # Get correlations
+            correlation_rows = []
+            try:
+                corr_data = dbh.scanCorrelationList(id)
+                for corr_row in corr_data:
+                    correlation_rows.append([
+                        str(corr_row[1]),   # Title
+                        str(corr_row[4]),   # Rule Name
+                        str(corr_row[3]),   # Risk
+                        str(corr_row[5]),   # Description
+                        str(corr_row[6]),   # Rule Logic
+                        str(corr_row[7]),   # Event Count
+                        str(corr_row[8] or ''),  # Event Types
+                    ])
+            except Exception:
+                pass
 
-        # Sort correlations by severity: CRITICAL → HIGH → MEDIUM → LOW → INFO
-        _risk_order = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'INFO': 4}
-        correlation_rows.sort(key=lambda r: _risk_order.get(str(r[2]).upper().strip(), 5))
+            # Sort correlations by severity: CRITICAL → HIGH → MEDIUM → LOW → INFO
+            _risk_order = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'INFO': 4}
+            correlation_rows.sort(key=lambda r: _risk_order.get(str(r[2]).upper().strip(), 5))
 
-        if filetype.lower() in ["xlsx", "excel"]:
-            cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            cherrypy.response.headers['Pragma'] = "no-cache"
+            if filetype.lower() in ["xlsx", "excel"]:
+                cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                cherrypy.response.headers['Pragma'] = "no-cache"
 
-            wb = None
+                wb = None
 
-            # Full report: styled with Executive Summary + category tabs
-            if report == "full":
-                cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={self._export_filename(_scan_name, id, 'REPORT', 'xlsx')}"
-                with warnings.catch_warnings():
-                    warnings.filterwarnings('ignore', category=UserWarning)
+                # Full report: styled with Executive Summary + category tabs
+                if report == "full":
+                    cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={self._export_filename(_scan_name, id, 'REPORT', 'xlsx')}"
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings('ignore', category=UserWarning)
 
-                    wb = openpyxl.Workbook()
+                        wb = openpyxl.Workbook()
 
-                    # Gather grade data (isolated error handling -- grade failure
-                    # should not prevent the entire report from generating)
-                    self.log.info(f"Full report: calculating grade for scan {id}")
-                    try:
-                        grade_data = self._calculateScanGrade(dbh, id)
-                    except Exception as e:
-                        self.log.error(f"Full report: grade calculation failed: {e}", exc_info=True)
-                        grade_data = {
-                            'enabled': False, 'overall_grade': '-', 'overall_score': 0,
-                            'overall_grade_color': '#6b7280', 'overall_grade_bg': '#f3f4f6',
-                            'categories': {},
+                        # Gather grade data (isolated error handling -- grade failure
+                        # should not prevent the entire report from generating)
+                        self.log.info(f"Full report: calculating grade for scan {id}")
+                        try:
+                            grade_data = self._calculateScanGrade(dbh, id)
+                        except Exception as e:
+                            self.log.error(f"Full report: grade calculation failed: {e}", exc_info=True)
+                            grade_data = {
+                                'enabled': False, 'overall_grade': '-', 'overall_score': 0,
+                                'overall_grade_color': '#6b7280', 'overall_grade_bg': '#f3f4f6',
+                                'categories': {},
+                            }
+
+                        # Gather scan metadata
+                        try:
+                            scan_instance = dbh.scanInstanceGet(id)
+                        except Exception as e:
+                            self.log.error(f"Full report: scan instance lookup failed: {e}", exc_info=True)
+                            scan_instance = None
+
+                        scan_info = {
+                            'name': scan_instance[0] if scan_instance else 'Unknown',
+                            'target': scan_instance[1] if scan_instance else 'Unknown',
+                            'date': time.strftime(
+                                "%Y-%m-%d %H:%M:%S",
+                                time.localtime(scan_instance[2]),
+                            ) if scan_instance and scan_instance[2] else '',
                         }
 
-                    # Gather scan metadata
-                    try:
-                        scan_instance = dbh.scanInstanceGet(id)
-                    except Exception as e:
-                        self.log.error(f"Full report: scan instance lookup failed: {e}", exc_info=True)
-                        scan_instance = None
+                        # Sheet 1: Executive Summary (reuse the default active sheet)
+                        self.log.info("Full report: building Executive Summary")
+                        ws_summary = wb.active
+                        ws_summary.title = "Executive Summary"
+                        build_executive_summary(ws_summary, grade_data, scan_info,
+                                                findings_rows=findings_rows,
+                                                correlation_rows=correlation_rows)
 
-                    scan_info = {
-                        'name': scan_instance[0] if scan_instance else 'Unknown',
-                        'target': scan_instance[1] if scan_instance else 'Unknown',
-                        'date': time.strftime(
-                            "%Y-%m-%d %H:%M:%S",
-                            time.localtime(scan_instance[2]),
-                        ) if scan_instance and scan_instance[2] else '',
-                    }
+                        # Sheet 2: Findings (black tab, severity colors)
+                        self.log.info(f"Full report: building Findings sheet ({len(findings_rows)} rows)")
+                        ws_findings = wb.create_sheet("Findings")
+                        build_findings_sheet(ws_findings, findings_rows)
 
-                    # Sheet 1: Executive Summary (reuse the default active sheet)
-                    self.log.info("Full report: building Executive Summary")
-                    ws_summary = wb.active
-                    ws_summary.title = "Executive Summary"
-                    build_executive_summary(ws_summary, grade_data, scan_info,
-                                            findings_rows=findings_rows,
-                                            correlation_rows=correlation_rows)
+                        # Sheet 3: Correlations (dark gray tab, risk colors)
+                        self.log.info(f"Full report: building Correlations sheet ({len(correlation_rows)} rows)")
+                        ws_corr = wb.create_sheet("Correlations")
+                        build_correlations_sheet(ws_corr, correlation_rows)
 
-                    # Sheet 2: Findings (black tab, severity colors)
-                    self.log.info(f"Full report: building Findings sheet ({len(findings_rows)} rows)")
-                    ws_findings = wb.create_sheet("Findings")
-                    build_findings_sheet(ws_findings, findings_rows)
+                        # Build category weight ordering for event-type tab sorting
+                        cat_results = grade_data.get('categories', {})
+                        _cat_weight_order = {
+                            cat_name: (-cat_data.get('weight', 0), cat_name)
+                            for cat_name, cat_data in cat_results.items()
+                        }
 
-                    # Sheet 3: Correlations (dark gray tab, risk colors)
-                    self.log.info(f"Full report: building Correlations sheet ({len(correlation_rows)} rows)")
-                    ws_corr = wb.create_sheet("Correlations")
-                    build_correlations_sheet(ws_corr, correlation_rows)
+                        used_names = {'Executive Summary', 'Findings', 'Correlations'}
 
-                    # Build category weight ordering for event-type tab sorting
-                    cat_results = grade_data.get('categories', {})
-                    _cat_weight_order = {
-                        cat_name: (-cat_data.get('weight', 0), cat_name)
-                        for cat_name, cat_data in cat_results.items()
-                    }
+                        # Sheet 4: EXT-VULNS (Nessus) - red tab
+                        try:
+                            self.log.info(f"Full report: fetching Nessus data for EXT-VULNS tab")
+                            nessus_data = dbh.scanNessusList(id)
+                            nessus_rows = []
+                            tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
+                            for row in nessus_data:
+                                nessus_rows.append([
+                                    str(row[1] or ''),   # severity
+                                    str(row[2] or ''),   # severity_number
+                                    str(row[3] or ''),   # plugin_name
+                                    str(row[4] or ''),   # plugin_id
+                                    str(row[5] or ''),   # host_ip
+                                    str(row[6] or ''),   # host_name
+                                    str(row[7] or ''),   # operating_system
+                                    str(row[8] or ''),   # description
+                                    str(row[9] or ''),   # synopsis
+                                    str(row[10] or ''),  # solution
+                                    str(row[11] or ''),  # see_also
+                                    str(row[12] or ''),  # service_name
+                                    str(row[13] or ''),  # port
+                                    str(row[14] or ''),  # protocol
+                                    str(row[15] or ''),  # request
+                                    str(row[16] or ''),  # plugin_output
+                                    str(row[17] or ''),  # cvss3_base_score
+                                    tracking_labels.get(int(row[18] or 0), 'OPEN'),  # tracking
+                                ])
+                            self.log.info(f"Full report: building EXT-VULNS sheet ({len(nessus_rows)} rows)")
+                            ws_nessus = wb.create_sheet("EXT-VULNS")
+                            used_names.add("EXT-VULNS")
+                            build_nessus_sheet(ws_nessus, nessus_rows)
+                        except Exception as e:
+                            self.log.error(f"Full report: EXT-VULNS tab failed: {e}", exc_info=True)
 
-                    used_names = {'Executive Summary', 'Findings', 'Correlations'}
+                        # Pre-fetch WEBAPP-VULNS (Burp) data -- sheet created later
+                        # in the event-type loop to position it at the Web App Security boundary
+                        burp_rows = []
+                        try:
+                            self.log.info(f"Full report: fetching Burp data for WEBAPP-VULNS tab")
+                            burp_data = dbh.scanBurpList(id)
+                            tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
+                            for row in burp_data:
+                                burp_rows.append([
+                                    str(row[1] or ''),   # severity
+                                    str(row[2] or ''),   # severity_number
+                                    str(row[3] or ''),   # host_ip
+                                    str(row[4] or ''),   # host_name
+                                    str(row[5] or ''),   # plugin_name
+                                    str(row[6] or ''),   # issue_type
+                                    str(row[7] or ''),   # path
+                                    str(row[8] or ''),   # location
+                                    str(row[9] or ''),   # confidence
+                                    str(row[10] or ''),  # issue_background
+                                    str(row[11] or ''),  # issue_detail
+                                    str(row[12] or ''),  # solutions
+                                    str(row[13] or ''),  # see_also
+                                    str(row[14] or ''),  # reference_links
+                                    str(row[15] or ''),  # vulnerability_classifications
+                                    str(row[16] or ''),  # request
+                                    str(row[17] or ''),  # response
+                                    tracking_labels.get(int(row[18] or 0), 'OPEN'),  # tracking
+                                ])
+                            self.log.info(f"Full report: WEBAPP-VULNS data ready ({len(burp_rows)} rows)")
+                        except Exception as e:
+                            self.log.error(f"Full report: WEBAPP-VULNS data fetch failed: {e}", exc_info=True)
 
-                    # Sheet 4: EXT-VULNS (Nessus) - red tab
-                    try:
-                        self.log.info(f"Full report: fetching Nessus data for EXT-VULNS tab")
-                        nessus_data = dbh.scanNessusList(id)
-                        nessus_rows = []
-                        tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
-                        for row in nessus_data:
-                            nessus_rows.append([
-                                str(row[1] or ''),   # severity
-                                str(row[2] or ''),   # severity_number
-                                str(row[3] or ''),   # plugin_name
-                                str(row[4] or ''),   # plugin_id
-                                str(row[5] or ''),   # host_ip
-                                str(row[6] or ''),   # host_name
-                                str(row[7] or ''),   # operating_system
-                                str(row[8] or ''),   # description
-                                str(row[9] or ''),   # synopsis
-                                str(row[10] or ''),  # solution
-                                str(row[11] or ''),  # see_also
-                                str(row[12] or ''),  # service_name
-                                str(row[13] or ''),  # port
-                                str(row[14] or ''),  # protocol
-                                str(row[15] or ''),  # request
-                                str(row[16] or ''),  # plugin_output
-                                str(row[17] or ''),  # cvss3_base_score
-                                tracking_labels.get(int(row[18] or 0), 'OPEN'),  # tracking
-                            ])
-                        self.log.info(f"Full report: building EXT-VULNS sheet ({len(nessus_rows)} rows)")
-                        ws_nessus = wb.create_sheet("EXT-VULNS")
-                        used_names.add("EXT-VULNS")
-                        build_nessus_sheet(ws_nessus, nessus_rows)
-                    except Exception as e:
-                        self.log.error(f"Full report: EXT-VULNS tab failed: {e}", exc_info=True)
+                        # Event-type data tabs (one sheet per event type, grouped by category weight order)
+                        try:
+                            self.log.info(f"Full report: fetching scan result events for data tabs")
+                            scan_data = dbh.scanResultEvent(id, 'ALL')
 
-                    # Pre-fetch WEBAPP-VULNS (Burp) data -- sheet created later
-                    # in the event-type loop to position it at the Web App Security boundary
-                    burp_rows = []
-                    try:
-                        self.log.info(f"Full report: fetching Burp data for WEBAPP-VULNS tab")
-                        burp_data = dbh.scanBurpList(id)
-                        tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
-                        for row in burp_data:
-                            burp_rows.append([
-                                str(row[1] or ''),   # severity
-                                str(row[2] or ''),   # severity_number
-                                str(row[3] or ''),   # host_ip
-                                str(row[4] or ''),   # host_name
-                                str(row[5] or ''),   # plugin_name
-                                str(row[6] or ''),   # issue_type
-                                str(row[7] or ''),   # path
-                                str(row[8] or ''),   # location
-                                str(row[9] or ''),   # confidence
-                                str(row[10] or ''),  # issue_background
-                                str(row[11] or ''),  # issue_detail
-                                str(row[12] or ''),  # solutions
-                                str(row[13] or ''),  # see_also
-                                str(row[14] or ''),  # reference_links
-                                str(row[15] or ''),  # vulnerability_classifications
-                                str(row[16] or ''),  # request
-                                str(row[17] or ''),  # response
-                                tracking_labels.get(int(row[18] or 0), 'OPEN'),  # tracking
-                            ])
-                        self.log.info(f"Full report: WEBAPP-VULNS data ready ({len(burp_rows)} rows)")
-                    except Exception as e:
-                        self.log.error(f"Full report: WEBAPP-VULNS data fetch failed: {e}", exc_info=True)
+                            # Get target-level FPs
+                            target = scan_instance[1] if scan_instance else None
+                            target_fps = set()
+                            if target:
+                                try:
+                                    target_fps = dbh.targetFalsePositivesForTarget(target)
+                                except Exception:
+                                    pass
 
-                    # Event-type data tabs (one sheet per event type, grouped by category weight order)
-                    try:
-                        self.log.info(f"Full report: fetching scan result events for data tabs")
-                        scan_data = dbh.scanResultEvent(id, 'ALL')
+                            # Group rows by event type
+                            event_type_groups = {}
+                            for row in scan_data:
+                                if row[4] == "ROOT":
+                                    continue
+                                event_type_code = str(row[4])
+                                fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], target_fps)
+                                lastseen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
+                                datafield = str(row[1]).replace("<SFURL>", "").replace("</SFURL>", "")
+                                display_type = translate_event_type(event_type_code)
+                                if display_type not in event_type_groups:
+                                    event_type_groups[display_type] = {
+                                        'rows': [],
+                                        'event_code': event_type_code,
+                                    }
+                                event_type_groups[display_type]['rows'].append(
+                                    [lastseen, str(row[3]), str(row[2]), fp_flag, datafield])
 
-                        # Get target-level FPs
-                        target = scan_instance[1] if scan_instance else None
-                        target_fps = set()
-                        if target:
-                            try:
-                                target_fps = dbh.targetFalsePositivesForTarget(target)
-                            except Exception:
-                                pass
+                            # Sort event types by category weight (descending), then alphabetically within category
+                            def _evt_sort_key(display_type):
+                                grp = event_type_groups[display_type]
+                                evt_grading = get_event_grading(grp['event_code'])
+                                evt_category = evt_grading.get('category', 'Information / Reference')
+                                # Use category weight order, falling back to (0, category_name)
+                                cat_order = _cat_weight_order.get(evt_category, (0, evt_category))
+                                return (cat_order[0], cat_order[1], display_type)
 
-                        # Group rows by event type
-                        event_type_groups = {}
-                        for row in scan_data:
-                            if row[4] == "ROOT":
-                                continue
-                            event_type_code = str(row[4])
-                            fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], target_fps)
-                            lastseen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
-                            datafield = str(row[1]).replace("<SFURL>", "").replace("</SFURL>", "")
-                            display_type = translate_event_type(event_type_code)
-                            if display_type not in event_type_groups:
-                                event_type_groups[display_type] = {
-                                    'rows': [],
-                                    'event_code': event_type_code,
-                                }
-                            event_type_groups[display_type]['rows'].append(
-                                [lastseen, str(row[3]), str(row[2]), fp_flag, datafield])
+                            sorted_event_types = sorted(event_type_groups.keys(), key=_evt_sort_key)
 
-                        # Sort event types by category weight (descending), then alphabetically within category
-                        def _evt_sort_key(display_type):
-                            grp = event_type_groups[display_type]
-                            evt_grading = get_event_grading(grp['event_code'])
-                            evt_category = evt_grading.get('category', 'Information / Reference')
-                            # Use category weight order, falling back to (0, category_name)
-                            cat_order = _cat_weight_order.get(evt_category, (0, evt_category))
-                            return (cat_order[0], cat_order[1], display_type)
+                            self.log.info(f"Full report: building {len(sorted_event_types)} event-type data tabs")
+                            _webapp_vulns_inserted = False
+                            for display_type in sorted_event_types:
+                                grp = event_type_groups[display_type]
+                                evt_code = grp['event_code']
+                                evt_rows = grp['rows']
 
-                        sorted_event_types = sorted(event_type_groups.keys(), key=_evt_sort_key)
+                                # Look up category color via grade config
+                                evt_grading = get_event_grading(evt_code)
+                                evt_category = evt_grading.get('category', 'Information / Reference')
+                                tab_color = CATEGORY_TAB_COLORS.get(evt_category, '#6b7280')
 
-                        self.log.info(f"Full report: building {len(sorted_event_types)} event-type data tabs")
-                        _webapp_vulns_inserted = False
-                        for display_type in sorted_event_types:
-                            grp = event_type_groups[display_type]
-                            evt_code = grp['event_code']
-                            evt_rows = grp['rows']
+                                # Insert WEBAPP-VULNS right before the first Web App Security event type
+                                if not _webapp_vulns_inserted and evt_category == 'Web App Security':
+                                    self.log.info(f"Full report: inserting WEBAPP-VULNS sheet ({len(burp_rows)} rows)")
+                                    ws_burp = wb.create_sheet("WEBAPP-VULNS")
+                                    used_names.add("WEBAPP-VULNS")
+                                    build_burp_sheet(ws_burp, burp_rows)
+                                    _webapp_vulns_inserted = True
 
-                            # Look up category color via grade config
-                            evt_grading = get_event_grading(evt_code)
-                            evt_category = evt_grading.get('category', 'Information / Reference')
-                            tab_color = CATEGORY_TAB_COLORS.get(evt_category, '#6b7280')
+                                safe_name = sanitize_sheet_name(display_type)
+                                original = safe_name
+                                suffix = 2
+                                while safe_name in used_names:
+                                    safe_name = f"{original[:28]}({suffix})"
+                                    suffix += 1
+                                used_names.add(safe_name)
 
-                            # Insert WEBAPP-VULNS right before the first Web App Security event type
-                            if not _webapp_vulns_inserted and evt_category == 'Web App Security':
-                                self.log.info(f"Full report: inserting WEBAPP-VULNS sheet ({len(burp_rows)} rows)")
+                                ws_evt = wb.create_sheet(safe_name)
+                                build_event_type_sheet(ws_evt, display_type, evt_rows, tab_color=tab_color)
+
+                            # Fallback: if no Web App Security events, append WEBAPP-VULNS at end
+                            if not _webapp_vulns_inserted:
+                                self.log.info(f"Full report: appending WEBAPP-VULNS sheet ({len(burp_rows)} rows)")
                                 ws_burp = wb.create_sheet("WEBAPP-VULNS")
                                 used_names.add("WEBAPP-VULNS")
                                 build_burp_sheet(ws_burp, burp_rows)
-                                _webapp_vulns_inserted = True
 
-                            safe_name = sanitize_sheet_name(display_type)
-                            original = safe_name
-                            suffix = 2
-                            while safe_name in used_names:
-                                safe_name = f"{original[:28]}({suffix})"
-                                suffix += 1
-                            used_names.add(safe_name)
+                        except Exception as e:
+                            self.log.error(f"Full report: event-type data tabs failed: {e}", exc_info=True)
 
-                            ws_evt = wb.create_sheet(safe_name)
-                            build_event_type_sheet(ws_evt, display_type, evt_rows, tab_color=tab_color)
+                        self.log.info("Full report: workbook built successfully")
 
-                        # Fallback: if no Web App Security events, append WEBAPP-VULNS at end
-                        if not _webapp_vulns_inserted:
-                            self.log.info(f"Full report: appending WEBAPP-VULNS sheet ({len(burp_rows)} rows)")
-                            ws_burp = wb.create_sheet("WEBAPP-VULNS")
-                            used_names.add("WEBAPP-VULNS")
-                            build_burp_sheet(ws_burp, burp_rows)
+                # Basic export (default) or fallback if full report failed
+                if wb is None:
+                    if report != "full":
+                        cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={self._export_filename(_scan_name, id, 'FINDINGS', 'xlsx')}"
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings('ignore', category=UserWarning)
+                        wb = openpyxl.Workbook()
 
-                    except Exception as e:
-                        self.log.error(f"Full report: event-type data tabs failed: {e}", exc_info=True)
+                        ws_findings = wb.active
+                        ws_findings.title = "Findings"
+                        build_findings_sheet(ws_findings, findings_rows)
 
-                    self.log.info("Full report: workbook built successfully")
+                        ws_corr = wb.create_sheet("Correlations")
+                        build_correlations_sheet(ws_corr, correlation_rows)
 
-            # Basic export (default) or fallback if full report failed
-            if wb is None:
-                if report != "full":
-                    cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={self._export_filename(_scan_name, id, 'FINDINGS', 'xlsx')}"
-                with warnings.catch_warnings():
-                    warnings.filterwarnings('ignore', category=UserWarning)
-                    wb = openpyxl.Workbook()
+                try:
+                    self.log.info("Full report: saving workbook...")
+                    with BytesIO() as f:
+                        wb.save(f)
+                        f.seek(0)
+                        data = f.read()
+                    self.log.info(f"Full report: saved successfully ({len(data)} bytes)")
+                    return data
+                except Exception as e:
+                    self.log.error(f"Full report: wb.save() failed: {e}", exc_info=True)
+                    # Fall back to basic export so the user gets something
+                    wb_fallback = openpyxl.Workbook()
+                    ws_err = wb_fallback.active
+                    ws_err.title = "Export Error"
+                    ws_err['A1'].value = "Full report save failed during Excel serialization."
+                    ws_err['A2'].value = f"Error: {str(e)}"
+                    ws_err['A3'].value = "The styled workbook was built but could not be saved. Basic data follows."
 
-                    ws_findings = wb.active
-                    ws_findings.title = "Findings"
-                    build_findings_sheet(ws_findings, findings_rows)
+                    ws_fb_findings = wb_fallback.create_sheet("Findings")
+                    fb_headers = ["Priority", "Category", "Tab", "Item", "Description", "Recommendation"]
+                    for col_num, header in enumerate(fb_headers, 1):
+                        ws_fb_findings.cell(row=1, column=col_num, value=header)
+                    for row_num, row_data in enumerate(findings_rows, 2):
+                        for col_num, cell_value in enumerate(row_data, 1):
+                            ws_fb_findings.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
 
-                    ws_corr = wb.create_sheet("Correlations")
-                    build_correlations_sheet(ws_corr, correlation_rows)
+                    ws_fb_corr = wb_fallback.create_sheet("Correlations")
+                    fb_corr_headers = ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"]
+                    for col_num, header in enumerate(fb_corr_headers, 1):
+                        ws_fb_corr.cell(row=1, column=col_num, value=header)
+                    for row_num, row_data in enumerate(correlation_rows, 2):
+                        for col_num, cell_value in enumerate(row_data, 1):
+                            ws_fb_corr.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
 
-            try:
-                self.log.info("Full report: saving workbook...")
-                with BytesIO() as f:
-                    wb.save(f)
-                    f.seek(0)
-                    data = f.read()
-                self.log.info(f"Full report: saved successfully ({len(data)} bytes)")
-                return data
-            except Exception as e:
-                self.log.error(f"Full report: wb.save() failed: {e}", exc_info=True)
-                # Fall back to basic export so the user gets something
-                wb_fallback = openpyxl.Workbook()
-                ws_err = wb_fallback.active
-                ws_err.title = "Export Error"
-                ws_err['A1'].value = "Full report save failed during Excel serialization."
-                ws_err['A2'].value = f"Error: {str(e)}"
-                ws_err['A3'].value = "The styled workbook was built but could not be saved. Basic data follows."
+                    with BytesIO() as f:
+                        wb_fallback.save(f)
+                        f.seek(0)
+                        return f.read()
 
-                ws_fb_findings = wb_fallback.create_sheet("Findings")
-                fb_headers = ["Priority", "Category", "Tab", "Item", "Description", "Recommendation"]
-                for col_num, header in enumerate(fb_headers, 1):
-                    ws_fb_findings.cell(row=1, column=col_num, value=header)
-                for row_num, row_data in enumerate(findings_rows, 2):
-                    for col_num, cell_value in enumerate(row_data, 1):
-                        ws_fb_findings.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
+            if filetype.lower() == 'csv':
+                import csv
+                import zipfile
 
-                ws_fb_corr = wb_fallback.create_sheet("Correlations")
-                fb_corr_headers = ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"]
-                for col_num, header in enumerate(fb_corr_headers, 1):
-                    ws_fb_corr.cell(row=1, column=col_num, value=header)
-                for row_num, row_data in enumerate(correlation_rows, 2):
-                    for col_num, cell_value in enumerate(row_data, 1):
-                        ws_fb_corr.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
+                cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={self._export_filename(_scan_name, id, 'FINDINGS', 'zip')}"
+                cherrypy.response.headers['Content-Type'] = "application/zip"
+                cherrypy.response.headers['Pragma'] = "no-cache"
 
-                with BytesIO() as f:
-                    wb_fallback.save(f)
-                    f.seek(0)
-                    return f.read()
+                zip_buffer = BytesIO()
+                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                    # FINDINGS.csv
+                    findings_io = StringIO()
+                    findings_writer = csv.writer(findings_io, dialect='excel')
+                    findings_writer.writerow(["Priority", "Category", "Tab", "Item", "Description", "Recommendation"])
+                    for row in findings_rows:
+                        findings_writer.writerow(row)
+                    zf.writestr("FINDINGS.csv", findings_io.getvalue())
 
-        if filetype.lower() == 'csv':
-            import csv
-            import zipfile
+                    # CORRELATIONS.csv
+                    corr_io = StringIO()
+                    corr_writer = csv.writer(corr_io, dialect='excel')
+                    corr_writer.writerow(["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"])
+                    for row in correlation_rows:
+                        corr_writer.writerow(row)
+                    zf.writestr("CORRELATIONS.csv", corr_io.getvalue())
 
-            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={self._export_filename(_scan_name, id, 'FINDINGS', 'zip')}"
-            cherrypy.response.headers['Content-Type'] = "application/zip"
-            cherrypy.response.headers['Pragma'] = "no-cache"
+                zip_buffer.seek(0)
+                return zip_buffer.read()
 
-            zip_buffer = BytesIO()
-            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-                # FINDINGS.csv
-                findings_io = StringIO()
-                findings_writer = csv.writer(findings_io, dialect='excel')
-                findings_writer.writerow(["Priority", "Category", "Tab", "Item", "Description", "Recommendation"])
-                for row in findings_rows:
-                    findings_writer.writerow(row)
-                zf.writestr("FINDINGS.csv", findings_io.getvalue())
-
-                # CORRELATIONS.csv
-                corr_io = StringIO()
-                corr_writer = csv.writer(corr_io, dialect='excel')
-                corr_writer.writerow(["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"])
-                for row in correlation_rows:
-                    corr_writer.writerow(row)
-                zf.writestr("CORRELATIONS.csv", corr_io.getvalue())
-
-            zip_buffer.seek(0)
-            return zip_buffer.read()
-
-        return self.error("Invalid export file type.")
+            return self.error("Invalid export file type.")
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -7159,41 +7159,41 @@ class SpiderFootWebUi:
         Returns:
             dict: available modes and event counts
         """
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        scanInfo = dbh.scanInstanceGet(id)
-        if not scanInfo:
-            return {'success': False, 'error': 'Scan not found'}
+            scanInfo = dbh.scanInstanceGet(id)
+            if not scanInfo:
+                return {'success': False, 'error': 'Scan not found'}
 
-        try:
-            qry = """SELECT
-                        COUNT(CASE WHEN imported_from_scan IS NULL THEN 1 END) as native_count,
-                        COUNT(CASE WHEN imported_from_scan IS NOT NULL THEN 1 END) as imported_count
-                     FROM tbl_scan_results
-                     WHERE scan_instance_id = ?
-                       AND type != 'ROOT'
-                       AND type != 'AI_CROSS_SCAN_CORRELATION'
-                       AND type != 'AI_SINGLE_SCAN_CORRELATION'
-                       AND false_positive = 0"""
+            try:
+                qry = """SELECT
+                            COUNT(CASE WHEN imported_from_scan IS NULL THEN 1 END) as native_count,
+                            COUNT(CASE WHEN imported_from_scan IS NOT NULL THEN 1 END) as imported_count
+                         FROM tbl_scan_results
+                         WHERE scan_instance_id = ?
+                           AND type != 'ROOT'
+                           AND type != 'AI_CROSS_SCAN_CORRELATION'
+                           AND type != 'AI_SINGLE_SCAN_CORRELATION'
+                           AND false_positive = 0"""
 
-            with dbh.dbhLock:
-                dbh.dbh.execute(qry, [id])
-                row = dbh.dbh.fetchone()
+                with dbh.dbhLock:
+                    dbh.dbh.execute(qry, [id])
+                    row = dbh.dbh.fetchone()
 
-            native_count = row[0] if row else 0
-            imported_count = row[1] if row else 0
+                native_count = row[0] if row else 0
+                imported_count = row[1] if row else 0
 
-            return {
-                'success': True,
-                'native_count': native_count,
-                'imported_count': imported_count,
-                'has_imported': imported_count > 0,
-                'single_scan_available': native_count > 0,
-                'cross_scan_available': imported_count > 0 and native_count > 0
-            }
-        except Exception as e:
-            self.log.error(f"Error checking correlation modes: {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+                return {
+                    'success': True,
+                    'native_count': native_count,
+                    'imported_count': imported_count,
+                    'has_imported': imported_count > 0,
+                    'single_scan_available': native_count > 0,
+                    'cross_scan_available': imported_count > 0 and native_count > 0
+                }
+            except Exception as e:
+                self.log.error(f"Error checking correlation modes: {e}", exc_info=True)
+                return {'success': False, 'error': str(e)}
 
     def _cleanupOldCorrelationJobs(self) -> None:
         """Remove completed correlation jobs older than 10 minutes."""
@@ -7249,39 +7249,39 @@ class SpiderFootWebUi:
         if mode not in ('cross', 'single'):
             return {'success': False, 'error': f'Invalid mode: {mode}'}
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        # Get scan info
-        scanInfo = dbh.scanInstanceGet(id)
-        if not scanInfo:
-            return {'success': False, 'error': 'Scan not found'}
+            # Get scan info
+            scanInfo = dbh.scanInstanceGet(id)
+            if not scanInfo:
+                return {'success': False, 'error': 'Scan not found'}
 
-        # Clean up old completed jobs
-        self._cleanupOldCorrelationJobs()
+            # Clean up old completed jobs
+            self._cleanupOldCorrelationJobs()
 
-        # Create a new job
-        job_id = str(uuid.uuid4())
-        with self._correlation_jobs_lock:
-            self._correlation_jobs[job_id] = {
-                'status': 'running',
-                'progress': 0,
-                'step': 'Initializing...',
-                'result': None,
-                'completed_at': 0,
-            }
+            # Create a new job
+            job_id = str(uuid.uuid4())
+            with self._correlation_jobs_lock:
+                self._correlation_jobs[job_id] = {
+                    'status': 'running',
+                    'progress': 0,
+                    'step': 'Initializing...',
+                    'result': None,
+                    'completed_at': 0,
+                }
 
-        target = scanInfo[1]
-        self.log.info(f"Running {mode} correlation analysis for scan {id} (target: {target}) [job {job_id}]")
+            target = scanInfo[1]
+            self.log.info(f"Running {mode} correlation analysis for scan {id} (target: {target}) [job {job_id}]")
 
-        # Launch background worker thread
-        worker = threading.Thread(
-            target=self._correlationWorker,
-            args=(job_id, id, target, mode),
-            daemon=True
-        )
-        worker.start()
+            # Launch background worker thread
+            worker = threading.Thread(
+                target=self._correlationWorker,
+                args=(job_id, id, target, mode),
+                daemon=True
+            )
+            worker.start()
 
-        return {'success': True, 'job_id': job_id, 'status': 'running'}
+            return {'success': True, 'job_id': job_id, 'status': 'running'}
 
     def _updateCorrelationJob(self, job_id: str, **kwargs) -> None:
         """Update a correlation job's state."""
@@ -7296,66 +7296,66 @@ class SpiderFootWebUi:
         Updates job progress at each stage so the frontend can poll.
         """
         try:
-            dbh = SpiderFootDb(self.config)
+            with SpiderFootDb(self.config) as dbh:
 
-            # Stage 1: Deduplication (0% -> 15%)
-            self._updateCorrelationJob(job_id, progress=5, step='Deduplicating events...')
-            try:
-                dedup = dbh.deduplicateScanResults(id)
-                self.log.info(f"Pre-correlation dedup: removed={dedup.get('removed', 0)}, fp_preserved={dedup.get('fp_preserved', 0)}")
-            except Exception as e:
-                self.log.warning(f"Pre-correlation dedup failed (continuing anyway): {e}")
+                # Stage 1: Deduplication (0% -> 15%)
+                self._updateCorrelationJob(job_id, progress=5, step='Deduplicating events...')
+                try:
+                    dedup = dbh.deduplicateScanResults(id)
+                    self.log.info(f"Pre-correlation dedup: removed={dedup.get('removed', 0)}, fp_preserved={dedup.get('fp_preserved', 0)}")
+                except Exception as e:
+                    self.log.warning(f"Pre-correlation dedup failed (continuing anyway): {e}")
 
-            self._updateCorrelationJob(job_id, progress=15, step='Deduplication complete')
+                self._updateCorrelationJob(job_id, progress=15, step='Deduplication complete')
 
-            # Stage 2: Clear old correlations (15% -> 20%)
-            ruleId = 'ai_single_scan_correlation' if mode == 'single' else 'ai_cross_scan_correlation'
-            try:
-                dbh.deleteCorrelationsByRule(id, ruleId)
-                self.log.info(f"Cleared previous {ruleId} correlations for scan {id}")
-            except Exception as e:
-                self.log.warning(f"Failed to clear old correlations (continuing anyway): {e}")
+                # Stage 2: Clear old correlations (15% -> 20%)
+                ruleId = 'ai_single_scan_correlation' if mode == 'single' else 'ai_cross_scan_correlation'
+                try:
+                    dbh.deleteCorrelationsByRule(id, ruleId)
+                    self.log.info(f"Cleared previous {ruleId} correlations for scan {id}")
+                except Exception as e:
+                    self.log.warning(f"Failed to clear old correlations (continuing anyway): {e}")
 
-            self._updateCorrelationJob(job_id, progress=20, step='Analyzing scan data...')
+                self._updateCorrelationJob(job_id, progress=20, step='Analyzing scan data...')
 
-            # Stage 3: Run AI correlation (20% -> 55%)
-            try:
-                if mode == 'single':
-                    ai_result = self._runSingleScanCorrelation(dbh, id, target)
-                else:
-                    ai_result = self._runCrossScanCorrelation(dbh, id, target)
-            except Exception as e:
-                self.log.error(f"Error running correlation: {e}", exc_info=True)
+                # Stage 3: Run AI correlation (20% -> 55%)
+                try:
+                    if mode == 'single':
+                        ai_result = self._runSingleScanCorrelation(dbh, id, target)
+                    else:
+                        ai_result = self._runCrossScanCorrelation(dbh, id, target)
+                except Exception as e:
+                    self.log.error(f"Error running correlation: {e}", exc_info=True)
+                    self._updateCorrelationJob(
+                        job_id,
+                        status='error',
+                        progress=100,
+                        step='Error',
+                        result={'success': False, 'error': f'Error running correlation: {str(e)}'},
+                        completed_at=time.time()
+                    )
+                    return
+
+                self._updateCorrelationJob(job_id, progress=55, step='Running correlation rules...')
+
+                # Stage 4: Rule-based correlations (55% -> 95%)
+                try:
+                    self._rerunRuleCorrelations(dbh, id)
+                except Exception as e:
+                    self.log.warning(f"Failed to re-run rule-based correlations: {e}")
+
+                self._updateCorrelationJob(job_id, progress=95, step='Finalizing results...')
+
+                # Done
                 self._updateCorrelationJob(
                     job_id,
-                    status='error',
+                    status='complete',
                     progress=100,
-                    step='Error',
-                    result={'success': False, 'error': f'Error running correlation: {str(e)}'},
+                    step='Complete',
+                    result=ai_result,
                     completed_at=time.time()
                 )
-                return
-
-            self._updateCorrelationJob(job_id, progress=55, step='Running correlation rules...')
-
-            # Stage 4: Rule-based correlations (55% -> 95%)
-            try:
-                self._rerunRuleCorrelations(dbh, id)
-            except Exception as e:
-                self.log.warning(f"Failed to re-run rule-based correlations: {e}")
-
-            self._updateCorrelationJob(job_id, progress=95, step='Finalizing results...')
-
-            # Done
-            self._updateCorrelationJob(
-                job_id,
-                status='complete',
-                progress=100,
-                step='Complete',
-                result=ai_result,
-                completed_at=time.time()
-            )
-            self.log.info(f"Correlation job {job_id} complete: {ai_result.get('correlations_found', 0)} correlations found")
+                self.log.info(f"Correlation job {job_id} complete: {ai_result.get('correlations_found', 0)} correlations found")
 
         except Exception as e:
             self.log.error(f"Correlation worker error: {e}", exc_info=True)
@@ -7889,102 +7889,102 @@ class SpiderFootWebUi:
         """
         retdata = []
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        if not eventType:
-            eventType = 'ALL'
+            if not eventType:
+                eventType = 'ALL'
 
-        try:
-            data = dbh.scanResultEvent(
-                id, eventType, filterFp=filterfp, correlationId=correlationId)
-        except Exception as e:
-            self.log.warning(
-                f"scaneventresults failed for scan={id}, correlationId={correlationId}, "
-                f"eventType={eventType}: {e}"
-            )
-            return retdata
-
-        # Get the target for this scan to check target-level FPs and validated status
-        scanInfo = dbh.scanInstanceGet(id)
-        target = scanInfo[1] if scanInfo else None
-
-        # Get all target-level false positives and validated entries for fast lookup
-        targetFps = set()
-        targetValidated = set()
-        knownAssets = {'ip': set(), 'domain': set(), 'employee': set()}
-        if target:
             try:
-                targetFps = dbh.targetFalsePositivesForTarget(target)
-            except Exception:
-                pass  # Table may not exist in older databases
-            try:
-                targetValidated = dbh.targetValidatedForTarget(target)
-            except Exception:
-                pass  # Table may not exist in older databases
-            try:
-                knownAssets = dbh.knownAssetValues(target)
-            except Exception:
-                pass  # Table may not exist in older databases
+                data = dbh.scanResultEvent(
+                    id, eventType, filterFp=filterfp, correlationId=correlationId)
+            except Exception as e:
+                self.log.warning(
+                    f"scaneventresults failed for scan={id}, correlationId={correlationId}, "
+                    f"eventType={eventType}: {e}"
+                )
+                return retdata
 
-        # Pre-compute known asset matching sets
-        ip_match_types = {'IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'}
-        domain_match_types = {'DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
-                              'CO_HOSTED_SITE', 'SIMILARDOMAIN', 'INTERNET_NAME_UNRESOLVED'}
-        employee_match_types = {'HUMAN_NAME', 'USERNAME', 'EMAILADDR', 'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'}
-        hasKnownAssets = any(knownAssets.values())
+            # Get the target for this scan to check target-level FPs and validated status
+            scanInfo = dbh.scanInstanceGet(id)
+            target = scanInfo[1] if scanInfo else None
 
-        for row in data:
-            lastseen = time.strftime(
-                "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
-            eventDataRaw = row[1]
-            sourceDataRaw = row[2]
-            eventTypeRaw = row[4]
+            # Get all target-level false positives and validated entries for fast lookup
+            targetFps = set()
+            targetValidated = set()
+            knownAssets = {'ip': set(), 'domain': set(), 'employee': set()}
+            if target:
+                try:
+                    targetFps = dbh.targetFalsePositivesForTarget(target)
+                except Exception:
+                    pass  # Table may not exist in older databases
+                try:
+                    targetValidated = dbh.targetValidatedForTarget(target)
+                except Exception:
+                    pass  # Table may not exist in older databases
+                try:
+                    knownAssets = dbh.knownAssetValues(target)
+                except Exception:
+                    pass  # Table may not exist in older databases
 
-            # Check if this result matches a target-level false positive (including source for granular matching)
-            isTargetFp = 1 if (eventTypeRaw, eventDataRaw, sourceDataRaw) in targetFps else 0
-            # Check if this result matches a target-level validated entry
-            isTargetValidated = 1 if (eventTypeRaw, eventDataRaw, sourceDataRaw) in targetValidated else 0
+            # Pre-compute known asset matching sets
+            ip_match_types = {'IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'}
+            domain_match_types = {'DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
+                                  'CO_HOSTED_SITE', 'SIMILARDOMAIN', 'INTERNET_NAME_UNRESOLVED'}
+            employee_match_types = {'HUMAN_NAME', 'USERNAME', 'EMAILADDR', 'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'}
+            hasKnownAssets = any(knownAssets.values())
 
-            # Check if this result matches a known asset
-            isKnownAsset = 0  # 0=no match, 1=client_provided match, 2=analyst_confirmed match
-            if hasKnownAssets and eventDataRaw:
-                dataLower = eventDataRaw.lower().strip()
-                if eventTypeRaw in ip_match_types and dataLower in knownAssets['ip']:
-                    isKnownAsset = 1
-                elif eventTypeRaw in domain_match_types:
-                    if dataLower in knownAssets['domain']:
+            for row in data:
+                lastseen = time.strftime(
+                    "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
+                eventDataRaw = row[1]
+                sourceDataRaw = row[2]
+                eventTypeRaw = row[4]
+
+                # Check if this result matches a target-level false positive (including source for granular matching)
+                isTargetFp = 1 if (eventTypeRaw, eventDataRaw, sourceDataRaw) in targetFps else 0
+                # Check if this result matches a target-level validated entry
+                isTargetValidated = 1 if (eventTypeRaw, eventDataRaw, sourceDataRaw) in targetValidated else 0
+
+                # Check if this result matches a known asset
+                isKnownAsset = 0  # 0=no match, 1=client_provided match, 2=analyst_confirmed match
+                if hasKnownAssets and eventDataRaw:
+                    dataLower = eventDataRaw.lower().strip()
+                    if eventTypeRaw in ip_match_types and dataLower in knownAssets['ip']:
                         isKnownAsset = 1
-                    else:
-                        for kd in knownAssets['domain']:
-                            if dataLower.endswith('.' + kd):
+                    elif eventTypeRaw in domain_match_types:
+                        if dataLower in knownAssets['domain']:
+                            isKnownAsset = 1
+                        else:
+                            for kd in knownAssets['domain']:
+                                if dataLower.endswith('.' + kd):
+                                    isKnownAsset = 1
+                                    break
+                    elif eventTypeRaw in employee_match_types:
+                        for ke in knownAssets['employee']:
+                            if ke in dataLower:
                                 isKnownAsset = 1
                                 break
-                elif eventTypeRaw in employee_match_types:
-                    for ke in knownAssets['employee']:
-                        if ke in dataLower:
-                            isKnownAsset = 1
-                            break
 
-            retdata.append([
-                lastseen,
-                html.escape(row[1]),
-                html.escape(row[2]),
-                row[3],
-                row[5],
-                row[6],
-                row[7],
-                row[8],
-                row[13],
-                row[14],
-                row[4],
-                isTargetFp,  # Index 11: target-level false positive flag
-                isTargetValidated,  # Index 12: target-level validated flag
-                row[15],  # Index 13: imported_from_scan (scan ID if imported, None otherwise)
-                isKnownAsset,  # Index 14: known asset match (0=no, 1=match)
-                row[16] if len(row) > 16 else 0  # Index 15: tracking (0=OPEN, 1=CLOSED, 2=TICKETED)
-            ])
+                retdata.append([
+                    lastseen,
+                    html.escape(row[1]),
+                    html.escape(row[2]),
+                    row[3],
+                    row[5],
+                    row[6],
+                    row[7],
+                    row[8],
+                    row[13],
+                    row[14],
+                    row[4],
+                    isTargetFp,  # Index 11: target-level false positive flag
+                    isTargetValidated,  # Index 12: target-level validated flag
+                    row[15],  # Index 13: imported_from_scan (scan ID if imported, None otherwise)
+                    isKnownAsset,  # Index 14: known asset match (0=no, 1=match)
+                    row[16] if len(row) > 16 else 0  # Index 15: tracking (0=OPEN, 1=CLOSED, 2=TICKETED)
+                ])
 
-        return retdata
+            return retdata
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -7999,19 +7999,19 @@ class SpiderFootWebUi:
         Returns:
             list: unique search results
         """
-        dbh = SpiderFootDb(self.config)
-        retdata = []
+        with SpiderFootDb(self.config) as dbh:
+            retdata = []
 
-        try:
-            data = dbh.scanResultEventUnique(id, eventType, filterfp)
-        except Exception:
+            try:
+                data = dbh.scanResultEventUnique(id, eventType, filterfp)
+            except Exception:
+                return retdata
+
+            for row in data:
+                escaped = html.escape(row[0])
+                retdata.append([escaped, row[1], row[2]])
+
             return retdata
-
-        for row in data:
-            escaped = html.escape(row[0])
-            retdata.append([escaped, row[1], row[2]])
-
-        return retdata
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -8045,12 +8045,12 @@ class SpiderFootWebUi:
         if not id:
             return self.jsonify_error('404', "No scan specified")
 
-        dbh = SpiderFootDb(self.config)
+        with SpiderFootDb(self.config) as dbh:
 
-        try:
-            return dbh.scanResultHistory(id)
-        except Exception:
-            return []
+            try:
+                return dbh.scanResultHistory(id)
+            except Exception:
+                return []
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
@@ -8065,49 +8065,49 @@ class SpiderFootWebUi:
         Returns:
             dict
         """
-        dbh = SpiderFootDb(self.config)
-        pc = dict()
-        datamap = dict()
-        retdata = dict()
+        with SpiderFootDb(self.config) as dbh:
+            pc = dict()
+            datamap = dict()
+            retdata = dict()
 
-        # Get the events we will be tracing back from
-        try:
-            # Filter false positives from leaf set if requested
-            filter_fp = filterFp == "1"
-            leafSet = dbh.scanResultEvent(id, eventType, filterFp=filter_fp)
-            [datamap, pc] = dbh.scanElementSourcesAll(id, leafSet)
-        except Exception:
+            # Get the events we will be tracing back from
+            try:
+                # Filter false positives from leaf set if requested
+                filter_fp = filterFp == "1"
+                leafSet = dbh.scanResultEvent(id, eventType, filterFp=filter_fp)
+                [datamap, pc] = dbh.scanElementSourcesAll(id, leafSet)
+            except Exception:
+                return retdata
+
+            # Delete the ROOT key as it adds no value from a viz perspective
+            del pc['ROOT']
+            retdata['tree'] = SpiderFootHelpers.dataParentChildToTree(pc)
+
+            # Add a synthetic entry for "Discovery Paths" node if multiple roots exist
+            # This provides tooltip data for the synthetic parent node
+            if retdata['tree'].get('name') == 'Discovery Paths':
+                datamap['Discovery Paths'] = [
+                    0,  # generated timestamp
+                    'Discovery Paths',  # data (display name)
+                    '',  # source_data
+                    'SpiderFoot',  # module
+                    'ROOT',  # type
+                    100,  # confidence
+                    100,  # visibility
+                    0,  # risk
+                    'discovery_paths',  # hash
+                    'ROOT',  # source_event_hash
+                    'Discovery Paths',  # event_descr
+                    'ROOT',  # event_type
+                    '',  # scan_instance_id
+                    0,  # false_positive
+                    0   # parent_fp
+                ]
+
+            retdata['data'] = datamap
+            retdata['scanId'] = id
+
             return retdata
-
-        # Delete the ROOT key as it adds no value from a viz perspective
-        del pc['ROOT']
-        retdata['tree'] = SpiderFootHelpers.dataParentChildToTree(pc)
-
-        # Add a synthetic entry for "Discovery Paths" node if multiple roots exist
-        # This provides tooltip data for the synthetic parent node
-        if retdata['tree'].get('name') == 'Discovery Paths':
-            datamap['Discovery Paths'] = [
-                0,  # generated timestamp
-                'Discovery Paths',  # data (display name)
-                '',  # source_data
-                'SpiderFoot',  # module
-                'ROOT',  # type
-                100,  # confidence
-                100,  # visibility
-                0,  # risk
-                'discovery_paths',  # hash
-                'ROOT',  # source_event_hash
-                'Discovery Paths',  # event_descr
-                'ROOT',  # event_type
-                '',  # scan_instance_id
-                0,  # false_positive
-                0   # parent_fp
-            ]
-
-        retdata['data'] = datamap
-        retdata['scanId'] = id
-
-        return retdata
 
     @cherrypy.expose
     def active_maintenance_status(self: 'SpiderFootWebUi') -> str:
@@ -8347,52 +8347,52 @@ class SpiderFootWebUi:
                 return {'success': False, 'error': 'No valid scan IDs provided'}
             
             # Verify scans exist before importing
-            dbh = SpiderFootDb(self.config)
-            valid_scans = []
-            invalid_scans = []
+            with SpiderFootDb(self.config) as dbh:
+                valid_scans = []
+                invalid_scans = []
             
-            for scan_id in scan_id_list:
-                scan_info = dbh.scanInstanceGet(scan_id)
-                if scan_info:
-                    valid_scans.append(scan_id)
-                    self.log.debug(f"[IMPORT] Verified scan {scan_id}: {scan_info[0]}")
-                else:
-                    invalid_scans.append(scan_id)
-                    self.log.warning(f"[IMPORT] Scan {scan_id} not found in database")
+                for scan_id in scan_id_list:
+                    scan_info = dbh.scanInstanceGet(scan_id)
+                    if scan_info:
+                        valid_scans.append(scan_id)
+                        self.log.debug(f"[IMPORT] Verified scan {scan_id}: {scan_info[0]}")
+                    else:
+                        invalid_scans.append(scan_id)
+                        self.log.warning(f"[IMPORT] Scan {scan_id} not found in database")
             
-            if invalid_scans:
-                self.log.warning(f"[IMPORT] Invalid scan IDs: {invalid_scans}")
-            
-            if not valid_scans:
-                return {'success': False, 'error': f'No valid scans found. Invalid IDs: {invalid_scans}'}
-            
-            # Import valid scans
-            if len(valid_scans) == 1:
-                success = workspace.import_single_scan(valid_scans[0])
-                if success:
-                    self.log.info(f"[IMPORT] Successfully imported scan {valid_scans[0]}")
-                    return {'success': True, 'message': 'Scan imported successfully'}
-                else:
-                    self.log.error(f"[IMPORT] Failed to import scan {valid_scans[0]}")
-                    return {'success': False, 'error': 'Failed to import scan'}
-            else:
-                results = workspace.bulk_import_scans(valid_scans)
-                successful_imports = sum(1 for success in results.values() if success)
-                
-                self.log.info(f"[IMPORT] Bulk import completed: {successful_imports}/{len(valid_scans)} successful")
-                
-                message = f'Import completed: {successful_imports} of {len(valid_scans)} scans imported'
                 if invalid_scans:
-                    message += f'. Invalid scan IDs: {invalid_scans}'
+                    self.log.warning(f"[IMPORT] Invalid scan IDs: {invalid_scans}")
+            
+                if not valid_scans:
+                    return {'success': False, 'error': f'No valid scans found. Invalid IDs: {invalid_scans}'}
+            
+                # Import valid scans
+                if len(valid_scans) == 1:
+                    success = workspace.import_single_scan(valid_scans[0])
+                    if success:
+                        self.log.info(f"[IMPORT] Successfully imported scan {valid_scans[0]}")
+                        return {'success': True, 'message': 'Scan imported successfully'}
+                    else:
+                        self.log.error(f"[IMPORT] Failed to import scan {valid_scans[0]}")
+                        return {'success': False, 'error': 'Failed to import scan'}
+                else:
+                    results = workspace.bulk_import_scans(valid_scans)
+                    successful_imports = sum(1 for success in results.values() if success)
                 
-                return {
-                    'success': True, 
-                    'results': results,
-                    'message': message,
-                    'successful_imports': successful_imports,
-                    'total_attempts': len(scan_id_list),
-                    'invalid_scans': invalid_scans
-                }
+                    self.log.info(f"[IMPORT] Bulk import completed: {successful_imports}/{len(valid_scans)} successful")
+                
+                    message = f'Import completed: {successful_imports} of {len(valid_scans)} scans imported'
+                    if invalid_scans:
+                        message += f'. Invalid scan IDs: {invalid_scans}'
+                
+                    return {
+                        'success': True, 
+                        'results': results,
+                        'message': message,
+                        'successful_imports': successful_imports,
+                        'total_attempts': len(scan_id_list),
+                        'invalid_scans': invalid_scans
+                    }
         except Exception as e:
             self.log.error(f"[IMPORT] Failed to import scans: {e}")
             import traceback
@@ -8962,32 +8962,32 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             workspace.load_workspace()
             
             # Get workspace summary and scan details
-            dbh = SpiderFootDb(self.config)
-            scan_details = []
+            with SpiderFootDb(self.config) as dbh:
+                scan_details = []
             
-            for scan in workspace.scans:
-                scan_info = dbh.scanInstanceGet(scan['scan_id'])
-                if scan_info:
-                    scan_details.append({
-                        'scan_id': scan['scan_id'],
-                        'name': scan_info[0],
-                        'target': scan_info[1],
-                        'status': scan_info[5],
-                        'created': scan_info[2],
-                        'started': scan_info[3],
-                        'ended': scan_info[4],
-                        'imported_time': scan.get('imported_time', 0)
-                    })
+                for scan in workspace.scans:
+                    scan_info = dbh.scanInstanceGet(scan['scan_id'])
+                    if scan_info:
+                        scan_details.append({
+                            'scan_id': scan['scan_id'],
+                            'name': scan_info[0],
+                            'target': scan_info[1],
+                            'status': scan_info[5],
+                            'created': scan_info[2],
+                            'started': scan_info[3],
+                            'ended': scan_info[4],
+                            'imported_time': scan.get('imported_time', 0)
+                        })
             
-            templ = Template(filename='spiderfoot/templates/workspace_details.tmpl', lookup=self.lookup)
-            return templ.render(
-                workspace=workspace,
-                scan_details=scan_details,
-                docroot=self.docroot,
-                version=__version__,
-                pageid="WORKSPACE_DETAILS",
-                user_role=self.currentUserRole()
-            )
+                templ = Template(filename='spiderfoot/templates/workspace_details.tmpl', lookup=self.lookup)
+                return templ.render(
+                    workspace=workspace,
+                    scan_details=scan_details,
+                    docroot=self.docroot,
+                    version=__version__,
+                    pageid="WORKSPACE_DETAILS",
+                    user_role=self.currentUserRole()
+                )
             
         except Exception as e:
             self.log.error(f"Error loading workspace details: {e}")
@@ -9010,61 +9010,61 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             if not workspace.scans or len(workspace.scans) < 2:
                 return {'success': True, 'correlations': [], 'message': 'Need at least 2 scans for cross-correlation analysis'}
             
-            dbh = SpiderFootDb(self.config)
-            correlations = []
-              # Get correlations for each scan
-            finished_scans = 0
-            for scan in workspace.scans:
-                # Check if scan is finished before looking for correlations
-                scan_info = dbh.scanInstanceGet(scan['scan_id'])
-                if scan_info and scan_info[5] == 'FINISHED':
-                    finished_scans += 1
-                    scan_correlations = dbh.scanCorrelationList(scan['scan_id'])
-                    for corr in scan_correlations:
-                        # scanCorrelationList returns:
-                        #   0: id, 1: title, 2: rule_id, 3: rule_risk,
-                        #   4: rule_name, 5: rule_descr, 6: rule_logic,
-                        #   7: event_count, 8: event_types
-                        correlations.append({
-                            'scan_id': scan['scan_id'],
-                            'correlation_id': corr[0],
-                            'correlation': corr[1],
-                            'rule_name': corr[4],
-                            'rule_risk': corr[3],
-                            'rule_id': corr[2],
-                            'rule_description': corr[5],
-                            'created': ''
-                        })
+            with SpiderFootDb(self.config) as dbh:
+                correlations = []
+                  # Get correlations for each scan
+                finished_scans = 0
+                for scan in workspace.scans:
+                    # Check if scan is finished before looking for correlations
+                    scan_info = dbh.scanInstanceGet(scan['scan_id'])
+                    if scan_info and scan_info[5] == 'FINISHED':
+                        finished_scans += 1
+                        scan_correlations = dbh.scanCorrelationList(scan['scan_id'])
+                        for corr in scan_correlations:
+                            # scanCorrelationList returns:
+                            #   0: id, 1: title, 2: rule_id, 3: rule_risk,
+                            #   4: rule_name, 5: rule_descr, 6: rule_logic,
+                            #   7: event_count, 8: event_types
+                            correlations.append({
+                                'scan_id': scan['scan_id'],
+                                'correlation_id': corr[0],
+                                'correlation': corr[1],
+                                'rule_name': corr[4],
+                                'rule_risk': corr[3],
+                                'rule_id': corr[2],
+                                'rule_description': corr[5],
+                                'created': ''
+                            })
             
-            # Check if we have enough finished scans for correlation analysis
-            if finished_scans < 2:
+                # Check if we have enough finished scans for correlation analysis
+                if finished_scans < 2:
+                    return {
+                        'success': True, 
+                        'correlations': [], 
+                        'correlation_groups': {},
+                        'total_correlations': 0,
+                        'cross_scan_patterns': 0,
+                        'finished_scans': finished_scans,
+                        'total_scans': len(workspace.scans),
+                        'message': f'Need at least 2 finished scans for correlation analysis. Currently have {finished_scans} finished out of {len(workspace.scans)} total scans.'
+                    }
+                  # Group correlations by rule type
+                correlation_groups = {}
+                for corr in correlations:
+                    rule_name = corr['rule_name']
+                    if rule_name not in correlation_groups:
+                        correlation_groups[rule_name] = []
+                    correlation_groups[rule_name].append(corr)
+            
                 return {
-                    'success': True, 
-                    'correlations': [], 
-                    'correlation_groups': {},
-                    'total_correlations': 0,
-                    'cross_scan_patterns': 0,
+                    'success': True,
+                    'correlations': correlations,
+                    'correlation_groups': correlation_groups,
+                    'total_correlations': len(correlations),
+                    'cross_scan_patterns': len(correlation_groups),
                     'finished_scans': finished_scans,
-                    'total_scans': len(workspace.scans),
-                    'message': f'Need at least 2 finished scans for correlation analysis. Currently have {finished_scans} finished out of {len(workspace.scans)} total scans.'
+                    'total_scans': len(workspace.scans)
                 }
-              # Group correlations by rule type
-            correlation_groups = {}
-            for corr in correlations:
-                rule_name = corr['rule_name']
-                if rule_name not in correlation_groups:
-                    correlation_groups[rule_name] = []
-                correlation_groups[rule_name].append(corr)
-            
-            return {
-                'success': True,
-                'correlations': correlations,
-                'correlation_groups': correlation_groups,
-                'total_correlations': len(correlations),
-                'cross_scan_patterns': len(correlation_groups),
-                'finished_scans': finished_scans,
-                'total_scans': len(workspace.scans)
-            }
             
         except Exception as e:
             self.log.error(f"Error getting workspace correlations: {e}")
@@ -9099,50 +9099,50 @@ This is a placeholder MCP report. Integration with actual MCP server required.
                 limit = 10000
 
             workspace = SpiderFootWorkspace(self.config, workspace_id)
-            dbh = SpiderFootDb(self.config)
+            with SpiderFootDb(self.config) as dbh:
 
-            if scan_id:
-                # Get results for specific scan
-                scan_ids = [scan_id]
-            else:
-                # Get results for all workspace scans
-                scan_ids = [scan['scan_id'] for scan in workspace.scans]
-
-            all_results = []
-            scan_summaries = {}
-
-            for sid in scan_ids:
-                # Get scan summary
-                summary = dbh.scanResultSummary(sid, 'type')
-                scan_summaries[sid] = summary
-
-                # Get recent events
-                if event_type:
-                    events = dbh.scanResultEvent(sid, event_type, filterFp=False)
+                if scan_id:
+                    # Get results for specific scan
+                    scan_ids = [scan_id]
                 else:
-                    events = dbh.scanResultEvent(sid, 'ALL', filterFp=False)
+                    # Get results for all workspace scans
+                    scan_ids = [scan['scan_id'] for scan in workspace.scans]
 
-                # Limit results per scan
-                events = events[:limit] if events else []
+                all_results = []
+                scan_summaries = {}
 
-                for event in events:
-                    all_results.append({
-                        'scan_id': sid,
-                        'timestamp': event[0],
-                        'event_type': event[1],
-                        'event_data': event[2],
-                        'source_module': event[3],
-                        'source_event': event[4] if len(event) > 4 else '',
-                        'false_positive': event[8] if len(event) > 8 else False
-                    })
+                for sid in scan_ids:
+                    # Get scan summary
+                    summary = dbh.scanResultSummary(sid, 'type')
+                    scan_summaries[sid] = summary
 
-            return {
-                'success': True,
-                'results': all_results[:limit],  # Apply overall limit
-                'scan_summaries': scan_summaries,
-                'total_results': len(all_results),
-                'workspace_id': workspace_id
-            }
+                    # Get recent events
+                    if event_type:
+                        events = dbh.scanResultEvent(sid, event_type, filterFp=False)
+                    else:
+                        events = dbh.scanResultEvent(sid, 'ALL', filterFp=False)
+
+                    # Limit results per scan
+                    events = events[:limit] if events else []
+
+                    for event in events:
+                        all_results.append({
+                            'scan_id': sid,
+                            'timestamp': event[0],
+                            'event_type': event[1],
+                            'event_data': event[2],
+                            'source_module': event[3],
+                            'source_event': event[4] if len(event) > 4 else '',
+                            'false_positive': event[8] if len(event) > 8 else False
+                        })
+
+                return {
+                    'success': True,
+                    'results': all_results[:limit],  # Apply overall limit
+                    'scan_summaries': scan_summaries,
+                    'total_results': len(all_results),
+                    'workspace_id': workspace_id
+                }
             
         except Exception as e:
             self.log.error(f"Error getting workspace scan results: {e}")
