@@ -2,13 +2,14 @@
 # ---------------------------------------------------------------------------
 # setup-postgresql.sh — Automated PostgreSQL setup for ASM-NG
 #
-# This script installs and configures PostgreSQL for use as the ASM-NG
-# database backend. Designed for Kali Linux / Debian-based systems.
+# Multi-platform support:
+#   - Debian/Kali/Ubuntu: apt-get
+#   - macOS: Homebrew (brew)
+#   - RHEL/Fedora/CentOS: dnf / yum
 #
 # Usage:
-#   sudo ./setup-postgresql.sh
-#   # or without sudo (will prompt for password):
-#   ./setup-postgresql.sh
+#   sudo ./setup-postgresql.sh          # Linux (requires root)
+#   ./setup-postgresql.sh               # macOS (Homebrew, no root needed)
 #
 # Default credentials: admin:admin (change after first login!)
 # ---------------------------------------------------------------------------
@@ -37,12 +38,44 @@ info()  { echo -e "${GREEN}[+]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[!]${NC} $*"; }
 error() { echo -e "${RED}[-]${NC} $*"; }
 
-# Check for root/sudo
-if [ "$EUID" -ne 0 ]; then
-    error "This script must be run as root or with sudo."
-    echo "  sudo $0"
+# ---------------------------------------------------------------------------
+# Detect platform and package manager
+# ---------------------------------------------------------------------------
+OS="$(uname -s)"
+PKG_MGR=""
+
+if [ "$OS" = "Darwin" ]; then
+    # macOS
+    if command -v brew &>/dev/null; then
+        PKG_MGR="brew"
+    else
+        error "Homebrew is required on macOS. Install it from https://brew.sh"
+        exit 1
+    fi
+elif [ "$OS" = "Linux" ]; then
+    # Check for root on Linux
+    if [ "$EUID" -ne 0 ]; then
+        error "This script must be run as root or with sudo on Linux."
+        echo "  sudo $0"
+        exit 1
+    fi
+    if command -v apt-get &>/dev/null; then
+        PKG_MGR="apt"
+    elif command -v dnf &>/dev/null; then
+        PKG_MGR="dnf"
+    elif command -v yum &>/dev/null; then
+        PKG_MGR="yum"
+    else
+        error "No supported package manager found (apt-get, dnf, yum)."
+        error "Install PostgreSQL manually and set ASMNG_DATABASE_URL."
+        exit 1
+    fi
+else
+    error "Unsupported operating system: $OS"
     exit 1
 fi
+
+info "Detected: $OS with $PKG_MGR"
 
 # ---------------------------------------------------------------------------
 # Step 1: Install PostgreSQL if not present
@@ -51,28 +84,71 @@ if command -v psql &>/dev/null; then
     info "PostgreSQL client already installed: $(psql --version)"
 else
     info "Installing PostgreSQL..."
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get update -qq
-    apt-get install -y -qq postgresql postgresql-client
+    case "$PKG_MGR" in
+        apt)
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq
+            apt-get install -y -qq postgresql postgresql-client
+            ;;
+        brew)
+            brew install postgresql@16 2>/dev/null || brew install postgresql 2>/dev/null || true
+            ;;
+        dnf)
+            dnf install -y -q postgresql-server postgresql
+            ;;
+        yum)
+            yum install -y -q postgresql-server postgresql
+            ;;
+    esac
     info "PostgreSQL installed successfully."
 fi
 
 # ---------------------------------------------------------------------------
-# Step 2: Start and enable PostgreSQL service
+# Step 2: Start PostgreSQL service
 # ---------------------------------------------------------------------------
-info "Enabling and starting PostgreSQL service..."
-systemctl enable --now postgresql 2>/dev/null || true
+info "Starting PostgreSQL service..."
+
+case "$PKG_MGR" in
+    brew)
+        # macOS: use brew services
+        brew services start postgresql@16 2>/dev/null || \
+            brew services start postgresql 2>/dev/null || true
+        ;;
+    apt)
+        systemctl enable --now postgresql 2>/dev/null || true
+        ;;
+    dnf|yum)
+        # RHEL/Fedora may need initdb first
+        if [ ! -f /var/lib/pgsql/data/PG_VERSION ]; then
+            postgresql-setup --initdb 2>/dev/null || \
+                su - postgres -c "initdb -D /var/lib/pgsql/data" 2>/dev/null || true
+        fi
+        systemctl enable --now postgresql 2>/dev/null || true
+        ;;
+esac
 
 # Wait for PostgreSQL to be ready
-for i in $(seq 1 10); do
-    if sudo -u postgres pg_isready -q 2>/dev/null; then
+PG_READY=false
+for i in $(seq 1 15); do
+    if pg_isready -q 2>/dev/null; then
+        PG_READY=true
+        break
+    fi
+    # Also try as postgres user (Linux)
+    if [ "$OS" = "Linux" ] && sudo -u postgres pg_isready -q 2>/dev/null; then
+        PG_READY=true
         break
     fi
     sleep 1
 done
 
-if ! sudo -u postgres pg_isready -q 2>/dev/null; then
-    error "PostgreSQL failed to start. Check: systemctl status postgresql"
+if [ "$PG_READY" = false ]; then
+    error "PostgreSQL failed to start."
+    if [ "$OS" = "Linux" ]; then
+        echo "  Check: systemctl status postgresql"
+    else
+        echo "  Check: brew services list"
+    fi
     exit 1
 fi
 info "PostgreSQL is running."
@@ -80,30 +156,57 @@ info "PostgreSQL is running."
 # ---------------------------------------------------------------------------
 # Step 3: Create database user and database
 # ---------------------------------------------------------------------------
+# Determine how to run psql as superuser
+if [ "$OS" = "Darwin" ]; then
+    # macOS: current user is typically the PG superuser after brew install
+    PG_SUDO=""
+    PG_SUPERUSER="$(whoami)"
+else
+    PG_SUDO="sudo -u postgres"
+    PG_SUPERUSER="postgres"
+fi
+
 info "Creating database user '${PG_USER}'..."
-sudo -u postgres psql -c "CREATE USER ${PG_USER} WITH PASSWORD '${PG_PASSWORD}';" 2>/dev/null || \
+$PG_SUDO psql -c "CREATE USER ${PG_USER} WITH PASSWORD '${PG_PASSWORD}';" 2>/dev/null || \
     warn "User '${PG_USER}' may already exist (this is OK)."
 
 info "Creating database '${PG_DATABASE}'..."
-sudo -u postgres psql -c "CREATE DATABASE ${PG_DATABASE} OWNER ${PG_USER};" 2>/dev/null || \
+$PG_SUDO psql -c "CREATE DATABASE ${PG_DATABASE} OWNER ${PG_USER};" 2>/dev/null || \
     warn "Database '${PG_DATABASE}' may already exist (this is OK)."
 
 # Grant privileges
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${PG_DATABASE} TO ${PG_USER};" 2>/dev/null || true
+$PG_SUDO psql -c "GRANT ALL PRIVILEGES ON DATABASE ${PG_DATABASE} TO ${PG_USER};" 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # Step 4: Configure local password authentication
 # ---------------------------------------------------------------------------
-PG_HBA=$(sudo -u postgres psql -t -c "SHOW hba_file;" 2>/dev/null | xargs)
+PG_HBA=$($PG_SUDO psql -t -c "SHOW hba_file;" 2>/dev/null | xargs)
 
 if [ -n "$PG_HBA" ] && [ -f "$PG_HBA" ]; then
     if ! grep -q "${PG_DATABASE}" "$PG_HBA" 2>/dev/null; then
         info "Configuring pg_hba.conf for local password authentication..."
-        # Add entry before the first 'local' line for our database
-        sed -i "/^local.*all.*all/i local   ${PG_DATABASE}   ${PG_USER}                           scram-sha-256" "$PG_HBA"
-        # Also allow TCP/IP connections from localhost
-        sed -i "/^host.*all.*all.*127/i host    ${PG_DATABASE}   ${PG_USER}   127.0.0.1/32          scram-sha-256" "$PG_HBA"
-        systemctl reload postgresql
+
+        if [ "$OS" = "Darwin" ]; then
+            # macOS sed requires different syntax (-i '' instead of -i)
+            sed -i '' "/^local.*all.*all/i\\
+local   ${PG_DATABASE}   ${PG_USER}                           scram-sha-256
+" "$PG_HBA" 2>/dev/null || true
+            sed -i '' "/^host.*all.*all.*127/i\\
+host    ${PG_DATABASE}   ${PG_USER}   127.0.0.1/32          scram-sha-256
+" "$PG_HBA" 2>/dev/null || true
+        else
+            sed -i "/^local.*all.*all/i local   ${PG_DATABASE}   ${PG_USER}                           scram-sha-256" "$PG_HBA"
+            sed -i "/^host.*all.*all.*127/i host    ${PG_DATABASE}   ${PG_USER}   127.0.0.1/32          scram-sha-256" "$PG_HBA"
+        fi
+
+        # Reload PostgreSQL to apply pg_hba.conf changes
+        if [ "$OS" = "Darwin" ]; then
+            brew services restart postgresql@16 2>/dev/null || \
+                brew services restart postgresql 2>/dev/null || true
+        else
+            systemctl reload postgresql 2>/dev/null || true
+        fi
+        sleep 2  # Give PG a moment to reload
         info "pg_hba.conf updated and PostgreSQL reloaded."
     else
         info "pg_hba.conf already configured for ${PG_DATABASE}."
@@ -122,7 +225,11 @@ if PGPASSWORD="${PG_PASSWORD}" psql -U "${PG_USER}" -d "${PG_DATABASE}" -h local
     echo "  Connection: postgresql://${PG_USER}:${PG_PASSWORD}@localhost:5432/${PG_DATABASE}"
     echo ""
     warn "IMPORTANT: Change the default password after first login:"
-    echo "  sudo -u postgres psql -c \"ALTER USER ${PG_USER} PASSWORD 'new_password';\""
+    if [ "$OS" = "Darwin" ]; then
+        echo "  psql -c \"ALTER USER ${PG_USER} PASSWORD 'new_password';\""
+    else
+        echo "  sudo -u postgres psql -c \"ALTER USER ${PG_USER} PASSWORD 'new_password';\""
+    fi
     echo ""
 else
     # Try without -h localhost (use Unix socket)

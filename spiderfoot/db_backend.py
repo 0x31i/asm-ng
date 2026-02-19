@@ -168,8 +168,27 @@ def _write_sentinel(status: str, reason: str) -> None:
         log.warning(f"Could not write PG setup sentinel file: {e}")
 
 
+def _detect_pkg_manager() -> str:
+    """Detect the available package manager.
+
+    Returns:
+        str: ``'apt'``, ``'brew'``, ``'dnf'``, ``'yum'``, or ``''`` if none found.
+    """
+    if shutil.which('apt-get'):
+        return 'apt'
+    if shutil.which('brew'):
+        return 'brew'
+    if shutil.which('dnf'):
+        return 'dnf'
+    if shutil.which('yum'):
+        return 'yum'
+    return ''
+
+
 def _can_run_auto_setup() -> tuple:
     """Check whether auto-setup can be attempted.
+
+    Supports Linux (apt-get, dnf, yum) and macOS (Homebrew).
 
     Returns:
         tuple: (can_run: bool, reason: str)
@@ -179,17 +198,28 @@ def _can_run_auto_setup() -> tuple:
     if opt_out in ('0', 'false', 'no', 'off'):
         return False, "Auto-setup disabled via ASMNG_PG_AUTO_SETUP=0"
 
-    # Check platform
-    if sys.platform != 'linux':
-        return False, f"Auto-setup only supported on Linux (current: {sys.platform})"
+    # Check platform — support Linux and macOS
+    if sys.platform not in ('linux', 'darwin'):
+        return False, (
+            f"Auto-setup not supported on {sys.platform}. "
+            "Install PostgreSQL manually and set ASMNG_DATABASE_URL."
+        )
 
-    # Check for apt-get (Debian/Kali requirement)
-    if not shutil.which('apt-get'):
-        return False, "apt-get not found; auto-setup requires a Debian-based system"
+    # Check for a supported package manager
+    pkg_mgr = _detect_pkg_manager()
+    if not pkg_mgr:
+        return False, (
+            "No supported package manager found (apt-get, brew, dnf, yum). "
+            "Install PostgreSQL manually."
+        )
 
-    # Check for root/sudo
+    # macOS + Homebrew: no root needed (brew runs as user)
+    if sys.platform == 'darwin' and pkg_mgr == 'brew':
+        return True, "macOS with Homebrew"
+
+    # Linux: need root or sudo
     if os.geteuid() == 0:
-        return True, "Running as root"
+        return True, f"Running as root ({pkg_mgr})"
 
     # Test non-interactive sudo
     try:
@@ -198,7 +228,7 @@ def _can_run_auto_setup() -> tuple:
             capture_output=True, timeout=5
         )
         if result.returncode == 0:
-            return True, "Passwordless sudo available"
+            return True, f"Passwordless sudo available ({pkg_mgr})"
     except Exception:
         pass
 
@@ -209,7 +239,8 @@ def _attempt_pg_auto_setup(opts: dict) -> bool:
     """Attempt to automatically install and configure PostgreSQL.
 
     Runs ``setup-postgresql.sh`` via subprocess. Only executes on first startup
-    (no sentinel file) and only on Linux systems with root/sudo access.
+    (no sentinel file) and only on supported systems with the right privileges.
+    Supports Linux (apt, dnf, yum + root/sudo) and macOS (Homebrew, no root).
 
     Returns:
         bool: True if PostgreSQL was successfully set up.
@@ -238,7 +269,7 @@ def _attempt_pg_auto_setup(opts: dict) -> bool:
         log.warning(
             f"Cannot auto-setup PostgreSQL: {reason}. "
             "Falling back to SQLite. "
-            "To set up PostgreSQL manually, run: sudo ./setup-postgresql.sh"
+            "To set up PostgreSQL manually, run: ./setup-postgresql.sh"
         )
         _write_sentinel('skipped', reason)
         return False
@@ -263,7 +294,9 @@ def _attempt_pg_auto_setup(opts: dict) -> bool:
 
     try:
         cmd = ['bash', script_path]
-        if os.geteuid() != 0:
+        # On Linux, use sudo if not already root.
+        # On macOS, run without sudo (brew must NOT run as root).
+        if sys.platform != 'darwin' and os.geteuid() != 0:
             cmd = ['sudo'] + cmd
 
         env = os.environ.copy()
