@@ -128,13 +128,23 @@ class PgCursorWrapper:
 
     @staticmethod
     def _convert_params(query: str) -> str:
-        """Replace SQLite ``?`` placeholders with PostgreSQL ``%s``.
+        """Convert SQLite SQL dialect to PostgreSQL.
+
+        - Replaces ``?`` placeholders with ``%s``
+        - Converts ``INSERT OR IGNORE INTO`` to
+          ``INSERT INTO ... ON CONFLICT DO NOTHING``
 
         This is safe because:
         - ``?`` only appears as parameter markers in our SQL
         - String literals are passed as bound parameters, never interpolated
         """
-        return query.replace('?', '%s')
+        query = query.replace('?', '%s')
+        if 'INSERT OR IGNORE INTO' in query:
+            query = query.replace('INSERT OR IGNORE INTO', 'INSERT INTO')
+            query = query.rstrip()
+            if not query.endswith('ON CONFLICT DO NOTHING'):
+                query += ' ON CONFLICT DO NOTHING'
+        return query
 
     # --- cursor interface -----------------------------------------------------
 

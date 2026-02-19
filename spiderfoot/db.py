@@ -1775,7 +1775,7 @@ class SpiderFootDb:
             qry = "SELECT r.type, e.event_descr, MAX(ROUND(generated)) AS last_in, \
                 count(*) AS total, count(DISTINCT r.data) as utotal FROM \
                 tbl_scan_results r, tbl_event_types e WHERE e.event = r.type \
-                AND r.scan_instance_id = ? GROUP BY r.type ORDER BY e.event_descr"
+                AND r.scan_instance_id = ? GROUP BY r.type, e.event_descr ORDER BY e.event_descr"
 
         if by == "module":
             qry = "SELECT r.module, '', MAX(ROUND(generated)) AS last_in, \
@@ -1985,13 +1985,13 @@ class SpiderFootDb:
         if by == "risk":
             qry = "SELECT rule_risk, count(*) AS total FROM \
                 tbl_scan_correlation_results \
-                WHERE scan_instance_id = ? GROUP BY rule_risk ORDER BY rule_id"
+                WHERE scan_instance_id = ? GROUP BY rule_risk ORDER BY rule_risk"
 
         if by == "rule":
             qry = "SELECT rule_id, rule_name, rule_risk, rule_descr, \
                 count(*) AS total FROM \
                 tbl_scan_correlation_results \
-                WHERE scan_instance_id = ? GROUP BY rule_id ORDER BY rule_id"
+                WHERE scan_instance_id = ? GROUP BY rule_id, rule_name, rule_risk, rule_descr ORDER BY rule_id"
 
         qvars = [instanceId]
 
@@ -2026,11 +2026,13 @@ class SpiderFootDb:
         # × scan_results in one pass, which was extremely slow on large scans.
         # Subqueries let the DB process each correlation independently using
         # existing indexes on correlation_id and (scan_instance_id, hash).
-        qry = """SELECT c.id, c.title, c.rule_id, c.rule_risk, c.rule_name,
+        agg_fn = 'STRING_AGG(DISTINCT r.type, \',\')' if self.db_type == 'postgresql' else 'GROUP_CONCAT(DISTINCT r.type)'
+
+        qry = f"""SELECT c.id, c.title, c.rule_id, c.rule_risk, c.rule_name,
                 c.rule_descr, c.rule_logic,
                 (SELECT COUNT(*) FROM tbl_scan_correlation_results_events e
                  WHERE e.correlation_id = c.id) AS event_count,
-                (SELECT GROUP_CONCAT(DISTINCT r.type)
+                (SELECT {agg_fn}
                  FROM tbl_scan_correlation_results_events e
                  JOIN tbl_scan_results r ON e.event_hash = r.hash
                     AND r.scan_instance_id = ?
@@ -3481,10 +3483,10 @@ class SpiderFootDb:
         qry = "SELECT i.guid, i.name, i.seed_target, ROUND(i.created/1000), \
             ROUND(i.started)/1000 as started, ROUND(i.ended)/1000, i.status, COUNT(r.type) \
             FROM tbl_scan_instance i, tbl_scan_results r WHERE i.guid = r.scan_instance_id \
-            AND r.type <> 'ROOT' GROUP BY i.guid \
+            AND r.type <> 'ROOT' GROUP BY i.guid, i.name, i.seed_target, i.status \
             UNION ALL \
             SELECT i.guid, i.name, i.seed_target, ROUND(i.created/1000), \
-            ROUND(i.started)/1000 as started, ROUND(i.ended)/1000, i.status, '0' \
+            ROUND(i.started)/1000 as started, ROUND(i.ended)/1000, i.status, 0 \
             FROM tbl_scan_instance i  WHERE i.guid NOT IN ( \
             SELECT distinct scan_instance_id FROM tbl_scan_results WHERE type <> 'ROOT') \
             ORDER BY started DESC"
