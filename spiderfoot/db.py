@@ -32,6 +32,7 @@ from spiderfoot.db_backend import (
     get_raw_connection,
     raw_execute,
     return_pg_connection,
+    return_pg_connection_fast,
 )
 
 if HAS_PSYCOPG2:
@@ -49,6 +50,17 @@ class _PgPoolLock:
     for the duration of a single ``with self.dbhLock:`` block
     (typically milliseconds) and then returned.
 
+    Connections are kept in ``autocommit=True`` mode while in the pool
+    so that the checkout/return path avoids the ``rollback()`` and
+    ``autocommit = False`` round-trips that would otherwise add ~1-5 ms
+    of network overhead **per operation**.  The first time a connection
+    is checked out, ``autocommit`` is toggled once (one round-trip);
+    thereafter the connection stays in autocommit mode permanently.
+
+    With autocommit, every SQL statement commits immediately — the
+    existing ``self.conn.commit()`` calls in db.py become harmless
+    no-ops.
+
     Supports reentrancy: if the same thread enters the lock multiple
     times, only the outermost entry/exit manages the pool connection.
     """
@@ -65,6 +77,10 @@ class _PgPoolLock:
         if self._depth == 1:
             try:
                 conn, cursor, _ = create_pg_connection(self._opts)
+                # Keep connections in autocommit mode permanently so
+                # return_pg_connection_fast() can skip rollback + reset.
+                if not conn.autocommit:
+                    conn.autocommit = True
                 self._db.conn = conn
                 self._db.dbh = cursor
             except Exception:
@@ -81,7 +97,7 @@ class _PgPoolLock:
                 self._db.conn = None
                 self._db.dbh = None
                 if conn is not None:
-                    return_pg_connection(conn)
+                    return_pg_connection_fast(conn)
             except Exception:
                 pass
         self._lock.release()
@@ -183,6 +199,7 @@ class SpiderFootDb:
         "CREATE INDEX idx_scan_results_hash ON tbl_scan_results (scan_instance_id, hash)",
         "CREATE INDEX idx_scan_results_module ON tbl_scan_results(scan_instance_id, module)",
         "CREATE INDEX idx_scan_results_srchash ON tbl_scan_results (scan_instance_id, source_event_hash)",
+        "CREATE INDEX idx_scan_results_generated ON tbl_scan_results (scan_instance_id, generated)",
         "CREATE INDEX idx_scan_logs ON tbl_scan_log (scan_instance_id)",
         "CREATE INDEX idx_scan_correlation ON tbl_scan_correlation_results (scan_instance_id, id)",
         "CREATE INDEX idx_scan_correlation_events ON tbl_scan_correlation_results_events (correlation_id)",
@@ -654,6 +671,17 @@ class SpiderFootDb:
                 self.conn.commit()
             except DatabaseError:
                 pass  # Index may already exist or table missing
+
+            # Add composite index on (scan_instance_id, generated) so that
+            # time-window queries (e.g. scanProgress "events in last 10s")
+            # use an index scan instead of a sequential scan on tbl_scan_results.
+            try:
+                self.dbh.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_scan_results_generated "
+                    "ON tbl_scan_results (scan_instance_id, generated)")
+                self.conn.commit()
+            except DatabaseError:
+                pass
 
             # Add target false positives table if it doesn't exist (migration)
             try:
