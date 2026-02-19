@@ -271,9 +271,10 @@ class SpiderFootScanner():
             status (str): terminal status to set (FINISHED, ABORTED, ERROR-FAILED)
         """
         try:
-            import sqlite3 as _sqlite3
-            _conn = _sqlite3.connect(self.__config['__database'])
-            _conn.execute(
+            from spiderfoot.db_backend import get_raw_connection, raw_execute
+            _conn = get_raw_connection(self.__config)
+            raw_execute(
+                _conn,
                 "UPDATE tbl_scan_instance SET status = ?, ended = ? WHERE guid = ?",
                 (status, time.time() * 1000, self.__scanId))
             _conn.commit()

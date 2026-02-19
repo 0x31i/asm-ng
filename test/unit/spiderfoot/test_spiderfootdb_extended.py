@@ -97,7 +97,7 @@ class TestSpiderFootDbInitialization:
             config = {'__database': invalid_path}
             
             # Should handle gracefully or raise appropriate exception
-            with pytest.raises((sqlite3.OperationalError, OSError, IOError)):
+            with pytest.raises((IOError, OSError)):
                 SpiderFootDb(config)
 
 
@@ -207,7 +207,7 @@ class TestSpiderFootDbScanOperations:
             sample_scan_data['seed_target']
         )
           # Try to create duplicate
-        with pytest.raises((sqlite3.IntegrityError, OSError, IOError)):
+        with pytest.raises((IOError, OSError)):
             db.scanInstanceCreate(
                 sample_scan_data['scan_id'],
                 sample_scan_data['name'],
@@ -289,14 +289,14 @@ class TestSpiderFootDbScanOperations:
 class TestSpiderFootDbErrorHandling:
     """Test database error handling and recovery."""
     
-    @patch('sqlite3.connect')
-    def test_connection_error_handling(self, mock_connect, temp_db_path):
+    @patch('spiderfoot.db_backend.create_connection')
+    def test_connection_error_handling(self, mock_create_conn, temp_db_path):
         """Test handling of database connection errors."""
         # Mock connection failure
-        mock_connect.side_effect = sqlite3.OperationalError("database is locked")
-        
+        mock_create_conn.side_effect = sqlite3.OperationalError("database is locked")
+
         config = {'__database': temp_db_path}
-        
+
         with pytest.raises(IOError):
             SpiderFootDb(config)
             
