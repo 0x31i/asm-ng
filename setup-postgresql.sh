@@ -107,6 +107,23 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Homebrew keg-only PATH fix
+# ---------------------------------------------------------------------------
+# postgresql@16 is keg-only: its binaries are NOT symlinked into the default
+# PATH.  Detect the keg prefix and prepend its bin/ so that pg_isready, psql,
+# etc. are available for the rest of the script.
+if [ "$PKG_MGR" = "brew" ]; then
+    PG_KEG_BIN="$(brew --prefix postgresql@16 2>/dev/null)/bin"
+    if [ ! -d "$PG_KEG_BIN" ]; then
+        PG_KEG_BIN="$(brew --prefix postgresql 2>/dev/null)/bin"
+    fi
+    if [ -d "$PG_KEG_BIN" ]; then
+        export PATH="$PG_KEG_BIN:$PATH"
+        info "Added $PG_KEG_BIN to PATH (keg-only formula)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # Step 2: Start PostgreSQL service
 # ---------------------------------------------------------------------------
 info "Starting PostgreSQL service..."
