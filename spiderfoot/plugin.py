@@ -387,6 +387,19 @@ class SpiderFootPlugin:
         """
         self.__sfdb__ = dbh
 
+    def _ensureDbh(self) -> None:
+        """Lazily create a per-thread DB handle on first event.
+
+        Called by threadWorker() when the first event arrives rather than
+        at thread start, so that idle modules do not hold pool connections.
+        """
+        if getattr(self, '_threadDbhReady', False):
+            return
+        from spiderfoot import SpiderFootDb
+        self.setDbh(SpiderFootDb(self.opts))
+        self.sf._dbh = self.__sfdb__
+        self._threadDbhReady = True
+
     def setScanId(self, scanId: str) -> None:
         """Set the scan ID.
 
@@ -591,17 +604,21 @@ class SpiderFootPlugin:
             self._stopCheckCounter += 1
             if self._stopCheckCounter >= self._stopCheckInterval:
                 self._stopCheckCounter = 0
-                try:
-                    scanstatus = self.__sfdb__.scanInstanceGet(
-                        self.__scanId__)
-                    if scanstatus and scanstatus[5] == "ABORT-REQUESTED":
-                        self._stopScanning = True
-                        return True
-                except Exception:
-                    pass
+                if hasattr(self, '__sfdb__') and self.__sfdb__ is not None:
+                    try:
+                        scanstatus = self.__sfdb__.scanInstanceGet(
+                            self.__scanId__)
+                        if scanstatus and scanstatus[5] == "ABORT-REQUESTED":
+                            self._stopScanning = True
+                            return True
+                    except Exception:
+                        pass
             return False
 
         if not self.__scanId__:
+            return False
+
+        if not hasattr(self, '__sfdb__') or self.__sfdb__ is None:
             return False
 
         scanstatus = self.__sfdb__.scanInstanceGet(self.__scanId__)
@@ -706,10 +723,10 @@ class SpiderFootPlugin:
 
     def threadWorker(self) -> None:
         try:
-            # create new database handle since we're in our own thread
-            from spiderfoot import SpiderFootDb
-            self.setDbh(SpiderFootDb(self.opts))
-            self.sf._dbh = self.__sfdb__
+            # DB connection is acquired lazily via _ensureDbh() on first
+            # event, not eagerly here.  This prevents the "thundering herd"
+            # problem where 100+ modules all request pool connections at
+            # startup simultaneously, exhausting the pool.
 
             if not (self.incomingEventQueue and self.outgoingEventQueue):
                 self.sf.error(
@@ -722,6 +739,10 @@ class SpiderFootPlugin:
                 except queue.Empty:
                     sleep(.3)
                     continue
+
+                # Lazily acquire a per-thread DB connection on first event
+                self._ensureDbh()
+
                 if sfEvent == 'FINISHED':
                     self.sf.debug(
                         f"{getattr(self, '__name__', self.__class__.__name__)}.threadWorker() got \"FINISHED\" from incomingEventQueue.")
@@ -750,6 +771,14 @@ class SpiderFootPlugin:
                 # set queue to None to prevent its use
                 # if there are leftover objects in the queue, the scan will hang.
                 self.incomingEventQueue = None
+        finally:
+            # Return the per-thread DB connection to the pool promptly
+            if getattr(self, '_threadDbhReady', False):
+                try:
+                    self.__sfdb__.close()
+                except Exception:
+                    pass
+                self._threadDbhReady = False
 
     def poolExecute(self, callback, *args, **kwargs) -> None:
         """Execute a callback with the given args. If we're in a storage

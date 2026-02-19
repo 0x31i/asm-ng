@@ -18,6 +18,7 @@ meaning the 200+ SQL queries in db.py don't need individual edits.
 
 import logging
 import os
+import random
 import re
 import shutil
 import sqlite3
@@ -641,17 +642,33 @@ def create_pg_connection(opts: dict):
     dsn = _build_pg_dsn(opts)
     pool = _get_pg_pool(dsn)
 
-    # Retry with backoff if the pool is temporarily exhausted
+    # Retry with exponential backoff + jitter if the pool is temporarily
+    # exhausted.  With lazy connection acquisition in plugin.threadWorker(),
+    # bursts are smaller, but fan-out events can still cause transient
+    # contention.
     conn = None
-    for attempt in range(5):
+    max_attempts = int(os.environ.get('ASMNG_PG_POOL_RETRY_ATTEMPTS', '8'))
+    base_delay = float(os.environ.get('ASMNG_PG_POOL_RETRY_BASE_DELAY', '0.5'))
+    for attempt in range(max_attempts):
         try:
             conn = pool.getconn()
             break
         except psycopg2.pool.PoolError:
-            if attempt < 4:
-                log.debug(f"Connection pool exhausted, retrying ({attempt + 1}/5)...")
-                _time.sleep(0.2 * (attempt + 1))
+            if attempt < max_attempts - 1:
+                delay = base_delay * (2 ** attempt)
+                # Jitter: randomize between 50%-100% of calculated delay
+                jittered = delay * (0.5 + random.random() * 0.5)
+                log.debug(
+                    f"Connection pool exhausted, retrying "
+                    f"({attempt + 1}/{max_attempts}) in {jittered:.2f}s..."
+                )
+                _time.sleep(jittered)
             else:
+                log.error(
+                    f"Connection pool exhausted after {max_attempts} "
+                    f"attempts. Consider increasing ASMNG_PG_POOL_MAX "
+                    f"(current: {pool.maxconn})."
+                )
                 raise
 
     conn.autocommit = False
