@@ -18,7 +18,11 @@ meaning the 200+ SQL queries in db.py don't need individual edits.
 
 import logging
 import os
+import shutil
 import sqlite3
+import subprocess
+import sys
+import time as _time
 
 log = logging.getLogger(f"spiderfoot.{__name__}")
 
@@ -115,6 +119,190 @@ class PgCursorWrapper:
 
 
 # ---------------------------------------------------------------------------
+# PostgreSQL auto-setup helpers
+# ---------------------------------------------------------------------------
+
+def _get_sentinel_path() -> str:
+    """Return the path to the PostgreSQL auto-setup sentinel file.
+
+    Stored in the ``data/`` directory (git-ignored) so it persists across
+    restarts but is never committed.
+    """
+    try:
+        from spiderfoot.helpers import SpiderFootHelpers
+        return os.path.join(SpiderFootHelpers.dataPath(), '.pg_setup_attempted')
+    except Exception:
+        base = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
+        os.makedirs(base, exist_ok=True)
+        return os.path.join(base, '.pg_setup_attempted')
+
+
+def _read_sentinel() -> dict:
+    """Read the sentinel file. Returns dict with 'status' key, or empty dict if not found."""
+    path = _get_sentinel_path()
+    if not os.path.exists(path):
+        return {}
+    try:
+        result = {}
+        with open(path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if '=' in line and not line.startswith('#'):
+                    k, v = line.split('=', 1)
+                    result[k.strip()] = v.strip()
+        return result
+    except Exception:
+        return {}
+
+
+def _write_sentinel(status: str, reason: str) -> None:
+    """Write the sentinel file recording auto-setup outcome."""
+    path = _get_sentinel_path()
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
+            f.write(f"status={status}\n")
+            f.write(f"timestamp={int(_time.time())}\n")
+            f.write(f"reason={reason}\n")
+    except Exception as e:
+        log.warning(f"Could not write PG setup sentinel file: {e}")
+
+
+def _can_run_auto_setup() -> tuple:
+    """Check whether auto-setup can be attempted.
+
+    Returns:
+        tuple: (can_run: bool, reason: str)
+    """
+    # Check opt-out env var
+    opt_out = os.environ.get('ASMNG_PG_AUTO_SETUP', '').lower()
+    if opt_out in ('0', 'false', 'no', 'off'):
+        return False, "Auto-setup disabled via ASMNG_PG_AUTO_SETUP=0"
+
+    # Check platform
+    if sys.platform != 'linux':
+        return False, f"Auto-setup only supported on Linux (current: {sys.platform})"
+
+    # Check for apt-get (Debian/Kali requirement)
+    if not shutil.which('apt-get'):
+        return False, "apt-get not found; auto-setup requires a Debian-based system"
+
+    # Check for root/sudo
+    if os.geteuid() == 0:
+        return True, "Running as root"
+
+    # Test non-interactive sudo
+    try:
+        result = subprocess.run(
+            ['sudo', '-n', 'true'],
+            capture_output=True, timeout=5
+        )
+        if result.returncode == 0:
+            return True, "Passwordless sudo available"
+    except Exception:
+        pass
+
+    return False, "No root/sudo access available"
+
+
+def _attempt_pg_auto_setup(opts: dict) -> bool:
+    """Attempt to automatically install and configure PostgreSQL.
+
+    Runs ``setup-postgresql.sh`` via subprocess. Only executes on first startup
+    (no sentinel file) and only on Linux systems with root/sudo access.
+
+    Returns:
+        bool: True if PostgreSQL was successfully set up.
+    """
+    # Check sentinel (idempotency guard)
+    sentinel = _read_sentinel()
+    if sentinel:
+        status = sentinel.get('status', '')
+        reason = sentinel.get('reason', '')
+        if status == 'success':
+            log.debug("PG auto-setup previously succeeded; skipping re-run.")
+            return False
+        elif status == 'failed':
+            log.info(
+                f"PG auto-setup previously failed ({reason}). "
+                f"To retry, delete: {_get_sentinel_path()}"
+            )
+            return False
+        elif status == 'skipped':
+            log.debug(f"PG auto-setup was previously skipped: {reason}")
+            return False
+
+    # Check preconditions
+    can_run, reason = _can_run_auto_setup()
+    if not can_run:
+        log.warning(
+            f"Cannot auto-setup PostgreSQL: {reason}. "
+            "Falling back to SQLite. "
+            "To set up PostgreSQL manually, run: sudo ./setup-postgresql.sh"
+        )
+        _write_sentinel('skipped', reason)
+        return False
+
+    # Locate the setup script
+    script_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), '..', 'setup-postgresql.sh')
+    )
+    if not os.path.isfile(script_path):
+        log.warning(
+            f"PostgreSQL setup script not found at {script_path}. "
+            "Falling back to SQLite."
+        )
+        _write_sentinel('failed', 'setup-postgresql.sh not found')
+        return False
+
+    # Run the setup script
+    log.info(
+        "PostgreSQL is not running. Attempting automatic setup... "
+        "(this may take a minute on first run)"
+    )
+
+    try:
+        cmd = ['bash', script_path]
+        if os.geteuid() != 0:
+            cmd = ['sudo'] + cmd
+
+        env = os.environ.copy()
+        env['PG_USER'] = opts.get('__pg_user', 'admin')
+        env['PG_PASSWORD'] = opts.get('__pg_password', 'admin')
+        env['PG_DATABASE'] = opts.get('__pg_database', 'asmng')
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env=env,
+        )
+
+        if result.returncode == 0:
+            log.info("PostgreSQL auto-setup completed successfully.")
+            _write_sentinel('success', 'PostgreSQL installed and configured')
+            return True
+        else:
+            stderr_snippet = (result.stderr or '')[:500]
+            log.warning(
+                f"PostgreSQL auto-setup failed (exit code {result.returncode}). "
+                f"stderr: {stderr_snippet}"
+            )
+            _write_sentinel('failed', f'Exit code {result.returncode}: {(result.stderr or "")[:200]}')
+            return False
+
+    except subprocess.TimeoutExpired:
+        log.warning("PostgreSQL auto-setup timed out after 120 seconds.")
+        _write_sentinel('failed', 'Timed out after 120s')
+        return False
+    except Exception as e:
+        log.warning(f"PostgreSQL auto-setup error: {e}")
+        _write_sentinel('failed', str(e)[:200])
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Connection factory
 # ---------------------------------------------------------------------------
 
@@ -158,10 +346,29 @@ def detect_db_type(opts: dict) -> str:
             log.info("Auto-detected PostgreSQL on localhost. Using PostgreSQL backend.")
             return 'postgresql'
         except Exception:
-            pass
+            # PostgreSQL not reachable -- attempt auto-setup if first run
+            setup_ok = _attempt_pg_auto_setup(opts)
+            if setup_ok:
+                # Re-probe after setup
+                try:
+                    test_conn = psycopg2.connect(dsn, connect_timeout=5)
+                    test_conn.close()
+                    log.info("PostgreSQL is now available after auto-setup. Using PostgreSQL backend.")
+                    return 'postgresql'
+                except Exception as e:
+                    log.warning(
+                        f"PostgreSQL auto-setup completed but connection still failed: {e}. "
+                        "Falling back to SQLite."
+                    )
 
     # 5. Fallback
-    log.info("PostgreSQL not available. Using SQLite backend.")
+    if not HAS_PSYCOPG2:
+        log.info(
+            "psycopg2 not installed. Using SQLite backend. "
+            "Install psycopg2-binary for PostgreSQL support: pip install psycopg2-binary"
+        )
+    else:
+        log.info("PostgreSQL not available. Using SQLite backend.")
     return 'sqlite'
 
 
