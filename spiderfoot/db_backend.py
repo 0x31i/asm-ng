@@ -260,8 +260,21 @@ def _attempt_pg_auto_setup(opts: dict) -> bool:
             )
             return False
         elif status == 'skipped':
-            log.debug(f"PG auto-setup was previously skipped: {reason}")
-            return False
+            # Re-evaluate: conditions may have changed (e.g., code update
+            # added macOS support, user installed brew, gained sudo, etc.)
+            can_run_now, _ = _can_run_auto_setup()
+            if not can_run_now:
+                log.debug(f"PG auto-setup was previously skipped: {reason}")
+                return False
+            # Conditions changed — clear stale sentinel and retry
+            log.info(
+                f"PG auto-setup was previously skipped ({reason}) "
+                "but conditions have changed. Retrying..."
+            )
+            try:
+                os.remove(_get_sentinel_path())
+            except OSError:
+                pass
 
     # Check preconditions
     can_run, reason = _can_run_auto_setup()
