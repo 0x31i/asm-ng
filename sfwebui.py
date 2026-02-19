@@ -6045,8 +6045,8 @@ class SpiderFootWebUi:
                     rule_description = row[5]
                     event_count = row[7] if len(row) > 7 else 0
                     event_types = row[8] if len(row) > 8 else ""
-                    retdata.append([correlation_id, correlation, rule_name, rule_risk,
-                                   rule_id, rule_description, event_count, "", event_types])
+                    retdata.append([correlation_id, correlation, rule_id, rule_risk,
+                                   rule_name, rule_description, event_count, "", event_types])
 
             self._updateCorrelationJob(job_id, progress=90, step='Preparing display...')
 
