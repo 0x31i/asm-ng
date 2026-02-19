@@ -115,6 +115,88 @@ All dependencies (including advanced features such as database monitoring, AI
 threat intelligence, and security hardening) are included in the main
 `requirements.txt`. No separate install step is needed.
 
+### 2.3 PostgreSQL Database Backend (Automatic)
+
+ASM-NG uses PostgreSQL as its default database backend for better performance,
+concurrency, and reliability on production deployments. **On first launch,
+ASM-NG will automatically install and configure PostgreSQL** if the following
+conditions are met:
+
+- Running on a Debian/Kali Linux system (with `apt-get` available)
+- Running as root, or passwordless `sudo` is configured
+- PostgreSQL is not already running on localhost:5432
+
+The auto-setup performs these steps automatically:
+1. Installs PostgreSQL via `apt-get` (if not already installed)
+2. Starts and enables the PostgreSQL service
+3. Creates the `admin` user and `asmng` database
+4. Configures `pg_hba.conf` for local password authentication
+
+**Default credentials:** `admin:admin` — change after first login!
+
+```bash
+sudo -u postgres psql -c "ALTER USER admin PASSWORD 'new_password';"
+```
+
+#### Verify PostgreSQL is Active
+
+After first launch, check the logs for:
+```
+PostgreSQL is now available after auto-setup. Using PostgreSQL backend.
+```
+
+If you see `PostgreSQL not available. Using SQLite backend.` instead, check:
+
+```bash
+sudo systemctl status postgresql
+sudo -u postgres psql -c "SELECT 1;"
+```
+
+#### Manual Setup (if auto-setup was skipped)
+
+If auto-setup could not run (e.g., no root access, non-Debian system), you can
+set up PostgreSQL manually:
+
+```bash
+sudo ./setup-postgresql.sh
+```
+
+Or install PostgreSQL yourself and set environment variables:
+
+```bash
+export ASMNG_DATABASE_URL="postgresql://user:pass@localhost:5432/asmng"
+```
+
+#### Disabling Auto-Setup
+
+To prevent auto-setup from running (e.g., in CI or container environments):
+
+```bash
+export ASMNG_PG_AUTO_SETUP=0
+```
+
+#### Forcing SQLite
+
+To explicitly use SQLite regardless of PostgreSQL availability:
+
+```bash
+export ASMNG_DB_TYPE=sqlite
+```
+
+#### Troubleshooting Auto-Setup
+
+The auto-setup writes a sentinel file to prevent re-running on every restart.
+To check the status or retry:
+
+```bash
+# Check what happened:
+cat ~/asm-ng/data/.pg_setup_attempted
+
+# To retry auto-setup, delete the sentinel and restart:
+rm ~/asm-ng/data/.pg_setup_attempted
+python3 sf.py -l 0.0.0.0:5001
+```
+
 ### 2.4 Grant Nmap Raw Socket Capabilities
 
 This allows nmap to perform SYN scans without running ASM-NG as root:
@@ -737,8 +819,8 @@ To run ASM-NG as a persistent background service that starts on boot:
 sudo tee /etc/systemd/system/asm-ng.service > /dev/null << 'EOF'
 [Unit]
 Description=ASM-NG Attack Surface Management Platform
-After=network-online.target
-Wants=network-online.target
+After=network-online.target postgresql.service
+Wants=network-online.target postgresql.service
 
 [Service]
 Type=simple

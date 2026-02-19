@@ -20,11 +20,18 @@ PG_USER="${PG_USER:-admin}"
 PG_PASSWORD="${PG_PASSWORD:-admin}"
 PG_DATABASE="${PG_DATABASE:-asmng}"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+# Colors for output (disabled when not running in a terminal, e.g. via subprocess)
+if [ -t 1 ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    NC='\033[0m'
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    NC=''
+fi
 
 info()  { echo -e "${GREEN}[+]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[!]${NC} $*"; }
@@ -44,6 +51,7 @@ if command -v psql &>/dev/null; then
     info "PostgreSQL client already installed: $(psql --version)"
 else
     info "Installing PostgreSQL..."
+    export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
     apt-get install -y -qq postgresql postgresql-client
     info "PostgreSQL installed successfully."
@@ -129,3 +137,5 @@ else
         echo "  Debug: PGPASSWORD=${PG_PASSWORD} psql -U ${PG_USER} -d ${PG_DATABASE} -h localhost"
     fi
 fi
+
+exit 0
