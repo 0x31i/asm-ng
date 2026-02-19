@@ -466,13 +466,11 @@ def detect_db_type(opts: dict) -> str:
 
 
 def _detect_db_type_impl(opts: dict) -> str:
-    """Internal implementation of database type detection (uncached)."""
-    if _cached_db_type is not None:
-        return _cached_db_type
+    """Internal implementation of database type detection (uncached).
 
-    result = _detect_db_type_uncached(opts)
-    _cached_db_type = result
-    return result
+    Caching is handled by the caller ``detect_db_type()`` via ``_detect_cache``.
+    """
+    return _detect_db_type_uncached(opts)
 
 
 def _detect_db_type_uncached(opts: dict) -> str:
