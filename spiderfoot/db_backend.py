@@ -58,6 +58,11 @@ else:
 _pg_pool = None
 _pg_pool_lock = threading.Lock()
 
+# ---------------------------------------------------------------------------
+# Cached database type detection (singleton)
+# ---------------------------------------------------------------------------
+_cached_db_type = None
+_db_type_lock = threading.Lock()
 # Cache the detected database type so we don't re-probe on every instantiation.
 _cached_db_type = None
 
@@ -446,10 +451,30 @@ def detect_db_type(opts: dict) -> str:
     4. Probe localhost:5432 with default creds → postgresql
     5. Fallback → sqlite
 
+    The result is cached after first detection so subsequent calls avoid
+    redundant PostgreSQL probe connections.
+
     Returns:
         str: ``'postgresql'`` or ``'sqlite'``
     """
     global _cached_db_type
+
+    # Fast path: return cached result
+    if _cached_db_type is not None:
+        return _cached_db_type
+
+    with _db_type_lock:
+        # Double-checked locking
+        if _cached_db_type is not None:
+            return _cached_db_type
+
+        result = _detect_db_type_impl(opts)
+        _cached_db_type = result
+        return result
+
+
+def _detect_db_type_impl(opts: dict) -> str:
+    """Internal implementation of database type detection (uncached)."""
     if _cached_db_type is not None:
         return _cached_db_type
 
