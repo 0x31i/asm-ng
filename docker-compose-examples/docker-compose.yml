@@ -19,6 +19,10 @@ version: "3"
 services:
   asm-ng:
     image: ghcr.io/0x31i/asm-ng
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     volumes:
       - asm-ng-data:/home/spiderfoot/data
     container_name: asm-ng
