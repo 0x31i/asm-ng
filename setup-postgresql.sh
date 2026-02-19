@@ -190,20 +190,20 @@ else
 fi
 
 info "Creating database user '${PG_USER}'..."
-$PG_SUDO psql -c "CREATE USER ${PG_USER} WITH PASSWORD '${PG_PASSWORD}';" 2>/dev/null || \
+$PG_SUDO psql -d postgres -c "CREATE USER ${PG_USER} WITH PASSWORD '${PG_PASSWORD}';" 2>/dev/null || \
     warn "User '${PG_USER}' may already exist (this is OK)."
 
 info "Creating database '${PG_DATABASE}'..."
-$PG_SUDO psql -c "CREATE DATABASE ${PG_DATABASE} OWNER ${PG_USER};" 2>/dev/null || \
+$PG_SUDO psql -d postgres -c "CREATE DATABASE ${PG_DATABASE} OWNER ${PG_USER};" 2>/dev/null || \
     warn "Database '${PG_DATABASE}' may already exist (this is OK)."
 
 # Grant privileges
-$PG_SUDO psql -c "GRANT ALL PRIVILEGES ON DATABASE ${PG_DATABASE} TO ${PG_USER};" 2>/dev/null || true
+$PG_SUDO psql -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE ${PG_DATABASE} TO ${PG_USER};" 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # Step 4: Configure local password authentication
 # ---------------------------------------------------------------------------
-PG_HBA=$($PG_SUDO psql -t -c "SHOW hba_file;" 2>/dev/null | xargs)
+PG_HBA=$($PG_SUDO psql -d postgres -t -c "SHOW hba_file;" 2>/dev/null | xargs)
 
 if [ -n "$PG_HBA" ] && [ -f "$PG_HBA" ]; then
     if ! grep -q "${PG_DATABASE}" "$PG_HBA" 2>/dev/null; then
