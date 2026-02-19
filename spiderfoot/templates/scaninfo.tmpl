@@ -76,26 +76,41 @@
         </div>
         <div class="btn-group" role="group">
             <button id='btn-refresh' rel="tooltip" title="Refresh" class="btn btn-success btn-default" onClick='refresh()'><i class='glyphicon glyphicon-refresh glyphicon glyphicon-white'></i></button>
-            <a id='btn-export' rel="tooltip" data-title="Export Data" class="btn btn-default dropdown-toggle download-button" data-toggle="dropdown"><i class='glyphicon glyphicon-download-alt glyphicon glyphicon-white'></i></a>
+            <a id='btn-export' rel="tooltip" data-title="Export Data" class="btn btn-default dropdown-toggle download-button" data-toggle="dropdown"><i class='glyphicon glyphicon-download-alt glyphicon glyphicon-white'></i> EXPORT</a>
             <ul id="export-dropdown-menu" class="dropdown-menu">
-              <li class="dropdown-header">Full Data (All Results)</li>
-              <li><a class='link' onClick='exportEventData("${id}", currentType, "csv", "full")'>CSV</a></li>
-              <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "full")'>Excel</a></li>
+              <li id="export-current-type-section" style="display:none"></li>
+              <li class="dropdown-header" style="color: #16a34a; font-weight: bold; font-size: 13px;">
+                <i class="glyphicon glyphicon-file" style="margin-right: 4px;"></i> Full Report
+              </li>
+              <li>
+                <a class="link export-fullreport-link" onClick='exportReportData("${id}")'>
+                  <i class="glyphicon glyphicon-download-alt" style="margin-right: 6px;"></i>
+                  Full Report (.xlsx)
+                </a>
+              </li>
               <li class="divider"></li>
-              <li class="dropdown-header">Analysis (No False Positives)</li>
-              <li><a class='link' onClick='exportEventData("${id}", currentType, "csv", "analysis")'>CSV</a></li>
-              <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "analysis")'>Excel</a></li>
-              <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "analysis_correlations")'>Excel + Findings & Correlations</a></li>
+              <li class="dropdown-header">Findings &amp; Correlations</li>
+              <li>
+                <a class="link" onClick='exportFindingsZip("${id}")'>
+                  CSV (.zip) &mdash; FINDINGS.csv + CORRELATIONS.csv
+                </a>
+              </li>
               <li class="divider"></li>
               <li class="dropdown-header">Legacy Export (v4.0 Types)</li>
-              <li><a class='link' onClick='exportEventData("${id}", currentType, "csv", "full", true)'>CSV</a></li>
-              <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "full", true)'>Excel</a></li>
-              <li><a class='link' onClick='exportEventData("${id}", currentType, "csv", "analysis", true)'>CSV Analysis</a></li>
-              <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "analysis", true)'>Excel Analysis</a></li>
-              <li><a class='link' onClick='exportEventData("${id}", currentType, "excel", "analysis_correlations", true)'>Excel Analysis + Findings & Correlations</a></li>
+              <li>
+                <a class="link" onClick='exportLegacyCSV("${id}")'>
+                  CSV &mdash; All Types with FP data
+                </a>
+              </li>
+              <li class="divider"></li>
+              <li class="dropdown-header">Assets Export</li>
+              <li>
+                <a class="link" onClick='exportAssetsZip()'>
+                  CSV (.zip) &mdash; IPs, Domains, Employees
+                </a>
+              </li>
             </ul>
         </div>
-        <button id='btn-full-report' class='btn btn-full-report' style='display:none' onClick='exportReportData("${id}")'><i class='glyphicon glyphicon-file'></i> REPORT</button>
     <div class='btn-group search-group'>
         <div id='btn-search' class='input-group'>
           <input class='form-control' id='searchvalue' type='text' placeholder='Search...' data-toggle='popover' data-html='true' data-animation='true' data-title='Usage' data-content="Supply a regular expression encapsulated in '/', e.g. <i>/searchregex/</i> or a simple wildcard search, e.g. <i>*string*</i> or an exact value, e.g. <i>string</i>.<br /><br /><b>Note</b> that the current scope is what's searched.">
@@ -244,7 +259,6 @@
         var dataloaders = [];
         var sharedSigma = "";
         var loadersrunning = false;
-        var defaultExportDropdownHtml = '';
         var refresh = function() { dataEventList("${id}"); }
         var _skipHistoryPush = false; // Flag to prevent pushState during popstate handling
         var _instanceId = "${id}";
@@ -2083,16 +2097,6 @@
             currentSection = target;
             updatePageTitle();
 
-            // Restore default export dropdown when navigating away from vulns/findings
-            if (target !== 'btn-graph' && target !== 'btn-findings' && defaultExportDropdownHtml) {
-                $('#export-dropdown-menu').html(defaultExportDropdownHtml);
-            }
-
-            // Hide full report button when navigating away from findings
-            if (target !== 'btn-findings') {
-                $("#btn-full-report").hide();
-            }
-
             $("#breadcrumbs").remove();
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
@@ -2129,6 +2133,7 @@
             $("#modifyactions").hide();
             $("#loader").show();
             $("#btn-export").show();
+            updateExportCurrentType('');
             $("#btn-download-logs").hide();
             $("#btn-refresh").show();
             $("#btn-search").show();
@@ -2197,16 +2202,7 @@
             vulnInstanceId = instanceId;
             currentSection = 'btn-graph';
             refresh = function() { viewVulnerabilities(instanceId); }
-
-            // Save default export dropdown and replace with vuln-specific options
-            if (!defaultExportDropdownHtml) {
-                defaultExportDropdownHtml = $('#export-dropdown-menu').html();
-            }
-            var vulnExportHtml = '';
-            vulnExportHtml += "<li class='dropdown-header'>Vulnerability Export</li>";
-            vulnExportHtml += "<li><a class='link' onClick='exportEventData(\"" + instanceId + "\", \"\", \"csv\", \"full\")'>CSV (EXT-VULNS.csv + WEBAPP-VULNS.csv)</a></li>";
-            vulnExportHtml += "<li><a class='link' onClick='exportEventData(\"" + instanceId + "\", \"\", \"excel\", \"full\")'>Excel (VULNS.xlsx - two tabs)</a></li>";
-            $('#export-dropdown-menu').html(vulnExportHtml);
+            updateExportCurrentType('');
 
             var grid = "<div id='scansummary-content'>";
             grid += "<div class='vuln-container'>";
@@ -2249,7 +2245,8 @@
             $("#scanlogs-content").remove();
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
-            $("#btn-export").hide();
+            $("#btn-export").show();
+            updateExportCurrentType('');
             $("#btn-download-logs").hide();
             $("#btn-refresh").show();
             $("#btn-search").hide();
@@ -2281,8 +2278,6 @@
             grid += "<i class='glyphicon glyphicon-upload'></i>&nbsp;&nbsp;IMPORT LIST</button>";
             grid += "<button class='btn btn-sm assets-add-btn' onclick='assetsShowAddModal()'>";
             grid += "<i class='glyphicon glyphicon-plus'></i>&nbsp;&nbsp;ADD ASSET</button>";
-            grid += "<a class='btn btn-sm assets-export-btn' href='${docroot}/knownassetexport?target=" + encodeURIComponent(assetsTarget) + "&format=excel'>";
-            grid += "<i class='glyphicon glyphicon-download-alt'></i>&nbsp;&nbsp;EXPORT</a>";
             grid += "</div>";
             grid += "</div>";
 
@@ -4045,7 +4040,7 @@
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
             $("#btn-export").show();
-            $("#btn-full-report").show();
+            updateExportCurrentType('');
             $("#btn-download-logs").hide();
             $("#btn-refresh").show();
             $("#btn-search").hide();
@@ -4053,22 +4048,6 @@
             navTo("btn-findings");
             pushViewState('btn-findings');
             refresh = function() { viewFindings(instanceId); }
-
-            // Save default export dropdown and replace with findings-specific options
-            if (!defaultExportDropdownHtml) {
-                defaultExportDropdownHtml = $('#export-dropdown-menu').html();
-            }
-            var findingsExportHtml = '';
-            findingsExportHtml += "<li class='dropdown-header' style='color: #16a34a; font-weight: bold; font-size: 13px;'>";
-            findingsExportHtml += "<i class='glyphicon glyphicon-file' style='margin-right: 4px;'></i> Executive Summary Report</li>";
-            findingsExportHtml += "<li><a class='link' style='font-weight: bold; color: #16a34a;' onClick='exportReportData(\"" + instanceId + "\")'>";
-            findingsExportHtml += "<i class='glyphicon glyphicon-download-alt' style='margin-right: 6px;'></i>";
-            findingsExportHtml += "Download Full Report (.xlsx)</a></li>";
-            findingsExportHtml += "<li class='divider'></li>";
-            findingsExportHtml += "<li class='dropdown-header'>Basic Export</li>";
-            findingsExportHtml += "<li><a class='link' onClick='exportEventData(\"" + instanceId + "\", \"\", \"csv\", \"full\")'>CSV (FINDINGS.csv + CORRELATIONS.csv)</a></li>";
-            findingsExportHtml += "<li><a class='link' onClick='exportEventData(\"" + instanceId + "\", \"\", \"excel\", \"full\")'>Excel (FINDINGS.xlsx - two tabs)</a></li>";
-            $('#export-dropdown-menu').html(findingsExportHtml);
 
             var grid = "<div id='scansummary-content'>";
             grid += "<div class='vuln-container'>";
@@ -5090,7 +5069,8 @@
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
             $("#loader").show();
-            $("#btn-export").hide();
+            $("#btn-export").show();
+            updateExportCurrentType('');
             $("#btn-download-logs").hide();
             $("#btn-refresh").hide();
             $("#btn-search").hide();
@@ -6708,7 +6688,8 @@
             $("#dedup-bar").remove();
             $("#loader").show();
             $("#btn-search").hide();
-            $("#btn-export").hide();
+            $("#btn-export").show();
+            updateExportCurrentType('');
             $("#scanreminder").hide();
             navTo("btn-findings");
             pushViewState('btn-findings', {findingsTab: 'correlations'});
@@ -7081,7 +7062,8 @@
             $("#dedup-bar").remove();
             $("#loader").show();
             $("#btn-search").hide();
-            $("#btn-export").hide();
+            $("#btn-export").show();
+            updateExportCurrentType('');
             $("#btn-download-logs").show();
             $("#scanreminder").hide();
             navTo("btn-log");
@@ -7259,6 +7241,7 @@
         function dataEventList(instanceId) {
             currentType = "ALL";
             currentTypeName = "All";
+            updateExportCurrentType('');
 
             // Remove pre-existing tables if they exist
             $("#scansummary-content").remove();
@@ -7373,6 +7356,7 @@
             $("#scanreminder").hide();
             currentType = eventType;
             currentTypeName = eventTypeLabel;
+            updateExportCurrentType(eventTypeLabel);
             updatePageTitle(currentTypeName);
             pushViewState('btn-data', {dataType: eventType, dataTypeName: eventTypeLabel, dataFormat: format});
             refresh = function() { dataEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated, filterImportedEntries); }
@@ -7947,6 +7931,87 @@
             $("#loader").fadeOut(500);
         }
 
+        // Helper: fetch a URL and trigger a file download from the response blob
+        function _fetchAndDownload(url, fallbackFilename) {
+            $("#loader").show();
+            fetch(url, { credentials: 'same-origin' })
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('Server returned ' + response.status);
+                    }
+                    var filename = fallbackFilename;
+                    var cd = response.headers.get('Content-Disposition');
+                    if (cd) {
+                        var match = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                        if (match && match[1]) {
+                            filename = match[1].replace(/['"]/g, '');
+                        }
+                    }
+                    return response.blob().then(function(blob) {
+                        return { blob: blob, filename: filename };
+                    });
+                })
+                .then(function(data) {
+                    var blobUrl = window.URL.createObjectURL(data.blob);
+                    var a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = data.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(blobUrl);
+                    $("#loader").fadeOut(500);
+                })
+                .catch(function(error) {
+                    alertify.error("Export failed: " + error.message);
+                    $("#loader").fadeOut(500);
+                });
+        }
+
+        // Export findings & correlations as a ZIP (FINDINGS.csv + CORRELATIONS.csv)
+        function exportFindingsZip(instanceId) {
+            _fetchAndDownload(
+                '${docroot}/scanfindingsexport?filetype=csv&id=' + instanceId,
+                'SpiderFoot-Findings.zip'
+            );
+        }
+
+        // Export all types as legacy CSV (SpiderFoot v4.0 compatible type names, includes FP data)
+        function exportLegacyCSV(instanceId) {
+            _fetchAndDownload(
+                '${docroot}/scaneventresultexport?filetype=csv&export_mode=full&legacy=1&id=' + instanceId + '&type=',
+                'SpiderFoot-Legacy-Export.csv'
+            );
+        }
+
+        // Export known assets as a ZIP (IPs.csv, DOMAINS.csv, EMPLOYEES.csv)
+        function exportAssetsZip() {
+            _fetchAndDownload(
+                '${docroot}/knownassetexportzip?target=' + encodeURIComponent('${seedtarget}'),
+                'SpiderFoot-Assets.zip'
+            );
+        }
+
+        // Update the "Current Type" section at the top of the export dropdown
+        // Called when navigating to a specific event type in the DATA tab
+        function updateExportCurrentType(eventType) {
+            // Remove any previously injected current-type items
+            $('#export-dropdown-menu .export-current-type-item').remove();
+            var marker = $('#export-current-type-section');
+            if (!eventType) {
+                marker.hide();
+                return;
+            }
+            // Insert new items right after the hidden marker element
+            var items = '';
+            items += "<li class='dropdown-header export-current-type-item' style='color: #3b82f6; font-weight: bold;'>";
+            items += "<i class='glyphicon glyphicon-list-alt' style='margin-right: 4px;'></i> Current Type: " + eventType + "</li>";
+            items += "<li class='export-current-type-item'><a class='link' onClick='exportEventData(\"${id}\", currentType, \"csv\", \"full\")'>CSV &mdash; " + eventType + "</a></li>";
+            items += "<li class='export-current-type-item'><a class='link' onClick='exportEventData(\"${id}\", currentType, \"excel\", \"full\")'>Excel &mdash; " + eventType + "</a></li>";
+            items += "<li class='divider export-current-type-item'></li>";
+            marker.after(items);
+        }
+
         // Download the data currently being viewed
         function exportEventData(instanceId, eventType, fileType, exportMode, legacy) {
             exportMode = exportMode || "full";
@@ -8111,7 +8176,8 @@
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
             $("#loader").show();
-            $("#btn-export").hide();
+            $("#btn-export").show();
+            updateExportCurrentType('');
             $("#btn-download-logs").hide();
             $("#btn-refresh").show();
             $("#btn-search").hide();
