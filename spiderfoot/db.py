@@ -26,14 +26,66 @@ from spiderfoot.db_backend import (
     OperationalError,
     HAS_PSYCOPG2,
     create_connection,
+    create_pg_connection,
     create_sqlite_connection,
     get_pg_schema_queries,
     get_raw_connection,
     raw_execute,
+    return_pg_connection,
 )
 
 if HAS_PSYCOPG2:
     import psycopg2
+
+
+class _PgPoolLock:
+    """Context manager that checks out a PostgreSQL connection from the
+    shared pool on entry and returns it on exit.
+
+    Drop-in replacement for the ``threading.RLock`` used by
+    ``SpiderFootDb.dbhLock``.  Instead of each ``SpiderFootDb`` instance
+    holding a permanent connection for its entire lifetime (which
+    exhausts the pool when 100+ modules run), connections are held only
+    for the duration of a single ``with self.dbhLock:`` block
+    (typically milliseconds) and then returned.
+
+    Supports reentrancy: if the same thread enters the lock multiple
+    times, only the outermost entry/exit manages the pool connection.
+    """
+
+    def __init__(self, db_instance, opts):
+        self._lock = threading.RLock()
+        self._db = db_instance
+        self._opts = opts
+        self._depth = 0
+
+    def __enter__(self):
+        self._lock.acquire()
+        self._depth += 1
+        if self._depth == 1:
+            try:
+                conn, cursor, _ = create_pg_connection(self._opts)
+                self._db.conn = conn
+                self._db.dbh = cursor
+            except Exception:
+                self._depth -= 1
+                self._lock.release()
+                raise
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._depth -= 1
+        if self._depth == 0:
+            try:
+                conn = self._db.conn
+                self._db.conn = None
+                self._db.dbh = None
+                if conn is not None:
+                    return_pg_connection(conn)
+            except Exception:
+                pass
+        self._lock.release()
+        return False
 
 
 class SpiderFootDb:
@@ -528,12 +580,14 @@ class SpiderFootDb:
         # Schema setup and migrations only need to run once per process.
         # Subsequent SpiderFootDb instances reuse the already-migrated schema.
         if SpiderFootDb._migrations_done and not init:
+            self._enable_pg_pool_mode(opts)
             return
 
         with self.dbhLock:
             # Re-check under lock in case another thread completed migrations
             # while we were waiting.
             if SpiderFootDb._migrations_done and not init:
+                self._enable_pg_pool_mode(opts)
                 return
 
             # PostgreSQL enters InFailedSqlTransaction after any query error,
@@ -964,6 +1018,9 @@ class SpiderFootDb:
                         continue
                 self.conn.commit()
 
+            # Switch to per-operation pool mode now that setup is done.
+            self._enable_pg_pool_mode(opts)
+
 
     #
     # Back-end database operations
@@ -1037,6 +1094,25 @@ class SpiderFootDb:
                 raise IOError(
                     "SQL error encountered when setting up database") from e
 
+    def _enable_pg_pool_mode(self, opts):
+        """Switch from a permanent connection to per-operation pool mode.
+
+        After this call, every ``with self.dbhLock:`` block will check
+        out a connection from the shared pool, use it, and return it
+        immediately.  This keeps pool usage minimal (connections held
+        for milliseconds instead of the module's entire lifetime) and
+        ensures the web server always has connections available.
+        """
+        if self.db_type != 'postgresql':
+            return
+        # Return the connection that __init__ acquired for setup.
+        if self.conn is not None:
+            return_pg_connection(self.conn)
+            self.conn = None
+            self.dbh = None
+        # Replace the class-level RLock with a per-instance pool lock.
+        self.dbhLock = _PgPoolLock(self, opts)
+
     def __enter__(self):
         """Enable use as a context manager: ``with SpiderFootDb(opts) as db:``."""
         return self
@@ -1057,9 +1133,15 @@ class SpiderFootDb:
     def close(self) -> None:
         """Close the database handle and connection.
 
-        For PostgreSQL, returns the connection to the shared pool instead
-        of closing it outright.
+        In per-operation pool mode (PostgreSQL with ``_PgPoolLock``),
+        connections are transient — checked out and returned within each
+        ``with self.dbhLock:`` block.  There is nothing to close.
+
+        For SQLite (or PostgreSQL still in init mode), closes the cursor
+        and connection normally.
         """
+        if isinstance(self.dbhLock, _PgPoolLock):
+            return
 
         with self.dbhLock:
             if self.dbh:
@@ -1067,7 +1149,6 @@ class SpiderFootDb:
                 self.dbh = None
             if self.conn:
                 if self.db_type == 'postgresql':
-                    from spiderfoot.db_backend import return_pg_connection
                     return_pg_connection(self.conn)
                 else:
                     self.conn.close()
