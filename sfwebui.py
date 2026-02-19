@@ -157,17 +157,14 @@ class SpiderFootWebUi:
         # Create default admin user if no users exist
         with SpiderFootDb(self.config, init=True) as dbh_init:
             if dbh_init.userCount() == 0:
-                import secrets as _secrets
-                default_password = _secrets.token_urlsafe(12)
-                dbh_init.userCreate('admin', default_password, display_name='Administrator', role='admin')
-                self._default_password = default_password
-                self.log.info(f"Created default admin user. Password: {default_password}")
+                dbh_init.userCreate('admin', 'admin', display_name='Administrator', role='admin')
+                self.log.info("Created default admin user with default credentials (admin:admin)")
                 print("")
                 print("*************************************************************")
-                print(f" Default login credentials created:")
-                print(f"   Username: admin")
-                print(f"   Password: {default_password}")
-                print(f" Please change this password after first login!")
+                print(" Default login credentials created:")
+                print("   Username: admin")
+                print("   Password: admin")
+                print(" WARNING: Change this password immediately after first login!")
                 print("*************************************************************")
                 print("")
 
@@ -511,6 +508,8 @@ class SpiderFootWebUi:
             if dbh.userVerify(username, password):
                 cherrypy.session['username'] = username
                 cherrypy.session['user_role'] = dbh.userGetRole(username)
+                # Flag if user is using the default password
+                cherrypy.session['default_password_warning'] = dbh.userHasDefaultPassword(username)
                 dbh.userUpdateLastLogin(username)
                 dbh.auditLog(username, 'LOGIN', detail='Successful login', ip_address=self.clientIP())
                 self.log.info(f"User '{username}' logged in from {self.clientIP()}")
@@ -3389,6 +3388,9 @@ class SpiderFootWebUi:
 
         if dbh.userChangePassword(username, new_password):
             dbh.auditLog(current_user, 'USER_PASSWORD_CHANGE', detail=f'Changed password for user: {username}', ip_address=self.clientIP())
+            # Clear the default password warning if the current user changed their own password
+            if username == current_user:
+                cherrypy.session['default_password_warning'] = False
             return {'success': True, 'message': f'Password for {username} changed successfully'}
         else:
             return {'success': False, 'error': 'Failed to change password'}

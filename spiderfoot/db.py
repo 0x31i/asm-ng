@@ -4528,6 +4528,29 @@ class SpiderFootDb:
             except DatabaseError:
                 return False
 
+    def userHasDefaultPassword(self, username: str) -> bool:
+        """Check if a user still has the default password ('admin').
+
+        Args:
+            username (str): username
+
+        Returns:
+            bool: True if the user's password is the default 'admin'
+        """
+        qry = "SELECT password_hash, salt FROM tbl_users WHERE username = ?"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [username])
+                row = self.dbh.fetchone()
+                if not row:
+                    return False
+                stored_hash, salt = row[0], row[1]
+                default_hash, _ = self.hashPassword('admin', salt)
+                return default_hash == stored_hash
+            except DatabaseError:
+                return False
+
     def userUpdateLastLogin(self, username: str) -> None:
         """Update the last login timestamp for a user.
 
