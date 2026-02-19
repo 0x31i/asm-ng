@@ -4589,6 +4589,65 @@ class SpiderFootWebUi:
             return output.getvalue().encode('utf-8')
 
     @cherrypy.expose
+    def knownassetexportzip(self: 'SpiderFootWebUi', target: str = None) -> bytes:
+        """Export known assets as a ZIP containing separate CSVs per asset type.
+
+        Creates three CSV files bundled in a zip:
+        - IPs.csv
+        - DOMAINS.csv
+        - EMPLOYEES.csv
+
+        Args:
+            target (str): the scan target
+
+        Returns:
+            bytes: ZIP file data
+        """
+        if not target:
+            return b''
+
+        import zipfile
+
+        dbh = SpiderFootDb(self.config)
+        rows = dbh.knownAssetList(target)
+
+        # Separate rows by asset type
+        asset_buckets = {
+            'ip': [],
+            'domain': [],
+            'employee': [],
+        }
+        for r in rows:
+            asset_type = r[2]
+            if asset_type in asset_buckets:
+                asset_buckets[asset_type].append(r)
+
+        headers = ["Type", "Value", "Source", "Date Added", "Added By", "Notes"]
+
+        type_filenames = {
+            'ip': 'IPs.csv',
+            'domain': 'DOMAINS.csv',
+            'employee': 'EMPLOYEES.csv',
+        }
+
+        zip_buf = BytesIO()
+        with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for atype, arows in asset_buckets.items():
+                buf = StringIO()
+                writer = csv.writer(buf, dialect='excel')
+                writer.writerow(headers)
+                for r in arows:
+                    writer.writerow([r[2], r[3], r[4], r[6], r[7], r[8]])
+                zf.writestr(type_filenames[atype], buf.getvalue())
+
+        zip_buf.seek(0)
+
+        cherrypy.response.headers['Content-Disposition'] = 'attachment; filename="SpiderFoot-Assets.zip"'
+        cherrypy.response.headers['Content-Type'] = "application/zip"
+        cherrypy.response.headers['Pragma'] = "no-cache"
+        return zip_buf.read()
+
+    @cherrypy.expose
     def knownassetimporthistory(self: 'SpiderFootWebUi', target: str = None) -> str:
         """Get asset import history for a target.
 
