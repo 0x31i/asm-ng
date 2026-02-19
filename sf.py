@@ -58,7 +58,13 @@ sfConfig = {
     '_internettlds': 'https://publicsuffix.org/list/effective_tld_names.dat',
     '_internettlds_cache': 72,
     '_genericusers': '',  # Will be set after SpiderFootHelpers is available
-    '__database': '',  # Will be set after SpiderFootHelpers is available
+    '__database': '',  # Will be set after SpiderFootHelpers is available (SQLite path)
+    '__dbtype': '',  # Auto-detected: 'postgresql' or 'sqlite'
+    '__pg_host': 'localhost',
+    '__pg_port': '5432',
+    '__pg_database': 'asmng',
+    '__pg_user': 'admin',
+    '__pg_password': 'admin',
     '__modules__': None,  # List of modules. Will be set after start-up.
     # List of correlation rules. Will be set after start-up.
     '__correlationrules__': None,
@@ -1275,27 +1281,32 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
 
         # Subscribe a CherryPy engine plugin that flushes the SQLite WAL
         # on graceful shutdown (SIGTERM, cherrypy.engine.exit(), etc.).
-        from cherrypy.process.plugins import SimplePlugin
+        # Only relevant for SQLite backend.
+        from spiderfoot.db_backend import detect_db_type
+        _db_type = detect_db_type(sfConfig)
 
-        class _DatabaseCleanupPlugin(SimplePlugin):
-            """Checkpoint and truncate the SQLite WAL on server stop."""
+        if _db_type == 'sqlite':
+            from cherrypy.process.plugins import SimplePlugin
 
-            def __init__(self, bus, db_path):
-                super().__init__(bus)
-                self._db_path = db_path
+            class _DatabaseCleanupPlugin(SimplePlugin):
+                """Checkpoint and truncate the SQLite WAL on server stop."""
 
-            def stop(self):
-                try:
-                    if self._db_path and os.path.exists(self._db_path):
-                        conn = sqlite3.connect(self._db_path, timeout=5)
-                        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                        conn.close()
-                except Exception:
-                    pass
+                def __init__(self, bus, db_path):
+                    super().__init__(bus)
+                    self._db_path = db_path
 
-        _DatabaseCleanupPlugin(
-            cherrypy.engine, sfConfig.get('__database')
-        ).subscribe()
+                def stop(self):
+                    try:
+                        if self._db_path and os.path.exists(self._db_path):
+                            conn = sqlite3.connect(self._db_path, timeout=5)
+                            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                            conn.close()
+                    except Exception:
+                        pass
+
+            _DatabaseCleanupPlugin(
+                cherrypy.engine, sfConfig.get('__database')
+            ).subscribe()
 
         # Disable auto-reloading of content
         cherrypy.engine.autoreload.unsubscribe()
@@ -1327,17 +1338,19 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
         # Register an atexit handler to flush the WAL and release SQLite
         # locks on exit.  This prevents stale -wal/-shm files from
         # blocking the next startup after a crash or SIGKILL.
-        def _atexit_wal_checkpoint():
-            try:
-                _db_path = sfConfig.get('__database')
-                if _db_path and os.path.exists(_db_path):
-                    _conn = sqlite3.connect(_db_path, timeout=5)
-                    _conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                    _conn.close()
-            except Exception:
-                pass
+        # Only relevant for SQLite backend.
+        if _db_type == 'sqlite':
+            def _atexit_wal_checkpoint():
+                try:
+                    _db_path = sfConfig.get('__database')
+                    if _db_path and os.path.exists(_db_path):
+                        _conn = sqlite3.connect(_db_path, timeout=5)
+                        _conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                        _conn.close()
+                except Exception:
+                    pass
 
-        atexit.register(_atexit_wal_checkpoint)
+            atexit.register(_atexit_wal_checkpoint)
 
         cherrypy.quickstart(web_ui, script_name=web_root, config=conf)
 

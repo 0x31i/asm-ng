@@ -8,6 +8,7 @@ import sqlite3
 from unittest.mock import Mock, MagicMock, patch
 from spiderfoot import SpiderFootDb
 from spiderfoot.event import SpiderFootEvent
+from spiderfoot.db_backend import DatabaseError, OperationalError
 
 
 @pytest.fixture
@@ -193,30 +194,31 @@ def database_error_scenarios():
 
 class MockSpiderFootDb:
     """Mock SpiderFootDb class for testing."""
-    
+
     def __init__(self, config=None):
         self.config = config or {}
         self.dbh = Mock()
+        self.db_type = 'sqlite'
         self.connection_error = False
-        
+
     def configGet(self, opt, default=None):
         return self.config.get(opt, default)
-        
+
     def scanInstanceCreate(self, scanId, scanName, scanTarget):
         if self.connection_error:
             raise sqlite3.OperationalError("Connection failed")
         return True
-        
+
     def scanEventStore(self, scanId, sfEvent):
         if self.connection_error:
             raise sqlite3.OperationalError("Connection failed")
         return True
-        
+
     def scanResultEvent(self, instanceId, eventType=None, filterFp=None):
         if self.connection_error:
             raise sqlite3.OperationalError("Connection failed")
         return []
-        
+
     def scanInstanceGet(self, instanceId):
         if self.connection_error:
             raise sqlite3.OperationalError("Connection failed")

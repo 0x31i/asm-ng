@@ -299,47 +299,48 @@ class SpiderFootWebUi:
                 else:
                     self.log.error(f"Startup cleanup of orphaned scans failed: {e}")
 
-        # Last resort: use direct SQLite connection if shared handler failed
+        # Last resort: use direct database connection if shared handler failed
         if not cleanup_done:
-            self.log.warning("Startup cleanup: falling back to direct SQLite connection")
+            self.log.warning("Startup cleanup: falling back to direct database connection")
             try:
-                import sqlite3
-                db_path = self.config.get('__database')
-                if db_path:
-                    conn = sqlite3.connect(db_path, timeout=30)
-                    cursor = conn.execute(
-                        "SELECT guid, status FROM tbl_scan_instance WHERE status IN (?, ?, ?, ?, ?)",
-                        active_statuses
-                    )
-                    orphans = cursor.fetchall()
-                    for scan_id, old_status in orphans:
-                        # Kill process by PID if possible
-                        try:
-                            pid_cursor = conn.execute(
-                                "SELECT pid FROM tbl_scan_instance WHERE guid = ?",
-                                (scan_id,)
-                            )
-                            pid_row = pid_cursor.fetchone()
-                            if pid_row and pid_row[0] and pid_row[0] > 1:
-                                import signal
-                                try:
-                                    os.kill(pid_row[0], signal.SIGKILL)
-                                    time.sleep(0.5)
-                                except OSError:
-                                    pass
-                        except Exception:
-                            pass
+                from spiderfoot.db_backend import get_raw_connection, raw_execute
+                conn = get_raw_connection(self.config)
+                cursor = raw_execute(
+                    conn,
+                    "SELECT guid, status FROM tbl_scan_instance WHERE status IN (?, ?, ?, ?, ?)",
+                    active_statuses
+                )
+                orphans = cursor.fetchall()
+                for scan_id, old_status in orphans:
+                    # Kill process by PID if possible
+                    try:
+                        pid_cursor = raw_execute(
+                            conn,
+                            "SELECT pid FROM tbl_scan_instance WHERE guid = ?",
+                            (scan_id,)
+                        )
+                        pid_row = pid_cursor.fetchone()
+                        if pid_row and pid_row[0] and pid_row[0] > 1:
+                            import signal
+                            try:
+                                os.kill(pid_row[0], signal.SIGKILL)
+                                time.sleep(0.5)
+                            except OSError:
+                                pass
+                    except Exception:
+                        pass
 
-                        conn.execute(
-                            "UPDATE tbl_scan_instance SET status = 'ABORTED', ended = ? WHERE guid = ?",
-                            (time.time() * 1000, scan_id)
-                        )
-                        self.log.warning(
-                            f"Startup cleanup (direct): marked orphaned scan "
-                            f"{scan_id} as ABORTED (was {old_status})"
-                        )
-                    conn.commit()
-                    conn.close()
+                    raw_execute(
+                        conn,
+                        "UPDATE tbl_scan_instance SET status = 'ABORTED', ended = ? WHERE guid = ?",
+                        (time.time() * 1000, scan_id)
+                    )
+                    self.log.warning(
+                        f"Startup cleanup (direct): marked orphaned scan "
+                        f"{scan_id} as ABORTED (was {old_status})"
+                    )
+                conn.commit()
+                conn.close()
             except Exception as e:
                 self.log.error(f"Startup cleanup (direct) also failed: {e}")
 
@@ -467,23 +468,20 @@ class SpiderFootWebUi:
         Returns:
             bool: True if the update succeeded
         """
-        import sqlite3
-
-        db_path = self.config.get('__database')
-        if not db_path:
-            return False
+        from spiderfoot.db_backend import get_raw_connection, raw_execute, OperationalError
 
         for attempt in range(5):
             try:
-                conn = sqlite3.connect(db_path, timeout=10)
-                conn.execute(
+                conn = get_raw_connection(self.config)
+                raw_execute(
+                    conn,
                     "UPDATE tbl_scan_instance SET status = ?, ended = ? WHERE guid = ?",
                     (status, time.time() * 1000, scan_id)
                 )
                 conn.commit()
                 conn.close()
                 return True
-            except sqlite3.OperationalError as e:
+            except OperationalError as e:
                 if "locked" in str(e) and attempt < 4:
                     time.sleep(2 ** attempt)
                     continue
