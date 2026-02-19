@@ -6614,26 +6614,18 @@ class SpiderFootWebUi:
             cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             cherrypy.response.headers['Pragma'] = "no-cache"
 
-            import openpyxl
-            from io import BytesIO
-            wb = openpyxl.Workbook()
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', category=UserWarning)
+                wb = openpyxl.Workbook()
 
-            # EXT-VULNS sheet (Nessus)
-            ws_nessus = wb.active
-            ws_nessus.title = "EXT-VULNS"
-            for col_num, header in enumerate(nessus_headers, 1):
-                ws_nessus.cell(row=1, column=col_num, value=header)
-            for row_num, row_data in enumerate(nessus_rows, 2):
-                for col_num, cell_value in enumerate(row_data, 1):
-                    ws_nessus.cell(row=row_num, column=col_num, value=cell_value)
+                # EXT-VULNS sheet (Nessus) — styled with severity colors
+                ws_nessus = wb.active
+                ws_nessus.title = "EXT-VULNS"
+                build_nessus_sheet(ws_nessus, nessus_rows)
 
-            # WEBAPP-VULNS sheet (Burp)
-            ws_burp = wb.create_sheet("WEBAPP-VULNS")
-            for col_num, header in enumerate(burp_headers, 1):
-                ws_burp.cell(row=1, column=col_num, value=header)
-            for row_num, row_data in enumerate(burp_rows, 2):
-                for col_num, cell_value in enumerate(row_data, 1):
-                    ws_burp.cell(row=row_num, column=col_num, value=cell_value)
+                # WEBAPP-VULNS sheet (Burp) — styled with severity colors
+                ws_burp = wb.create_sheet("WEBAPP-VULNS")
+                build_burp_sheet(ws_burp, burp_rows)
 
             with BytesIO() as f:
                 wb.save(f)
@@ -7031,24 +7023,16 @@ class SpiderFootWebUi:
             if wb is None:
                 if report != "full":
                     cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-FINDINGS.xlsx"
-                wb = openpyxl.Workbook()
+                with warnings.catch_warnings():
+                    warnings.filterwarnings('ignore', category=UserWarning)
+                    wb = openpyxl.Workbook()
 
-                ws_findings = wb.active
-                ws_findings.title = "Findings"
-                findings_headers = ["Priority", "Category", "Tab", "Item", "Description", "Recommendation"]
-                for col_num, header in enumerate(findings_headers, 1):
-                    ws_findings.cell(row=1, column=col_num, value=header)
-                for row_num, row_data in enumerate(findings_rows, 2):
-                    for col_num, cell_value in enumerate(row_data, 1):
-                        ws_findings.cell(row=row_num, column=col_num, value=cell_value)
+                    ws_findings = wb.active
+                    ws_findings.title = "Findings"
+                    build_findings_sheet(ws_findings, findings_rows)
 
-                ws_corr = wb.create_sheet("Correlations")
-                corr_headers = ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"]
-                for col_num, header in enumerate(corr_headers, 1):
-                    ws_corr.cell(row=1, column=col_num, value=header)
-                for row_num, row_data in enumerate(correlation_rows, 2):
-                    for col_num, cell_value in enumerate(row_data, 1):
-                        ws_corr.cell(row=row_num, column=col_num, value=cell_value)
+                    ws_corr = wb.create_sheet("Correlations")
+                    build_correlations_sheet(ws_corr, correlation_rows)
 
             try:
                 self.log.info("Full report: saving workbook...")
