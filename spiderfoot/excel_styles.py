@@ -5,12 +5,30 @@ for producing professionally formatted Excel workbooks with tab colors,
 severity color-coding, and an Executive Summary with grade visualization.
 """
 
+import re
+
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.chart import BarChart, Reference
 from openpyxl.chart.series import DataPoint
 from openpyxl.formatting.rule import DataBarRule
 from openpyxl.worksheet.table import Table, TableStyleInfo
+
+# Regex matching XML-illegal control characters that openpyxl rejects.
+# Covers: 0x00-0x08, 0x0B-0x0C, 0x0E-0x1F, 0x7F-0x84, 0x86-0x9F
+_ILLEGAL_XML_CHARS_RE = re.compile(
+    r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x84\x86-\x9f]'
+)
+
+
+def _safe_str(value) -> str:
+    """Convert a value to a string safe for openpyxl worksheet cells.
+
+    Strips illegal XML control characters that cause
+    openpyxl.utils.exceptions.IllegalCharacterError.
+    """
+    s = str(value)
+    return _ILLEGAL_XML_CHARS_RE.sub('', s)
 
 
 # ============================================================================
@@ -565,7 +583,7 @@ def build_findings_sheet(ws, findings_rows: list):
 
     for row_num, row_data in enumerate(findings_rows, 2):
         for col_num, cell_value in enumerate(row_data, 1):
-            cell = ws.cell(row=row_num, column=col_num, value=str(cell_value))
+            cell = ws.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
             cell.font = DATA_FONT
             cell.alignment = DATA_ALIGNMENT
             cell.border = THIN_BORDER
@@ -606,7 +624,7 @@ def build_correlations_sheet(ws, correlation_rows: list):
 
     for row_num, row_data in enumerate(correlation_rows, 2):
         for col_num, cell_value in enumerate(row_data, 1):
-            cell = ws.cell(row=row_num, column=col_num, value=str(cell_value))
+            cell = ws.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
             cell.font = DATA_FONT
             cell.alignment = DATA_ALIGNMENT
             cell.border = THIN_BORDER
@@ -661,7 +679,7 @@ def build_nessus_sheet(ws, nessus_rows: list):
 
     for row_num, row_data in enumerate(nessus_rows, 2):
         for col_num, cell_value in enumerate(row_data, 1):
-            cell = ws.cell(row=row_num, column=col_num, value=str(cell_value))
+            cell = ws.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
             cell.font = DATA_FONT
             cell.alignment = DATA_ALIGNMENT
             cell.border = THIN_BORDER
@@ -711,7 +729,7 @@ def build_burp_sheet(ws, burp_rows: list):
 
     for row_num, row_data in enumerate(burp_rows, 2):
         for col_num, cell_value in enumerate(row_data, 1):
-            cell = ws.cell(row=row_num, column=col_num, value=str(cell_value))
+            cell = ws.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
             cell.font = DATA_FONT
             cell.alignment = DATA_ALIGNMENT
             cell.border = THIN_BORDER
@@ -868,7 +886,7 @@ def build_event_type_sheet(ws, event_type_name: str, rows: list, tab_color: str 
 
     for row_num, row_data in enumerate(rows, 3):
         for col_num, cell_value in enumerate(row_data, 1):
-            cell = ws.cell(row=row_num, column=col_num, value=str(cell_value))
+            cell = ws.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
             cell.font = DATA_FONT
             cell.alignment = DATA_ALIGNMENT
             cell.border = THIN_BORDER

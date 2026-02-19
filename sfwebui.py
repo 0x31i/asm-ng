@@ -63,6 +63,7 @@ from spiderfoot.excel_styles import (
     build_event_type_sheet,
     sanitize_sheet_name,
     CATEGORY_TAB_COLORS,
+    _safe_str,
 )
 
 # Use a spawn context for scan subprocesses only, rather than setting it
@@ -716,6 +717,27 @@ class SpiderFootWebUi:
             return 2
         return 0
 
+    @staticmethod
+    def _export_filename(scan_name: str, scan_id: str, suffix: str, ext: str) -> str:
+        """Build a sanitised export filename using the scan name and a short hash.
+
+        Example: ``FHCSD-ASM-2026_01-FINDINGS-a3c8d7e1.xlsx``
+
+        Args:
+            scan_name: human-readable scan name (e.g. ``FHCSD-ASM-2026_01``)
+            scan_id:   full scan UUID / hash
+            suffix:    descriptive label (e.g. ``REPORT``, ``FINDINGS-CSV``)
+            ext:       file extension without dot (e.g. ``xlsx``, ``csv``, ``zip``)
+
+        Returns:
+            str: filename safe for Content-Disposition headers
+        """
+        import re as _re
+        # Sanitise scan name: keep alphanumerics, hyphens, underscores, dots
+        safe_name = _re.sub(r'[^\w\-.]', '_', scan_name or 'Export').strip('_') or 'Export'
+        short_id = (scan_id or 'unknown')[:8]
+        return f"{safe_name}-{suffix}-{short_id}.{ext}"
+
     def buildExcel(self: 'SpiderFootWebUi', data: list, columnNames: list, sheetNameIndex: int = 0, prepend_sheets: list = None) -> str:
         """Convert supplied raw data into Excel format.
 
@@ -750,7 +772,7 @@ class SpiderFootWebUi:
 
             # Write row
             for col_num, cell_value in enumerate(row, 1):
-                worksheet.cell(row=rowNums[sheetName], column=col_num, value=str(cell_value))
+                worksheet.cell(row=rowNums[sheetName], column=col_num, value=_safe_str(cell_value))
 
             rowNums[sheetName] += 1
 
@@ -768,7 +790,7 @@ class SpiderFootWebUi:
                     ws.cell(row=1, column=col_num, value=header)
                 for row_num, row_data in enumerate(sheet_info["rows"], 2):
                     for col_num, cell_value in enumerate(row_data, 1):
-                        ws.cell(row=row_num, column=col_num, value=str(cell_value))
+                        ws.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
 
         # Save workbook
         with BytesIO() as f:
@@ -801,13 +823,17 @@ class SpiderFootWebUi:
         if not data:
             return json.dumps(self.jsonify_error("404", "No scan logs found")).encode("utf-8")
 
+        scan = dbh.scanInstanceGet(id)
+        scan_name = scan[0] if scan else ''
+
         fileobj = StringIO()
         parser = csv.writer(fileobj, dialect=dialect)
         parser.writerow(["Date", "Component", "Type", "Event", "Event ID"])
         for row in data:
             parser.writerow([str(x) for x in row])
+        fname = self._export_filename(scan_name, id, 'LOGS', 'csv')
         cherrypy.response.headers[
-            'Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}.log.csv"
+            'Content-Disposition'] = f"attachment; filename={fname}"
         cherrypy.response.headers['Content-Type'] = "application/csv"
         cherrypy.response.headers['Pragma'] = "no-cache"
         return fileobj.getvalue().encode('utf-8')
@@ -841,15 +867,18 @@ class SpiderFootWebUi:
             return self.error("Scan ID not found")
 
         headings = ["Rule Name", "Correlation", "Risk", "Description"]
+        scan_name = scan[0] if scan else ''
 
         if filetype.lower() in ["xlsx", "excel"]:
-            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-correlations.xlsx"
+            fname = self._export_filename(scan_name, id, 'CORRELATIONS', 'xlsx')
+            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
             cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             cherrypy.response.headers['Pragma'] = "no-cache"
             return self.buildExcel(data, headings)
 
         if filetype.lower() == 'csv':
-            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-correlations.csv"
+            fname = self._export_filename(scan_name, id, 'CORRELATIONS', 'csv')
+            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
             cherrypy.response.headers['Content-Type'] = "application/csv"
             cherrypy.response.headers['Pragma'] = "no-cache"
 
@@ -946,7 +975,8 @@ class SpiderFootWebUi:
 </body>
 </html>"""
 
-            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-correlations.html"
+            fname = self._export_filename(scan_name, id, 'CORRELATIONS', 'html')
+            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
             cherrypy.response.headers['Content-Type'] = "text/html; charset=utf-8"
             cherrypy.response.headers['Pragma'] = "no-cache"
             return html_content.encode('utf-8')
@@ -1052,12 +1082,13 @@ class SpiderFootWebUi:
                 rows.append([lastseen, event_type, str(row[3]),
                             str(row[2]), fp_flag, datafield])
 
+            _scan_name = scanInfo[0] if scanInfo else ''
             if export_mode == "analysis_correlations":
-                fname = "SpiderFoot-Analysis-Correlations.xlsx"
+                fname = self._export_filename(_scan_name, id, 'ANALYSIS-CORRELATIONS', 'xlsx')
             elif export_mode == "analysis":
-                fname = "SpiderFoot-Analysis.xlsx"
+                fname = self._export_filename(_scan_name, id, 'ANALYSIS', 'xlsx')
             else:
-                fname = "SpiderFoot.xlsx"
+                fname = self._export_filename(_scan_name, id, 'DATA', 'xlsx')
             cherrypy.response.headers[
                 'Content-Disposition'] = f"attachment; filename={fname}"
             cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -1085,10 +1116,11 @@ class SpiderFootWebUi:
                 parser.writerow([lastseen, event_type, str(
                     row[3]), str(row[2]), fp_flag, datafield])
 
+            _scan_name = scanInfo[0] if scanInfo else ''
             if export_mode == "analysis":
-                fname = "SpiderFoot-Analysis.csv"
+                fname = self._export_filename(_scan_name, id, 'ANALYSIS', 'csv')
             else:
-                fname = "SpiderFoot.csv"
+                fname = self._export_filename(_scan_name, id, 'DATA', 'csv')
             cherrypy.response.headers[
                 'Content-Disposition'] = f"attachment; filename={fname}"
             cherrypy.response.headers['Content-Type'] = "application/csv"
@@ -1177,7 +1209,8 @@ class SpiderFootWebUi:
 </body>
 </html>"""
 
-            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-Report.html"
+            fname = self._export_filename(scan_name, id, 'REPORT', 'html')
+            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
             cherrypy.response.headers['Content-Type'] = "text/html; charset=utf-8"
             cherrypy.response.headers['Pragma'] = "no-cache"
             return html_content.encode('utf-8')
@@ -1203,12 +1236,15 @@ class SpiderFootWebUi:
             str: CSV or Excel data as file download
         """
         dbh = SpiderFootDb(self.config)
+        scan = dbh.scanInstanceGet(id)
+        _scan_name = scan[0] if scan else ''
 
         try:
             leafSet = dbh.scanResultEvent(id, eventType)
             [datamap, pc] = dbh.scanElementSourcesAll(id, leafSet)
         except Exception:
-            cherrypy.response.headers['Content-Disposition'] = 'attachment; filename=SpiderFoot-DiscoveryPath.csv'
+            fname = self._export_filename(_scan_name, id, 'DISCOVERY-PATH', 'csv')
+            cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={fname}'
             cherrypy.response.headers['Content-Type'] = 'application/csv'
             cherrypy.response.headers['Pragma'] = 'no-cache'
             return b''
@@ -1300,7 +1336,8 @@ class SpiderFootWebUi:
                     excel_rows.append([sheet_name] + rows[idx])
             excel_col_names = ["_SheetName"] + column_names
 
-            cherrypy.response.headers['Content-Disposition'] = 'attachment; filename=SpiderFoot-DiscoveryPath.xlsx'
+            fname = self._export_filename(_scan_name, id, 'DISCOVERY-PATH', 'xlsx')
+            cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={fname}'
             cherrypy.response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             cherrypy.response.headers['Pragma'] = 'no-cache'
             return self.buildExcel(excel_rows, excel_col_names, sheetNameIndex=0)
@@ -1312,7 +1349,8 @@ class SpiderFootWebUi:
         for row in rows:
             parser.writerow(row)
 
-        cherrypy.response.headers['Content-Disposition'] = 'attachment; filename=SpiderFoot-DiscoveryPath.csv'
+        fname = self._export_filename(_scan_name, id, 'DISCOVERY-PATH', 'csv')
+        cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={fname}'
         cherrypy.response.headers['Content-Type'] = 'application/csv'
         cherrypy.response.headers['Pragma'] = 'no-cache'
         return fileobj.getvalue().encode('utf-8')
@@ -1436,20 +1474,14 @@ class SpiderFootWebUi:
                 rows.append([scaninfo[row[12]][0], lastseen, event_type, str(row[3]),
                             str(row[2]), fp_flag, datafield])
 
-            if len(ids.split(',')) > 1 or scan_name == "":
-                if export_mode == "analysis_correlations":
-                    fname = "SpiderFoot-Analysis-Correlations.xlsx"
-                elif export_mode == "analysis":
-                    fname = "SpiderFoot-Analysis.xlsx"
-                else:
-                    fname = "SpiderFoot.xlsx"
+            _name = scan_name if scan_name and len(ids.split(',')) == 1 else 'Multi-Scan'
+            _id = ids.split(',')[0] if ids else ''
+            if export_mode == "analysis_correlations":
+                fname = self._export_filename(_name, _id, 'ANALYSIS-CORRELATIONS', 'xlsx')
+            elif export_mode == "analysis":
+                fname = self._export_filename(_name, _id, 'ANALYSIS', 'xlsx')
             else:
-                if export_mode == "analysis_correlations":
-                    fname = scan_name + "-SpiderFoot-Analysis-Correlations.xlsx"
-                elif export_mode == "analysis":
-                    fname = scan_name + "-SpiderFoot-Analysis.xlsx"
-                else:
-                    fname = scan_name + "-SpiderFoot.xlsx"
+                fname = self._export_filename(_name, _id, 'DATA', 'xlsx')
 
             cherrypy.response.headers[
                 'Content-Disposition'] = f"attachment; filename={fname}"
@@ -1480,16 +1512,12 @@ class SpiderFootWebUi:
                 parser.writerow([scaninfo[row[12]][0], lastseen, event_type, str(row[3]),
                                 str(row[2]), fp_flag, datafield])
 
-            if len(ids.split(',')) > 1 or scan_name == "":
-                if export_mode == "analysis":
-                    fname = "SpiderFoot-Analysis.csv"
-                else:
-                    fname = "SpiderFoot.csv"
+            _name = scan_name if scan_name and len(ids.split(',')) == 1 else 'Multi-Scan'
+            _id = ids.split(',')[0] if ids else ''
+            if export_mode == "analysis":
+                fname = self._export_filename(_name, _id, 'ANALYSIS', 'csv')
             else:
-                if export_mode == "analysis":
-                    fname = scan_name + "-SpiderFoot-Analysis.csv"
-                else:
-                    fname = scan_name + "-SpiderFoot.csv"
+                fname = self._export_filename(_name, _id, 'DATA', 'csv')
 
             cherrypy.response.headers[
                 'Content-Disposition'] = f"attachment; filename={fname}"
@@ -1583,10 +1611,9 @@ class SpiderFootWebUi:
 </body>
 </html>"""
 
-            if len(ids.split(',')) > 1 or scan_name == "":
-                fname = "SpiderFoot-Report.html"
-            else:
-                fname = scan_name + "-SpiderFoot-Report.html"
+            _name = scan_name if scan_name and len(ids.split(',')) == 1 else 'Multi-Scan'
+            _id = ids.split(',')[0] if ids else ''
+            fname = self._export_filename(_name, _id, 'REPORT', 'html')
 
             cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
             cherrypy.response.headers['Content-Type'] = "text/html; charset=utf-8"
@@ -1693,12 +1720,13 @@ class SpiderFootWebUi:
                 rows.append([row[0], event_type, str(row[3]),
                             str(row[2]), fp_flag, datafield])
 
+            _scan_name = scanInfo[0] if scanInfo else 'Search'
             if export_mode == "analysis_correlations":
-                fname = "SpiderFoot-Analysis-Correlations.xlsx"
+                fname = self._export_filename(_scan_name, id, 'ANALYSIS-CORRELATIONS', 'xlsx')
             elif export_mode == "analysis":
-                fname = "SpiderFoot-Analysis.xlsx"
+                fname = self._export_filename(_scan_name, id, 'ANALYSIS', 'xlsx')
             else:
-                fname = "SpiderFoot.xlsx"
+                fname = self._export_filename(_scan_name, id, 'DATA', 'xlsx')
             cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
             cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             cherrypy.response.headers['Pragma'] = "no-cache"
@@ -1723,10 +1751,11 @@ class SpiderFootWebUi:
                 parser.writerow([row[0], event_type, str(
                     row[3]), str(row[2]), fp_flag, datafield])
 
+            _scan_name = scanInfo[0] if scanInfo else 'Search'
             if export_mode == "analysis":
-                fname = "SpiderFoot-Analysis.csv"
+                fname = self._export_filename(_scan_name, id, 'ANALYSIS', 'csv')
             else:
-                fname = "SpiderFoot.csv"
+                fname = self._export_filename(_scan_name, id, 'DATA', 'csv')
             cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
             cherrypy.response.headers['Content-Type'] = "application/csv"
             cherrypy.response.headers['Pragma'] = "no-cache"
@@ -1780,10 +1809,9 @@ class SpiderFootWebUi:
                     "scan_target": scan[1]
                 })
 
-        if len(ids.split(',')) > 1 or scan_name == "":
-            fname = "SpiderFoot.json"
-        else:
-            fname = scan_name + "-SpiderFoot.json"
+        _name = scan_name if scan_name and len(ids.split(',')) == 1 else 'Multi-Scan'
+        _id = ids.split(',')[0] if ids else ''
+        fname = self._export_filename(_name, _id, 'DATA', 'json')
 
         cherrypy.response.headers[
             'Content-Disposition'] = f"attachment; filename={fname}"
@@ -1847,7 +1875,7 @@ class SpiderFootWebUi:
 
             scan_name = scan[0]
             root = scan[1]
-            fname = f"{scan_name}SpiderFoot.gexf" if scan_name else "SpiderFoot.gexf"
+            fname = self._export_filename(scan_name, id, 'GRAPH', 'gexf')
 
             cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
             cherrypy.response.headers['Content-Type'] = "application/gexf"
@@ -1891,10 +1919,9 @@ class SpiderFootWebUi:
             # Not implemented yet
             return None
 
-        if len(ids.split(',')) > 1 or scan_name == "":
-            fname = "SpiderFoot.gexf"
-        else:
-            fname = scan_name + "-SpiderFoot.gexf"
+        _name = scan_name if scan_name and len(ids.split(',')) == 1 else 'Multi-Scan'
+        _id = ids.split(',')[0] if ids else ''
+        fname = self._export_filename(_name, _id, 'GRAPH', 'gexf')
 
         cherrypy.response.headers[
             'Content-Disposition'] = f"attachment; filename={fname}"
@@ -4568,7 +4595,8 @@ class SpiderFootWebUi:
 
         if format == 'excel':
             cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            cherrypy.response.headers['Content-Disposition'] = 'attachment; filename="known_assets.xlsx"'
+            fname = self._export_filename(target, '', 'ASSETS', 'xlsx')
+            cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="{fname}"'
             wb = openpyxl.Workbook()
             ws = wb.active
             ws.title = "Known Assets"
@@ -4580,7 +4608,8 @@ class SpiderFootWebUi:
             return output.getvalue()
         else:
             cherrypy.response.headers['Content-Type'] = "text/csv; charset=utf-8"
-            cherrypy.response.headers['Content-Disposition'] = 'attachment; filename="known_assets.csv"'
+            fname = self._export_filename(target, '', 'ASSETS', 'csv')
+            cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="{fname}"'
             output = StringIO()
             writer = csv.writer(output)
             writer.writerow(["Type", "Value", "Source", "Date Added", "Added By", "Notes"])
@@ -4642,7 +4671,8 @@ class SpiderFootWebUi:
 
         zip_buf.seek(0)
 
-        cherrypy.response.headers['Content-Disposition'] = 'attachment; filename="SpiderFoot-Assets.zip"'
+        fname = self._export_filename(target, '', 'ASSETS', 'zip')
+        cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="{fname}"'
         cherrypy.response.headers['Content-Type'] = "application/zip"
         cherrypy.response.headers['Pragma'] = "no-cache"
         return zip_buf.read()
@@ -6537,6 +6567,8 @@ class SpiderFootWebUi:
             bytes: exported file data
         """
         dbh = SpiderFootDb(self.config)
+        scan = dbh.scanInstanceGet(id)
+        _scan_name = scan[0] if scan else ''
 
         # --- Nessus data ---
         nessus_headers = [
@@ -6610,7 +6642,8 @@ class SpiderFootWebUi:
             pass
 
         if filetype.lower() in ["xlsx", "excel"]:
-            cherrypy.response.headers['Content-Disposition'] = 'attachment; filename=VULNS.xlsx'
+            fname = self._export_filename(_scan_name, id, 'VULNS', 'xlsx')
+            cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={fname}'
             cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             cherrypy.response.headers['Pragma'] = "no-cache"
 
@@ -6660,7 +6693,8 @@ class SpiderFootWebUi:
                 zf.writestr('WEBAPP-VULNS.csv', burp_csv)
             zip_buf.seek(0)
 
-            cherrypy.response.headers['Content-Disposition'] = 'attachment; filename=VULNS-CSV.zip'
+            fname = self._export_filename(_scan_name, id, 'VULNS', 'zip')
+            cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={fname}'
             cherrypy.response.headers['Content-Type'] = "application/zip"
             cherrypy.response.headers['Pragma'] = "no-cache"
             return zip_buf.read()
@@ -6759,6 +6793,8 @@ class SpiderFootWebUi:
             str: exported data
         """
         dbh = SpiderFootDb(self.config)
+        _scan = dbh.scanInstanceGet(id)
+        _scan_name = _scan[0] if _scan else ''
 
         # Get findings
         findings_rows = []
@@ -6805,7 +6841,7 @@ class SpiderFootWebUi:
 
             # Full report: styled with Executive Summary + category tabs
             if report == "full":
-                cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-REPORT.xlsx"
+                cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={self._export_filename(_scan_name, id, 'REPORT', 'xlsx')}"
                 with warnings.catch_warnings():
                     warnings.filterwarnings('ignore', category=UserWarning)
 
@@ -7022,7 +7058,7 @@ class SpiderFootWebUi:
             # Basic export (default) or fallback if full report failed
             if wb is None:
                 if report != "full":
-                    cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-FINDINGS.xlsx"
+                    cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={self._export_filename(_scan_name, id, 'FINDINGS', 'xlsx')}"
                 with warnings.catch_warnings():
                     warnings.filterwarnings('ignore', category=UserWarning)
                     wb = openpyxl.Workbook()
@@ -7058,7 +7094,7 @@ class SpiderFootWebUi:
                     ws_fb_findings.cell(row=1, column=col_num, value=header)
                 for row_num, row_data in enumerate(findings_rows, 2):
                     for col_num, cell_value in enumerate(row_data, 1):
-                        ws_fb_findings.cell(row=row_num, column=col_num, value=str(cell_value))
+                        ws_fb_findings.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
 
                 ws_fb_corr = wb_fallback.create_sheet("Correlations")
                 fb_corr_headers = ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"]
@@ -7066,7 +7102,7 @@ class SpiderFootWebUi:
                     ws_fb_corr.cell(row=1, column=col_num, value=header)
                 for row_num, row_data in enumerate(correlation_rows, 2):
                     for col_num, cell_value in enumerate(row_data, 1):
-                        ws_fb_corr.cell(row=row_num, column=col_num, value=str(cell_value))
+                        ws_fb_corr.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
 
                 with BytesIO() as f:
                     wb_fallback.save(f)
@@ -7077,7 +7113,7 @@ class SpiderFootWebUi:
             import csv
             import zipfile
 
-            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename=SpiderFoot-{id}-FINDINGS-CSV.zip"
+            cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={self._export_filename(_scan_name, id, 'FINDINGS', 'zip')}"
             cherrypy.response.headers['Content-Type'] = "application/zip"
             cherrypy.response.headers['Pragma'] = "no-cache"
 
