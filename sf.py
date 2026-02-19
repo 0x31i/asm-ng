@@ -12,6 +12,7 @@
 # -------------------------------------------------------------------------------
 
 import argparse
+import atexit
 import logging
 import multiprocessing as mp
 import os
@@ -19,6 +20,7 @@ import os.path
 import random
 import signal
 import socket
+import sqlite3
 import sys
 import time
 import threading
@@ -1271,6 +1273,30 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
             'cors.preflight.origins': cors_origins
         })
 
+        # Subscribe a CherryPy engine plugin that flushes the SQLite WAL
+        # on graceful shutdown (SIGTERM, cherrypy.engine.exit(), etc.).
+        from cherrypy.process.plugins import SimplePlugin
+
+        class _DatabaseCleanupPlugin(SimplePlugin):
+            """Checkpoint and truncate the SQLite WAL on server stop."""
+
+            def __init__(self, bus, db_path):
+                super().__init__(bus)
+                self._db_path = db_path
+
+            def stop(self):
+                try:
+                    if self._db_path and os.path.exists(self._db_path):
+                        conn = sqlite3.connect(self._db_path, timeout=5)
+                        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                        conn.close()
+                except Exception:
+                    pass
+
+        _DatabaseCleanupPlugin(
+            cherrypy.engine, sfConfig.get('__database')
+        ).subscribe()
+
         # Disable auto-reloading of content
         cherrypy.engine.autoreload.unsubscribe()
 
@@ -1297,6 +1323,21 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
             _verify_server_listening(web_host, int(web_port), url, log)
 
         cherrypy.engine.subscribe('started', _on_server_ready)
+
+        # Register an atexit handler to flush the WAL and release SQLite
+        # locks on exit.  This prevents stale -wal/-shm files from
+        # blocking the next startup after a crash or SIGKILL.
+        def _atexit_wal_checkpoint():
+            try:
+                _db_path = sfConfig.get('__database')
+                if _db_path and os.path.exists(_db_path):
+                    _conn = sqlite3.connect(_db_path, timeout=5)
+                    _conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                    _conn.close()
+            except Exception:
+                pass
+
+        atexit.register(_atexit_wal_checkpoint)
 
         cherrypy.quickstart(web_ui, script_name=web_root, config=conf)
 

@@ -494,7 +494,7 @@ class SpiderFootDb:
         # at least we can use this opportunity to ensure we have permissions to
         # read and write to such a file.
         try:
-            dbh = sqlite3.connect(database_path)
+            dbh = sqlite3.connect(database_path, timeout=30)
         except Exception as e:
             raise IOError(
                 f"Error connecting to internal database {database_path}") from e
@@ -955,6 +955,23 @@ class SpiderFootDb:
             except sqlite3.Error as e:
                 raise IOError(
                     "SQL error encountered when setting up database") from e
+
+    def __enter__(self):
+        """Enable use as a context manager: ``with SpiderFootDb(opts) as db:``."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Auto-close the database connection when leaving a ``with`` block."""
+        self.close()
+        return False
+
+    def __del__(self):
+        """Safety net: close the connection if the object is garbage-collected
+        without an explicit ``close()`` call."""
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def close(self) -> None:
         """Close the database handle and connection."""
