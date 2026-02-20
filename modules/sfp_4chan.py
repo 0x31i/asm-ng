@@ -1,16 +1,18 @@
 from spiderfoot import SpiderFootPlugin, SpiderFootEvent
+import re
 import requests
 import time
 from typing import Optional, List, Dict
 
+
 class sfp_4chan(SpiderFootPlugin):
     """
-    SpiderFoot plugin to monitor 4chan boards for new posts and emit events.
+    SpiderFoot plugin to search 4chan boards for posts mentioning the target.
     """
 
     meta = {
         'name': "4chan Monitor",
-        'summary': "Monitors 4chan boards for new posts and emits events.",
+        'summary': "Searches 4chan boards for posts mentioning the scan target.",
         'flags': [],
         'useCases': ["Passive", "Investigate"],
         'group': ["Passive", "Investigate"],
@@ -31,26 +33,19 @@ class sfp_4chan(SpiderFootPlugin):
     }
 
     optdescs = {
-        "boards": "Comma-separated list of 4chan board names.",
+        "boards": "Comma-separated list of 4chan board names to search.",
         "max_threads": "Maximum number of threads to fetch per board."
     }
 
     def setup(self, sfc, userOpts=dict()):
-        """
-        Setup plugin with SpiderFoot context and user options.
-        :param sfc: SpiderFoot context
-        :param userOpts: User options
-        """
         self.sf = sfc
         self.opts.update(userOpts)
         self._seen_posts = set()
 
     def watchedEvents(self) -> List[str]:
-        """Return a list of event types this module watches."""
         return ["ROOT"]
 
     def producedEvents(self) -> List[str]:
-        """Return a list of event types this module produces."""
         return ["FOURCHAN_POST"]
 
     def _fetch_catalog(self, board: str) -> Optional[List[Dict]]:
@@ -75,37 +70,104 @@ class sfp_4chan(SpiderFootPlugin):
             self.sf.error(f"Exception fetching thread {thread_id} on board {board}: {e}")
         return None
 
+    def _build_search_terms(self, target: str) -> list:
+        """Build a list of search terms from the scan target.
+
+        For a domain like 'chchcheckit.com', produces:
+          - 'chchcheckit.com'  (full domain)
+          - 'chchcheckit'      (domain without TLD)
+        """
+        terms = [target.lower()]
+
+        # Strip common prefixes
+        clean = target.lower()
+        for prefix in ('http://', 'https://', 'www.'):
+            if clean.startswith(prefix):
+                clean = clean[len(prefix):]
+        clean = clean.rstrip('/')
+        if clean != target.lower():
+            terms.append(clean)
+
+        # Add domain name without TLD (e.g. 'chchcheckit' from 'chchcheckit.com')
+        parts = clean.split('.')
+        if len(parts) >= 2:
+            name = parts[0]
+            if len(name) >= 4:  # Only if the name part is meaningful
+                terms.append(name)
+
+        return list(set(terms))
+
+    def _post_mentions_target(self, post: dict, search_terms: list) -> bool:
+        """Check if a post's text content mentions any of the search terms."""
+        # Combine all text fields from the post
+        text_parts = []
+        for field in ('com', 'sub', 'name', 'filename'):
+            val = post.get(field)
+            if val:
+                text_parts.append(str(val).lower())
+
+        if not text_parts:
+            return False
+
+        combined = ' '.join(text_parts)
+        # Strip HTML tags from 4chan comment HTML
+        combined = re.sub(r'<[^>]+>', ' ', combined)
+
+        return any(term in combined for term in search_terms)
+
     def handleEvent(self, event):
-        """
-        Handle the incoming event and monitor 4chan boards for new posts.
-        :param event: SpiderFootEvent
-        """
+        target = event.data
+        if not target:
+            return
+
+        search_terms = self._build_search_terms(target)
+        self.sf.info(f"4chan: searching for target mentions: {search_terms}")
+
         boards = [b.strip() for b in self.opts.get("boards", "").split(",") if b.strip()]
         max_threads = int(self.opts.get("max_threads", 10))
         if not boards:
             self.sf.error("No 4chan boards specified in options.")
             return
-        self.sf.info(f"Monitoring 4chan boards: {', '.join(boards)} (max_threads={max_threads})")
+
         for board in boards:
+            if self.checkForStop():
+                return
+
             catalog = self._fetch_catalog(board)
             if not catalog:
                 continue
+
             threads = []
             for page in catalog:
                 threads.extend(page.get("threads", []))
+
             for thread in threads[:max_threads]:
+                if self.checkForStop():
+                    return
+
                 thread_id = thread.get("no")
                 if not thread_id:
                     continue
+
+                # Quick check: does the thread OP mention the target?
+                # (catalog includes OP subject/comment — skip the full
+                #  thread fetch if the OP has no mention and the thread
+                #  is unlikely to be relevant)
+                op_dominated = not self._post_mentions_target(thread, search_terms)
+
                 thread_data = self._fetch_thread(board, thread_id)
                 if not thread_data:
                     continue
+
                 for post in thread_data.get("posts", []):
+                    if not self._post_mentions_target(post, search_terms):
+                        continue
+
                     post_key = f"{board}-{thread_id}-{post.get('no')}"
                     if post_key in self._seen_posts:
                         continue
                     self._seen_posts.add(post_key)
-                    # Emit structured event data
+
                     post_info = {
                         "board": board,
                         "thread_id": thread_id,
@@ -127,8 +189,8 @@ class sfp_4chan(SpiderFootPlugin):
                         event
                     )
                     self.notifyListeners(post_event)
+
                 time.sleep(1)  # Respect API rate limit
 
     def shutdown(self):
-        """Clean up resources if needed."""
         pass
