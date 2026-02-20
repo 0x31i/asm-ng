@@ -1054,6 +1054,8 @@ class SpiderFootWebUi:
             str: results in CSV, Excel, or HTML format
         """
         use_legacy = (str(legacy) == "1")
+        if not type:
+            type = 'ALL'
         with SpiderFootDb(self.config) as dbh:
             data = dbh.scanResultEvent(id, type)
             filter_fps = export_mode in ("analysis", "analysis_correlations")
