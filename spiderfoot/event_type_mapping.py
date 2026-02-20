@@ -131,6 +131,14 @@ EVENT_TYPE_LEGACY_MAPPING = {
     'MALICIOUS_INTERNET_NAME': 'MALICIOUS_IPADDR',
     'MALICIOUS_NETBLOCK': 'MALICIOUS_SUBNET',
     'MALICIOUS_PHONE_NUMBER': 'PHONE_NUMBER',
+
+    # =========================================================================
+    # AI/ML INFRASTRUCTURE TYPES
+    # =========================================================================
+    'AI_INFRASTRUCTURE_DETECTED': 'SOFTWARE_USED',
+    'AI_MODEL_EXPOSED': 'SOFTWARE_USED',
+    'AI_ENDPOINT_UNAUTHENTICATED': 'VULNERABILITY_DISCLOSURE',
+    'AI_API_KEY_LEAKED': 'HASH',
 }
 
 # Legacy types that are valid SpiderFoot event types

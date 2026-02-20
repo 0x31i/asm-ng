@@ -557,6 +557,14 @@ class SpiderFootDb:
             'NLP Analysis', 0, 'DESCRIPTOR'],
         ['FOURCHAN_POST',
             '4chan Post', 0, 'DATA'],
+        ['AI_INFRASTRUCTURE_DETECTED',
+            'AI/ML Infrastructure Detected', 0, 'DESCRIPTOR'],
+        ['AI_MODEL_EXPOSED',
+            'AI Model Exposed via Inference API', 0, 'DESCRIPTOR'],
+        ['AI_ENDPOINT_UNAUTHENTICATED',
+            'AI Endpoint Without Authentication', 0, 'DESCRIPTOR'],
+        ['AI_API_KEY_LEAKED',
+            'AI Service API Key Leaked', 0, 'DATA'],
     ]
 
     def __init__(self, opts: dict, init: bool = False) -> None:
