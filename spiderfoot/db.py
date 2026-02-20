@@ -596,7 +596,9 @@ class SpiderFootDb:
             raise IOError(
                 "Could not connect to database") from None
 
-        _log.info(f"Database backend: {self.db_type}")
+        # Only log the backend type once on first connection, not on every request
+        if not SpiderFootDb._migrations_done:
+            _log.info(f"Database backend: {self.db_type}")
 
         # Schema setup and migrations only need to run once per process.
         # Subsequent SpiderFootDb instances reuse the already-migrated schema.
@@ -1701,6 +1703,7 @@ class SpiderFootDb:
                     instanceId, scanName, scanTarget, time.time() * 1000, 'CREATED'
                 ))
                 self.conn.commit()
+                _log.info(f"Scan created: id={instanceId} target={scanTarget}")
             except DatabaseError as e:
                 raise IOError(
                     "Unable to create scan instance in database") from e
@@ -1924,7 +1927,9 @@ class SpiderFootDb:
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, qvars)
-                return self.dbh.fetchall()
+                rows = self.dbh.fetchall()
+                _log.debug(f"Query scan summary: scan={instanceId} by={by} rows={len(rows)}")
+                return rows
             except DatabaseError as e:
                 raise IOError(
                     "SQL error encountered when fetching result summary") from e
@@ -2152,6 +2157,7 @@ class SpiderFootDb:
                     if scan_id not in result:
                         result[scan_id] = {}
                     result[scan_id][row[1]] = row[2]
+                _log.debug(f"Query all correlation summaries: scans={len(result)}")
                 return result
             except DatabaseError as e:
                 raise IOError(
@@ -2316,7 +2322,9 @@ class SpiderFootDb:
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, qvars)
-                return self.dbh.fetchall()
+                rows = self.dbh.fetchall()
+                _log.debug(f"Query scan events: scan={instanceId} type={eventType} limit={limit} rows={len(rows)}")
+                return rows
             except DatabaseError as e:
                 raise IOError(
                     "SQL error encountered when fetching result events") from e
@@ -2369,6 +2377,7 @@ class SpiderFootDb:
                 result = {}
                 for row in self.dbh.fetchall():
                     result[row[0]] = row[1]
+                _log.debug(f"Query event count: scan={instanceId} type={eventType} counts={result}")
                 return result
             except DatabaseError as e:
                 raise IOError(
@@ -2597,6 +2606,7 @@ class SpiderFootDb:
                 # Delete parent table last
                 self.dbh.execute("DELETE FROM tbl_scan_instance WHERE guid = ?", qvars)
                 self.conn.commit()
+                _log.info(f"Scan deleted: id={instanceId}")
             except DatabaseError as e:
                 raise IOError(
                     f"SQL error encountered when deleting scan: {e}") from e
@@ -2649,6 +2659,7 @@ class SpiderFootDb:
                 raise IOError(
                     "SQL error encountered when updating false-positive") from e
 
+        _log.info(f"FP update: scan={instanceId} hashes={len(resultHashes)} flag={fpFlag}")
         return True
 
     def syncFalsePositiveAcrossScans(self, target: str, eventType: str, eventData: str, sourceData: str, fpFlag: int) -> int:
@@ -2710,6 +2721,7 @@ class SpiderFootDb:
                 self.dbh.execute(qry, params)
                 rowcount = self.dbh.rowcount
                 self.conn.commit()
+                _log.info(f"FP sync: target={target} type={eventType} flag={fpFlag} rows_updated={rowcount}")
                 return rowcount
             except DatabaseError as e:
                 raise IOError("SQL error encountered when syncing false positive across scans") from e
@@ -2763,6 +2775,7 @@ class SpiderFootDb:
                 self.conn.commit()
             except DatabaseError as e:
                 raise IOError("SQL error encountered when committing batch sync") from e
+        _log.info(f"FP sync batch: target={target} items={len(items)} total_updated={total}")
         return total
 
     def targetFalsePositiveAdd(self, target: str, eventType: str, eventData: str, sourceData: str = None, notes: str = None) -> bool:
@@ -2799,6 +2812,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, (target, eventType, eventData, sourceData, int(time.time() * 1000), notes))
                 self.conn.commit()
+                _log.info(f"Target FP add: target={target} type={eventType}")
             except DatabaseError as e:
                 raise IOError("SQL error encountered when adding target false positive") from e
 
@@ -2845,6 +2859,7 @@ class SpiderFootDb:
                     qry_null = "DELETE FROM tbl_target_false_positives WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
                     self.dbh.execute(qry_null, (target, eventType, eventData))
                 self.conn.commit()
+                _log.info(f"Target FP remove: target={target} type={eventType}")
             except DatabaseError as e:
                 raise IOError("SQL error encountered when removing target false positive") from e
 
@@ -2998,6 +3013,7 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, (target, eventType, eventData, sourceData, int(time.time() * 1000), notes))
                 self.conn.commit()
+                _log.info(f"Target validated add: target={target} type={eventType}")
             except DatabaseError as e:
                 raise IOError("SQL error encountered when adding target validated entry") from e
 
@@ -3044,6 +3060,7 @@ class SpiderFootDb:
                     qry_null = "DELETE FROM tbl_target_validated WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
                     self.dbh.execute(qry_null, (target, eventType, eventData))
                 self.conn.commit()
+                _log.info(f"Target validated remove: target={target} type={eventType}")
             except DatabaseError as e:
                 raise IOError("SQL error encountered when removing target validated entry") from e
 
@@ -3076,6 +3093,7 @@ class SpiderFootDb:
                 self.conn.commit()
             except DatabaseError as e:
                 raise IOError("SQL error in batch add target false positive") from e
+        _log.info(f"Target FP add batch: target={target} count={len(items)}")
         return True
 
     def targetFalsePositiveRemoveBatch(self, target: str, items: list) -> bool:
@@ -3107,6 +3125,7 @@ class SpiderFootDb:
                 self.conn.commit()
             except DatabaseError as e:
                 raise IOError("SQL error in batch remove target false positive") from e
+        _log.info(f"Target FP remove batch: target={target} count={len(items)}")
         return True
 
     def targetValidatedAddBatch(self, target: str, items: list) -> bool:
@@ -3134,6 +3153,7 @@ class SpiderFootDb:
                 self.conn.commit()
             except DatabaseError as e:
                 raise IOError("SQL error in batch add target validated") from e
+        _log.info(f"Target validated add batch: target={target} count={len(items)}")
         return True
 
     def targetValidatedRemoveBatch(self, target: str, items: list) -> bool:
@@ -3163,6 +3183,7 @@ class SpiderFootDb:
                 self.conn.commit()
             except DatabaseError as e:
                 raise IOError("SQL error in batch remove target validated") from e
+        _log.info(f"Target validated remove batch: target={target} count={len(items)}")
         return True
 
     def knownAssetAddBatch(self, target: str, items: list, source: str = 'ANALYST_CONFIRMED', addedBy: str = None) -> bool:
@@ -3192,6 +3213,7 @@ class SpiderFootDb:
                 self.conn.commit()
             except DatabaseError as e:
                 raise IOError("SQL error in batch add known assets") from e
+        _log.info(f"Known asset add batch: target={target} count={len(items)}")
         return True
 
     # ---- End batch methods ----
@@ -3342,6 +3364,7 @@ class SpiderFootDb:
                 self.dbh.execute(qry, (target, assetType, assetValue, source,
                                        importBatch, int(time.time() * 1000), addedBy, notes))
                 self.conn.commit()
+                _log.info(f"Known asset add: target={target} type={assetType} value={assetValue}")
             except DatabaseError as e:
                 raise IOError("SQL error encountered when adding known asset") from e
         return True
@@ -4061,7 +4084,9 @@ class SpiderFootDb:
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, qvars)
-                return self.dbh.fetchall()
+                rows = self.dbh.fetchall()
+                _log.debug(f"Query element sources: scan={instanceId} hashes={len(elementIdList)} rows={len(rows)}")
+                return rows
             except DatabaseError as e:
                 raise IOError(
                     "SQL error encountered when getting source element IDs") from e

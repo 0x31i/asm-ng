@@ -84,6 +84,7 @@ def _deferred_sync_fp(config: dict, target: str, items: list):
     try:
         with SpiderFootDb(config) as dbh:
             dbh.syncFalsePositiveAcrossScansMulti(target, items)
+        _log.info(f"FP cross-scan sync complete: target={target} items={len(items)}")
     except Exception as e:
         _log.warning(f"Deferred FP sync failed for target {target}: {e}", exc_info=True)
 
@@ -4026,6 +4027,7 @@ class SpiderFootWebUi:
                 ret = dbh.scanResultsUpdateFP(id, ids, int(fp))
                 if not ret:
                     return json.dumps(["ERROR", "Failed to update status."]).encode('utf-8')
+                self.log.info(f"FP update: scan={id} results={len(ids)} flag={fp}")
                 return json.dumps(["SUCCESS", ""]).encode('utf-8')
             except Exception as e:
                 self.log.error(f"Error updating FP for scan {id}: {e}", exc_info=True)
@@ -4113,6 +4115,8 @@ class SpiderFootWebUi:
 
             if not ret:
                 return json.dumps(["ERROR", "Failed to update status."]).encode('utf-8')
+
+            self.log.info(f"FP persist: scan={id} results={len(allIds)} flag={fp} persist={persist}")
 
             # Handle target-level persistence and cross-scan sync
             # Uses batch methods and background thread for performance
@@ -5633,6 +5637,7 @@ class SpiderFootWebUi:
             retdata.append([row[0], row[1], row[2], created,
                            started, finished, row[6], row[7], riskmatrix])
 
+        self.log.info(f"Scan list: returned {len(retdata)} scans")
         return retdata
 
     @cherrypy.expose
@@ -5770,6 +5775,7 @@ class SpiderFootWebUi:
                                row[3], row[4], statusdata[5],
                                category, color, rank, weight])
 
+            self.log.info(f"Scan summary: scan={id} by={by} types={len(retdata)}")
             return retdata
 
     def _calculateScanGrade(self, dbh, scan_id: str) -> dict:
@@ -8061,6 +8067,7 @@ class SpiderFootWebUi:
                     row[16] if len(row) > 16 else 0  # Index 15: tracking (0=OPEN, 1=CLOSED, 2=TICKETED)
                 ])
 
+            self.log.info(f"Event results: scan={id} type={eventType} rows={len(retdata)}")
             return retdata
 
     @cherrypy.expose
@@ -8089,6 +8096,7 @@ class SpiderFootWebUi:
                 return {'total': 0, 'fp': 0, 'validated': 0, 'unverified': 0}
 
             total = sum(counts.values())
+            self.log.info(f"Event count: scan={id} type={eventType} total={total}")
             return {
                 'total': total,
                 'fp': counts.get(1, 0),
