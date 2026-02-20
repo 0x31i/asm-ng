@@ -1530,7 +1530,7 @@ class SpiderFootDb:
                 "Only one search criteria provided; expected at least two")
 
         qvars = list()
-        qry = "SELECT ROUND(c.generated) AS generated, c.data, \
+        qry = "SELECT c.generated, c.data, \
             s.data as source_data, \
             c.module, c.type, c.confidence, c.visibility, c.risk, c.hash, \
             c.source_event_hash, t.event_descr, t.event_type, c.scan_instance_id, \
@@ -1884,8 +1884,8 @@ class SpiderFootDb:
             raise TypeError(
                 f"instanceId is {type(instanceId)}; expected str()") from None
 
-        qry = "SELECT name, seed_target, ROUND(created/1000) AS created, \
-            ROUND(started/1000) AS started, ROUND(ended/1000) AS ended, status \
+        qry = "SELECT name, seed_target, created/1000 AS created, \
+            started/1000 AS started, ended/1000 AS ended, status \
             FROM tbl_scan_instance WHERE guid = ?"
         qvars = [instanceId]
 
@@ -1951,19 +1951,19 @@ class SpiderFootDb:
             raise ValueError(f"Invalid filter by value: {by}") from None
 
         if by == "type":
-            qry = "SELECT r.type, e.event_descr, MAX(ROUND(generated)) AS last_in, \
+            qry = "SELECT r.type, e.event_descr, MAX(r.generated) AS last_in, \
                 count(*) AS total, count(DISTINCT r.data) as utotal FROM \
                 tbl_scan_results r, tbl_event_types e WHERE e.event = r.type \
                 AND r.scan_instance_id = ? GROUP BY r.type, e.event_descr ORDER BY e.event_descr"
 
         if by == "module":
-            qry = "SELECT r.module, '', MAX(ROUND(generated)) AS last_in, \
+            qry = "SELECT r.module, '', MAX(r.generated) AS last_in, \
                 count(*) AS total, count(DISTINCT r.data) as utotal FROM \
                 tbl_scan_results r, tbl_event_types e WHERE e.event = r.type \
                 AND r.scan_instance_id = ? GROUP BY r.module ORDER BY r.module DESC"
 
         if by == "entity":
-            qry = "SELECT r.data, e.event_descr, MAX(ROUND(generated)) AS last_in, \
+            qry = "SELECT r.data, e.event_descr, MAX(r.generated) AS last_in, \
                 count(*) AS total, count(DISTINCT r.data) as utotal FROM \
                 tbl_scan_results r, tbl_event_types e WHERE e.event = r.type \
                 AND r.scan_instance_id = ? \
@@ -2019,7 +2019,7 @@ class SpiderFootDb:
             try:
                 # Get scan status and timing
                 self.dbh.execute(
-                    "SELECT status, ROUND(started/1000) AS started "
+                    "SELECT status, started/1000 AS started "
                     "FROM tbl_scan_instance WHERE guid = ?",
                     [instanceId])
                 row = self.dbh.fetchone()
@@ -2300,7 +2300,7 @@ class SpiderFootDb:
             raise TypeError(
                 f"eventType is {type(eventType)}; expected str() or list()") from None
 
-        qry = "SELECT ROUND(c.generated) AS generated, c.data, \
+        qry = "SELECT c.generated, c.data, \
             s.data as source_data, \
             c.module, c.type, c.confidence, c.visibility, c.risk, c.hash, \
             c.source_event_hash, t.event_descr, t.event_type, s.scan_instance_id, \
@@ -2953,11 +2953,11 @@ class SpiderFootDb:
             IOError: database I/O failed
         """
         if target is not None:
-            qry = "SELECT id, target, event_type, event_data, ROUND(date_added/1000) as date_added, notes \
+            qry = "SELECT id, target, event_type, event_data, date_added/1000 as date_added, notes \
                 FROM tbl_target_false_positives WHERE target = ? ORDER BY date_added DESC"
             qvars = [target]
         else:
-            qry = "SELECT id, target, event_type, event_data, ROUND(date_added/1000) as date_added, notes \
+            qry = "SELECT id, target, event_type, event_data, date_added/1000 as date_added, notes \
                 FROM tbl_target_false_positives ORDER BY target, date_added DESC"
             qvars = []
 
@@ -3306,11 +3306,11 @@ class SpiderFootDb:
             IOError: database I/O failed
         """
         if target is not None:
-            qry = "SELECT id, target, event_type, event_data, ROUND(date_added/1000) as date_added, notes \
+            qry = "SELECT id, target, event_type, event_data, date_added/1000 as date_added, notes \
                 FROM tbl_target_validated WHERE target = ? ORDER BY date_added DESC"
             qvars = [target]
         else:
-            qry = "SELECT id, target, event_type, event_data, ROUND(date_added/1000) as date_added, notes \
+            qry = "SELECT id, target, event_type, event_data, date_added/1000 as date_added, notes \
                 FROM tbl_target_validated ORDER BY target, date_added DESC"
             qvars = []
 
@@ -3528,12 +3528,12 @@ class SpiderFootDb:
         """
         if assetType:
             qry = "SELECT id, target, asset_type, asset_value, source, import_batch, \
-                ROUND(date_added/1000) as date_added, added_by, notes \
+                date_added/1000 as date_added, added_by, notes \
                 FROM tbl_known_assets WHERE target = ? AND asset_type = ? ORDER BY date_added DESC"
             qvars = [target, assetType]
         else:
             qry = "SELECT id, target, asset_type, asset_value, source, import_batch, \
-                ROUND(date_added/1000) as date_added, added_by, notes \
+                date_added/1000 as date_added, added_by, notes \
                 FROM tbl_known_assets WHERE target = ? ORDER BY asset_type, date_added DESC"
             qvars = [target]
 
@@ -3713,7 +3713,7 @@ class SpiderFootDb:
     def assetImportHistoryList(self, target: str) -> list:
         """Get import history for a target."""
         qry = "SELECT id, target, asset_type, file_name, item_count, imported_by, \
-            ROUND(date_imported/1000) as date_imported \
+            date_imported/1000 as date_imported \
             FROM tbl_asset_import_history WHERE target = ? ORDER BY date_imported DESC"
 
         with self.dbhLock:
@@ -4025,8 +4025,8 @@ class SpiderFootDb:
         # query.  This replaces the old UNION ALL approach which used an
         # implicit cross-join (``FROM a, b``) that failed on PostgreSQL when
         # the tbl_scan_results schema was incomplete.
-        qry = "SELECT i.guid, i.name, i.seed_target, ROUND(i.created/1000), \
-            ROUND(i.started/1000) as started, ROUND(i.ended/1000), i.status, \
+        qry = "SELECT i.guid, i.name, i.seed_target, i.created/1000, \
+            i.started/1000 as started, i.ended/1000, i.status, \
             COUNT(r.type) \
             FROM tbl_scan_instance i \
             LEFT JOIN tbl_scan_results r \
@@ -4116,7 +4116,7 @@ class SpiderFootDb:
         # the output of this needs to be aligned with scanResultEvent,
         # as other functions call both expecting the same output.
         placeholders = ','.join(['?'] * len(hashIds))
-        qry = "SELECT ROUND(c.generated) AS generated, c.data, \
+        qry = "SELECT c.generated, c.data, \
             s.data as source_data, \
             c.module, c.type, c.confidence, c.visibility, c.risk, c.hash, \
             c.source_event_hash, t.event_descr, t.event_type, s.scan_instance_id, \
@@ -4176,7 +4176,7 @@ class SpiderFootDb:
         # the output of this needs to be aligned with scanResultEvent,
         # as other functions call both expecting the same output.
         placeholders = ','.join(['?'] * len(hashIds))
-        qry = "SELECT ROUND(c.generated) AS generated, c.data, \
+        qry = "SELECT c.generated, c.data, \
             s.data as source_data, \
             c.module, c.type, c.confidence, c.visibility, c.risk, c.hash, \
             c.source_event_hash, t.event_descr, t.event_type, s.scan_instance_id, \
@@ -5027,8 +5027,8 @@ class SpiderFootDb:
         if not isinstance(target, str):
             raise TypeError(f"target is {type(target)}; expected str()") from None
 
-        qry = """SELECT guid, name, ROUND(created/1000) as created,
-            ROUND(started/1000) as started, ROUND(ended/1000) as ended, status
+        qry = """SELECT guid, name, created/1000 as created,
+            started/1000 as started, ended/1000 as ended, status
             FROM tbl_scan_instance
             WHERE seed_target = ?
             ORDER BY started DESC"""
