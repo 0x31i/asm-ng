@@ -3675,6 +3675,9 @@ class SpiderFootDb:
                 continue
             hashIds.append(hashId)
 
+        if not hashIds:
+            return []
+
         # the output of this needs to be aligned with scanResultEvent,
         # as other functions call both expecting the same output.
         placeholders = ','.join(['?'] * len(hashIds))
@@ -3729,6 +3732,9 @@ class SpiderFootDb:
             if not hashId.isalnum():
                 continue
             hashIds.append(hashId)
+
+        if not hashIds:
+            return []
 
         # the output of this needs to be aligned with scanResultEvent,
         # as other functions call both expecting the same output.
