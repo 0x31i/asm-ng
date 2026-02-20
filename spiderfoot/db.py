@@ -104,6 +104,9 @@ class _PgPoolLock:
         return False
 
 
+_log = logging.getLogger("spiderfoot.db")
+
+
 class SpiderFootDb:
     """SpiderFoot database.
 
@@ -580,8 +583,6 @@ class SpiderFootDb:
             raise ValueError("opts is empty") from None
         if not opts.get('__database'):
             raise ValueError("opts['__database'] is empty") from None
-
-        _log = logging.getLogger(f"spiderfoot.{__name__}")
 
         # --- Create connection via backend abstraction ---
         try:
