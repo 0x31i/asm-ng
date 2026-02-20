@@ -3965,7 +3965,7 @@ class SpiderFootWebUi:
             # Cannot set FPs if a scan is not completed
             status = dbh.scanInstanceGet(id)
             if not status:
-                return self.error(f"Invalid scan ID: {id}")
+                return json.dumps(["ERROR", f"Invalid scan ID: {id}"]).encode('utf-8')
 
             if status[5] not in ["ABORTED", "FINISHED", "ERROR-FAILED"]:
                 return json.dumps([
@@ -3973,30 +3973,14 @@ class SpiderFootWebUi:
                     "Scan must be in a finished state when setting False Positives."
                 ]).encode('utf-8')
 
-            # Make sure the user doesn't set something as non-FP when the
-            # parent is set as an FP (unless force is set).
-            if fp == "0" and force != "1":
-                data = dbh.scanElementSourcesDirect(id, ids)
-                for row in data:
-                    if str(row[14]) == "1":
-                        return json.dumps([
-                            "WARNING",
-                            f"Cannot unset element {id} as False Positive if a parent element is still False Positive. Use force option to override."
-                        ]).encode('utf-8')
-
-            # Set all the children as FPs too.. it's only logical afterall, right?
-            # When force unsetting, only unset the selected items, not children
-            if force == "1" and fp == "0":
-                allIds = ids
-            else:
-                childs = dbh.scanElementChildrenAll(id, ids)
-                allIds = ids + childs
-
-            ret = dbh.scanResultsUpdateFP(id, allIds, int(fp))
-            if ret:
+            try:
+                ret = dbh.scanResultsUpdateFP(id, ids, int(fp))
+                if not ret:
+                    return json.dumps(["ERROR", "Failed to update status."]).encode('utf-8')
                 return json.dumps(["SUCCESS", ""]).encode('utf-8')
-
-            return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
+            except Exception as e:
+                self.log.error(f"Error updating FP for scan {id}: {e}", exc_info=True)
+                return json.dumps(["ERROR", f"Database error: {e}"]).encode('utf-8')
 
     @cherrypy.expose
     def resultsetfppersist(self: 'SpiderFootWebUi', id: str, resultids: str, fp: str, persist: str = "0", force: str = "0") -> str:
@@ -4027,10 +4011,13 @@ class SpiderFootWebUi:
             except Exception:
                 return json.dumps(["ERROR", "No IDs supplied."]).encode('utf-8')
 
+            if not ids:
+                return json.dumps(["ERROR", "No IDs supplied."]).encode('utf-8')
+
             # Cannot set FPs if a scan is not completed
             status = dbh.scanInstanceGet(id)
             if not status:
-                return self.error(f"Invalid scan ID: {id}")
+                return json.dumps(["ERROR", f"Invalid scan ID: {id}"]).encode('utf-8')
 
             if status[5] not in ["ABORTED", "FINISHED", "ERROR-FAILED"]:
                 return json.dumps([
@@ -4043,53 +4030,61 @@ class SpiderFootWebUi:
             # Auto-enable persistence if there are multiple scans for this target
             # This ensures FP changes always sync across all scans of the same target
             if persist != "1":
-                scanCount = dbh.scanCountForTarget(target)
-                if scanCount > 1:
-                    persist = "1"
+                try:
+                    scanCount = dbh.scanCountForTarget(target)
+                    if scanCount > 1:
+                        persist = "1"
+                except Exception:
+                    pass
 
-            # Make sure the user doesn't set something as non-FP when the
-            # parent is set as an FP (unless force is set).
-            if fp == "0" and force != "1":
-                data = dbh.scanElementSourcesDirect(id, ids)
-                for row in data:
-                    if str(row[14]) == "1":
-                        return json.dumps([
-                            "WARNING",
-                            f"Cannot unset element {id} as False Positive if a parent element is still False Positive. Use force option to override."
-                        ]).encode('utf-8')
+            try:
+                # Make sure the user doesn't set something as non-FP when the
+                # parent is set as an FP (unless force is set).
+                if fp == "0" and force != "1":
+                    data = dbh.scanElementSourcesDirect(id, ids)
+                    for row in data:
+                        if str(row[14]) == "1":
+                            return json.dumps([
+                                "WARNING",
+                                "Cannot unset element as False Positive if a parent element is still False Positive. Use force option to override."
+                            ]).encode('utf-8')
 
-            # Set all the children as FPs too.. it's only logical afterall, right?
-            # When force unsetting, only unset the selected items, not children
-            if force == "1" and fp == "0":
-                allIds = ids
-            else:
-                childs = dbh.scanElementChildrenAll(id, ids)
-                allIds = ids + childs
+                # Set all the children as FPs too.. it's only logical afterall, right?
+                # When force unsetting, only unset the selected items, not children
+                if force == "1" and fp == "0":
+                    allIds = ids
+                else:
+                    childs = dbh.scanElementChildrenAll(id, ids)
+                    allIds = ids + childs
 
-            ret = dbh.scanResultsUpdateFP(id, allIds, int(fp))
+                ret = dbh.scanResultsUpdateFP(id, allIds, int(fp))
+            except Exception as e:
+                self.log.error(f"Error updating FP status for scan {id}: {e}", exc_info=True)
+                return json.dumps(["ERROR", f"Database error updating status: {e}"]).encode('utf-8')
+
+            if not ret:
+                return json.dumps(["ERROR", "Failed to update status."]).encode('utf-8')
 
             # Handle target-level persistence and cross-scan sync
-            if ret and persist == "1":
-                # Get the event details for each ID to persist at target level
-                events = dbh.scanResultEvent(id)
-                eventMap = {row[8]: row for row in events}  # hash -> event data
+            if persist == "1":
+                try:
+                    events = dbh.scanResultEvent(id)
+                    eventMap = {row[8]: row for row in events}  # hash -> event data
 
-                for resultId in allIds:  # Persist all marked items including children
-                    if resultId in eventMap:
+                    for resultId in allIds:
+                        if resultId not in eventMap:
+                            continue
                         eventData = eventMap[resultId]
                         eventType = eventData[4]  # type
-                        data = eventData[1]  # data
+                        evData = eventData[1]  # data
                         sourceData = eventData[2]  # source data for granular matching
 
                         if fp == "1":
-                            # Mark as false positive - add to FP table, remove from validated
-                            dbh.targetFalsePositiveAdd(target, eventType, data, sourceData)
-                            dbh.targetValidatedRemove(target, eventType, data, sourceData)
+                            dbh.targetFalsePositiveAdd(target, eventType, evData, sourceData)
+                            dbh.targetValidatedRemove(target, eventType, evData, sourceData)
                         elif fp == "2":
-                            # Mark as validated - add to validated table, remove from FP
-                            dbh.targetValidatedAdd(target, eventType, data, sourceData)
-                            dbh.targetFalsePositiveRemove(target, eventType, data, sourceData)
-                            # Two-way sync: also add to known assets as ANALYST_CONFIRMED
+                            dbh.targetValidatedAdd(target, eventType, evData, sourceData)
+                            dbh.targetFalsePositiveRemove(target, eventType, evData, sourceData)
                             try:
                                 ka_type = 'domain'
                                 if eventType in ('IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'):
@@ -4098,24 +4093,20 @@ class SpiderFootWebUi:
                                                    'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'):
                                     ka_type = 'employee'
                                 current_user = cherrypy.session.get('user', 'anonymous')
-                                dbh.knownAssetAdd(target, ka_type, data,
+                                dbh.knownAssetAdd(target, ka_type, evData,
                                                   source='ANALYST_CONFIRMED', addedBy=current_user)
                             except Exception:
-                                pass  # Non-critical - asset table may not exist on older DBs
+                                pass
                         else:
-                            # Clear status - remove from both tables
-                            dbh.targetFalsePositiveRemove(target, eventType, data, sourceData)
-                            dbh.targetValidatedRemove(target, eventType, data, sourceData)
+                            dbh.targetFalsePositiveRemove(target, eventType, evData, sourceData)
+                            dbh.targetValidatedRemove(target, eventType, evData, sourceData)
 
-                        # Sync the scan-level FP flag across all scans of the same target
-                        # This ensures that if you change FP status on one scan, all other scans
-                        # with the same entry (same type, data, source_data) are also updated
-                        dbh.syncFalsePositiveAcrossScans(target, eventType, data, sourceData, int(fp))
+                        dbh.syncFalsePositiveAcrossScans(target, eventType, evData, sourceData, int(fp))
+                except Exception as e:
+                    # Persistence/sync is best-effort — the core update already succeeded
+                    self.log.warning(f"FP persistence/sync failed for scan {id}: {e}", exc_info=True)
 
-            if ret:
-                return json.dumps(["SUCCESS", ""]).encode('utf-8')
-
-            return json.dumps(["ERROR", "Exception encountered."]).encode('utf-8')
+            return json.dumps(["SUCCESS", ""]).encode('utf-8')
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
