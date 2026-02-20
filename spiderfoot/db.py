@@ -654,6 +654,47 @@ class SpiderFootDb:
                 except DatabaseError:
                     pass
 
+            # Migration: Ensure tbl_scan_results exists with scan_instance_id.
+            # If a previous create() call failed partway through (autocommit
+            # mode commits each DDL individually), tbl_scan_config may exist
+            # while tbl_scan_results does not.  Detect and fix this.
+            try:
+                self.dbh.execute("SELECT scan_instance_id FROM tbl_scan_results LIMIT 0")
+            except DatabaseError:
+                try:
+                    # Check whether the table exists (with wrong schema)
+                    # vs doesn't exist at all.
+                    table_exists = False
+                    try:
+                        self.dbh.execute("SELECT 1 FROM tbl_scan_results LIMIT 0")
+                        table_exists = True
+                    except DatabaseError:
+                        pass
+
+                    if table_exists:
+                        # Table exists but scan_instance_id is missing — broken
+                        _log.warning("tbl_scan_results exists but is missing "
+                                     "scan_instance_id column, recreating table")
+                        if self.db_type == 'postgresql':
+                            self.dbh.execute("DROP TABLE IF EXISTS tbl_scan_results CASCADE")
+                        else:
+                            self.dbh.execute("DROP TABLE IF EXISTS tbl_scan_results")
+
+                    # Create the table (and its indexes)
+                    if self.db_type == 'postgresql':
+                        schema = get_pg_schema_queries(self.createSchemaQueries)
+                    else:
+                        schema = self.createSchemaQueries
+                    for qry in schema:
+                        if 'tbl_scan_results' in qry and (
+                                'CREATE TABLE' in qry.upper()
+                                or 'CREATE INDEX' in qry.upper()):
+                            self.dbh.execute(qry)
+                    self.conn.commit()
+                    _log.info("Created tbl_scan_results table")
+                except DatabaseError as e:
+                    _log.error(f"Failed to create tbl_scan_results: {e}")
+
             # For users with pre 4.0 databases, add the correlation
             # tables + indexes if they don't exist.
             try:
@@ -1124,18 +1165,24 @@ class SpiderFootDb:
                     schema = get_pg_schema_queries(schema)
 
                 for qry in schema:
-                    self.dbh.execute(qry)
+                    # Add IF NOT EXISTS so create() is idempotent and
+                    # survives partially-created schemas from prior runs.
+                    safe = qry.replace(
+                        'CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS ')
+                    safe = safe.replace(
+                        'CREATE INDEX ', 'CREATE INDEX IF NOT EXISTS ')
+                    self.dbh.execute(safe)
 
                 self.conn.commit()
 
-                # Insert event types
+                # Insert event types (OR IGNORE handles idempotent re-runs)
                 for row in self.eventDetails:
                     event = row[0]
                     event_descr = row[1]
                     event_raw = row[2]
                     event_type = row[3]
 
-                    qry = "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (?, ?, ?, ?)"
+                    qry = "INSERT OR IGNORE INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (?, ?, ?, ?)"
                     self.dbh.execute(qry, (event, event_descr, event_raw, event_type))
                 self.conn.commit()
             except DatabaseError as e:
@@ -3974,18 +4021,18 @@ class SpiderFootDb:
             IOError: database I/O failed
         """
 
-        # SQLite doesn't support OUTER JOINs, so we need a work-around that
-        # does a UNION of scans with results and scans without results to
-        # get a complete listing.
+        # Use LEFT JOIN to include scans with and without results in one
+        # query.  This replaces the old UNION ALL approach which used an
+        # implicit cross-join (``FROM a, b``) that failed on PostgreSQL when
+        # the tbl_scan_results schema was incomplete.
         qry = "SELECT i.guid, i.name, i.seed_target, ROUND(i.created/1000), \
-            ROUND(i.started)/1000 as started, ROUND(i.ended)/1000, i.status, COUNT(r.type) \
-            FROM tbl_scan_instance i, tbl_scan_results r WHERE i.guid = r.scan_instance_id \
-            AND r.type <> 'ROOT' GROUP BY i.guid, i.name, i.seed_target, i.status \
-            UNION ALL \
-            SELECT i.guid, i.name, i.seed_target, ROUND(i.created/1000), \
-            ROUND(i.started)/1000 as started, ROUND(i.ended)/1000, i.status, 0 \
-            FROM tbl_scan_instance i  WHERE i.guid NOT IN ( \
-            SELECT distinct scan_instance_id FROM tbl_scan_results WHERE type <> 'ROOT') \
+            ROUND(i.started/1000) as started, ROUND(i.ended/1000), i.status, \
+            COUNT(r.type) \
+            FROM tbl_scan_instance i \
+            LEFT JOIN tbl_scan_results r \
+                ON i.guid = r.scan_instance_id AND r.type <> 'ROOT' \
+            GROUP BY i.guid, i.name, i.seed_target, \
+                i.created, i.started, i.ended, i.status \
             ORDER BY started DESC"
 
         with self.dbhLock:
