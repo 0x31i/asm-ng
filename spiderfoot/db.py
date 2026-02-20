@@ -5656,6 +5656,13 @@ class SpiderFootDb:
                 key = (str(tf[0]).lower().strip(), str(tf[1]).lower().strip(), str(tf[2]).lower().strip())
                 tracked_lookup[key] = tf[3]
 
+        # Strip NUL bytes that PostgreSQL text columns cannot store.
+        # Burp XML request/response fields often contain binary data with
+        # embedded NUL chars that survive base64 decode + UTF-8 replace.
+        def _clean(val):
+            s = str(val) if val else ''
+            return s.replace('\x00', '') if '\x00' in s else s
+
         with self.dbhLock:
             try:
                 self.dbh.execute("DELETE FROM tbl_scan_burp_results WHERE scan_instance_id = ?", [instanceId])
@@ -5678,23 +5685,23 @@ class SpiderFootDb:
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                     self.dbh.execute(qry, [
                         instanceId,
-                        str(r.get('severity', '')),
+                        _clean(r.get('severity', '')),
                         int(r.get('severity_number', 0)),
-                        str(r.get('host_ip', '')),
-                        str(r.get('host_name', '')),
-                        str(r.get('plugin_name', '')),
-                        str(r.get('issue_type', '')),
-                        str(r.get('path', '')),
-                        str(r.get('location', '')),
-                        str(r.get('confidence', '')),
-                        str(r.get('issue_background', '')),
-                        str(r.get('issue_detail', '')),
-                        str(r.get('solutions', '')),
-                        str(r.get('see_also', '')),
-                        str(r.get('references', '')),
-                        str(r.get('vulnerability_classifications', '')),
-                        str(r.get('request', '')),
-                        str(r.get('response', '')),
+                        _clean(r.get('host_ip', '')),
+                        _clean(r.get('host_name', '')),
+                        _clean(r.get('plugin_name', '')),
+                        _clean(r.get('issue_type', '')),
+                        _clean(r.get('path', '')),
+                        _clean(r.get('location', '')),
+                        _clean(r.get('confidence', '')),
+                        _clean(r.get('issue_background', '')),
+                        _clean(r.get('issue_detail', '')),
+                        _clean(r.get('solutions', '')),
+                        _clean(r.get('see_also', '')),
+                        _clean(r.get('references', '')),
+                        _clean(r.get('vulnerability_classifications', '')),
+                        _clean(r.get('request', '')),
+                        _clean(r.get('response', '')),
                         tracking_val,
                         0,
                         now
@@ -5790,6 +5797,11 @@ class SpiderFootDb:
                         existing_by_name[plugin_name] = []
                     existing_by_name[plugin_name].append({'id': row_id, 'fields': fields})
 
+                # Strip NUL bytes that PostgreSQL text columns cannot store
+                def _clean(val):
+                    s = str(val) if val else ''
+                    return s.replace('\x00', '') if '\x00' in s else s
+
                 for enh in enhancements:
                     plugin_name = str(enh.get('plugin_name', ''))
                     if not plugin_name:
@@ -5806,7 +5818,7 @@ class SpiderFootDb:
                         updates = []
                         values = []
                         for enh_key, col_name in field_to_col.items():
-                            new_val = str(enh.get(enh_key, '')).strip()
+                            new_val = _clean(enh.get(enh_key, '')).strip()
                             existing_val = match['fields'].get(col_name, '').strip()
                             if new_val and not existing_val:
                                 updates.append(f"{col_name} = {ph}")
