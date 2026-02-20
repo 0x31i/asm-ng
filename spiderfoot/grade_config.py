@@ -876,6 +876,26 @@ DEFAULT_EVENT_TYPE_GRADING = {
         'category': 'Information / Reference', 'rank': 5, 'points': 0,
         'logic': 'informational',
     },
+
+    # =========================================================================
+    # AI/ML Infrastructure Discovery
+    # =========================================================================
+    'AI_ENDPOINT_UNAUTHENTICATED': {
+        'category': 'Network Security', 'rank': 1, 'points': -20,
+        'logic': 'unverified_exists',
+    },
+    'AI_MODEL_EXPOSED': {
+        'category': 'Network Security', 'rank': 2, 'points': -10,
+        'logic': 'unverified_exists',
+    },
+    'AI_INFRASTRUCTURE_DETECTED': {
+        'category': 'Information / Reference', 'rank': 5, 'points': 0,
+        'logic': 'informational',
+    },
+    'AI_API_KEY_LEAKED': {
+        'category': 'Information Leakage', 'rank': 1, 'points': -20,
+        'logic': 'count_scaled',
+    },
 }
 
 
