@@ -5602,8 +5602,13 @@ class SpiderFootWebUi:
             with SpiderFootDb(self.config) as dbh:
                 data = dbh.scanInstanceList()
                 # Fetch all correlation summaries in one query instead of N queries
-                all_correlations = dbh.scanCorrelationSummaryAllByRisk()
-        except Exception:
+                try:
+                    all_correlations = dbh.scanCorrelationSummaryAllByRisk()
+                except Exception as ce:
+                    self.log.warning(f"Correlation summary query failed (non-fatal): {ce}")
+                    all_correlations = {}
+        except Exception as e:
+            self.log.error(f"scanlist failed: {e}", exc_info=True)
             return []
         retdata = []
 
