@@ -671,29 +671,39 @@ class SpiderFootDb:
                     except DatabaseError:
                         pass
 
-                    if table_exists:
-                        # Table exists but scan_instance_id is missing — broken
-                        _log.warning("tbl_scan_results exists but is missing "
-                                     "scan_instance_id column, recreating table")
+                    if not table_exists:
+                        # Table doesn't exist at all — create it fresh.
                         if self.db_type == 'postgresql':
-                            self.dbh.execute("DROP TABLE IF EXISTS tbl_scan_results CASCADE")
+                            schema = get_pg_schema_queries(self.createSchemaQueries)
                         else:
-                            self.dbh.execute("DROP TABLE IF EXISTS tbl_scan_results")
-
-                    # Create the table (and its indexes)
-                    if self.db_type == 'postgresql':
-                        schema = get_pg_schema_queries(self.createSchemaQueries)
+                            schema = self.createSchemaQueries
+                        for qry in schema:
+                            if 'tbl_scan_results' in qry and (
+                                    'CREATE TABLE' in qry.upper()
+                                    or 'CREATE INDEX' in qry.upper()):
+                                self.dbh.execute(qry)
+                        self.conn.commit()
+                        _log.info("Created missing tbl_scan_results table")
                     else:
-                        schema = self.createSchemaQueries
-                    for qry in schema:
-                        if 'tbl_scan_results' in qry and (
-                                'CREATE TABLE' in qry.upper()
-                                or 'CREATE INDEX' in qry.upper()):
-                            self.dbh.execute(qry)
-                    self.conn.commit()
-                    _log.info("Created tbl_scan_results table")
+                        # Table exists but scan_instance_id column is missing.
+                        # Log a warning — do NOT drop the table as that
+                        # permanently destroys all historical scan data.
+                        _log.warning(
+                            "tbl_scan_results exists but the scan_instance_id "
+                            "column could not be queried. This may indicate "
+                            "schema corruption. Attempting to add the column.")
+                        try:
+                            self.dbh.execute(
+                                "ALTER TABLE tbl_scan_results "
+                                "ADD COLUMN scan_instance_id VARCHAR")
+                            self.conn.commit()
+                            _log.info("Added scan_instance_id column to tbl_scan_results")
+                        except DatabaseError:
+                            _log.warning(
+                                "Could not add scan_instance_id column "
+                                "(it may already exist under a different state)")
                 except DatabaseError as e:
-                    _log.error(f"Failed to create tbl_scan_results: {e}")
+                    _log.error(f"Failed to fix tbl_scan_results: {e}")
 
             # For users with pre 4.0 databases, add the correlation
             # tables + indexes if they don't exist.
@@ -842,26 +852,33 @@ class SpiderFootDb:
                 except DatabaseError:
                     pass
 
-            # Migration: Ensure AI and custom event types exist
-            for ai_type in (
-                'AI_SINGLE_SCAN_CORRELATION', 'AI_CROSS_SCAN_CORRELATION',
-                'AI_THREAT_PREDICTION', 'AI_THREAT_SIGNATURE',
-                'AI_IOC_CORRELATION', 'AI_THREAT_SCORE', 'AI_ANOMALY_DETECTED',
-                'AI_NLP_ANALYSIS', 'FOURCHAN_POST',
-            ):
-                try:
-                    self.dbh.execute("SELECT event FROM tbl_event_types WHERE event = ?", (ai_type,))
-                    if not self.dbh.fetchone():
-                        for row in self.eventDetails:
-                            if row[0] == ai_type:
-                                self.dbh.execute(
-                                    "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (?, ?, ?, ?)",
-                                    (row[0], row[1], row[2], row[3])
-                                )
-                                break
+            # Migration: Ensure ALL event types exist in tbl_event_types.
+            # On PostgreSQL, tbl_scan_results.type has a FK constraint
+            # referencing tbl_event_types(event).  If event types are
+            # missing, every INSERT into tbl_scan_results will fail with
+            # a FK violation, causing sfp__stor_db to silently drop ALL
+            # events.  Use INSERT OR IGNORE to be idempotent.
+            try:
+                self.dbh.execute("SELECT COUNT(*) FROM tbl_event_types")
+                row = self.dbh.fetchone()
+                et_count = row[0] if row else 0
+                if et_count < len(self.eventDetails):
+                    _log.info(f"tbl_event_types has {et_count} rows but "
+                              f"{len(self.eventDetails)} expected, "
+                              f"populating missing event types")
+                    for erow in self.eventDetails:
+                        try:
+                            qry = "INSERT OR IGNORE INTO tbl_event_types " \
+                                  "(event, event_descr, event_raw, event_type) " \
+                                  "VALUES (?, ?, ?, ?)"
+                            self.dbh.execute(qry, (
+                                erow[0], erow[1], erow[2], erow[3]))
+                        except DatabaseError:
+                            pass
                     self.conn.commit()
-                except DatabaseError:
-                    pass
+                    _log.info("Event types migration complete")
+            except DatabaseError as e:
+                _log.warning(f"Event types migration check failed: {e}")
 
             # Migration: Add tbl_scan_findings table if it doesn't exist
             try:
@@ -4008,6 +4025,9 @@ class SpiderFootDb:
                 self.dbh.execute(qry, qvals)
                 self.conn.commit()
             except DatabaseError as e:
+                _log.error(
+                    f"Failed to store event type={sfEvent.eventType} "
+                    f"scan={instanceId}: {e}")
                 raise IOError(
                     f"SQL error encountered when storing event data: {e}") from e
 
