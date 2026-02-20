@@ -403,6 +403,11 @@
         // Store data for bulk FP operations
         var currentViewData = [];
 
+        // Pagination state for "Load All" button
+        var paginatedInstanceId = null;
+        var paginatedEventType = null;
+        var PAGE_SIZE = 500;
+
         // Client-side filter state - persists while on the page
         var clientFilterState = {
             fp: false,
@@ -628,6 +633,88 @@
                 row.addClass('finding-expanded');
                 detail.find('.finding-detail').slideDown(150);
             }
+        }
+
+        // Load all results (removes pagination limit)
+        function loadAllResults() {
+            var btn = document.getElementById('btn-load-all');
+            var spinner = document.getElementById('load-all-spinner');
+            if (btn) btn.disabled = true;
+            if (spinner) spinner.style.display = 'inline';
+
+            sf.fetchData('${docroot}/scaneventresults', {
+                'id': paginatedInstanceId,
+                'eventType': paginatedEventType
+            }, function(allData) {
+                // Re-trigger the full view with all data by calling the refresh function
+                // which re-renders everything without pagination
+                var loadAllBar = document.getElementById('load-all-bar');
+                if (loadAllBar) loadAllBar.remove();
+
+                // Build new tbody rows for the additional data (beyond first page)
+                var tbody = $('#scansummary-content tbody');
+                var existingCount = currentViewData ? currentViewData.length : 0;
+
+                // Replace currentViewData with full dataset
+                currentViewData = allData;
+
+                // Clear and rebuild entire tbody with full data
+                tbody.empty();
+                for (var i = 0; i < allData.length; i++) {
+                    var isImported = allData[i][13] != null;
+                    var isKnownAsset = allData[i][14] && allData[i][14] > 0;
+                    var rowClasses = ['data-event-row'];
+                    if (isImported) rowClasses.push("imported-row");
+                    if (isKnownAsset) rowClasses.push("known-asset-row");
+
+                    var row = "<tr class='" + rowClasses.join(" ") + "' data-event-idx='" + i + "' onclick='toggleDataDetail(" + i + ")'>";
+                    row += "<td class='text-center' onclick='event.stopPropagation()'><input type='checkbox' id='cb_" + allData[i][7] + "'></td>";
+                    row += "<td class='text-center validation-status'>";
+                    var importedClass = isImported ? " status-imported-glow" : "";
+                    if (allData[i][8] == "1" || allData[i][11] == 1) {
+                        row += "<span class='status-fp" + importedClass + "'>FALSE POSITIVE</span>";
+                    } else if (allData[i][8] == "2" || allData[i][12] == 1) {
+                        row += "<span class='status-validated" + importedClass + "'>VALIDATED</span>";
+                    } else {
+                        row += "<span class='status-unvalidated" + importedClass + "'>UNVALIDATED</span>";
+                    }
+                    if (isKnownAsset) {
+                        row += "<br><span class='status-known-asset'>KNOWN ASSET</span>";
+                    }
+                    row += "</td>";
+                    row += "<td class='pre-expandable pre-collapsed'><pre class='table-border-bg-inherit'>" + sf.replace_sfurltag(allData[i][1]) + "</pre><div class='pre-expand-hint'></div></td>";
+                    row += "<td class='pre-expandable pre-collapsed'><pre class='table-border-bg-inherit'>" + sf.replace_sfurltag(allData[i][2]) + "</pre><div class='pre-expand-hint'></div></td>";
+                    row += "<td><pre class='table-border-bg-inherit'>" + allData[i][3] + "</pre></td>";
+                    row += "<td class='text-center'>" + getDataTrackingBadge(allData[i][15], allData[i][7]) + "</td>";
+                    row += "</tr>";
+                    row += "<tr class='data-detail-row' style='display:none'><td colspan='6'><div class='finding-detail' style='display:none'>" + buildDataDetailHtml(allData[i]) + "</div></td></tr>";
+                    tbody.append(row);
+                }
+
+                // Re-initialize tablesorter with new data
+                $("#scansummary-content").trigger("update");
+                initExpandableCells();
+                updateDataTrackingFilterCounts();
+                updateStatsBarCounts();
+
+                // Re-apply any active filters
+                if (clientFilterState.fp || clientFilterState.validated || clientFilterState.imported || dataTrackingFilterState.closed || dataTrackingFilterState.ticketed) {
+                    applyClientSideFilters();
+                }
+
+                // Re-bind shift-click
+                lastChecked = null;
+                var chkboxes = $('input[id*=cb_]');
+                chkboxes.click(function(e) {
+                    if (!lastChecked) { lastChecked = this; return; }
+                    if (e.shiftKey) {
+                        var start = chkboxes.index(this);
+                        var end = chkboxes.index(lastChecked);
+                        chkboxes.slice(Math.min(start, end), Math.max(start, end) + 1).prop('checked', lastChecked.checked);
+                    }
+                    lastChecked = this;
+                });
+            });
         }
 
         // Toggle client-side filter
@@ -7385,8 +7472,12 @@
                 $("#btn-discoverypathview").removeClass("active");
                 $("#btn-vizview").removeClass("active");
                 $("#modifyactions").show();
-                sf.fetchData('${docroot}/scaneventresults', {'id': instanceId, 'eventType': eventType }, function(data) {
-                            // Count all categories
+                // Set pagination state for "Load All" button
+                paginatedEventType = eventType;
+                paginatedInstanceId = instanceId;
+
+                sf.fetchData('${docroot}/scaneventresults', {'id': instanceId, 'eventType': eventType, 'limit': PAGE_SIZE }, function(data) {
+                            // Count all categories from loaded data
                             var stats = {
                                 total: 0,
                                 fp: 0,           // Current scan FPs
@@ -7420,6 +7511,8 @@
                                     stats.unvalidated++;
                                 }
                             }
+
+                            var isPaginated = data.length >= PAGE_SIZE;
 
                             var totalFP = stats.fp + stats.fpLegacy;
                             var totalValidated = stats.validated + stats.validatedLegacy;
@@ -7552,8 +7645,19 @@
                                 table += "</tr>";
                             }
                             table += "</tbody></table>"
+
+                            // Add "Load All" button if results were paginated
+                            var loadAllHtml = "";
+                            if (isPaginated) {
+                                loadAllHtml = "<div id='load-all-bar' style='text-align:center; padding:12px; background:#1a1a2e; border:1px solid #333; margin-top:-1px;'>" +
+                                    "<span style='color:#aaa; margin-right:10px;'>Showing first " + PAGE_SIZE + " results.</span>" +
+                                    "<button id='btn-load-all' class='btn btn-sm btn-outline-info' onclick='loadAllResults()'>Load All Results</button>" +
+                                    "<span id='load-all-spinner' style='display:none; margin-left:10px; color:#aaa;'><i class='fas fa-spinner fa-spin'></i> Loading...</span>" +
+                                    "</div>";
+                            }
+
                             $("#loader").fadeOut(500);
-                            $("#mainbody").append(statsBar + table);
+                            $("#mainbody").append(statsBar + table + loadAllHtml);
 
                             // Set sticky headers below stats bar
                             var dataStatsBar = document.getElementById('stats-bar');
