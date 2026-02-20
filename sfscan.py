@@ -519,6 +519,13 @@ class SpiderFootScanner():
                 except Exception as e:
                     self.__sf.error(f"Scan [{self.__scanId}] correlation processing failed: {e}")
 
+                try:
+                    inherited = self.__dbh.inheritTrackingFromPreviousScans(self.__scanId)
+                    if inherited:
+                        self.__sf.status(f"Scan [{self.__scanId}] inherited tracking for {inherited} results from previous scans.")
+                except Exception as e:
+                    self.__sf.error(f"Scan [{self.__scanId}] tracking inheritance failed: {e}")
+
                 self.__sf.status(f"Scan [{self.__scanId}] completed.")
             else:
                 # Scan failed or was aborted - ensure it has a terminal status

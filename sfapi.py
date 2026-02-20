@@ -641,18 +641,21 @@ async def export_scan(
         # Get all events
         events = db.scanResultEvent(scan_id, ['ALL'])
 
+        tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
+
         if format == "csv":
             output = StringIO()
             writer = csv.writer(output)
-            writer.writerow(['Time', 'Event Type', 'Module', 'Data', 'Source', 'F/P', 'Confidence', 'Visibility', 'Risk'])
+            writer.writerow(['Time', 'Event Type', 'Module', 'Data', 'Source', 'F/P', 'Tracking', 'Confidence', 'Visibility', 'Risk'])
 
             for event in events:
                 event_type = translate_event_type(str(event[4]), use_legacy=legacy)
                 # Check both per-event FP flag (event[13]) and target-level FPs
                 fp_flag = 1 if event[13] or (event[4], event[1]) in targetFps else 0
+                tracking_label = tracking_labels.get(event[16], 'OPEN')
                 writer.writerow([
                     event[0], event_type, event[3], event[1],
-                    event[2], fp_flag, event[6], event[7], event[8]
+                    event[2], fp_flag, tracking_label, event[6], event[7], event[8]
                 ])
 
             csv_content = output.getvalue()
@@ -670,7 +673,8 @@ async def export_scan(
                 event_type = translate_event_type(str(event[4]), use_legacy=legacy)
                 # Check both per-event FP flag and target-level FPs
                 fp_flag = 1 if event[13] or (event[4], event[1]) in targetFps else 0
-                xml_content += f"  <event type='{event_type}' module='{event[3]}' time='{event[0]}' fp='{fp_flag}'>\n"
+                tracking_label = tracking_labels.get(event[16], 'OPEN')
+                xml_content += f"  <event type='{event_type}' module='{event[3]}' time='{event[0]}' fp='{fp_flag}' tracking='{tracking_label}'>\n"
                 xml_content += f"    <data>{html.escape(str(event[1]))}</data>\n"
                 xml_content += f"    <confidence>{event[6]}</confidence>\n"
                 xml_content += f"  </event>\n"
@@ -688,6 +692,7 @@ async def export_scan(
                 event_type = translate_event_type(str(event[4]), use_legacy=legacy)
                 # Check both per-event FP flag and target-level FPs
                 fp_flag = 1 if event[13] or (event[4], event[1]) in targetFps else 0
+                tracking_label = tracking_labels.get(event[16], 'OPEN')
                 events_list.append({
                     "time": event[0],
                     "data": event[1],
@@ -695,6 +700,7 @@ async def export_scan(
                     "module": event[3],
                     "type": event_type,
                     "false_positive": fp_flag,
+                    "tracking": tracking_label,
                     "confidence": event[6],
                     "visibility": event[7],
                     "risk": event[8]

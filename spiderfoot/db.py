@@ -1487,7 +1487,7 @@ class SpiderFootDb:
             s.data as source_data, \
             c.module, c.type, c.confidence, c.visibility, c.risk, c.hash, \
             c.source_event_hash, t.event_descr, t.event_type, c.scan_instance_id, \
-            c.false_positive as fp, s.false_positive as parent_fp \
+            c.false_positive as fp, s.false_positive as parent_fp, c.tracking \
             FROM tbl_scan_results c, tbl_scan_results s, tbl_event_types t \
             WHERE s.scan_instance_id = c.scan_instance_id AND \
             t.event = c.type AND c.source_event_hash = s.hash "
@@ -6105,3 +6105,59 @@ class SpiderFootDb:
                 return rowcount
             except DatabaseError as e:
                 raise IOError("SQL error encountered when syncing tracking across scans") from e
+
+    def inheritTrackingFromPreviousScans(self, instanceId: str) -> int:
+        """Copy non-zero tracking from previous scans of the same target.
+
+        For each result in the current scan that has tracking=0 (OPEN),
+        look for matching (type, data) in other scans of the same target
+        with non-zero tracking, and copy the highest tracking value.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            int: number of rows updated
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(f"instanceId is {type(instanceId)}; expected str()") from None
+
+        qry = """UPDATE tbl_scan_results
+            SET tracking = (
+                SELECT MAX(prev.tracking)
+                FROM tbl_scan_results prev
+                INNER JOIN tbl_scan_instance si_prev ON prev.scan_instance_id = si_prev.guid
+                INNER JOIN tbl_scan_instance si_cur ON si_cur.guid = ?
+                WHERE si_prev.seed_target = si_cur.seed_target
+                AND prev.scan_instance_id != ?
+                AND prev.type = tbl_scan_results.type
+                AND prev.data = tbl_scan_results.data
+                AND prev.tracking > 0
+            )
+            WHERE scan_instance_id = ?
+            AND tracking = 0
+            AND EXISTS (
+                SELECT 1
+                FROM tbl_scan_results prev2
+                INNER JOIN tbl_scan_instance si_prev2 ON prev2.scan_instance_id = si_prev2.guid
+                INNER JOIN tbl_scan_instance si_cur2 ON si_cur2.guid = ?
+                WHERE si_prev2.seed_target = si_cur2.seed_target
+                AND prev2.scan_instance_id != ?
+                AND prev2.type = tbl_scan_results.type
+                AND prev2.data = tbl_scan_results.data
+                AND prev2.tracking > 0
+            )"""
+        params = (instanceId, instanceId, instanceId, instanceId, instanceId)
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, params)
+                rowcount = self.dbh.rowcount
+                self.conn.commit()
+                return rowcount
+            except DatabaseError as e:
+                raise IOError("SQL error encountered when inheriting tracking from previous scans") from e
