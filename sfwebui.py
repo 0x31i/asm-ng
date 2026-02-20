@@ -996,6 +996,7 @@ class SpiderFootWebUi:
             filetype (str): type of file ("xlsx|excel", "csv", or "html")
             dialect (str): CSV dialect (default: excel)
             export_mode (str): "full" (all data), "analysis" (no FPs),
+                               "full_scored" (10-col CSV with CVR scores),
                                or "analysis_correlations" (no FPs + correlations tab, Excel only)
             legacy (str): "1" to use legacy v4.0 type mapping, "0" for native types (default)
 
@@ -1106,8 +1107,13 @@ class SpiderFootWebUi:
                 tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
                 fileobj = StringIO()
                 parser = csv.writer(fileobj, dialect=dialect)
-                parser.writerow(
-                    ["Updated", "Type", "Module", "Source", "F/P", "Tracking", "Data"])
+                if export_mode == "full_scored":
+                    parser.writerow(
+                        ["Updated", "Type", "Module", "Source", "F/P", "Tracking",
+                         "Confidence", "Visibility", "Risk", "Data"])
+                else:
+                    parser.writerow(
+                        ["Updated", "Type", "Module", "Source", "F/P", "Tracking", "Data"])
                 for row in data:
                     if row[4] == "ROOT":
                         continue
@@ -1120,11 +1126,19 @@ class SpiderFootWebUi:
                         "<SFURL>", "").replace("</SFURL>", "")
                     event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
                     tracking_label = tracking_labels.get(row[16], 'OPEN')
-                    parser.writerow([lastseen, event_type, str(
-                        row[3]), str(row[2]), fp_flag, tracking_label, datafield])
+                    if export_mode == "full_scored":
+                        parser.writerow([lastseen, event_type, str(row[3]),
+                                         str(row[2]), fp_flag, tracking_label,
+                                         row[5], row[6], row[7],
+                                         datafield])
+                    else:
+                        parser.writerow([lastseen, event_type, str(
+                            row[3]), str(row[2]), fp_flag, tracking_label, datafield])
 
                 _scan_name = scanInfo[0] if scanInfo else ''
-                if export_mode == "analysis":
+                if export_mode == "full_scored":
+                    fname = self._export_filename(_scan_name, id, 'FULL-SCORED', 'csv')
+                elif export_mode == "analysis":
                     fname = self._export_filename(_scan_name, id, 'ANALYSIS', 'csv')
                 else:
                     fname = self._export_filename(_scan_name, id, 'DATA', 'csv')
