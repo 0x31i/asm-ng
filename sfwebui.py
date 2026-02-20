@@ -699,7 +699,7 @@ class SpiderFootWebUi:
                 escapedsrc = html.escape(row[2])
                 retdata.append([lastseen, escapeddata, escapedsrc,
                                 row[3], row[5], row[6], row[7], row[8], row[10],
-                                row[11], row[4], row[13], row[14]])
+                                row[11], row[4], row[13], row[14], row[15]])
 
             return retdata
 
@@ -1081,9 +1081,11 @@ class SpiderFootWebUi:
                         "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
                     datafield = str(row[1]).replace(
                         "<SFURL>", "").replace("</SFURL>", "")
+                    tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
                     event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
+                    tracking_label = tracking_labels.get(row[16], 'OPEN')
                     rows.append([lastseen, event_type, str(row[3]),
-                                str(row[2]), fp_flag, datafield])
+                                str(row[2]), fp_flag, tracking_label, datafield])
 
                 _scan_name = scanInfo[0] if scanInfo else ''
                 if export_mode == "analysis_correlations":
@@ -1097,14 +1099,15 @@ class SpiderFootWebUi:
                 cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 cherrypy.response.headers['Pragma'] = "no-cache"
                 return self.buildExcel(rows, ["Updated", "Type", "Module", "Source",
-                                       "F/P", "Data"], sheetNameIndex=1,
+                                       "F/P", "Tracking", "Data"], sheetNameIndex=1,
                                        prepend_sheets=prepend_sheets)
 
             if filetype.lower() == 'csv':
+                tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
                 fileobj = StringIO()
                 parser = csv.writer(fileobj, dialect=dialect)
                 parser.writerow(
-                    ["Updated", "Type", "Module", "Source", "F/P", "Data"])
+                    ["Updated", "Type", "Module", "Source", "F/P", "Tracking", "Data"])
                 for row in data:
                     if row[4] == "ROOT":
                         continue
@@ -1116,8 +1119,9 @@ class SpiderFootWebUi:
                     datafield = str(row[1]).replace(
                         "<SFURL>", "").replace("</SFURL>", "")
                     event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
+                    tracking_label = tracking_labels.get(row[16], 'OPEN')
                     parser.writerow([lastseen, event_type, str(
-                        row[3]), str(row[2]), fp_flag, datafield])
+                        row[3]), str(row[2]), fp_flag, tracking_label, datafield])
 
                 _scan_name = scanInfo[0] if scanInfo else ''
                 if export_mode == "analysis":
@@ -1153,6 +1157,9 @@ class SpiderFootWebUi:
         tr:nth-child(even):hover { background: #f0f0f0; }
         .fp-yes { color: #dc3545; font-weight: bold; }
         .fp-no { color: #28a745; }
+        .tracking-open { color: #007bff; }
+        .tracking-closed { color: #6c757d; }
+        .tracking-ticketed { color: #fd7e14; font-weight: bold; }
         .data-cell { max-width: 400px; word-wrap: break-word; font-family: monospace; font-size: 12px; }
         .type-badge { background: #007bff; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; white-space: nowrap; }
         .module-badge { background: #6c757d; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
@@ -1177,11 +1184,14 @@ class SpiderFootWebUi:
                     <th>Module</th>
                     <th>Source</th>
                     <th>F/P</th>
+                    <th>Tracking</th>
                     <th>Data</th>
                 </tr>
             </thead>
             <tbody>
 """
+            tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
+            tracking_classes = {0: 'tracking-open', 1: 'tracking-closed', 2: 'tracking-ticketed'}
             for row in data:
                 if row[4] == "ROOT":
                     continue
@@ -1192,6 +1202,8 @@ class SpiderFootWebUi:
                 event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
                 fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
                 fp_display = '<span class="fp-yes">Yes</span>' if fp_flag else '<span class="fp-no">No</span>'
+                tracking_val = row[16] if row[16] else 0
+                tracking_display = f'<span class="{tracking_classes.get(tracking_val, "tracking-open")}">{tracking_labels.get(tracking_val, "OPEN")}</span>'
 
                 html_content += f"""                <tr>
                     <td class="timestamp">{lastseen}</td>
@@ -1199,6 +1211,7 @@ class SpiderFootWebUi:
                     <td><span class="module-badge">{row[3]}</span></td>
                     <td>{row[2]}</td>
                     <td>{fp_display}</td>
+                    <td>{tracking_display}</td>
                     <td class="data-cell">{datafield}</td>
                 </tr>
 """
@@ -1473,9 +1486,11 @@ class SpiderFootWebUi:
                         "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
                     datafield = str(row[1]).replace(
                         "<SFURL>", "").replace("</SFURL>", "")
+                    tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
                     event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
+                    tracking_label = tracking_labels.get(row[16], 'OPEN')
                     rows.append([scaninfo[row[12]][0], lastseen, event_type, str(row[3]),
-                                str(row[2]), fp_flag, datafield])
+                                str(row[2]), fp_flag, tracking_label, datafield])
 
                 _name = scan_name if scan_name and len(ids.split(',')) == 1 else 'Multi-Scan'
                 _id = ids.split(',')[0] if ids else ''
@@ -1491,14 +1506,15 @@ class SpiderFootWebUi:
                 cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 cherrypy.response.headers['Pragma'] = "no-cache"
                 return self.buildExcel(rows, ["Scan Name", "Updated", "Type", "Module",
-                                       "Source", "F/P", "Data"], sheetNameIndex=2,
+                                       "Source", "F/P", "Tracking", "Data"], sheetNameIndex=2,
                                        prepend_sheets=prepend_sheets)
 
             if filetype.lower() == 'csv':
+                tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
                 fileobj = StringIO()
                 parser = csv.writer(fileobj, dialect=dialect)
                 parser.writerow(["Scan Name", "Updated", "Type",
-                                "Module", "Source", "F/P", "Data"])
+                                "Module", "Source", "F/P", "Tracking", "Data"])
                 for row in data:
                     if row[4] == "ROOT":
                         continue
@@ -1512,8 +1528,9 @@ class SpiderFootWebUi:
                     datafield = str(row[1]).replace(
                         "<SFURL>", "").replace("</SFURL>", "")
                     event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
+                    tracking_label = tracking_labels.get(row[16], 'OPEN')
                     parser.writerow([scaninfo[row[12]][0], lastseen, event_type, str(row[3]),
-                                    str(row[2]), fp_flag, datafield])
+                                    str(row[2]), fp_flag, tracking_label, datafield])
 
                 _name = scan_name if scan_name and len(ids.split(',')) == 1 else 'Multi-Scan'
                 _id = ids.split(',')[0] if ids else ''
@@ -1550,6 +1567,9 @@ class SpiderFootWebUi:
         tr:nth-child(even):hover { background: #f0f0f0; }
         .fp-yes { color: #dc3545; font-weight: bold; }
         .fp-no { color: #28a745; }
+        .tracking-open { color: #007bff; }
+        .tracking-closed { color: #6c757d; }
+        .tracking-ticketed { color: #fd7e14; font-weight: bold; }
         .data-cell { max-width: 400px; word-wrap: break-word; font-family: monospace; font-size: 12px; }
         .type-badge { background: #007bff; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; white-space: nowrap; }
         .module-badge { background: #6c757d; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
@@ -1575,11 +1595,14 @@ class SpiderFootWebUi:
                     <th>Module</th>
                     <th>Source</th>
                     <th>F/P</th>
+                    <th>Tracking</th>
                     <th>Data</th>
                 </tr>
             </thead>
             <tbody>
 """
+            tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
+            tracking_classes = {0: 'tracking-open', 1: 'tracking-closed', 2: 'tracking-ticketed'}
             for row in data:
                 if row[4] == "ROOT":
                     continue
@@ -1593,6 +1616,8 @@ class SpiderFootWebUi:
                 targetFps = targetFpsPerScan.get(scan_id, set())
                 fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
                 fp_display = '<span class="fp-yes">Yes</span>' if fp_flag else '<span class="fp-no">No</span>'
+                tracking_val = row[16] if row[16] else 0
+                tracking_display = f'<span class="{tracking_classes.get(tracking_val, "tracking-open")}">{tracking_labels.get(tracking_val, "OPEN")}</span>'
 
                 html_content += f"""                <tr>
                     <td class="scan-name">{scan_name_display}</td>
@@ -1601,6 +1626,7 @@ class SpiderFootWebUi:
                     <td><span class="module-badge">{row[3]}</span></td>
                     <td>{row[2]}</td>
                     <td>{fp_display}</td>
+                    <td>{tracking_display}</td>
                     <td class="data-cell">{datafield}</td>
                 </tr>
 """
@@ -1710,6 +1736,7 @@ class SpiderFootWebUi:
                 ]
 
             if filetype.lower() in ["xlsx", "excel"]:
+                tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
                 rows = []
                 for row in data:
                     if row[10] == "ROOT":
@@ -1720,8 +1747,9 @@ class SpiderFootWebUi:
                     datafield = str(row[1]).replace(
                         "<SFURL>", "").replace("</SFURL>", "")
                     event_type = translate_event_type(str(row[10]), use_legacy=use_legacy)
+                    tracking_label = tracking_labels.get(row[13], 'OPEN')
                     rows.append([row[0], event_type, str(row[3]),
-                                str(row[2]), fp_flag, datafield])
+                                str(row[2]), fp_flag, tracking_label, datafield])
 
                 _scan_name = scanInfo[0] if scanInfo else 'Search'
                 if export_mode == "analysis_correlations":
@@ -1734,14 +1762,15 @@ class SpiderFootWebUi:
                 cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 cherrypy.response.headers['Pragma'] = "no-cache"
                 return self.buildExcel(rows, ["Updated", "Type", "Module", "Source",
-                                       "F/P", "Data"], sheetNameIndex=1,
+                                       "F/P", "Tracking", "Data"], sheetNameIndex=1,
                                        prepend_sheets=prepend_sheets)
 
             if filetype.lower() == 'csv':
+                tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
                 fileobj = StringIO()
                 parser = csv.writer(fileobj, dialect=dialect)
                 parser.writerow(
-                    ["Updated", "Type", "Module", "Source", "F/P", "Data"])
+                    ["Updated", "Type", "Module", "Source", "F/P", "Tracking", "Data"])
                 for row in data:
                     if row[10] == "ROOT":
                         continue
@@ -1751,8 +1780,9 @@ class SpiderFootWebUi:
                     datafield = str(row[1]).replace(
                         "<SFURL>", "").replace("</SFURL>", "")
                     event_type = translate_event_type(str(row[10]), use_legacy=use_legacy)
+                    tracking_label = tracking_labels.get(row[13], 'OPEN')
                     parser.writerow([row[0], event_type, str(
-                        row[3]), str(row[2]), fp_flag, datafield])
+                        row[3]), str(row[2]), fp_flag, tracking_label, datafield])
 
                 _scan_name = scanInfo[0] if scanInfo else 'Search'
                 if export_mode == "analysis":
@@ -1801,12 +1831,15 @@ class SpiderFootWebUi:
                     if event_type == "ROOT":
                         continue
 
+                    tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
+                    tracking_label = tracking_labels.get(row[16], 'OPEN')
                     scaninfo.append({
                         "data": event_data,
                         "event_type": event_type,
                         "module": source_module,
                         "source_data": source_data,
                         "false_positive": false_positive,
+                        "tracking": tracking_label,
                         "last_seen": lastseen,
                         "scan_name": scan_name,
                         "scan_target": scan[1]
