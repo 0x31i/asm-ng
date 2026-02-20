@@ -72,6 +72,55 @@ from spiderfoot.excel_styles import (
 # which leaks semaphores and can crash the CherryPy web server under load.
 _spawn_ctx = mp.get_context("spawn")
 
+_log = logging.getLogger("spiderfoot.sfwebui")
+
+
+def _deferred_sync_fp(config: dict, target: str, items: list):
+    """Background worker to sync FP/validated status across scans.
+
+    Runs in a daemon thread so it doesn't block the HTTP response.
+    Opens its own database connection to avoid thread-safety issues.
+    """
+    try:
+        with SpiderFootDb(config) as dbh:
+            dbh.syncFalsePositiveAcrossScansMulti(target, items)
+    except Exception as e:
+        _log.warning(f"Deferred FP sync failed for target {target}: {e}", exc_info=True)
+
+
+# --- Caching for frequently-accessed, rarely-changing data ---
+_grade_config_cache = {}
+_grade_config_cache_time = 0
+_GRADE_CACHE_TTL = 60  # seconds
+
+
+def _cached_grade_config(config: dict) -> dict:
+    """Return grade config overrides with a 60-second TTL cache."""
+    global _grade_config_cache, _grade_config_cache_time
+    now = time.time()
+    if now - _grade_config_cache_time < _GRADE_CACHE_TTL and _grade_config_cache:
+        return _grade_config_cache
+    _grade_config_cache = load_grade_config_overrides(config)
+    _grade_config_cache_time = now
+    return _grade_config_cache
+
+
+_summary_cache = {}
+_SUMMARY_CACHE_TTL = 10  # seconds — short enough for near-real-time
+
+
+def _cached_scan_summary(dbh, scan_id: str, by: str):
+    """Return cached scan summary with a 10-second TTL."""
+    key = (scan_id, by)
+    now = time.time()
+    if key in _summary_cache:
+        cached_data, cached_time = _summary_cache[key]
+        if now - cached_time < _SUMMARY_CACHE_TTL:
+            return cached_data
+    data = dbh.scanResultSummary(scan_id, by)
+    _summary_cache[key] = (data, now)
+    return data
+
 
 class SpiderFootWebUi:
     """SpiderFoot web interface."""
@@ -4066,10 +4115,22 @@ class SpiderFootWebUi:
                 return json.dumps(["ERROR", "Failed to update status."]).encode('utf-8')
 
             # Handle target-level persistence and cross-scan sync
+            # Uses batch methods and background thread for performance
             if persist == "1":
                 try:
-                    events = dbh.scanResultEvent(id)
+                    # Fetch only the events we need instead of ALL events for the scan
+                    events = dbh.scanElementSourcesDirect(id, allIds)
                     eventMap = {row[8]: row for row in events}  # hash -> event data
+
+                    # Collect batch operations
+                    fp_adds = []
+                    fp_removes = []
+                    val_adds = []
+                    val_removes = []
+                    ka_adds = []
+                    sync_items = []
+
+                    current_user = cherrypy.session.get('user', 'anonymous')
 
                     for resultId in allIds:
                         if resultId not in eventMap:
@@ -4080,28 +4141,45 @@ class SpiderFootWebUi:
                         sourceData = eventData[2]  # source data for granular matching
 
                         if fp == "1":
-                            dbh.targetFalsePositiveAdd(target, eventType, evData, sourceData)
-                            dbh.targetValidatedRemove(target, eventType, evData, sourceData)
+                            fp_adds.append((eventType, evData, sourceData))
+                            val_removes.append((eventType, evData, sourceData))
                         elif fp == "2":
-                            dbh.targetValidatedAdd(target, eventType, evData, sourceData)
-                            dbh.targetFalsePositiveRemove(target, eventType, evData, sourceData)
-                            try:
-                                ka_type = 'domain'
-                                if eventType in ('IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'):
-                                    ka_type = 'ip'
-                                elif eventType in ('HUMAN_NAME', 'USERNAME', 'EMAILADDR',
-                                                   'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'):
-                                    ka_type = 'employee'
-                                current_user = cherrypy.session.get('user', 'anonymous')
-                                dbh.knownAssetAdd(target, ka_type, evData,
-                                                  source='ANALYST_CONFIRMED', addedBy=current_user)
-                            except Exception:
-                                pass
+                            val_adds.append((eventType, evData, sourceData))
+                            fp_removes.append((eventType, evData, sourceData))
+                            ka_type = 'domain'
+                            if eventType in ('IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'):
+                                ka_type = 'ip'
+                            elif eventType in ('HUMAN_NAME', 'USERNAME', 'EMAILADDR',
+                                               'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'):
+                                ka_type = 'employee'
+                            ka_adds.append((ka_type, evData))
                         else:
-                            dbh.targetFalsePositiveRemove(target, eventType, evData, sourceData)
-                            dbh.targetValidatedRemove(target, eventType, evData, sourceData)
+                            fp_removes.append((eventType, evData, sourceData))
+                            val_removes.append((eventType, evData, sourceData))
 
-                        dbh.syncFalsePositiveAcrossScans(target, eventType, evData, sourceData, int(fp))
+                        sync_items.append((eventType, evData, sourceData, int(fp)))
+
+                    # Execute batch persistence operations (single lock/commit each)
+                    if fp_adds:
+                        dbh.targetFalsePositiveAddBatch(target, fp_adds)
+                    if fp_removes:
+                        dbh.targetFalsePositiveRemoveBatch(target, fp_removes)
+                    if val_adds:
+                        dbh.targetValidatedAddBatch(target, val_adds)
+                    if val_removes:
+                        dbh.targetValidatedRemoveBatch(target, val_removes)
+                    if ka_adds:
+                        dbh.knownAssetAddBatch(target, ka_adds,
+                                               source='ANALYST_CONFIRMED', addedBy=current_user)
+
+                    # Defer cross-scan sync to background thread — doesn't block response
+                    if sync_items:
+                        t = threading.Thread(
+                            target=_deferred_sync_fp,
+                            args=(self.config, target, sync_items),
+                            daemon=True
+                        )
+                        t.start()
                 except Exception as e:
                     # Persistence/sync is best-effort — the core update already succeeded
                     self.log.warning(f"FP persistence/sync failed for scan {id}: {e}", exc_info=True)
@@ -5519,6 +5597,8 @@ class SpiderFootWebUi:
         try:
             with SpiderFootDb(self.config) as dbh:
                 data = dbh.scanInstanceList()
+                # Fetch all correlation summaries in one query instead of N queries
+                all_correlations = dbh.scanCorrelationSummaryAllByRisk()
         except Exception:
             return []
         retdata = []
@@ -5533,11 +5613,10 @@ class SpiderFootWebUi:
                 "LOW": 0,
                 "INFO": 0
             }
-            correlations = dbh.scanCorrelationSummary(row[0], by="risk")
-            if correlations:
-                for c in correlations:
-                    if c[0] in riskmatrix:
-                        riskmatrix[c[0]] = c[1]
+            scan_corrs = all_correlations.get(row[0], {})
+            for risk_level, count in scan_corrs.items():
+                if risk_level in riskmatrix:
+                    riskmatrix[risk_level] = count
 
             if row[4] == 0:
                 started = "Not yet"
@@ -5661,7 +5740,7 @@ class SpiderFootWebUi:
         with SpiderFootDb(self.config) as dbh:
 
             try:
-                scandata = dbh.scanResultSummary(id, by)
+                scandata = _cached_scan_summary(dbh, id, by)
             except Exception:
                 return retdata
 
@@ -5673,7 +5752,7 @@ class SpiderFootWebUi:
             if not statusdata:
                 return retdata
 
-            config_overrides = load_grade_config_overrides(self.config)
+            config_overrides = _cached_grade_config(self.config)
             overrides = config_overrides.get('event_overrides')
 
             for row in scandata:
@@ -5803,8 +5882,8 @@ class SpiderFootWebUi:
             else:
                 self.log.debug(f"Grade: {etype} NOT in scan results -> will get fail penalty")
 
-        # Load config overrides from settings
-        config_overrides = load_grade_config_overrides(self.config)
+        # Load config overrides from settings (cached)
+        config_overrides = _cached_grade_config(self.config)
 
         # Calculate grade
         result = calculate_full_grade(event_type_counts, config_overrides)
@@ -7866,7 +7945,7 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
-    def scaneventresults(self: 'SpiderFootWebUi', id: str, eventType: str = None, filterfp: bool = False, correlationId: str = None) -> list:
+    def scaneventresults(self: 'SpiderFootWebUi', id: str, eventType: str = None, filterfp: bool = False, correlationId: str = None, limit: str = None, offset: str = None) -> list:
         """Return all event results for a scan as JSON.
 
         Args:
@@ -7874,11 +7953,17 @@ class SpiderFootWebUi:
             eventType (str): filter by event type
             filterfp (bool): remove false positives from search results
             correlationId (str): filter by events associated with a correlation
+            limit (str): max rows to return (for pagination)
+            offset (str): rows to skip (for pagination)
 
         Returns:
             list: scan results with target-level FP and validated status
         """
         retdata = []
+
+        # Parse pagination parameters
+        pg_limit = int(limit) if limit is not None else None
+        pg_offset = int(offset) if offset is not None else None
 
         with SpiderFootDb(self.config) as dbh:
 
@@ -7887,7 +7972,8 @@ class SpiderFootWebUi:
 
             try:
                 data = dbh.scanResultEvent(
-                    id, eventType, filterFp=filterfp, correlationId=correlationId)
+                    id, eventType, filterFp=filterfp, correlationId=correlationId,
+                    limit=pg_limit, offset=pg_offset)
             except Exception as e:
                 self.log.warning(
                     f"scaneventresults failed for scan={id}, correlationId={correlationId}, "
@@ -7976,6 +8062,39 @@ class SpiderFootWebUi:
                 ])
 
             return retdata
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scaneventresultscount(self: 'SpiderFootWebUi', id: str, eventType: str = None, correlationId: str = None) -> dict:
+        """Return count of event results grouped by false_positive flag.
+
+        This is a lightweight endpoint for the stats bar that avoids fetching all rows.
+
+        Args:
+            id (str): scan ID
+            eventType (str): filter by event type
+            correlationId (str): filter by correlation ID
+
+        Returns:
+            dict: {total: N, fp: N, validated: N, unverified: N}
+        """
+        with SpiderFootDb(self.config) as dbh:
+            if not eventType:
+                eventType = 'ALL'
+
+            try:
+                counts = dbh.scanResultEventCount(id, eventType, correlationId=correlationId)
+            except Exception as e:
+                self.log.warning(f"scaneventresultscount failed for scan={id}: {e}")
+                return {'total': 0, 'fp': 0, 'validated': 0, 'unverified': 0}
+
+            total = sum(counts.values())
+            return {
+                'total': total,
+                'fp': counts.get(1, 0),
+                'validated': counts.get(2, 0),
+                'unverified': counts.get(0, 0)
+            }
 
     @cherrypy.expose
     @cherrypy.tools.json_out()

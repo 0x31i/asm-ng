@@ -204,6 +204,10 @@ class SpiderFootDb:
         "CREATE INDEX idx_scan_correlation ON tbl_scan_correlation_results (scan_instance_id, id)",
         "CREATE INDEX idx_scan_correlation_events ON tbl_scan_correlation_results_events (correlation_id)",
         "CREATE INDEX idx_scan_correlation_events_hash ON tbl_scan_correlation_results_events (event_hash)",
+        "CREATE INDEX idx_scan_instance_target ON tbl_scan_instance (seed_target)",
+        "CREATE INDEX idx_scan_results_type_data ON tbl_scan_results (scan_instance_id, type, data)",
+        "CREATE INDEX idx_scan_results_fp ON tbl_scan_results (scan_instance_id, false_positive)",
+        "CREATE INDEX idx_scan_correlation_risk ON tbl_scan_correlation_results (scan_instance_id, rule_risk)",
         "CREATE TABLE tbl_scan_findings ( \
             id                  INTEGER PRIMARY KEY AUTOINCREMENT, \
             scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
@@ -1019,6 +1023,19 @@ class SpiderFootDb:
                         self.dbh.execute(
                             "ALTER TABLE tbl_scan_config_new RENAME TO tbl_scan_config")
                         self.conn.commit()
+                except DatabaseError:
+                    pass
+
+            # Performance indexes for common query patterns
+            for idx_stmt in [
+                "CREATE INDEX IF NOT EXISTS idx_scan_instance_target ON tbl_scan_instance (seed_target)",
+                "CREATE INDEX IF NOT EXISTS idx_scan_results_type_data ON tbl_scan_results (scan_instance_id, type, data)",
+                "CREATE INDEX IF NOT EXISTS idx_scan_results_fp ON tbl_scan_results (scan_instance_id, false_positive)",
+                "CREATE INDEX IF NOT EXISTS idx_scan_correlation_risk ON tbl_scan_correlation_results (scan_instance_id, rule_risk)",
+            ]:
+                try:
+                    self.dbh.execute(idx_stmt)
+                    self.conn.commit()
                 except DatabaseError:
                     pass
 
@@ -2114,6 +2131,32 @@ class SpiderFootDb:
                 raise IOError(
                     "SQL error encountered when fetching correlation summary") from e
 
+    def scanCorrelationSummaryAllByRisk(self) -> dict:
+        """Get correlation risk summaries for ALL scans in a single query.
+
+        Returns:
+            dict: {scan_instance_id: {risk_level: count, ...}, ...}
+
+        Raises:
+            IOError: database I/O failed
+        """
+        qry = "SELECT scan_instance_id, rule_risk, count(*) AS total FROM \
+            tbl_scan_correlation_results GROUP BY scan_instance_id, rule_risk"
+
+        result = {}
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry)
+                for row in self.dbh.fetchall():
+                    scan_id = row[0]
+                    if scan_id not in result:
+                        result[scan_id] = {}
+                    result[scan_id][row[1]] = row[2]
+                return result
+            except DatabaseError as e:
+                raise IOError(
+                    "SQL error encountered when fetching all correlation summaries") from e
+
     def scanCorrelationList(self, instanceId: str) -> list:
         """Obtain a list of the correlations from a scan.
 
@@ -2170,7 +2213,9 @@ class SpiderFootDb:
         data: list = None,
         sourceId: list = None,
         correlationId: str = None,
-        filterFp: bool = False
+        filterFp: bool = False,
+        limit: int = None,
+        offset: int = None
     ) -> list:
         """Obtain the data for a scan and event type.
 
@@ -2182,6 +2227,8 @@ class SpiderFootDb:
             sourceId (list): filter by the ID of the source event
             correlationId (str): filter by the ID of a correlation result
             filterFp (bool): filter false positives
+            limit (int): max rows to return (for pagination)
+            offset (int): rows to skip (for pagination)
 
         Returns:
             list: scan results
@@ -2259,6 +2306,13 @@ class SpiderFootDb:
 
         qry += " ORDER BY c.data"
 
+        if limit is not None:
+            qry += " LIMIT ?"
+            qvars.append(limit)
+            if offset is not None:
+                qry += " OFFSET ?"
+                qvars.append(offset)
+
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, qvars)
@@ -2266,6 +2320,111 @@ class SpiderFootDb:
             except DatabaseError as e:
                 raise IOError(
                     "SQL error encountered when fetching result events") from e
+
+    def scanResultEventCount(self, instanceId: str, eventType: str = 'ALL', correlationId: str = None) -> dict:
+        """Get count of scan results grouped by false_positive flag.
+
+        Args:
+            instanceId (str): scan instance ID
+            eventType (str): filter by event type
+            correlationId (str): filter by correlation ID
+
+        Returns:
+            dict: {fp_flag: count} e.g. {0: 1500, 1: 20, 2: 50}
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(
+                f"instanceId is {type(instanceId)}; expected str()") from None
+
+        qry = "SELECT c.false_positive, COUNT(*) FROM tbl_scan_results c "
+
+        if correlationId:
+            qry += ", tbl_scan_correlation_results_events ce "
+
+        qry += "WHERE c.scan_instance_id = ? AND c.source_event_hash <> 'ROOT' "
+
+        qvars = [instanceId]
+
+        if correlationId:
+            qry += " AND ce.event_hash = c.hash AND ce.correlation_id = ?"
+            qvars.append(correlationId)
+
+        if eventType != "ALL":
+            if isinstance(eventType, list):
+                qry += " AND c.type in (" + ','.join(['?'] * len(eventType)) + ")"
+                qvars.extend(eventType)
+            else:
+                qry += " AND c.type = ?"
+                qvars.append(eventType)
+
+        qry += " GROUP BY c.false_positive"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, qvars)
+                result = {}
+                for row in self.dbh.fetchall():
+                    result[row[0]] = row[1]
+                return result
+            except DatabaseError as e:
+                raise IOError(
+                    "SQL error encountered when fetching result event count") from e
+
+    def scanResultEventTotalCount(self, instanceId: str, eventType: str = 'ALL', correlationId: str = None, filterFp: bool = False) -> int:
+        """Get total count of scan results (for pagination).
+
+        Args:
+            instanceId (str): scan instance ID
+            eventType (str): filter by event type
+            correlationId (str): filter by correlation ID
+            filterFp (bool): filter false positives
+
+        Returns:
+            int: total count
+
+        Raises:
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(
+                f"instanceId is {type(instanceId)}; expected str()") from None
+
+        qry = "SELECT COUNT(*) FROM tbl_scan_results c "
+
+        if correlationId:
+            qry += ", tbl_scan_correlation_results_events ce "
+
+        qry += "WHERE c.scan_instance_id = ? AND c.source_event_hash <> 'ROOT' "
+
+        qvars = [instanceId]
+
+        if correlationId:
+            qry += " AND ce.event_hash = c.hash AND ce.correlation_id = ?"
+            qvars.append(correlationId)
+
+        if eventType != "ALL":
+            if isinstance(eventType, list):
+                qry += " AND c.type in (" + ','.join(['?'] * len(eventType)) + ")"
+                qvars.extend(eventType)
+            else:
+                qry += " AND c.type = ?"
+                qvars.append(eventType)
+
+        if filterFp:
+            qry += " AND c.false_positive <> 1"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, qvars)
+                row = self.dbh.fetchone()
+                return row[0] if row else 0
+            except DatabaseError as e:
+                raise IOError(
+                    "SQL error encountered when fetching result event count") from e
 
     def scanResultEventUnique(self, instanceId: str, eventType: str = 'ALL', filterFp: bool = False) -> list:
         """Obtain a unique list of elements.
@@ -2469,10 +2628,15 @@ class SpiderFootDb:
                 f"resultHashes is {type(resultHashes)}; expected list()") from None
 
         with self.dbhLock:
-            for resultHash in resultHashes:
-                qry = "UPDATE tbl_scan_results SET false_positive = ? WHERE \
-                    scan_instance_id = ? AND hash = ?"
-                qvars = [fpFlag, instanceId, resultHash]
+            # Batch update using WHERE hash IN (...) instead of per-hash loop.
+            # Chunk into groups of 500 to stay within SQLite's 999-variable limit.
+            chunk_size = 500
+            for i in range(0, len(resultHashes), chunk_size):
+                chunk = resultHashes[i:i + chunk_size]
+                placeholders = ','.join(['?'] * len(chunk))
+                qry = f"UPDATE tbl_scan_results SET false_positive = ? WHERE \
+                    scan_instance_id = ? AND hash IN ({placeholders})"
+                qvars = [fpFlag, instanceId] + chunk
                 try:
                     self.dbh.execute(qry, qvars)
                 except DatabaseError as e:
@@ -2549,6 +2713,57 @@ class SpiderFootDb:
                 return rowcount
             except DatabaseError as e:
                 raise IOError("SQL error encountered when syncing false positive across scans") from e
+
+    def syncFalsePositiveAcrossScansMulti(self, target: str, items: list) -> int:
+        """Sync FP flags across all scans of the same target for multiple items in one transaction.
+
+        Args:
+            target (str): seed_target value
+            items (list): list of (eventType, eventData, sourceData, fpFlag) tuples
+
+        Returns:
+            int: total rows updated
+
+        Raises:
+            IOError: database I/O failed
+        """
+        if not items:
+            return 0
+
+        total = 0
+        with self.dbhLock:
+            for (eventType, eventData, sourceData, fpFlag) in items:
+                if sourceData is not None:
+                    qry = """UPDATE tbl_scan_results
+                        SET false_positive = ?
+                        WHERE scan_instance_id IN (SELECT guid FROM tbl_scan_instance WHERE seed_target = ?)
+                        AND type = ?
+                        AND data = ?
+                        AND source_event_hash IN (
+                            SELECT hash FROM tbl_scan_results src
+                            WHERE src.scan_instance_id = tbl_scan_results.scan_instance_id
+                            AND src.data = ?
+                        )"""
+                    params = (fpFlag, target, eventType, eventData, sourceData)
+                else:
+                    qry = """UPDATE tbl_scan_results
+                        SET false_positive = ?
+                        WHERE scan_instance_id IN (SELECT guid FROM tbl_scan_instance WHERE seed_target = ?)
+                        AND type = ?
+                        AND data = ?
+                        AND source_event_hash = 'ROOT'"""
+                    params = (fpFlag, target, eventType, eventData)
+                try:
+                    self.dbh.execute(qry, params)
+                    if self.dbh.rowcount and self.dbh.rowcount > 0:
+                        total += self.dbh.rowcount
+                except DatabaseError as e:
+                    raise IOError("SQL error encountered when syncing false positive across scans") from e
+            try:
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error encountered when committing batch sync") from e
+        return total
 
     def targetFalsePositiveAdd(self, target: str, eventType: str, eventData: str, sourceData: str = None, notes: str = None) -> bool:
         """Add a target-level false positive entry.
@@ -2833,6 +3048,153 @@ class SpiderFootDb:
                 raise IOError("SQL error encountered when removing target validated entry") from e
 
         return True
+
+    # ---- Batch methods for target-level persistence (performance optimization) ----
+
+    def targetFalsePositiveAddBatch(self, target: str, items: list) -> bool:
+        """Add multiple target-level false positive entries in one transaction.
+
+        Args:
+            target (str): the seed_target value
+            items (list): list of (eventType, eventData, sourceData) tuples
+
+        Returns:
+            bool: success
+        """
+        if not items:
+            return True
+
+        qry = self._insert_or_ignore("INSERT OR IGNORE INTO tbl_target_false_positives \
+            (target, event_type, event_data, source_data, date_added, notes) \
+            VALUES (?, ?, ?, ?, ?, ?)")
+        now = int(time.time() * 1000)
+        params_list = [(target, et, ed, sd, now, None) for (et, ed, sd) in items]
+
+        with self.dbhLock:
+            try:
+                self.dbh.executemany(qry, params_list)
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error in batch add target false positive") from e
+        return True
+
+    def targetFalsePositiveRemoveBatch(self, target: str, items: list) -> bool:
+        """Remove multiple target-level false positive entries in one transaction.
+
+        Handles both source_data=None and non-None cases, including legacy cleanup.
+
+        Args:
+            target (str): the seed_target value
+            items (list): list of (eventType, eventData, sourceData) tuples
+
+        Returns:
+            bool: success
+        """
+        if not items:
+            return True
+
+        with self.dbhLock:
+            try:
+                for (eventType, eventData, sourceData) in items:
+                    if sourceData is None:
+                        qry = "DELETE FROM tbl_target_false_positives WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+                        self.dbh.execute(qry, (target, eventType, eventData))
+                    else:
+                        qry = "DELETE FROM tbl_target_false_positives WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ?"
+                        self.dbh.execute(qry, (target, eventType, eventData, sourceData))
+                        qry_null = "DELETE FROM tbl_target_false_positives WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+                        self.dbh.execute(qry_null, (target, eventType, eventData))
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error in batch remove target false positive") from e
+        return True
+
+    def targetValidatedAddBatch(self, target: str, items: list) -> bool:
+        """Add multiple target-level validated entries in one transaction.
+
+        Args:
+            target (str): the seed_target value
+            items (list): list of (eventType, eventData, sourceData) tuples
+
+        Returns:
+            bool: success
+        """
+        if not items:
+            return True
+
+        qry = self._insert_or_ignore("INSERT OR IGNORE INTO tbl_target_validated \
+            (target, event_type, event_data, source_data, date_added, notes) \
+            VALUES (?, ?, ?, ?, ?, ?)")
+        now = int(time.time() * 1000)
+        params_list = [(target, et, ed, sd, now, None) for (et, ed, sd) in items]
+
+        with self.dbhLock:
+            try:
+                self.dbh.executemany(qry, params_list)
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error in batch add target validated") from e
+        return True
+
+    def targetValidatedRemoveBatch(self, target: str, items: list) -> bool:
+        """Remove multiple target-level validated entries in one transaction.
+
+        Args:
+            target (str): the seed_target value
+            items (list): list of (eventType, eventData, sourceData) tuples
+
+        Returns:
+            bool: success
+        """
+        if not items:
+            return True
+
+        with self.dbhLock:
+            try:
+                for (eventType, eventData, sourceData) in items:
+                    if sourceData is None:
+                        qry = "DELETE FROM tbl_target_validated WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+                        self.dbh.execute(qry, (target, eventType, eventData))
+                    else:
+                        qry = "DELETE FROM tbl_target_validated WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ?"
+                        self.dbh.execute(qry, (target, eventType, eventData, sourceData))
+                        qry_null = "DELETE FROM tbl_target_validated WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+                        self.dbh.execute(qry_null, (target, eventType, eventData))
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error in batch remove target validated") from e
+        return True
+
+    def knownAssetAddBatch(self, target: str, items: list, source: str = 'ANALYST_CONFIRMED', addedBy: str = None) -> bool:
+        """Add multiple known asset entries in one transaction.
+
+        Args:
+            target (str): scan target this asset belongs to
+            items (list): list of (assetType, assetValue) tuples
+            source (str): 'CLIENT_PROVIDED' or 'ANALYST_CONFIRMED'
+            addedBy (str): username who added this
+
+        Returns:
+            bool: success
+        """
+        if not items:
+            return True
+
+        qry = self._insert_or_ignore("INSERT OR IGNORE INTO tbl_known_assets \
+            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes) \
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        now = int(time.time() * 1000)
+        params_list = [(target, at, av, source, None, now, addedBy, None) for (at, av) in items]
+
+        with self.dbhLock:
+            try:
+                self.dbh.executemany(qry, params_list)
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error in batch add known assets") from e
+        return True
+
+    # ---- End batch methods ----
 
     def targetValidatedRemoveById(self, valId: int) -> bool:
         """Remove a target-level validated entry by its ID.
