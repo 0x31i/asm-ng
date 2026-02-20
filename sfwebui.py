@@ -2382,18 +2382,6 @@ class SpiderFootWebUi:
             except Exception as e:
                 return {'success': False, 'message': f'Failed to create scan instance: {e}'}
 
-            # Create ROOT event for web UI browse compatibility
-            try:
-                root_qry = """INSERT INTO tbl_scan_results
-                    (scan_instance_id, hash, type, generated, confidence,
-                    visibility, risk, module, data, false_positive, source_event_hash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
-                root_qvals = [scan_id, 'ROOT', 'ROOT', int(time.time() * 1000),
-                              100, 100, 0, '', target, 0, 'ROOT']
-                dbh.dbh.execute(root_qry, root_qvals)
-            except Exception as e:
-                return {'success': False, 'message': f'Failed to create ROOT event: {e}'}
-
             # Build synthetic source events so that each imported event
             # points to the correct source data element instead of ROOT.
             source_hash_map = {}
@@ -2410,104 +2398,120 @@ class SpiderFootWebUi:
                 except (IndexError, KeyError):
                     continue
 
-            # Insert synthetic source events (children of ROOT)
-            src_qry = """INSERT INTO tbl_scan_results
-                (scan_instance_id, hash, type, generated, confidence,
-                visibility, risk, module, data, false_positive, source_event_hash)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
-            for source_val, src_hash in source_hash_map.items():
+            # All direct SQL operations must be inside dbhLock so that
+            # the PostgreSQL pool connection (dbh.dbh) is available.
+            with dbh.dbhLock:
+                # Create ROOT event for web UI browse compatibility
                 try:
-                    src_qvals = [scan_id, src_hash, 'ROOT', int(time.time() * 1000),
-                                 100, 100, 0, '', source_val, 0, 'ROOT']
-                    dbh.dbh.execute(src_qry, src_qvals)
-                except Exception:
-                    pass
-
-            # Import each row
-            for i, row in enumerate(rows):
-                try:
-                    event_type = row[col_map['type']]
-                    module = row[col_map['module']]
-                    source = row[col_map['source']]
-                    data = row[col_map['data']]
-
-                    # Parse timestamp
-                    timestamp_str = row[col_map['updated']]
-                    timestamp = int(time.time() * 1000)
-                    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S", "%m/%d/%Y %H:%M:%S"]:
-                        try:
-                            dt = dt_datetime.strptime(timestamp_str.strip(), fmt)
-                            timestamp = int(dt.timestamp() * 1000)
-                            break
-                        except ValueError:
-                            continue
-
-                    # Parse status flag
-                    fp = 0
-                    if col_map['fp'] is not None and len(row) > col_map['fp']:
-                        fp_val = row[col_map['fp']].strip().lower() if row[col_map['fp']] else ''
-                        if fp_val in ('1', 'true', 'yes', 'fp', 'false positive'):
-                            fp = 1
-                        elif fp_val in ('2', 'validated', 'valid', 'confirmed'):
-                            fp = 2
-                        elif fp_val and fp_val.isdigit():
-                            fp = int(fp_val) if int(fp_val) in (0, 1, 2) else 0
-
-                    # Skip ROOT events
-                    if event_type == 'ROOT':
-                        stats['rows_skipped'] += 1
-                        continue
-
-                    # Generate hash
-                    hash_input = f"{scan_id}|{event_type}|{data}|{source}|{time.time()}"
-                    event_hash = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()[:32]
-
-                    # Resolve source event hash from synthetic source events
-                    source_event_hash = source_hash_map.get(source, 'ROOT')
-
-                    qry = """INSERT INTO tbl_scan_results
+                    root_qry = """INSERT INTO tbl_scan_results
                         (scan_instance_id, hash, type, generated, confidence,
                         visibility, risk, module, data, false_positive, source_event_hash)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
-                    qvals = [scan_id, event_hash, event_type, timestamp,
-                             100, 100, 0, module, data, fp, source_event_hash]
-                    dbh.dbh.execute(qry, qvals)
-
-                    # Save target-level false positives
-                    if fp == 1:
-                        try:
-                            fp_qry = """INSERT OR IGNORE INTO tbl_target_false_positives
-                                (target, event_type, event_data, source_data, date_added, notes)
-                                VALUES (?, ?, ?, ?, ?, ?)"""
-                            fp_qvals = [target, event_type, data, source, int(time.time() * 1000),
-                                        f'Imported via web UI: {scan_name}']
-                            dbh.dbh.execute(fp_qry, fp_qvals)
-                            stats['fps_imported'] += 1
-                        except Exception:
-                            pass
-
-                    # Save target-level validated entries
-                    if fp == 2:
-                        try:
-                            val_qry = """INSERT OR IGNORE INTO tbl_target_validated
-                                (target, event_type, event_data, source_data, date_added, notes)
-                                VALUES (?, ?, ?, ?, ?, ?)"""
-                            val_qvals = [target, event_type, data, source, int(time.time() * 1000),
-                                         f'Imported via web UI: {scan_name}']
-                            dbh.dbh.execute(val_qry, val_qvals)
-                            stats['validated_imported'] += 1
-                        except Exception:
-                            pass
-
-                    stats['event_types'].add(event_type)
-                    stats['rows_imported'] += 1
-
+                    root_qvals = [scan_id, 'ROOT', 'ROOT', int(time.time() * 1000),
+                                  100, 100, 0, '', target, 0, 'ROOT']
+                    dbh.dbh.execute(root_qry, root_qvals)
                 except Exception as e:
-                    stats['errors'].append(f'Row {i + 1}: {str(e)}')
-                    stats['rows_skipped'] += 1
+                    return {'success': False, 'message': f'Failed to create ROOT event: {e}'}
 
-            # Commit and finalize
-            dbh.conn.commit()
+                # Insert synthetic source events (children of ROOT)
+                src_qry = """INSERT INTO tbl_scan_results
+                    (scan_instance_id, hash, type, generated, confidence,
+                    visibility, risk, module, data, false_positive, source_event_hash)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                for source_val, src_hash in source_hash_map.items():
+                    try:
+                        src_qvals = [scan_id, src_hash, 'ROOT', int(time.time() * 1000),
+                                     100, 100, 0, '', source_val, 0, 'ROOT']
+                        dbh.dbh.execute(src_qry, src_qvals)
+                    except Exception:
+                        pass
+
+                # Import each row
+                for i, row in enumerate(rows):
+                    try:
+                        event_type = row[col_map['type']]
+                        module = row[col_map['module']]
+                        source = row[col_map['source']]
+                        data = row[col_map['data']]
+
+                        # Parse timestamp
+                        timestamp_str = row[col_map['updated']]
+                        timestamp = int(time.time() * 1000)
+                        for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S", "%m/%d/%Y %H:%M:%S"]:
+                            try:
+                                dt = dt_datetime.strptime(timestamp_str.strip(), fmt)
+                                timestamp = int(dt.timestamp() * 1000)
+                                break
+                            except ValueError:
+                                continue
+
+                        # Parse status flag
+                        fp = 0
+                        if col_map['fp'] is not None and len(row) > col_map['fp']:
+                            fp_val = row[col_map['fp']].strip().lower() if row[col_map['fp']] else ''
+                            if fp_val in ('1', 'true', 'yes', 'fp', 'false positive'):
+                                fp = 1
+                            elif fp_val in ('2', 'validated', 'valid', 'confirmed'):
+                                fp = 2
+                            elif fp_val and fp_val.isdigit():
+                                fp = int(fp_val) if int(fp_val) in (0, 1, 2) else 0
+
+                        # Skip ROOT events
+                        if event_type == 'ROOT':
+                            stats['rows_skipped'] += 1
+                            continue
+
+                        # Generate hash
+                        hash_input = f"{scan_id}|{event_type}|{data}|{source}|{time.time()}"
+                        event_hash = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()[:32]
+
+                        # Resolve source event hash from synthetic source events
+                        source_event_hash = source_hash_map.get(source, 'ROOT')
+
+                        qry = """INSERT INTO tbl_scan_results
+                            (scan_instance_id, hash, type, generated, confidence,
+                            visibility, risk, module, data, false_positive, source_event_hash)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                        qvals = [scan_id, event_hash, event_type, timestamp,
+                                 100, 100, 0, module, data, fp, source_event_hash]
+                        dbh.dbh.execute(qry, qvals)
+
+                        # Save target-level false positives
+                        if fp == 1:
+                            try:
+                                fp_qry = """INSERT OR IGNORE INTO tbl_target_false_positives
+                                    (target, event_type, event_data, source_data, date_added, notes)
+                                    VALUES (?, ?, ?, ?, ?, ?)"""
+                                fp_qvals = [target, event_type, data, source, int(time.time() * 1000),
+                                            f'Imported via web UI: {scan_name}']
+                                dbh.dbh.execute(fp_qry, fp_qvals)
+                                stats['fps_imported'] += 1
+                            except Exception:
+                                pass
+
+                        # Save target-level validated entries
+                        if fp == 2:
+                            try:
+                                val_qry = """INSERT OR IGNORE INTO tbl_target_validated
+                                    (target, event_type, event_data, source_data, date_added, notes)
+                                    VALUES (?, ?, ?, ?, ?, ?)"""
+                                val_qvals = [target, event_type, data, source, int(time.time() * 1000),
+                                             f'Imported via web UI: {scan_name}']
+                                dbh.dbh.execute(val_qry, val_qvals)
+                                stats['validated_imported'] += 1
+                            except Exception:
+                                pass
+
+                        stats['event_types'].add(event_type)
+                        stats['rows_imported'] += 1
+
+                    except Exception as e:
+                        stats['errors'].append(f'Row {i + 1}: {str(e)}')
+                        stats['rows_skipped'] += 1
+
+                # Commit (no-op with autocommit but harmless)
+                dbh.conn.commit()
+
             dbh.scanInstanceSet(scan_id, status='FINISHED', ended=time.time() * 1000)
 
             return {
@@ -2640,8 +2644,9 @@ class SpiderFootWebUi:
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
                     root_qvals = [scan_id, 'ROOT', 'ROOT', int(time.time() * 1000),
                                   100, 100, 0, '', target, 0, 'ROOT']
-                    dbh.dbh.execute(root_qry, root_qvals)
-                    dbh.conn.commit()
+                    with dbh.dbhLock:
+                        dbh.dbh.execute(root_qry, root_qvals)
+                        dbh.conn.commit()
                 except Exception as e:
                     return {'success': False, 'message': f'Failed to create scan instance: {e}'}
 
@@ -2821,8 +2826,9 @@ class SpiderFootWebUi:
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
                     root_qvals = [scan_id, 'ROOT', 'ROOT', int(time.time() * 1000),
                                   100, 100, 0, '', target, 0, 'ROOT']
-                    dbh.dbh.execute(root_qry, root_qvals)
-                    dbh.conn.commit()
+                    with dbh.dbhLock:
+                        dbh.dbh.execute(root_qry, root_qvals)
+                        dbh.conn.commit()
                 except Exception as e:
                     return {'success': False, 'message': f'Failed to create scan instance: {e}'}
 
@@ -5148,9 +5154,10 @@ class SpiderFootWebUi:
                 return self.jsonify_error('400', "Non-SELECTs are unpredictable and not recommended.")
 
             try:
-                ret = dbh.dbh.execute(query)
-                data = ret.fetchall()
-                columnNames = [c[0] for c in dbh.dbh.description]
+                with dbh.dbhLock:
+                    dbh.dbh.execute(query)
+                    data = dbh.dbh.fetchall()
+                    columnNames = [c[0] for c in dbh.dbh.description]
                 return [dict(zip(columnNames, row)) for row in data]
             except Exception as e:
                 return self.jsonify_error('500', str(e))
