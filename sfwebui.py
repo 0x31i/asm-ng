@@ -5751,31 +5751,44 @@ class SpiderFootWebUi:
 
             try:
                 scandata = _cached_scan_summary(dbh, id, by)
-            except Exception:
+            except Exception as e:
+                self.log.error(f"scansummary: scan summary query failed for scan={id}: {e}", exc_info=True)
                 return retdata
 
             try:
                 statusdata = dbh.scanInstanceGet(id)
-            except Exception:
+            except Exception as e:
+                self.log.error(f"scansummary: scanInstanceGet failed for scan={id}: {e}", exc_info=True)
                 return retdata
 
             if not statusdata:
+                self.log.warning(f"scansummary: no instance data for scan={id}")
                 return retdata
 
-            config_overrides = _cached_grade_config(self.config)
-            overrides = config_overrides.get('event_overrides')
+            try:
+                config_overrides = _cached_grade_config(self.config)
+                overrides = config_overrides.get('event_overrides')
+            except Exception as e:
+                self.log.warning(f"scansummary: grade config failed, using defaults: {e}")
+                overrides = None
 
             for row in scandata:
                 if row[0] == "ROOT":
                     continue
                 lastseen = time.strftime(
                     "%Y-%m-%d %H:%M:%S", time.localtime(row[2]))
-                grading = get_event_grading(row[0], overrides)
-                category = grading.get('category', 'Information / Reference')
-                rank = grading.get('rank', 5)
-                cat_meta = DEFAULT_GRADE_CATEGORIES.get(category, {})
-                color = cat_meta.get('color', '#6b7280')
-                weight = cat_meta.get('weight', 0.0)
+                try:
+                    grading = get_event_grading(row[0], overrides)
+                    category = grading.get('category', 'Information / Reference')
+                    rank = grading.get('rank', 5)
+                    cat_meta = DEFAULT_GRADE_CATEGORIES.get(category, {})
+                    color = cat_meta.get('color', '#6b7280')
+                    weight = cat_meta.get('weight', 0.0)
+                except Exception:
+                    category = 'Information / Reference'
+                    rank = 5
+                    color = '#6b7280'
+                    weight = 0.0
                 retdata.append([row[0], row[1], lastseen,
                                row[3], row[4], statusdata[5],
                                category, color, rank, weight])
