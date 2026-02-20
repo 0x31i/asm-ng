@@ -6,7 +6,7 @@
 [![Last Commit](https://img.shields.io/github/last-commit/0x31i/asm-ng)](https://github.com/0x31i/asm-ng/commits/master)
 ![Active Development](https://img.shields.io/badge/Maintenance%20Level-Actively%20Developed-brightgreen.svg)
 
-**ASM-NG** is a production-ready attack surface management and OSINT platform. Built on a battle-tested scanning engine with 200+ modules, it extends far beyond traditional OSINT with **workspace management**, **security grading**, **false positive tracking**, **known asset management**, **external vulnerability tool integration** (Burp Suite Pro, Nessus Pro, Nuclei), and **multi-layered cross-scan correlation** — making intelligence data truly navigable and actionable.
+**ASM-NG** is a production-ready attack surface management and OSINT platform. Built on a battle-tested scanning engine with 200+ modules, it extends far beyond traditional OSINT with **workspace management**, **security grading**, **AI/ML infrastructure discovery**, **false positive tracking**, **known asset management**, **external vulnerability tool integration** (Burp Suite Pro, Nessus Pro, Nuclei), **dual-backend database** (SQLite + PostgreSQL), and **multi-layered cross-scan correlation** — making intelligence data truly navigable and actionable.
 
 ASM-NG features an embedded web server with a clean, modern interface and can also be used entirely via the command line. Written in **Python 3** and **MIT-licensed**.
 
@@ -32,8 +32,9 @@ ASM-NG is a ground-up transformation of SpiderFoot into a full attack surface ma
 | **Correlation Engine** | Basic YAML rules | YAML rules + single-scan IOC correlation + cross-scan historical correlation + CTI report generation |
 | **Data Import** | None | Legacy CSV, Scan Backup, Nessus XML, Burp XML/HTML, Excel findings |
 | **Export** | CSV/JSON | CSV/JSON/XLSX/GEXF with multi-scan export, vulnerability export, asset export |
-| **Database** | SQLite only | Hardened SQLite with 9 new tables, auto-migration, and built-in backup/health checks |
-| **Modules** | ~200 | 274 modules including security hardening and threat intel modules |
+| **Database** | SQLite only | Dual-backend: SQLite (dev) + PostgreSQL (production) with auto-setup, connection pooling, and bidirectional migration |
+| **AI/ML Discovery** | None | 3 modules for external AI infrastructure fingerprinting, AI subdomain discovery, and embedded AI detection |
+| **Modules** | ~200 | 277 modules including AI recon, security hardening, and threat intel modules |
 | **Correlation Rules** | 37 YAML rules | 51 YAML rules + automated single-scan and cross-scan correlation |
 
 ---
@@ -290,6 +291,42 @@ Structured analysis modules and report generation built on the correlation engin
 
 ---
 
+### AI/ML Attack Surface Discovery
+
+Discover and fingerprint exposed AI/ML infrastructure on the external attack surface — the first open-source ASM platform with true outside-in AI detection, not just internal cloud scanning.
+
+**Three purpose-built modules covering four detection layers:**
+
+**AI Infrastructure Fingerprinter** (`sfp_ai_fingerprint`):
+- Watches open ports and banners from Shodan, Censys, and port scanner modules
+- Recognizes 15+ AI service ports: Ollama (11434), NVIDIA Triton (8000), vLLM (8000), TorchServe (8080), TensorFlow Serving (8501), MLflow (5000), BentoML (3000), Gradio (7860), Ray Dashboard (8265), Streamlit (8501), LM Studio (1234), Jupyter (8888), and more
+- Sends framework-specific HTTP probes to positively confirm what's running (e.g., `GET /api/tags` for Ollama, `GET /v2/health/ready` for Triton, `GET /ping` for TorchServe)
+- Checks for unauthenticated model access — lists exposed models and flags endpoints with no authentication
+- Detects AI frameworks in TCP banners and HTTP headers regardless of port
+
+**AI Subdomain Discovery** (`sfp_ai_subdomain`):
+- Queries Certificate Transparency logs (crt.sh) and filters for AI-related subdomain patterns
+- DNS brute-forces with an 80+ term AI-specific wordlist (`inference.*`, `ml.*`, `ai.*`, `model.*`, `llm.*`, `genai.*`, `gpu.*`, `serving.*`, `ollama.*`, `triton.*`, etc.)
+- Detects cloud AI service CNAME patterns (AWS SageMaker, Azure OpenAI, HuggingFace Inference Endpoints)
+- Discovered hostnames flow into the standard pipeline: DNS resolution, port scanning, and AI fingerprinting
+
+**AI Web Content Analyzer** (`sfp_ai_webcontent`):
+- Scans fetched web content for AI SDK imports (OpenAI, Anthropic, Vercel AI, LangChain, HuggingFace, Cohere, Google Generative AI, Mistral, Pinecone, and more)
+- Detects AI chat widget embed codes (Chatbase, Botpress, Voiceflow, Ada, CustomGPT, Microsoft Copilot, and others)
+- Finds leaked AI service API keys (OpenAI `sk-*`, Anthropic `sk-ant-*`, HuggingFace `hf_*`, Google AI `AIza*`, Pinecone `pcsk_*`, Replicate `r8_*`)
+- Identifies hardcoded AI inference endpoint references in JavaScript bundles
+
+**New event types integrated into the grading system:**
+
+| Event Type | Severity | Grading Category |
+|---|---|---|
+| `AI_INFRASTRUCTURE_DETECTED` | Informational | Information / Reference |
+| `AI_MODEL_EXPOSED` | High | Network Security (-10 pts) |
+| `AI_ENDPOINT_UNAUTHENTICATED` | Critical | Network Security (-20 pts) |
+| `AI_API_KEY_LEAKED` | Critical | Information Leakage (-20 pts, count-scaled) |
+
+---
+
 ### Enhanced Export & Reporting
 
 Multi-format, multi-scan export capabilities for professional reporting workflows.
@@ -318,9 +355,34 @@ Multi-format, multi-scan export capabilities for professional reporting workflow
 
 ### Database Architecture
 
-ASM-NG uses a hardened SQLite database with optimized PRAGMAs, built-in backup/health checks, and 9 new database tables with automatic migration on upgrade.
+ASM-NG supports two database backends: **SQLite** for development and single-user deployments, and **PostgreSQL** for production multi-user environments. Both backends share the same schema, queries, and features — switching is transparent.
 
-**New tables beyond SpiderFoot v4.0:**
+**Dual-Backend Support:**
+
+| | SQLite | PostgreSQL |
+|---|---|---|
+| **Best for** | Development, single-user | Production, multi-user, concurrent scans |
+| **Setup** | Zero-config, file-based | Auto-setup on first launch or manual |
+| **Storage** | `~/.spiderfoot/spiderfoot.db` | `asmng` database on localhost:5432 |
+| **Concurrency** | Single-writer | 64 pooled connections (configurable) |
+| **Monitoring** | `/dbhealth`, `/dbbackup` endpoints | Standard PostgreSQL tooling |
+
+**PostgreSQL Features:**
+- **Auto-setup** — on first launch, ASM-NG automatically installs and configures PostgreSQL on Debian/Kali/Ubuntu, macOS (Homebrew), and RHEL/Fedora
+- **Connection pooling** — semaphore-gated thread pool with 64 concurrent connections (prevents thundering herd from 100+ modules)
+- **Autocommit mode** — pool connections stay in autocommit mode, eliminating 2 network round-trips per operation
+- **Transparent SQL translation** — `PgCursorWrapper` automatically converts SQLite parameter markers and conflict syntax to PostgreSQL equivalents
+- **Automatic INT-to-BIGINT conversion** — handles millisecond timestamp overflow (SQLite INT is variable-length, PostgreSQL INT is 32-bit)
+- **Bidirectional migration** — `python -m spiderfoot.db_migrate` migrates data in either direction between SQLite and PostgreSQL
+
+**Backend Detection Priority:**
+1. `ASMNG_DATABASE_URL` environment variable (explicit PostgreSQL DSN)
+2. `ASMNG_DB_TYPE` environment variable (`postgresql` or `sqlite`)
+3. Auto-probe localhost:5432 for running PostgreSQL
+4. Auto-setup attempt (first launch only, creates sentinel file)
+5. Fallback to SQLite
+
+**New tables beyond SpiderFoot v4.0 (17 total across both backends):**
 
 | Table | Purpose |
 |---|---|
@@ -329,15 +391,15 @@ ASM-NG uses a hardened SQLite database with optimized PRAGMAs, built-in backup/h
 | `tbl_scan_findings` | Structured findings from Excel imports |
 | `tbl_scan_nessus_results` | Nessus Pro vulnerability scan results (18 fields) |
 | `tbl_scan_burp_results` | Burp Suite Pro vulnerability scan results (20 fields) |
-| `tbl_users` | User accounts with salted password hashes |
+| `tbl_users` | User accounts with salted password hashes and roles |
 | `tbl_audit_log` | Audit trail with username, action, IP, timestamp |
 | `tbl_known_assets` | Known asset inventory (IPs, domains, employees) |
 | `tbl_asset_import_history` | Asset import operation history |
 
 Plus enhancements to existing tables:
 - `tbl_scan_results` — new `imported_from_scan` column for provenance tracking
-- Comprehensive indexing on all new tables for query performance
-- Auto-migration handles schema upgrades seamlessly
+- Comprehensive indexing on all new tables (25+ indexes) for query performance
+- Incremental auto-migration handles schema upgrades seamlessly on both backends
 
 ---
 
@@ -347,8 +409,8 @@ Plus enhancements to existing tables:
 graph TD;
     A[User] -->|Web UI| B[ASM-NG Core Engine];
     A -->|CLI| B;
-    B --> C[274 Modules];
-    B --> D[Database - SQLite];
+    B --> C[277 Modules];
+    B --> D[Database - SQLite / PostgreSQL];
     B --> E[REST API];
     B --> F[Workspace Manager];
     B --> G[Grading Engine];
@@ -437,15 +499,57 @@ Or install via `pip install .` / `setup.py` which registers both legacy (`spider
 
 ## Database Configuration
 
-### SQLite (Default)
+### SQLite (Default for Development)
 
-Works out of the box. Database stored at `~/.spiderfoot/spiderfoot.db`.
+Works out of the box with zero configuration. Database stored at `~/.spiderfoot/spiderfoot.db`.
+
+```bash
+# Force SQLite even if PostgreSQL is available
+export ASMNG_DB_TYPE=sqlite
+```
+
+### PostgreSQL (Recommended for Production)
+
+On first launch, ASM-NG automatically installs and configures PostgreSQL if running on a supported platform (Debian/Kali/Ubuntu, macOS, RHEL/Fedora). Default credentials: `admin:admin`.
+
+```bash
+# Explicit PostgreSQL connection
+export ASMNG_DATABASE_URL="postgresql://admin:admin@localhost:5432/asmng"
+
+# Or configure individual parameters
+export PG_HOST=localhost
+export PG_PORT=5432
+export PG_DATABASE=asmng
+export PG_USER=admin
+export PG_PASSWORD=admin
+
+# Disable auto-setup if you manage PostgreSQL yourself
+export ASMNG_PG_AUTO_SETUP=0
+
+# Tune connection pool (defaults shown)
+export ASMNG_PG_POOL_MAX=64
+export ASMNG_PG_POOL_TIMEOUT=120
+```
+
+**Manual setup:**
+```bash
+# Run the setup script directly
+sudo ./setup-postgresql.sh
+```
+
+**Migrate existing data from SQLite to PostgreSQL:**
+```bash
+python -m spiderfoot.db_migrate \
+    --direction sqlite-to-pg \
+    --sqlite ~/.spiderfoot/spiderfoot.db \
+    --pg-dsn postgresql://admin:admin@localhost:5432/asmng
+```
 
 ### Database Health & Backup
 
 ASM-NG provides built-in database health monitoring and backup capabilities via the web UI:
 - `/dbhealth` — check database integrity, file size, page counts, and WAL status
-- `/dbbackup` — create a hot backup of the database while it's in use
+- `/dbbackup` — create a hot backup of the database while it's in use (SQLite)
 
 ---
 
@@ -522,12 +626,13 @@ You can target the following entities:
 
 ## Modules & Integrations
 
-ASM-NG has **274 modules**, most of which don't require API keys, and many that do have a free tier.
+ASM-NG has **277 modules**, most of which don't require API keys, and many that do have a free tier.
 
 Module categories include:
 - **OSINT Collection** — DNS, WHOIS, web scraping, port scanning, social media enumeration
 - **Threat Intelligence** — SHODAN, HaveIBeenPwned, GreyNoise, AlienVault, SecurityTrails, and more
 - **Vulnerability Scanning** — Nuclei, Nmap, CMSeeK, Whatweb, DNSTwist
+- **AI/ML Infrastructure Discovery** — AI framework fingerprinting, AI subdomain discovery, embedded AI/SDK detection
 - **Threat Analysis** — cross-scan threat intel, scan summarization
 - **Security Hardening** — built-in hardening configuration module
 - **Data Storage** — database, stdout, and custom storage backends

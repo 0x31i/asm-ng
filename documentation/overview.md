@@ -21,7 +21,8 @@ ASM-NG is designed for both beginners and advanced users, offering a user-friend
 ## Key Features
 
 - **Automated OSINT Collection:** Schedule and run scans to collect intelligence from a wide range of sources with minimal manual effort. ASM-NG can run unattended, making it ideal for continuous monitoring.
-- **200+ Data Gathering Modules:** Integrate with threat feeds, search engines, social media, DNS, WHOIS, breach databases, paste sites, and more. Modules are regularly updated and community contributions are welcome.
+- **277 Data Gathering Modules:** Integrate with threat feeds, search engines, social media, DNS, WHOIS, breach databases, paste sites, and more. Modules are regularly updated and community contributions are welcome.
+- **AI/ML Infrastructure Discovery:** Detect and fingerprint exposed AI inference services (Ollama, Triton, vLLM, TorchServe, MLflow, BentoML, Gradio, and more), discover AI-related subdomains, and find embedded AI SDKs and leaked API keys in web content.
 - **Web UI and CLI:** Use the intuitive web interface for interactive investigations, visualization, and reporting, or the command-line interface for automation, scripting, and integration with other tools.
 - **Workspaces and Multi-Target Support:** Organize scans, targets, and results into workspaces for collaborative investigations and large-scale assessments. Workspaces allow you to manage multiple projects and share findings with your team.
 - **API for Integration:** Integrate ASM-NG with SIEM, SOAR, and other security tools using the RESTful API. Automate scans, retrieve results, and trigger actions based on findings.
@@ -41,7 +42,7 @@ ASM-NG consists of the following main components:
 - **Modules:** Each module is responsible for gathering a specific type of data or integrating with a particular source. Modules can be enabled, disabled, or configured individually.
 - **Web UI:** Provides a user-friendly interface for configuring scans, viewing results, managing workspaces, and visualizing relationships between entities. The UI supports advanced filtering, search, and export features.
 - **API:** Enables programmatic access to ASM-NG's capabilities for integration and automation. The API is fully documented and supports authentication, scan management, and data retrieval.
-- **Database:** Stores scan results, configuration, and workspace data. ASM-NG uses SQLite by default but can be configured for other backends in advanced setups.
+- **Database:** Stores scan results, configuration, and workspace data. ASM-NG supports dual backends: SQLite for development and PostgreSQL for production, with automatic setup, connection pooling, and bidirectional migration tooling.
 - **Scheduler:** Allows for automated, recurring scans to ensure continuous monitoring of assets and threats.
 
 ---
@@ -55,6 +56,7 @@ ASM-NG consists of the following main components:
 - **Enriching alerts and incidents with OSINT context:** Provide additional context to security alerts and incidents, improving triage and response.
 - **Third-party/vendor risk assessment:** Evaluate the security posture of partners, vendors, or acquisition targets by mapping their digital footprint.
 - **Red team and penetration test reconnaissance:** Automate the reconnaissance phase of security assessments, saving time and increasing coverage.
+- **Discovering exposed AI/ML infrastructure:** Identify unauthenticated AI inference endpoints, exposed models, leaked AI API keys, and shadow AI deployments across your external attack surface.
 - **Continuous monitoring:** Set up scheduled scans to keep track of changes in your attack surface and receive alerts for new findings.
 
 ---

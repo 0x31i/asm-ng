@@ -2,7 +2,7 @@
 
 *Author: poppopjmp*
 
-ASM-NG includes over 200 modules for data gathering, enrichment, and analysis. Modules can be combined to create powerful OSINT workflows tailored to your needs.
+ASM-NG includes over 270 modules for data gathering, enrichment, and analysis. Modules can be combined to create powerful OSINT workflows tailored to your needs.
 
 ---
 
@@ -47,6 +47,11 @@ Modules are plugins that collect, enrich, or analyze data from various sources. 
 - **sfp_haveibeen**: HaveIBeenPwned integration
 - **sfp_hunter**: Hunter.io email discovery
 - **sfp_emailrep**: Email reputation checking
+
+### AI/ML Infrastructure Discovery
+- **sfp_ai_fingerprint**: Detects and fingerprints exposed AI/ML inference services (Ollama, NVIDIA Triton, vLLM, TorchServe, TensorFlow Serving, MLflow, BentoML, Gradio, Ray Dashboard, Streamlit, LM Studio, MCP servers, and more) by analyzing open ports, banners, and sending framework-specific HTTP probes. Checks for unauthenticated model access.
+- **sfp_ai_subdomain**: Discovers AI/ML-related subdomains via Certificate Transparency logs (crt.sh) and DNS brute-forcing with an AI-specific wordlist (80+ terms including inference.*, ml.*, ai.*, model.*, llm.*, genai.*, gpu.*, serving.*, etc.). Detects cloud AI service CNAME patterns (AWS SageMaker, Azure OpenAI, HuggingFace Inference Endpoints).
+- **sfp_ai_webcontent**: Analyzes fetched web content for embedded AI integrations: SDK imports (OpenAI, Anthropic, Vercel AI, LangChain, HuggingFace, Cohere, Google Generative AI, Mistral, Pinecone), AI chat widget markers (Chatbase, Botpress, Voiceflow, Ada), leaked AI API keys (OpenAI, Anthropic, HuggingFace, Google AI, Pinecone, Replicate), and AI endpoint references in JavaScript.
 
 ---
 
