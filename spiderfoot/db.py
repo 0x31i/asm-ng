@@ -929,7 +929,7 @@ class SpiderFootDb:
                     self.dbh.execute("ALTER TABLE tbl_scan_results ADD COLUMN tracking INT NOT NULL DEFAULT 0")
                     self.conn.commit()
                 except DatabaseError as e:
-                    self.log.warning(f"Migration failed: could not add tracking column to tbl_scan_results: {e}")
+                    _log.warning(f"Migration failed: could not add tracking column to tbl_scan_results: {e}")
 
             # Migration: Fix invalid FK in tbl_scan_correlation_results_events
             # The REFERENCES tbl_scan_results(hash) is invalid because hash is
