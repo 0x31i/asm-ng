@@ -88,6 +88,12 @@
                   Full Report (.xlsx)
                 </a>
               </li>
+              <li>
+                <a class="link" onClick='exportFullScoredCSV("${id}")'>
+                  <i class="glyphicon glyphicon-download-alt" style="margin-right: 6px;"></i>
+                  Full Report (.csv) &mdash; with Scores
+                </a>
+              </li>
               <li class="divider"></li>
               <li class="dropdown-header">Findings &amp; Correlations</li>
               <li>
@@ -8126,6 +8132,13 @@
             _fetchAndDownload(
                 '${docroot}/scaneventresultexport?filetype=csv&export_mode=full&legacy=1&id=' + instanceId + '&type=',
                 'SpiderFoot-Legacy-Export.csv'
+            );
+        }
+
+        function exportFullScoredCSV(instanceId) {
+            _fetchAndDownload(
+                '${docroot}/scaneventresultexport?filetype=csv&export_mode=full_scored&id=' + instanceId + '&type=',
+                'SpiderFoot-Full-Scored.csv'
             );
         }
 
