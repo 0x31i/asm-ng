@@ -1133,7 +1133,7 @@ class SpiderFootWebUi:
                     lastseen = time.strftime(
                         "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
                     datafield = str(row[1]).replace(
-                        "<SFURL>", "").replace("</SFURL>", "")
+                        "<SFURL>", "").replace("</SFURL>", "").replace("\x00", "")
                     tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
                     event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
                     tracking_label = tracking_labels.get(row[16], 'OPEN')
@@ -1175,7 +1175,7 @@ class SpiderFootWebUi:
                     lastseen = time.strftime(
                         "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
                     datafield = str(row[1]).replace(
-                        "<SFURL>", "").replace("</SFURL>", "")
+                        "<SFURL>", "").replace("</SFURL>", "").replace("\x00", "")
                     event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
                     tracking_label = tracking_labels.get(row[16], 'OPEN')
                     if export_mode == "full_scored":
