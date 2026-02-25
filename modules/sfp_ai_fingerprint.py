@@ -23,9 +23,12 @@ class sfp_ai_fingerprint(SpiderFootPlugin):
     meta = {
         'name': "AI Infrastructure Fingerprinter",
         'summary': "Detect and fingerprint exposed AI/ML inference services "
-            "(Ollama, Triton, vLLM, TorchServe, MLflow, BentoML, Gradio, etc.) "
-            "by analyzing open ports, banners, and sending framework-specific "
-            "HTTP probes.",
+            "(Ollama, Triton, vLLM, LiteLLM, LocalAI, TorchServe, MLflow, "
+            "BentoML, Gradio, ComfyUI, Stable Diffusion WebUI, Weaviate, "
+            "ChromaDB, Milvus, Qdrant, Open WebUI, AnythingLLM, LangServe, "
+            "TabbyAPI, and more) by analyzing open ports, banners, and "
+            "sending framework-specific HTTP probes with graphw00f-style "
+            "backend differentiation.",
         'flags': ["slow", "invasive"],
         'useCases': ["Footprint", "Investigate"],
         'categories': ["Crawling and Scanning"],
@@ -64,22 +67,32 @@ class sfp_ai_fingerprint(SpiderFootPlugin):
     # A port appearing here triggers active fingerprinting.
     AI_PORTS = {
         '11434': ['ollama'],
-        '8000': ['triton', 'vllm', 'fastapi_ml'],
+        '8000': ['triton', 'vllm', 'fastapi_ml', 'chromadb'],
         '8001': ['triton_grpc'],
         '8002': ['triton_metrics'],
         '8501': ['tfserving', 'streamlit'],
         '8500': ['tfserving_grpc'],
-        '8080': ['torchserve'],
+        '8080': ['torchserve', 'weaviate', 'open_webui', 'langserve'],
         '8081': ['torchserve_mgmt'],
         '5000': ['mlflow'],
-        '3000': ['bentoml'],
-        '7860': ['gradio'],
+        '3000': ['bentoml', 'open_webui', 'flowise'],
+        '7860': ['gradio', 'stable_diffusion_webui'],
         '8265': ['ray_dashboard'],
         '1234': ['lm_studio'],
         '8888': ['jupyter'],
         '6333': ['qdrant'],
+        '6334': ['qdrant_grpc'],
         '19530': ['milvus'],
-        '8080': ['torchserve', 'comfyui'],
+        '9091': ['milvus_metrics'],
+        '8188': ['comfyui'],
+        '3001': ['anythingllm'],
+        '7861': ['text_generation_webui'],
+        '4000': ['litellm'],
+        '5002': ['tabbyapi'],
+        '3100': ['dify'],
+        '9400': ['dcgm_exporter'],
+        '6817': ['slurm_controller'],
+        '6818': ['slurm_daemon'],
     }
 
     # Banner substrings that suggest AI infrastructure regardless of port.
@@ -99,6 +112,21 @@ class sfp_ai_fingerprint(SpiderFootPlugin):
         (re.compile(r'lm\s*studio', re.I), 'LM Studio'),
         (re.compile(r'comfyui', re.I), 'ComfyUI'),
         (re.compile(r'langserve|langchain', re.I), 'LangServe'),
+        # New banner patterns
+        (re.compile(r'stable\s*diffusion|automatic1111|sd-webui', re.I), 'Stable Diffusion WebUI'),
+        (re.compile(r'anythingllm', re.I), 'AnythingLLM'),
+        (re.compile(r'open\s*webui', re.I), 'Open WebUI'),
+        (re.compile(r'litellm', re.I), 'LiteLLM'),
+        (re.compile(r'tabbyapi|tabby-api', re.I), 'TabbyAPI'),
+        (re.compile(r'text-generation-webui|oobabooga', re.I), 'text-generation-webui'),
+        (re.compile(r'chromadb|chroma', re.I), 'ChromaDB'),
+        (re.compile(r'weaviate', re.I), 'Weaviate'),
+        (re.compile(r'milvus', re.I), 'Milvus'),
+        (re.compile(r'flowise', re.I), 'Flowise'),
+        (re.compile(r'dify', re.I), 'Dify'),
+        (re.compile(r'koboldai|koboldcpp', re.I), 'KoboldAI'),
+        (re.compile(r'label.?studio', re.I), 'Label Studio'),
+        (re.compile(r'airflow', re.I), 'Apache Airflow'),
     ]
 
     # Framework-specific probe definitions.
@@ -130,6 +158,92 @@ class sfp_ai_fingerprint(SpiderFootPlugin):
         ('GET', '/_stcore/health', '', 'Streamlit'),
         # MCP Server (JSON-RPC 2.0)
         ('POST', '/', '{"jsonrpc"', 'MCP Server'),
+        # --- New probes for additional frameworks ---
+        # LiteLLM
+        ('GET', '/health/liveliness', '', 'LiteLLM'),
+        ('GET', '/health/readiness', '', 'LiteLLM'),
+        # LocalAI
+        ('GET', '/readyz', '', 'LocalAI'),
+        # text-generation-webui
+        ('GET', '/api/v1/model', '"model_name"', 'text-generation-webui'),
+        # ComfyUI
+        ('GET', '/system_stats', '"system"', 'ComfyUI'),
+        ('GET', '/object_info', '', 'ComfyUI'),
+        # Stable Diffusion WebUI (Automatic1111)
+        ('GET', '/sdapi/v1/options', '"sd_model_checkpoint"', 'Stable Diffusion WebUI'),
+        # Open WebUI
+        ('GET', '/api/config', '', 'Open WebUI'),
+        # AnythingLLM
+        ('GET', '/api/system', '', 'AnythingLLM'),
+        # LangServe
+        ('GET', '/docs', 'langserve', 'LangServe'),
+        # Weaviate
+        ('GET', '/v1/schema', '"classes"', 'Weaviate'),
+        ('GET', '/v1/.well-known/ready', '', 'Weaviate'),
+        # ChromaDB
+        ('GET', '/api/v1/collections', '', 'ChromaDB'),
+        ('GET', '/api/v1/heartbeat', '"nanosecond heartbeat"', 'ChromaDB'),
+        # Milvus
+        ('GET', '/api/v1/health', '', 'Milvus'),
+        # Qdrant (additional probes)
+        ('GET', '/collections', '"result"', 'Qdrant'),
+        # TabbyAPI
+        ('GET', '/v1/model/list', '', 'TabbyAPI'),
+        # Dify
+        ('GET', '/api/health', '', 'Dify'),
+        # Flowise
+        ('GET', '/api/v1/flows', '', 'Flowise'),
+        # Label Studio
+        ('GET', '/api/version', 'label-studio', 'Label Studio'),
+        # Apache Airflow
+        ('GET', '/api/v1/health', '"metadatabase"', 'Apache Airflow'),
+    ]
+
+    # OpenAI-Compatible Backend Differentiator (graphw00f technique).
+    # When /v1/models or /v1/chat/completions responds, send targeted
+    # probes to distinguish the specific backend framework.
+    OPENAI_BACKEND_SIGNATURES = [
+        # vLLM: error body contains "vllm" or "AsyncLLMEngine"
+        {
+            'method': 'POST', 'path': '/v1/chat/completions',
+            'body': '{"model": "NONEXISTENT_12345", "messages": [{"role": "user", "content": "test"}]}',
+            'match_field': 'body',
+            'match_patterns': [re.compile(r'vllm|AsyncLLMEngine|vllm\.entrypoints', re.I)],
+            'framework': 'vLLM',
+        },
+        # LiteLLM: unique health endpoint
+        {
+            'method': 'GET', 'path': '/health/liveliness', 'body': None,
+            'match_field': 'status', 'match_patterns': [re.compile(r'^200$')],
+            'framework': 'LiteLLM',
+        },
+        # LiteLLM: readiness with litellm in body
+        {
+            'method': 'GET', 'path': '/health/readiness', 'body': None,
+            'match_field': 'body', 'match_patterns': [re.compile(r'litellm', re.I)],
+            'framework': 'LiteLLM',
+        },
+        # LocalAI: X-Powered-By or body contains localai
+        {
+            'method': 'GET', 'path': '/v1/models', 'body': None,
+            'match_field': 'header', 'header_name': 'x-powered-by',
+            'match_patterns': [re.compile(r'LocalAI', re.I)],
+            'framework': 'LocalAI',
+        },
+        # text-generation-webui: /api/v1/model endpoint
+        {
+            'method': 'GET', 'path': '/api/v1/model', 'body': None,
+            'match_field': 'body',
+            'match_patterns': [re.compile(r'"model_name"|text-generation', re.I)],
+            'framework': 'text-generation-webui',
+        },
+        # TabbyAPI: /v1/model/list endpoint
+        {
+            'method': 'GET', 'path': '/v1/model/list', 'body': None,
+            'match_field': 'body',
+            'match_patterns': [re.compile(r'tabby|TabbyAPI', re.I)],
+            'framework': 'TabbyAPI',
+        },
     ]
 
     def setup(self, sfc, userOpts=dict()):
@@ -221,6 +335,65 @@ class sfp_ai_fingerprint(SpiderFootPlugin):
             return text
         return text[:length] + "..."
 
+    def _differentiate_openai_backend(self, base_url):
+        """Apply graphw00f technique to differentiate OpenAI-compatible backends.
+
+        When a host serves /v1/models or /v1/chat/completions, multiple
+        frameworks could be behind it. Send targeted probes and analyze
+        error signatures to identify the specific backend.
+
+        Returns: (framework_name, details) or None
+        """
+        for sig in self.OPENAI_BACKEND_SIGNATURES:
+            if self.checkForStop():
+                return None
+
+            url = f"{base_url}{sig['path']}"
+            try:
+                if sig['method'] == 'POST' and sig['body']:
+                    res = self.sf.fetchUrl(
+                        url,
+                        timeout=self.opts['probe_timeout'],
+                        useragent=self.opts['_useragent'],
+                        postData=sig['body'],
+                        headers={'Content-Type': 'application/json'}
+                    )
+                else:
+                    res = self.sf.fetchUrl(
+                        url,
+                        timeout=self.opts['probe_timeout'],
+                        useragent=self.opts['_useragent']
+                    )
+            except Exception:
+                continue
+
+            if not res:
+                continue
+
+            if sig['match_field'] == 'body' and res.get('content'):
+                for pattern in sig['match_patterns']:
+                    if pattern.search(res['content']):
+                        return (sig['framework'],
+                                f"Identified via error fingerprint on {sig['path']}")
+
+            elif sig['match_field'] == 'header' and res.get('headers'):
+                header_name = sig.get('header_name', '')
+                header_val = ''
+                if isinstance(res['headers'], dict):
+                    header_val = res['headers'].get(header_name, '')
+                for pattern in sig['match_patterns']:
+                    if pattern.search(str(header_val)):
+                        return (sig['framework'],
+                                f"Identified via {header_name} header")
+
+            elif sig['match_field'] == 'status' and res.get('code'):
+                for pattern in sig['match_patterns']:
+                    if pattern.search(str(res['code'])):
+                        return (sig['framework'],
+                                f"Identified via HTTP {res['code']} on {sig['path']}")
+
+        return None
+
     def _check_models_exposed(self, base_url, framework):
         """Check if models are accessible without authentication.
 
@@ -235,6 +408,17 @@ class sfp_ai_fingerprint(SpiderFootPlugin):
             'TensorFlow Serving': '/v1/models',
             'TorchServe': '/models',
             'MLflow': '/api/2.0/mlflow/experiments/list',
+            # New frameworks
+            'vLLM': '/v1/models',
+            'LiteLLM': '/v1/models',
+            'LocalAI': '/v1/models',
+            'LM Studio': '/v1/models',
+            'text-generation-webui': '/api/v1/model',
+            'TabbyAPI': '/v1/model/list',
+            'Weaviate': '/v1/schema',
+            'ChromaDB': '/api/v1/collections',
+            'Milvus': '/api/v1/collections',
+            'Qdrant': '/collections',
         }
 
         endpoint = model_endpoints.get(framework)
@@ -293,8 +477,75 @@ class sfp_ai_fingerprint(SpiderFootPlugin):
                 name = exp.get('name', '')
                 if name:
                     models.append(name)
+        elif framework == 'Weaviate':
+            for cls in data.get('classes', []):
+                name = cls.get('class', '')
+                if name:
+                    models.append(f"collection:{name}")
+        elif framework == 'ChromaDB':
+            if isinstance(data, list):
+                for coll in data:
+                    name = coll.get('name', '') if isinstance(coll, dict) else str(coll)
+                    if name:
+                        models.append(f"collection:{name}")
+        elif framework == 'Qdrant':
+            for coll in data.get('result', {}).get('collections', []):
+                name = coll.get('name', '')
+                if name:
+                    models.append(f"collection:{name}")
+        elif framework in ('vLLM', 'LiteLLM', 'LocalAI', 'LM Studio', 'TabbyAPI'):
+            # These all use OpenAI-compatible /v1/models format
+            for m in data.get('data', []):
+                if isinstance(m, dict):
+                    name = m.get('id', '')
+                    if name:
+                        models.append(name)
 
         return models[:20]  # Cap at 20 to avoid noise
+
+    def _check_admin_exposed(self, base_url, framework):
+        """Check if management/admin endpoints are exposed without auth.
+
+        Returns description of exposed admin surface, or None.
+        """
+        admin_endpoints = {
+            'Ollama': [('/api/delete', 'DELETE model endpoint')],
+            'NVIDIA Triton': [('/v2/repository/index', 'Model repository management')],
+            'TorchServe': [('/models', 'Model management API (port 8081)')],
+            'MLflow': [
+                ('/api/2.0/mlflow/registered-models/list', 'Model registry'),
+            ],
+            'Ray Dashboard': [('/api/cluster_status', 'Cluster management')],
+            'LiteLLM': [('/key/info', 'API key management')],
+            'ComfyUI': [('/system_stats', 'System statistics')],
+            'Stable Diffusion WebUI': [('/sdapi/v1/cmd-flags', 'Command flags')],
+            'Jupyter': [('/api/kernels', 'Kernel management')],
+            'Weaviate': [('/v1/schema', 'Schema management')],
+            'ChromaDB': [('/api/v1/collections', 'Collection management')],
+            'Milvus': [('/api/v1/collections', 'Collection management')],
+            'Qdrant': [('/collections', 'Collection management')],
+        }
+
+        endpoints = admin_endpoints.get(framework, [])
+        exposed = []
+
+        for path, description in endpoints:
+            if self.checkForStop():
+                return None
+            try:
+                res = self.sf.fetchUrl(
+                    f"{base_url}{path}",
+                    timeout=self.opts['probe_timeout'],
+                    useragent=self.opts['_useragent']
+                )
+                if res and res.get('code') and int(res['code']) < 400:
+                    exposed.append(f"{path} ({description})")
+            except Exception:
+                continue
+
+        if exposed:
+            return f"Admin endpoints accessible: {', '.join(exposed[:3])}"
+        return None
 
     def _fingerprint_from_banner(self, banner):
         """Check banner text against known AI patterns. Returns framework name or None."""
@@ -325,6 +576,14 @@ class sfp_ai_fingerprint(SpiderFootPlugin):
                 result = self._probe_endpoint(base_url, method, path, expected, framework)
                 if result:
                     fw_name, details = result
+
+                    # graphw00f differentiator for OpenAI-compatible APIs
+                    if fw_name == 'OpenAI-Compatible API':
+                        backend = self._differentiate_openai_backend(base_url)
+                        if backend:
+                            fw_name = backend[0]
+                            details = backend[1]
+
                     self.info(f"Confirmed {fw_name} on {key} via {path}")
 
                     # Emit AI_INFRASTRUCTURE_DETECTED
@@ -363,6 +622,15 @@ class sfp_ai_fingerprint(SpiderFootPlugin):
                                 f"model listing ({len(exposed_models)} models)",
                                 self.__name__, evt)
                             self.notifyListeners(unauth_evt)
+
+                        # Check for exposed admin/management endpoints
+                        admin_check = self._check_admin_exposed(base_url, fw_name)
+                        if admin_check:
+                            admin_evt = SpiderFootEvent(
+                                "AI_ENDPOINT_UNAUTHENTICATED",
+                                f"{fw_name} on {key}: {admin_check}",
+                                self.__name__, evt)
+                            self.notifyListeners(admin_evt)
 
                     # Found a match on this scheme, stop probing
                     return

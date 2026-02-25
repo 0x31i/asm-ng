@@ -22,9 +22,11 @@ class sfp_ai_webcontent(SpiderFootPlugin):
     meta = {
         'name': "AI Web Content Analyzer",
         'summary': "Detect embedded AI/ML integrations in web content: SDK "
-            "imports (OpenAI, Anthropic, Vercel AI, LangChain), chat widget "
-            "markers, leaked API keys, and AI endpoint references in "
-            "JavaScript and HTML.",
+            "imports (OpenAI, Anthropic, Vercel AI, LangChain, LlamaIndex, "
+            "Groq, Mistral, Cohere, Fireworks), MCP client indicators, "
+            "AI agent frameworks (CrewAI, AutoGen, LangGraph), chat widget "
+            "markers, leaked API keys (15+ providers), and AI endpoint "
+            "references in JavaScript and HTML.",
         'flags': [],
         'useCases': ["Footprint", "Investigate"],
         'categories': ["Content Analysis"],
@@ -45,6 +47,8 @@ class sfp_ai_webcontent(SpiderFootPlugin):
         'detect_api_keys': True,
         'detect_widgets': True,
         'detect_endpoints': True,
+        'detect_mcp': True,
+        'detect_agents': True,
         'min_key_entropy': True,
     }
 
@@ -58,6 +62,10 @@ class sfp_ai_webcontent(SpiderFootPlugin):
             "(Ada, Voiceflow, Chatbase, Intercom AI, etc.).",
         'detect_endpoints': "Detect AI inference API endpoint references "
             "(/v1/chat/completions, /api/generate, etc.).",
+        'detect_mcp': "Detect MCP (Model Context Protocol) client references "
+            "and configuration patterns.",
+        'detect_agents': "Detect AI agent framework references "
+            "(CrewAI, AutoGen, LangGraph, Semantic Kernel, etc.).",
         'min_key_entropy': "Filter out low-entropy strings that match API key "
             "patterns but are likely false positives.",
     }
@@ -96,6 +104,39 @@ class sfp_ai_webcontent(SpiderFootPlugin):
             'ChromaDB SDK'),
         (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*weaviate-client''', re.I),
             'Weaviate SDK'),
+        # Additional LangChain packages
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*@langchain/core''', re.I),
+            'LangChain Core'),
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*@langchain/openai''', re.I),
+            'LangChain OpenAI'),
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*@langchain/anthropic''', re.I),
+            'LangChain Anthropic'),
+        # Google Generative AI (Python variant)
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*google\.generativeai''', re.I),
+            'Google Generative AI (Python)'),
+        # LlamaIndex
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*llama[-_]index|llamaindex''', re.I),
+            'LlamaIndex'),
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*@llamaindex''', re.I),
+            'LlamaIndex (JS)'),
+        # Anthropic Bedrock SDK
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*@anthropic-ai/bedrock-sdk''', re.I),
+            'Anthropic Bedrock SDK'),
+        # Groq SDK
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*groq''', re.I),
+            'Groq SDK'),
+        # Together AI
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*together''', re.I),
+            'Together AI SDK'),
+        # Fireworks AI
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*fireworks[.-]ai|fireworks\.client''', re.I),
+            'Fireworks AI SDK'),
+        # Mistral AI
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*mistralai|@mistralai''', re.I),
+            'Mistral AI SDK'),
+        # Deepseek
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*deepseek''', re.I),
+            'Deepseek SDK'),
         # CDN script tags
         (re.compile(r'src=["\'][^"\']*cdn[^"\']*openai[^"\']*["\']', re.I),
             'OpenAI CDN'),
@@ -127,6 +168,24 @@ class sfp_ai_webcontent(SpiderFootPlugin):
         # Replicate
         (re.compile(r'(?:^|["\'\s=:,])(?P<key>r8_[a-zA-Z0-9]{20,})(?:["\'\s,;]|$)'),
             'Replicate', 'r8_'),
+        # Groq
+        (re.compile(r'(?:^|["\'\s=:,])(?P<key>gsk_[a-zA-Z0-9]{20,})(?:["\'\s,;]|$)'),
+            'Groq', 'gsk_'),
+        # Cohere
+        (re.compile(r'(?:^|["\'\s=:,])(?P<key>co-[a-zA-Z0-9]{20,})(?:["\'\s,;]|$)'),
+            'Cohere', 'co-'),
+        # Together AI
+        (re.compile(r'(?:^|["\'\s=:,])(?P<key>tog_[a-zA-Z0-9]{20,})(?:["\'\s,;]|$)'),
+            'Together AI', 'tog_'),
+        # Fireworks AI
+        (re.compile(r'(?:^|["\'\s=:,])(?P<key>fw_[a-zA-Z0-9]{20,})(?:["\'\s,;]|$)'),
+            'Fireworks AI', 'fw_'),
+        # Weaviate
+        (re.compile(r'(?:^|["\'\s=:,])(?P<key>wvt_[a-zA-Z0-9]{20,})(?:["\'\s,;]|$)'),
+            'Weaviate', 'wvt_'),
+        # Deepseek (sk- prefix with deepseek context)
+        (re.compile(r'(?:deepseek|DEEPSEEK)[^"\']{0,30}(?P<key>sk-[a-zA-Z0-9]{20,})(?:["\'\s,;]|$)'),
+            'Deepseek', 'sk-'),
     ]
 
     # --- CHAT WIDGET PATTERNS ---
@@ -143,6 +202,11 @@ class sfp_ai_webcontent(SpiderFootPlugin):
         (re.compile(r'widget\.writesonic\.com', re.I), 'Writesonic/Botsonic'),
         (re.compile(r'copilot\.microsoft\.com/embed', re.I), 'Microsoft Copilot'),
         (re.compile(r'cdn\.zapier\.com/packages/partner-sdk', re.I), 'Zapier AI Chatbot'),
+        (re.compile(r'cdn\.chainlit\.io|chainlit-widget', re.I), 'Chainlit'),
+        (re.compile(r'app\.dify\.ai/embed|dify-chat-widget', re.I), 'Dify Chat Widget'),
+        (re.compile(r'cdn\.flowise\.ai|flowise-embed', re.I), 'Flowise Chat Widget'),
+        (re.compile(r'widget\.stack-ai\.com', re.I), 'Stack AI'),
+        (re.compile(r'embed\.typebot\.io', re.I), 'Typebot AI'),
     ]
 
     # --- AI ENDPOINT PATTERNS ---
@@ -158,6 +222,61 @@ class sfp_ai_webcontent(SpiderFootPlugin):
         (re.compile(r'/v1/models/[^/]+:predict', re.I), 'KServe v1 Prediction'),
         (re.compile(r'/api/2\.0/mlflow/', re.I), 'MLflow API'),
         (re.compile(r'/v2/repository/index', re.I), 'Triton Model Repository'),
+        # Additional endpoints
+        (re.compile(r'/v1/audio/speech', re.I), 'OpenAI-compatible TTS API'),
+        (re.compile(r'/api/tags\b', re.I), 'Ollama Tags API'),
+        (re.compile(r'/sdapi/v1/', re.I), 'Stable Diffusion WebUI API'),
+        (re.compile(r'/api/v1/collections', re.I), 'ChromaDB Collections API'),
+        (re.compile(r'/v1/schema', re.I), 'Weaviate Schema API'),
+        # External AI API references
+        (re.compile(r'api-inference\.huggingface\.co', re.I), 'HuggingFace Inference API'),
+        (re.compile(r'api\.anthropic\.com/v1/messages', re.I), 'Anthropic Messages API'),
+        (re.compile(r'api\.groq\.com', re.I), 'Groq API'),
+        (re.compile(r'api\.together\.xyz', re.I), 'Together AI API'),
+        # MCP endpoints in web content
+        (re.compile(r'/mcp/tools|/mcp/resources|/mcp/prompts', re.I), 'MCP Server Endpoint'),
+    ]
+
+    # --- MCP / MODEL CONTEXT PROTOCOL PATTERNS ---
+    MCP_PATTERNS = [
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*@modelcontextprotocol/sdk''', re.I),
+            'MCP SDK'),
+        (re.compile(r'mcp://[a-zA-Z0-9._/-]+', re.I),
+            'MCP URL Reference'),
+        (re.compile(r'"method"\s*:\s*"(tools/list|resources/list|prompts/list|rpc\.discover)"', re.I),
+            'MCP JSON-RPC Method'),
+        (re.compile(r'mcp[_-]?config|\.mcp\.json|mcp[_-]?servers?\.(json|yaml|yml)', re.I),
+            'MCP Configuration Reference'),
+        (re.compile(r'McpClient|McpServer|MCPConnection|mcp_client|mcp_server', re.I),
+            'MCP Client/Server Reference'),
+    ]
+
+    # --- AI AGENT FRAMEWORK PATTERNS ---
+    AGENT_PATTERNS = [
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*crewai''', re.I),
+            'CrewAI'),
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*autogen|pyautogen''', re.I),
+            'AutoGen'),
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*@langchain/langgraph|langgraph''', re.I),
+            'LangGraph'),
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*semantic[_-]kernel''', re.I),
+            'Semantic Kernel'),
+        (re.compile(r'cdn\.chainlit\.io|chainlit\.run', re.I),
+            'Chainlit'),
+        (re.compile(r'app\.dify\.ai|dify\.ai/embed', re.I),
+            'Dify'),
+        (re.compile(r'cdn\.flowise\.ai|flowise\.ai/embed|flowiseai', re.I),
+            'Flowise'),
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*llamaindex|llama[-_]index''', re.I),
+            'LlamaIndex'),
+        (re.compile(r'''(?:import|require|from)\s*[\(\['"]\s*@llamaindex''', re.I),
+            'LlamaIndex'),
+        (re.compile(r'CrewBase|@crew|crew\.kickoff|Agent\s*\(\s*role\s*=', re.I),
+            'CrewAI Reference'),
+        (re.compile(r'AssistantAgent|UserProxyAgent|GroupChat\s*\(', re.I),
+            'AutoGen Reference'),
+        (re.compile(r'StateGraph|MessageGraph|add_node.*langgraph', re.I),
+            'LangGraph Reference'),
     ]
 
     def setup(self, sfc, userOpts=dict()):
@@ -275,6 +394,42 @@ class sfp_ai_webcontent(SpiderFootPlugin):
                         self.__name__, event)
                     self.notifyListeners(evt)
 
+    def _scan_for_mcp(self, content, event):
+        """Scan content for MCP (Model Context Protocol) indicators."""
+        found = set()
+        for pattern, mcp_name in self.MCP_PATTERNS:
+            if pattern.search(content):
+                if mcp_name not in found:
+                    found.add(mcp_name)
+                    self.info(f"MCP indicator found: {mcp_name}")
+
+                    evt = SpiderFootEvent(
+                        "AI_INFRASTRUCTURE_DETECTED",
+                        f"MCP integration: {mcp_name}",
+                        self.__name__, event)
+                    self.notifyListeners(evt)
+
+    def _scan_for_agents(self, content, event):
+        """Scan content for AI agent framework indicators."""
+        found = set()
+        for pattern, agent_name in self.AGENT_PATTERNS:
+            if pattern.search(content):
+                if agent_name not in found:
+                    found.add(agent_name)
+                    self.info(f"AI agent framework detected: {agent_name}")
+
+                    evt = SpiderFootEvent(
+                        "AI_INFRASTRUCTURE_DETECTED",
+                        f"AI agent framework: {agent_name}",
+                        self.__name__, event)
+                    self.notifyListeners(evt)
+
+                    sw_evt = SpiderFootEvent(
+                        "SOFTWARE_USED",
+                        agent_name,
+                        self.__name__, event)
+                    self.notifyListeners(sw_evt)
+
     def handleEvent(self, event):
         eventName = event.eventType
         eventData = event.data
@@ -305,6 +460,12 @@ class sfp_ai_webcontent(SpiderFootPlugin):
 
         if self.opts['detect_endpoints']:
             self._scan_for_endpoints(eventData, event)
+
+        if self.opts['detect_mcp']:
+            self._scan_for_mcp(eventData, event)
+
+        if self.opts['detect_agents']:
+            self._scan_for_agents(eventData, event)
 
 
 # End of sfp_ai_webcontent class

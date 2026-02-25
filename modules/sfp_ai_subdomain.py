@@ -13,9 +13,12 @@
 # -------------------------------------------------------------------------------
 
 import json
+import os
 import re
+import shutil
 import threading
 import time
+from subprocess import PIPE, Popen, TimeoutExpired
 
 from spiderfoot import SpiderFootEvent, SpiderFootPlugin
 
@@ -25,9 +28,10 @@ class sfp_ai_subdomain(SpiderFootPlugin):
     meta = {
         'name': "AI Subdomain Discovery",
         'summary': "Discover AI/ML-related subdomains via Certificate "
-            "Transparency logs (crt.sh) and DNS brute-forcing with an "
-            "AI-specific wordlist. Targets patterns like inference.*, ml.*, "
-            "ai.*, model.*, llm.*, serving.*, etc.",
+            "Transparency logs (crt.sh), DNS brute-forcing with an "
+            "AI-specific wordlist (130+ terms), optional subfinder "
+            "integration, and cloud CNAME pattern detection for 15+ "
+            "AI service providers.",
         'flags': [],
         'useCases': ["Footprint", "Investigate"],
         'categories': ["DNS"],
@@ -48,6 +52,8 @@ class sfp_ai_subdomain(SpiderFootPlugin):
         'query_ct_logs': True,
         'dns_bruteforce': True,
         'check_cloud_patterns': True,
+        'use_subfinder': True,
+        'subfinder_path': 'subfinder',
         '_maxthreads': 50,
     }
 
@@ -59,6 +65,10 @@ class sfp_ai_subdomain(SpiderFootPlugin):
             "resolution using the bundled ai-subdomains.txt wordlist.",
         'check_cloud_patterns': "Check for cloud provider AI service patterns "
             "(e.g. *.sagemaker.*.amazonaws.com, *.inference.*.azurecontainer.io).",
+        'use_subfinder': "If subfinder is installed, use it as an additional "
+            "subdomain discovery source. Falls back gracefully if not available.",
+        'subfinder_path': "Path to the subfinder binary. If just 'subfinder' "
+            "then it must be in your $PATH.",
         '_maxthreads': "Maximum threads for DNS brute-forcing.",
     }
 
@@ -71,21 +81,69 @@ class sfp_ai_subdomain(SpiderFootPlugin):
         r'(inference|ml[.-]|ai[.-]|model[s]?[.-]|llm|chat[.-]|copilot|'
         r'predict|serving|genai|gen-ai|gpu|triton|mlflow|ollama|'
         r'huggingface|sagemaker|bedrock|vertex|openai|notebook|jupyter|'
-        r'tensorboard|embedding|vector|gradio|streamlit|vllm|torchserve|'
+        r'tensorboard|embedding[s]?|vector|gradio|streamlit|vllm|torchserve|'
         r'bentoml|ray[.-]|langchain|langserve|diffusion|comfyui|'
-        r'deeplearning|transformers|cuda|agent[s]?[.-])',
+        r'deeplearning|transformers|cuda|agent[s]?[.-]|'
+        # MCP / Agent / RAG infrastructure
+        r'mcp|a2a|toolserver|function-calling|'
+        r'rag|vectordb|vector-db|retrieval|pinecone|weaviate|chromadb|milvus|qdrant|'
+        # Training / data pipeline
+        r'finetune|fine-tune|training|dataset|annotation|label|labeling|'
+        # AI platforms / frameworks
+        r'langflow|flowise|chainlit|dify|openwebui|anythingllm|'
+        r'litellm|tabbyapi|localai|textgen|koboldai|lmstudio|'
+        # Compute infrastructure
+        r'slurm|a100|h100|compute[.-]|'
+        # Image generation
+        r'stable-diffusion|automatic1111|comfy|'
+        # General AI terms
+        r'foundation-model|llm-api|prompt[.-]|copilot-api)',
         re.I
     )
 
     # Cloud provider AI service CNAME patterns
     CLOUD_AI_PATTERNS = [
+        # AWS
         re.compile(r'\.sagemaker\..*\.amazonaws\.com', re.I),
+        # Azure
         re.compile(r'\.inference\..*\.azurecontainer\.io', re.I),
         re.compile(r'\.openai\.azure\.com', re.I),
         re.compile(r'\.cognitiveservices\.azure\.com', re.I),
+        # HuggingFace
         re.compile(r'\.endpoints\.huggingface\.cloud', re.I),
+        # Google Cloud
         re.compile(r'\.aiplatform\.googleapis\.com', re.I),
         re.compile(r'\.run\.app', re.I),  # Cloud Run (common for AI serving)
+        # Anthropic
+        re.compile(r'\.anthropic\.com', re.I),
+        re.compile(r'\.claude\.ai', re.I),
+        # Replicate
+        re.compile(r'\.replicate\.delivery', re.I),
+        re.compile(r'\.replicate\.com', re.I),
+        # Together AI
+        re.compile(r'\.together\.ai', re.I),
+        re.compile(r'\.together\.xyz', re.I),
+        # Groq
+        re.compile(r'\.groq\.com', re.I),
+        # Fireworks AI
+        re.compile(r'\.fireworks\.ai', re.I),
+        # Modal
+        re.compile(r'\.modal\.run', re.I),
+        re.compile(r'\.modal\.com', re.I),
+        # RunPod
+        re.compile(r'\.runpod\.io', re.I),
+        re.compile(r'\.runpod\.net', re.I),
+        # Lambda Labs
+        re.compile(r'\.lambdalabs\.com', re.I),
+        re.compile(r'\.lambda\.cloud', re.I),
+        # CoreWeave
+        re.compile(r'\.coreweave\.com', re.I),
+        # Deepseek
+        re.compile(r'\.deepseek\.com', re.I),
+        # Mistral
+        re.compile(r'\.mistral\.ai', re.I),
+        # Perplexity
+        re.compile(r'\.perplexity\.ai', re.I),
     ]
 
     def setup(self, sfc, userOpts=dict()):
@@ -211,6 +269,55 @@ class sfp_ai_subdomain(SpiderFootPlugin):
 
         return resolved_hosts
 
+    def _run_subfinder(self, domain):
+        """Run subfinder as an additional subdomain source.
+
+        Falls back gracefully if subfinder is not installed.
+        Returns a set of discovered AI-related hostnames.
+        """
+        ai_hosts = set()
+
+        exe = self.opts.get('subfinder_path', 'subfinder')
+
+        # Check if subfinder is available
+        if not shutil.which(exe) and not os.path.isfile(exe):
+            self.debug("subfinder not found, skipping subfinder enumeration")
+            return ai_hosts
+
+        self.info(f"Running subfinder for {domain}")
+
+        try:
+            args = [exe, '-d', domain, '-silent', '-all']
+            p = Popen(args, stdout=PIPE, stderr=PIPE)
+            stdout, stderr = p.communicate(timeout=120)
+        except TimeoutExpired:
+            p.kill()
+            p.communicate()
+            self.debug(f"subfinder timed out for {domain}")
+            return ai_hosts
+        except Exception as e:
+            self.debug(f"subfinder execution failed: {e}")
+            return ai_hosts
+
+        if not stdout:
+            return ai_hosts
+
+        for line in stdout.decode('utf-8', errors='ignore').splitlines():
+            hostname = line.strip().lower()
+            if not hostname:
+                continue
+            if not hostname.endswith(f".{domain}") and hostname != domain:
+                continue
+            # Filter to AI-related subdomains only
+            subdomain_part = hostname.replace(f".{domain}", "")
+            if self.AI_SUBDOMAIN_RE.search(subdomain_part):
+                ai_hosts.add(hostname)
+
+        if ai_hosts:
+            self.info(f"subfinder found {len(ai_hosts)} AI-related subdomains for {domain}")
+
+        return ai_hosts
+
     def _check_cloud_ai_cnames(self, hostname):
         """Check if a hostname CNAMEs to a known cloud AI service."""
         try:
@@ -259,6 +366,13 @@ class sfp_ai_subdomain(SpiderFootPlugin):
             ai_hosts.update(brute_hosts)
             if brute_hosts:
                 self.info(f"Resolved {len(brute_hosts)} AI subdomains for {domain}")
+
+        # Layer 3c: subfinder integration (optional)
+        if self.opts.get('use_subfinder'):
+            subfinder_hosts = self._run_subfinder(domain)
+            ai_hosts.update(subfinder_hosts)
+            if subfinder_hosts:
+                self.info(f"subfinder found {len(subfinder_hosts)} AI subdomains for {domain}")
 
         # Emit events for discovered AI hostnames
         for hostname in ai_hosts:
