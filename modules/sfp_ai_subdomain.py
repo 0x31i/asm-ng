@@ -33,7 +33,7 @@ class sfp_ai_subdomain(SpiderFootPlugin):
             "integration, and cloud CNAME pattern detection for 15+ "
             "AI service providers.",
         'flags': [],
-        'useCases': ["Footprint", "Investigate"],
+        'useCases': ["Footprint", "Investigate", "AI Attack Surface"],
         'categories': ["DNS"],
         'dataSource': {
             'website': "https://crt.sh/",

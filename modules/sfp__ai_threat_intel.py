@@ -1076,7 +1076,8 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
     meta = {
         'name': "Threat Intelligence Engine",
         'summary': "Threat intelligence with pattern recognition, trend analysis, and automated IOC correlation.",
-        'flags': []
+        'flags': [],
+        'useCases': ["Investigate", "AI Attack Surface"],
     }
 
     _priority = 1  # High priority for threat intelligence

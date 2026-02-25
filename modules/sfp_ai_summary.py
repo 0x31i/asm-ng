@@ -6,8 +6,8 @@ class sfp_ai_summary(SpiderFootPlugin):
         'name': "AI Threat Intelligence Summarizer",
         'summary': "Summarizes scan findings using an LLM.",
         'flags': ['apikey'],
-        'useCases': ["Investigate"],
-        'group': ["Investigate"],
+        'useCases': ["Investigate", "AI Attack Surface"],
+        'group': ["Investigate", "AI Attack Surface"],
         'categories': ["Content Analysis"],
         'dataSource': {
             'name': 'OpenAI',

@@ -28,7 +28,7 @@ class sfp_ai_webcontent(SpiderFootPlugin):
             "markers, leaked API keys (15+ providers), and AI endpoint "
             "references in JavaScript and HTML.",
         'flags': [],
-        'useCases': ["Footprint", "Investigate"],
+        'useCases': ["Footprint", "Investigate", "AI Attack Surface"],
         'categories': ["Content Analysis"],
         'dataSource': {
             'website': "N/A",

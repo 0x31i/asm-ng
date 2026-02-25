@@ -30,7 +30,7 @@ class sfp_ai_fingerprint(SpiderFootPlugin):
             "sending framework-specific HTTP probes with graphw00f-style "
             "backend differentiation.",
         'flags': ["slow", "invasive"],
-        'useCases': ["Footprint", "Investigate"],
+        'useCases': ["Footprint", "Investigate", "AI Attack Surface"],
         'categories': ["Crawling and Scanning"],
         'dataSource': {
             'website': "https://github.com/Tencent/AI-Infra-Guard",
