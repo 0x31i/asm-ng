@@ -565,6 +565,12 @@ class SpiderFootDb:
             'AI Endpoint Without Authentication', 0, 'DESCRIPTOR'],
         ['AI_API_KEY_LEAKED',
             'AI Service API Key Leaked', 0, 'DATA'],
+        ['AI_MCP_SERVER_EXPOSED',
+            'MCP Server Exposed (Tools/Resources Accessible)', 0, 'DESCRIPTOR'],
+        ['AI_LLM_VULN_DETECTED',
+            'AI/LLM Vulnerability Detected', 0, 'DESCRIPTOR'],
+        ['AI_PASSIVE_RECON_HIT',
+            'AI Service Found via Passive Recon', 0, 'DESCRIPTOR'],
     ]
 
     def __init__(self, opts: dict, init: bool = False) -> None:

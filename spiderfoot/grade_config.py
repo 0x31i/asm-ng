@@ -896,6 +896,18 @@ DEFAULT_EVENT_TYPE_GRADING = {
         'category': 'Information Leakage', 'rank': 1, 'points': -20,
         'logic': 'count_scaled',
     },
+    'AI_MCP_SERVER_EXPOSED': {
+        'category': 'Network Security', 'rank': 1, 'points': -20,
+        'logic': 'unverified_exists',
+    },
+    'AI_LLM_VULN_DETECTED': {
+        'category': 'Network Security', 'rank': 1, 'points': -20,
+        'logic': 'unverified_exists',
+    },
+    'AI_PASSIVE_RECON_HIT': {
+        'category': 'Information / Reference', 'rank': 4, 'points': -5,
+        'logic': 'informational',
+    },
 }
 
 
