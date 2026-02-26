@@ -8356,18 +8356,28 @@ class SpiderFootWebUi:
                 # Filter false positives from leaf set if requested
                 filter_fp = filterFp == "1"
                 leafSet = dbh.scanResultEvent(id, eventType, filterFp=filter_fp)
+                if not leafSet:
+                    retdata['tree'] = {}
+                    retdata['data'] = {}
+                    retdata['scanId'] = id
+                    return retdata
                 [datamap, pc] = dbh.scanElementSourcesAll(id, leafSet)
-            except Exception:
+            except Exception as e:
+                self.log.warning(
+                    f"scanelementtypediscovery source trace failed for "
+                    f"scan={id}, eventType={eventType}: {e}")
+                retdata['tree'] = {}
+                retdata['data'] = datamap
+                retdata['scanId'] = id
                 return retdata
 
-            # Delete the ROOT key as it adds no value from a viz perspective
-            # Use pop() — imported events may have broken source chains
-            # that never reach ROOT, so the key may not exist
-            pc.pop('ROOT', None)
+            # Remove ROOT only if the tree has depth beyond it;
+            # keep it when all events are direct ROOT children (flat tree)
+            # so the discovery path still renders something useful.
+            if 'ROOT' in pc and len(pc) > 1:
+                pc.pop('ROOT', None)
 
             if not pc:
-                # No parent-child relationships to visualize (e.g. all
-                # events are imported with broken source chains)
                 retdata['tree'] = {}
                 retdata['data'] = datamap
                 retdata['scanId'] = id
