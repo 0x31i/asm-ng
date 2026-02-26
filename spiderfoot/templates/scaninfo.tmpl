@@ -2193,7 +2193,7 @@
                 html += '</div></div>';
                 openInfoPanel('comments', html, 'ANALYST COMMENTS \u2014 ' + currentType, 'glyphicon-comment');
                 // Load existing comment
-                sf.fetchData('${docroot}/typecomment', {id: scanId, eventType: currentType}, function(data) {
+                sf.fetchData('${docroot}/typecomment', {id: '${id}', eventType: currentType}, function(data) {
                     if (data && data.success && data.comment) {
                         var ta = document.getElementById('analyst-type-comment');
                         if (ta) ta.value = data.comment;
@@ -2210,7 +2210,7 @@
             var status = document.getElementById('comment-save-status');
             if (!ta) return;
             var comment = ta.value;
-            sf.fetchData('${docroot}/typecommentsave', {id: scanId, eventType: currentType, comment: comment}, function(data) {
+            sf.fetchData('${docroot}/typecommentsave', {id: '${id}', eventType: currentType, comment: comment}, function(data) {
                 if (status) {
                     if (data && data.success) {
                         status.textContent = 'Saved';
@@ -2229,7 +2229,7 @@
             var status = document.getElementById('note-save-status-' + eventHash);
             if (!ta) return;
             var note = ta.value;
-            sf.fetchData('${docroot}/rownotesave', {id: scanId, resultHash: eventHash, note: note}, function(data) {
+            sf.fetchData('${docroot}/rownotesave', {id: '${id}', resultHash: eventHash, note: note}, function(data) {
                 if (status) {
                     if (data && data.success) {
                         status.textContent = 'Saved';
