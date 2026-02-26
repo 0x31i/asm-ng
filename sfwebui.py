@@ -8361,7 +8361,18 @@ class SpiderFootWebUi:
                 return retdata
 
             # Delete the ROOT key as it adds no value from a viz perspective
-            del pc['ROOT']
+            # Use pop() — imported events may have broken source chains
+            # that never reach ROOT, so the key may not exist
+            pc.pop('ROOT', None)
+
+            if not pc:
+                # No parent-child relationships to visualize (e.g. all
+                # events are imported with broken source chains)
+                retdata['tree'] = {}
+                retdata['data'] = datamap
+                retdata['scanId'] = id
+                return retdata
+
             retdata['tree'] = SpiderFootHelpers.dataParentChildToTree(pc)
 
             # Add a synthetic entry for "Discovery Paths" node if multiple roots exist

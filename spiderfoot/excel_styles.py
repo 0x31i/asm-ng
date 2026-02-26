@@ -846,6 +846,7 @@ CATEGORY_TAB_COLORS = {
     'External Account Exposure':  '#06b6d4',
     'DNS Health':                 '#22c55e',
     'IP Reputation':              '#d946ef',
+    'AI Security':                '#8b5cf6',
     'Information / Reference':    '#6b7280',
 }
 
