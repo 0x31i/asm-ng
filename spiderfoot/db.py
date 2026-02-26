@@ -4787,27 +4787,27 @@ class SpiderFootDb:
                     current_entries.add((data, source_data, module))
 
                 # Step 2: Get all entries from older scans with their source_data
-                # IMPORTANT: Look up source_data in the CURRENT scan (not old scan)
-                # This ensures we compare what the entry would look like AFTER import,
-                # since the UI displays source_data by joining on current scan_instance_id.
-                # If the parent doesn't exist in current scan, COALESCE returns 'ROOT'.
+                # Look up source_data in the OLD/source scan (where the parent exists)
+                # so the triple check has the actual parent data for comparison.
+                # Previously this joined against the current scan, but since imported
+                # entries get new hashes, old source_event_hash never matched → always 'ROOT'.
                 old_entries_qry = """
                     SELECT old.hash, old.type, old.data, old.module, old.generated,
                            old.confidence, old.visibility, old.risk, old.false_positive,
                            old.source_event_hash, old.scan_instance_id,
                            si.name as source_scan_name, si.started as source_scan_started,
-                           COALESCE(curr_src.data, 'ROOT') as source_data
+                           COALESCE(old_src.data, 'ROOT') as source_data
                     FROM tbl_scan_results old
                     JOIN tbl_scan_instance si ON old.scan_instance_id = si.guid
-                    LEFT JOIN tbl_scan_results curr_src ON old.source_event_hash = curr_src.hash
-                        AND curr_src.scan_instance_id = ?
+                    LEFT JOIN tbl_scan_results old_src ON old.source_event_hash = old_src.hash
+                        AND old.scan_instance_id = old_src.scan_instance_id
                     WHERE si.seed_target = ?
                       AND old.scan_instance_id != ?
                       AND old.type != 'ROOT'
                       AND old.imported_from_scan IS NULL
                     ORDER BY si.started DESC, old.generated DESC
                 """
-                self.dbh.execute(old_entries_qry, [instanceId, target, instanceId])
+                self.dbh.execute(old_entries_qry, [target, instanceId])
                 old_entries = self.dbh.fetchall()
 
                 # Step 3: Filter and deduplicate in Python using triple check
@@ -4875,6 +4875,14 @@ class SpiderFootDb:
         # Track already imported combinations to prevent duplicates within this batch
         imported_combinations = set()
 
+        # Hash mapping: old_hash (from source scan) → new_hash (in current scan)
+        # Used to preserve parent-child discovery paths across import
+        hash_map = {}
+
+        # Entries whose source_event_hash needs remapping after all parents are imported
+        # List of (new_hash, original_source_event_hash) tuples
+        needs_remap = []
+
         with self.dbhLock:
             try:
                 pending = 0
@@ -4926,20 +4934,20 @@ class SpiderFootDb:
                         f"{instanceId}{event_type}{data}{module}{source_data}".encode('utf-8')
                     ).hexdigest()
 
-                    # Check if we need to map the source_event_hash
-                    # For ROOT events or if the parent doesn't exist, use ROOT
+                    # Track old_hash → new_hash mapping for parent remapping
+                    hash_map[original_hash] = new_hash
+
+                    # Initially insert with ROOT as source_event_hash for non-ROOT entries
+                    # that need remapping. We'll fix them in the repair pass.
                     if source_event_hash == 'ROOT':
                         mapped_source_hash = 'ROOT'
+                    elif source_event_hash in hash_map:
+                        # Parent was already imported — use its new hash directly
+                        mapped_source_hash = hash_map[source_event_hash]
                     else:
-                        # Check if parent exists in current scan
-                        parent_qry = """SELECT hash FROM tbl_scan_results
-                            WHERE scan_instance_id = ? AND hash = ?"""
-                        self.dbh.execute(parent_qry, [instanceId, source_event_hash])
-                        if self.dbh.fetchone():
-                            mapped_source_hash = source_event_hash
-                        else:
-                            # Parent doesn't exist - link to ROOT
-                            mapped_source_hash = 'ROOT'
+                        # Parent not yet imported — insert with ROOT, fix later
+                        mapped_source_hash = 'ROOT'
+                        needs_remap.append((new_hash, source_event_hash))
 
                     # Insert the imported entry
                     qry = """INSERT INTO tbl_scan_results
@@ -4967,7 +4975,27 @@ class SpiderFootDb:
                         self.conn.commit()
                         pending = 0
 
-                if pending > 0:
+                # Repair pass: remap source_event_hash for entries whose parents
+                # were imported after them (or existed in current scan already)
+                remapped = 0
+                for new_hash, old_parent_hash in needs_remap:
+                    new_parent_hash = hash_map.get(old_parent_hash)
+                    if not new_parent_hash:
+                        # Parent's old hash not in our map — check if it already
+                        # exists in the current scan (from a prior import or native)
+                        parent_qry = """SELECT hash FROM tbl_scan_results
+                            WHERE scan_instance_id = ? AND hash = ?"""
+                        self.dbh.execute(parent_qry, [instanceId, old_parent_hash])
+                        if self.dbh.fetchone():
+                            new_parent_hash = old_parent_hash
+                    if new_parent_hash:
+                        update_qry = """UPDATE tbl_scan_results
+                            SET source_event_hash = ?
+                            WHERE scan_instance_id = ? AND hash = ?"""
+                        self.dbh.execute(update_qry, [new_parent_hash, instanceId, new_hash])
+                        remapped += 1
+
+                if pending > 0 or remapped > 0:
                     self.conn.commit()
                 return {'imported': imported, 'skipped': skipped}
 
