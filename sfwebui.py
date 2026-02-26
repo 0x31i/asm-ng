@@ -3589,13 +3589,18 @@ class SpiderFootWebUi:
         """Get the current resource tuning tier (admin only).
 
         Returns:
-            dict: current tier info
+            dict: current tier info including db_type
         """
         if self.currentUserRole() != 'admin':
             return {'success': False, 'error': 'Unauthorized'}
+
+        with SpiderFootDb(self.config) as dbh:
+            db_type = dbh.db_type
+
         return {
             'success': True,
             'tier': self.config.get('_resource_tier', 'medium'),
+            'db_type': db_type,
         }
 
     @cherrypy.expose
@@ -3637,6 +3642,7 @@ class SpiderFootWebUi:
 
             restart_required = (
                 tier_config['cherrypy_thread_pool'] != old_tier_config['cherrypy_thread_pool']
+                or tier_config.get('pg_pool_max') != old_tier_config.get('pg_pool_max')
             )
 
             return {

@@ -788,6 +788,22 @@ def create_pg_connection(opts: dict):
         raise
 
     conn.autocommit = False
+
+    # Apply resource-tier session settings (work_mem, effective_cache_size,
+    # maintenance_work_mem).  These persist for the life of the connection
+    # and carry over when the pool recycles it, which is desirable.
+    try:
+        from spiderfoot.resource_tiers import get_tier_config
+        _tier = get_tier_config(opts.get('_resource_tier', 'medium'))
+        raw = conn.cursor()
+        raw.execute("SET work_mem = %s", (_tier.get('pg_work_mem', '128MB'),))
+        raw.execute("SET effective_cache_size = %s", (_tier.get('pg_effective_cache_size', '10GB'),))
+        raw.execute("SET maintenance_work_mem = %s", (_tier.get('pg_maintenance_work_mem', '512MB'),))
+        raw.close()
+        conn.commit()
+    except Exception:
+        pass
+
     cursor = PgCursorWrapper(conn.cursor())
 
     return conn, cursor, 'postgresql'
