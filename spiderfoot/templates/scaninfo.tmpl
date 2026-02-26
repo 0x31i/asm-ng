@@ -648,9 +648,12 @@
             var detail = row.next('.data-detail-row');
             if (row.hasClass('finding-expanded')) {
                 row.removeClass('finding-expanded');
-                detail.find('.finding-detail').slideUp(150);
+                detail.find('.finding-detail').slideUp(150, function() {
+                    detail.hide();
+                });
             } else {
                 row.addClass('finding-expanded');
+                detail.show();
                 detail.find('.finding-detail').slideDown(150);
             }
         }
