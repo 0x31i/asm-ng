@@ -1153,7 +1153,8 @@ class SpiderFootDb:
                 self.dbh.execute("SELECT COUNT(*) FROM tbl_analyst_type_comments")
             except DatabaseError:
                 try:
-                    for qry in self.createSchemaQueries:
+                    schema = get_pg_schema_queries(self.createSchemaQueries) if self.db_type == 'postgresql' else self.createSchemaQueries
+                    for qry in schema:
                         if "tbl_analyst_type_comments" in qry:
                             self.dbh.execute(qry)
                     self.conn.commit()
@@ -1165,7 +1166,8 @@ class SpiderFootDb:
                 self.dbh.execute("SELECT COUNT(*) FROM tbl_analyst_row_notes")
             except DatabaseError:
                 try:
-                    for qry in self.createSchemaQueries:
+                    schema = get_pg_schema_queries(self.createSchemaQueries) if self.db_type == 'postgresql' else self.createSchemaQueries
+                    for qry in schema:
                         if "tbl_analyst_row_notes" in qry:
                             self.dbh.execute(qry)
                     self.conn.commit()
