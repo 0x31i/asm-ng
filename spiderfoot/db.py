@@ -589,6 +589,14 @@ class SpiderFootDb:
             'ML Training/Annotation Data Exposed', 0, 'DESCRIPTOR'],
         ['AI_MODEL_REGISTRY_EXPOSED',
             'Model Registry/Hub Exposed', 0, 'DESCRIPTOR'],
+        ['AI_VENDOR_WIDGET_DETECTED',
+            'Third-Party AI Vendor Widget Detected', 0, 'DESCRIPTOR'],
+        ['AI_HISTORICAL_EVIDENCE',
+            'Historical AI Infrastructure Evidence', 0, 'DESCRIPTOR'],
+        ['AI_COMPLIANCE_GAP',
+            'AI Regulatory Compliance Gap', 0, 'DESCRIPTOR'],
+        ['AI_GOVERNANCE_FINDING',
+            'AI Governance Policy Finding', 0, 'DESCRIPTOR'],
     ]
 
     def __init__(self, opts: dict, init: bool = False) -> None:
