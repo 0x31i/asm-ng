@@ -4947,7 +4947,7 @@ class SpiderFootDb:
                     else:
                         # Parent not yet imported — insert with ROOT, fix later
                         mapped_source_hash = 'ROOT'
-                        needs_remap.append((new_hash, source_event_hash))
+                        needs_remap.append((new_hash, source_event_hash, source_scan_id))
 
                     # Insert the imported entry
                     qry = """INSERT INTO tbl_scan_results
@@ -4976,18 +4976,27 @@ class SpiderFootDb:
                         pending = 0
 
                 # Repair pass: remap source_event_hash for entries whose parents
-                # were imported after them (or existed in current scan already)
+                # were imported after them, exist natively, or from a prior import
                 remapped = 0
-                for new_hash, old_parent_hash in needs_remap:
+                for new_hash, old_parent_hash, src_scan_id in needs_remap:
                     new_parent_hash = hash_map.get(old_parent_hash)
                     if not new_parent_hash:
-                        # Parent's old hash not in our map — check if it already
-                        # exists in the current scan (from a prior import or native)
-                        parent_qry = """SELECT hash FROM tbl_scan_results
+                        # Parent wasn't imported (likely exists natively in current scan
+                        # with a different hash). Look up parent's data+type from the
+                        # source scan, then find the equivalent in the current scan.
+                        parent_data_qry = """SELECT data, type FROM tbl_scan_results
                             WHERE scan_instance_id = ? AND hash = ?"""
-                        self.dbh.execute(parent_qry, [instanceId, old_parent_hash])
-                        if self.dbh.fetchone():
-                            new_parent_hash = old_parent_hash
+                        self.dbh.execute(parent_data_qry, [src_scan_id, old_parent_hash])
+                        parent_row = self.dbh.fetchone()
+                        if parent_row:
+                            p_data, p_type = parent_row
+                            match_qry = """SELECT hash FROM tbl_scan_results
+                                WHERE scan_instance_id = ? AND data = ? AND type = ?
+                                LIMIT 1"""
+                            self.dbh.execute(match_qry, [instanceId, p_data, p_type])
+                            match_row = self.dbh.fetchone()
+                            if match_row:
+                                new_parent_hash = match_row[0]
                     if new_parent_hash:
                         update_qry = """UPDATE tbl_scan_results
                             SET source_event_hash = ?
