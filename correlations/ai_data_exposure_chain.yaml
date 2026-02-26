@@ -1,0 +1,18 @@
+id: ai_data_exposure_chain
+version: "1"
+meta:
+  name: AI data exposure chain — vector DB and data pipeline exposed
+  description: >
+    An exposed vector database combined with an exposed data
+    pipeline creates a full AI supply chain compromise risk.
+    Attackers can access both the training data pipeline and
+    the production RAG knowledge base.
+  risk: HIGH
+collections:
+  collect:
+    - method: exact
+      field: type
+      value: AI_VECTORDB_EXPOSED
+aggregation:
+  field: data
+headline: "AI data exposure chain: {data}"
