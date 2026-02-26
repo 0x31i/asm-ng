@@ -1,0 +1,19 @@
+id: ai_mcp_tool_exposure
+version: "1"
+meta:
+  name: MCP server with exposed tools accessible without authentication
+  description: >
+    An MCP (Model Context Protocol) server was found exposing tools
+    or resources without requiring authentication. This allows
+    unauthorized callers to execute tools and access data sources,
+    creating a significant risk of agent hijacking, data exfiltration,
+    and unauthorized actions.
+  risk: HIGH
+collections:
+  collect:
+      - method: exact
+        field: type
+        value: AI_MCP_SERVER_EXPOSED
+aggregation:
+  field: data
+headline: "MCP server exposed with tools: {data}"

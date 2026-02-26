@@ -315,7 +315,7 @@ def main():
             p.add_argument("-s", metavar="TARGET", help="Target for the scan.")
             p.add_argument("-t", metavar="type1,type2,...", type=str,
                         help="Event types to collect (modules selected automatically).")
-            p.add_argument("-u", choices=["all", "footprint", "investigate", "passive"],
+            p.add_argument("-u", choices=["all", "footprint", "investigate", "passive", "ai_attack_surface"],
                         type=str, help="Select modules automatically by use case")
             p.add_argument("-T", "--types", action='store_true',
                         help="List available event types.")
@@ -764,8 +764,15 @@ def prepare_modules(args, sf, sfModules, log, targetType):
 
     # Select modules if the user selected usercase
     if args.u:
-        # Make the first Letter Uppercase
-        usecase = args.u[0].upper() + args.u[1:]
+        # Map CLI use case names to their canonical form
+        usecase_map = {
+            'all': 'All',
+            'footprint': 'Footprint',
+            'investigate': 'Investigate',
+            'passive': 'Passive',
+            'ai_attack_surface': 'AI Attack Surface',
+        }
+        usecase = usecase_map.get(args.u, args.u[0].upper() + args.u[1:])
         for mod in sfConfig['__modules__']:
             if usecase == 'All' or usecase in sfConfig['__modules__'][mod]['group']:
                 modlist.append(mod)

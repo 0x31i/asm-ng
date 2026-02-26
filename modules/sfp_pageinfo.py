@@ -34,7 +34,7 @@ class sfp_pageinfo(SpiderFootPlugin):
         'name': "Page Information",
         'summary': "Obtain information about web pages (do they take passwords, do they contain forms, etc.)",
         'flags': [],
-        'useCases': ["Footprint", "Investigate", "Passive"],
+        'useCases': ["Footprint", "Investigate", "Passive", "AI Attack Surface"],
         'categories': ["Content Analysis"]
     }
 

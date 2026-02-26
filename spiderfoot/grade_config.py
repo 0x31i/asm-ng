@@ -62,6 +62,11 @@ DEFAULT_GRADE_CATEGORIES = {
         'color': '#d946ef',
         'description': 'Blacklisted IPs, malicious IPs, malicious subnets',
     },
+    'AI Security': {
+        'weight': 0.9,
+        'color': '#8b5cf6',
+        'description': 'AI/ML infrastructure exposure, unauthenticated endpoints, model leaks, MCP servers',
+    },
     'Information / Reference': {
         'weight': 0.0,
         'color': '#6b7280',
@@ -881,20 +886,68 @@ DEFAULT_EVENT_TYPE_GRADING = {
     # AI/ML Infrastructure Discovery
     # =========================================================================
     'AI_ENDPOINT_UNAUTHENTICATED': {
-        'category': 'Network Security', 'rank': 1, 'points': -20,
+        'category': 'AI Security', 'rank': 1, 'points': -20,
         'logic': 'unverified_exists',
     },
     'AI_MODEL_EXPOSED': {
-        'category': 'Network Security', 'rank': 2, 'points': -10,
+        'category': 'AI Security', 'rank': 2, 'points': -10,
         'logic': 'unverified_exists',
     },
     'AI_INFRASTRUCTURE_DETECTED': {
-        'category': 'Information / Reference', 'rank': 5, 'points': 0,
+        'category': 'AI Security', 'rank': 5, 'points': 0,
         'logic': 'informational',
     },
     'AI_API_KEY_LEAKED': {
-        'category': 'Information Leakage', 'rank': 1, 'points': -20,
+        'category': 'AI Security', 'rank': 1, 'points': -20,
         'logic': 'count_scaled',
+    },
+    'AI_MCP_SERVER_EXPOSED': {
+        'category': 'AI Security', 'rank': 1, 'points': -20,
+        'logic': 'unverified_exists',
+    },
+    'AI_LLM_VULN_DETECTED': {
+        'category': 'AI Security', 'rank': 1, 'points': -20,
+        'logic': 'unverified_exists',
+    },
+    'AI_PASSIVE_RECON_HIT': {
+        'category': 'AI Security', 'rank': 4, 'points': -5,
+        'logic': 'informational',
+    },
+    'AI_SHADOW_SERVICE_DETECTED': {
+        'category': 'AI Security', 'rank': 2, 'points': -15,
+        'logic': 'count_scaled',
+    },
+    'AI_AGENT_INFRASTRUCTURE_DETECTED': {
+        'category': 'AI Security', 'rank': 2, 'points': -15,
+        'logic': 'unverified_exists',
+    },
+    'AI_AGENT_TOOL_EXPOSED': {
+        'category': 'AI Security', 'rank': 1, 'points': -15,
+        'logic': 'unverified_exists',
+    },
+    'AI_VECTORDB_EXPOSED': {
+        'category': 'AI Security', 'rank': 1, 'points': -25,
+        'logic': 'unverified_exists',
+    },
+    'AI_RAG_DATA_EXPOSED': {
+        'category': 'AI Security', 'rank': 1, 'points': -25,
+        'logic': 'unverified_exists',
+    },
+    'AI_COMPUTE_CLUSTER_EXPOSED': {
+        'category': 'AI Security', 'rank': 1, 'points': -20,
+        'logic': 'unverified_exists',
+    },
+    'AI_DATA_PIPELINE_EXPOSED': {
+        'category': 'AI Security', 'rank': 1, 'points': -20,
+        'logic': 'unverified_exists',
+    },
+    'AI_TRAINING_DATA_EXPOSED': {
+        'category': 'AI Security', 'rank': 1, 'points': -20,
+        'logic': 'unverified_exists',
+    },
+    'AI_MODEL_REGISTRY_EXPOSED': {
+        'category': 'AI Security', 'rank': 1, 'points': -20,
+        'logic': 'unverified_exists',
     },
 }
 
@@ -906,6 +959,7 @@ DEFAULT_EVENT_TYPE_GRADING = {
 
 _AUTO_CATEGORY_PATTERNS = [
     # Order matters: more specific patterns first
+    ('AI_', 'AI Security'),
     ('MALICIOUS_', 'IP Reputation'),
     ('BLACKLISTED_', 'IP Reputation'),
     ('DEFACED_', 'Network Security'),

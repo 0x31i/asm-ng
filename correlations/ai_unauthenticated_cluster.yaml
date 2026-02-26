@@ -1,0 +1,18 @@
+id: ai_unauthenticated_cluster
+version: "1"
+meta:
+  name: Multiple unauthenticated AI services on same host
+  description: >
+    Multiple AI services were found without authentication on the
+    same host, indicating a misconfigured AI infrastructure cluster.
+    Unauthenticated AI endpoints allow model theft, prompt injection,
+    unauthorized inference, and potential lateral movement.
+  risk: HIGH
+collections:
+  collect:
+      - method: exact
+        field: type
+        value: AI_ENDPOINT_UNAUTHENTICATED
+aggregation:
+  field: data
+headline: "Unauthenticated AI endpoint cluster: {data}"

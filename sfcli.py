@@ -976,8 +976,8 @@ class SpiderFootCli(cmd.Cmd):
     def do_start(self, line):
         """Start <target> (-m m1,... | -t t1,... | -u case) [-n name] [-w]
         Start a scan against <target> using modules m1,... OR looking for types
-        t1,... OR by use case ("all", "investigate", "passive" and
-        "footprint").
+        t1,... OR by use case ("all", "investigate", "passive",
+        "footprint" and "ai_attack_surface").
 
         Scan be be optionally named [name], without a name the target
         will be used. Use -w to watch the logs from the scan. Ctrl-C to

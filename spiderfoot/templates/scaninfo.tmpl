@@ -5145,6 +5145,16 @@
             grid += "</div></div></div></div>";
             grid += "</div>"; // end row 2
 
+            // === ROW 2.5: AI Footprint (full width, horizontal metrics) ===
+            grid += "<div class='row' id='ai-footprint-row'>";
+            grid += "<div class='col-sm-12'>";
+            grid += "<div class='panel panel-default'>";
+            grid += "<div class='panel-heading'><i class='glyphicon glyphicon-cloud'></i>&nbsp;&nbsp;AI FOOTPRINT</div>";
+            grid += "<div class='panel-body' style='padding: 0;'><div id='ai-footprint-body'>";
+            grid += "<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-hourglass'></i>&nbsp;ANALYZING...</div>";
+            grid += "</div></div></div></div>";
+            grid += "</div>"; // end row 2.5
+
             // === ROW 3: Geo Intelligence Globe (full width) ===
             grid += "<div class='row'>";
             grid += "<div class='col-sm-12'>";
@@ -5429,6 +5439,15 @@
                 }
             );
 
+            // AI Footprint loader
+            dataloaders.push(
+                function() {
+                    sf.fetchData('${docroot}/scansummary', {'id': instanceId, 'by': 'type'}, function(data) {
+                        renderAIFootprint(data, instanceId);
+                    });
+                }
+            );
+
             // Nessus severity counts loader (from Vulnerabilities page API)
             dataloaders.push(
                 function() {
@@ -5547,7 +5566,7 @@
             var catOrder = [
                 'Network Security', 'Web App Security', 'Information Leakage',
                 'General Health', 'External Account Exposure', 'DNS Health',
-                'IP Reputation', 'Information / Reference'
+                'IP Reputation', 'AI Security', 'Information / Reference'
             ];
 
             var h = '';
@@ -6669,6 +6688,65 @@
                 h += "<span style='font-family:var(--font-mono);font-size:14px;font-weight:700;color:" + textColor + ";'>" + ind.count + "</span>";
                 h += "</div>";
             }
+            panel.html(h);
+        }
+
+        // === AI FOOTPRINT PANEL ===
+        function renderAIFootprint(data, instanceId) {
+            var panel = $('#ai-footprint-body');
+            if (!data || data.length === 0) {
+                panel.html("<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;'>NO AI INFRASTRUCTURE DETECTED</div>");
+                return;
+            }
+
+            var metrics = [
+                {label: 'ENDPOINTS UNAUTH', type: 'AI_ENDPOINT_UNAUTHENTICATED', icon: 'glyphicon-log-in', color: '#dc2626', count: 0},
+                {label: 'MODELS EXPOSED', type: 'AI_MODEL_EXPOSED', icon: 'glyphicon-eye-open', color: '#ea580c', count: 0},
+                {label: 'API KEYS LEAKED', type: 'AI_API_KEY_LEAKED', icon: 'glyphicon-lock', color: '#dc2626', count: 0},
+                {label: 'MCP SERVERS', type: 'AI_MCP_SERVER_EXPOSED', icon: 'glyphicon-transfer', color: '#8b5cf6', count: 0},
+                {label: 'LLM VULNS', type: 'AI_LLM_VULN_DETECTED', icon: 'glyphicon-flash', color: '#ea580c', count: 0},
+                {label: 'INFRASTRUCTURE', type: 'AI_INFRASTRUCTURE_DETECTED', icon: 'glyphicon-cloud', color: '#3b82f6', count: 0},
+                {label: 'PASSIVE RECON', type: 'AI_PASSIVE_RECON_HIT', icon: 'glyphicon-search', color: '#22c55e', count: 0},
+                {label: 'SHADOW AI', type: 'AI_SHADOW_SERVICE_DETECTED', icon: 'glyphicon-eye-close', color: '#d946ef', count: 0},
+                {label: 'AGENTS', type: 'AI_AGENT_INFRASTRUCTURE_DETECTED', icon: 'glyphicon-link', color: '#ea580c', count: 0},
+                {label: 'VECTOR DBs', type: 'AI_VECTORDB_EXPOSED', icon: 'glyphicon-hdd', color: '#dc2626', count: 0},
+                {label: 'GPU CLUSTERS', type: 'AI_COMPUTE_CLUSTER_EXPOSED', icon: 'glyphicon-fire', color: '#ea580c', count: 0},
+                {label: 'DATA PIPES', type: 'AI_DATA_PIPELINE_EXPOSED', icon: 'glyphicon-random', color: '#eab308', count: 0},
+                {label: 'MODEL REGISTRIES', type: 'AI_MODEL_REGISTRY_EXPOSED', icon: 'glyphicon-briefcase', color: '#8b5cf6', count: 0}
+            ];
+
+            var totalAI = 0;
+            for (var i = 0; i < data.length; i++) {
+                var evtType = data[i][0];
+                var unique = data[i][4];
+                for (var m = 0; m < metrics.length; m++) {
+                    if (metrics[m].type === evtType) {
+                        metrics[m].count = unique;
+                        totalAI += unique;
+                    }
+                }
+            }
+
+            if (totalAI === 0) {
+                panel.html("<div style='text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;'>NO AI INFRASTRUCTURE DETECTED</div>");
+                return;
+            }
+
+            var h = "<div style='display:flex;flex-wrap:wrap;justify-content:center;gap:0;width:100%;'>";
+            for (var m = 0; m < metrics.length; m++) {
+                var met = metrics[m];
+                var textColor = met.count > 0 ? met.color : 'var(--text-muted)';
+                var cursor = met.count > 0 ? 'pointer' : 'default';
+                var safeType = met.type.replace(/"/g, '&quot;');
+                var onclick = met.count > 0 ? "onclick='event.stopPropagation(); dataEventData(\"" + instanceId + "\", \"" + safeType + "\", \"" + safeType + "\", \"full\"); window.scrollTo(0,0); return false;'" : '';
+                var hoverStyle = met.count > 0 ? "onmouseover=\"this.style.background='var(--glass-bg)'\" onmouseout=\"this.style.background='transparent'\"" : '';
+                h += "<div style='flex:1;min-width:120px;text-align:center;padding:14px 8px;border-right:1px solid var(--glass-border);cursor:" + cursor + ";transition:background 0.15s;' " + onclick + " " + hoverStyle + ">";
+                h += "<div style='font-family:var(--font-mono);font-size:22px;font-weight:700;color:" + textColor + ";text-shadow:0 0 10px " + (met.count > 0 ? met.color + '40' : 'transparent') + ";'>" + met.count + "</div>";
+                h += "<div style='font-family:var(--font-mono);font-size:9px;font-weight:600;color:" + textColor + ";text-transform:uppercase;letter-spacing:0.5px;margin-top:4px;'>";
+                h += "<i class='glyphicon " + met.icon + "' style='font-size:10px;margin-right:3px;'></i>" + met.label + "</div>";
+                h += "</div>";
+            }
+            h += "</div>";
             panel.html(h);
         }
 

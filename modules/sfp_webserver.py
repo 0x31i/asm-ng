@@ -23,7 +23,7 @@ class sfp_webserver(SpiderFootPlugin):
         'name': "Web Server Identifier",
         'summary': "Obtain web server banners to identify versions of web servers being used.",
         'flags': [],
-        'useCases': ["Footprint", "Investigate", "Passive"],
+        'useCases': ["Footprint", "Investigate", "Passive", "AI Attack Surface"],
         'categories': ["Content Analysis"]
     }
 

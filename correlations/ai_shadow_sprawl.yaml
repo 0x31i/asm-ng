@@ -1,0 +1,18 @@
+id: ai_shadow_sprawl
+version: "1"
+meta:
+  name: Multiple shadow AI SaaS services detected
+  description: >
+    Multiple unsanctioned AI SaaS services were detected in
+    the target's infrastructure, indicating a lack of AI
+    governance. Shadow AI adoption creates unmonitored data
+    flows and compliance risks.
+  risk: MEDIUM
+collections:
+  collect:
+    - method: exact
+      field: type
+      value: AI_SHADOW_SERVICE_DETECTED
+aggregation:
+  field: data
+headline: "Shadow AI SaaS detected: {data}"
