@@ -1952,6 +1952,178 @@
                     "Remove sensitive data and rotate any leaked secrets.",
                     "Apply .gitignore and secret-scanning tools (ex: GitGuardian, Trufflehog) to prevent recurrence."
                 ]
+            },
+
+            // --- AI Attack Surface ---
+            "AI_COMPLIANCE_GAP": {
+                title: "AI Regulatory Compliance Gap",
+                intro: _defaultIntro,
+                items: [
+                    "Validate the finding against the referenced compliance framework (EU AI Act, NIST AI RMF, or ISO 42001).",
+                    "Map the gap to the specific regulatory article or clause cited and confirm applicability to your AI system.",
+                    "Engage the compliance or legal team to assess remediation priority and regulatory exposure.",
+                    "Track the gap in a compliance register and assign a remediation owner with a target date."
+                ]
+            },
+            "AI_GOVERNANCE_FINDING": {
+                title: "AI Governance Finding",
+                intro: _defaultIntro,
+                items: [
+                    "Assess whether the organization has a published AI governance policy that covers intended use, risk management, and transparency.",
+                    "If no policy exists, escalate to leadership — absence of AI governance is a material finding under EU AI Act, NIST AI RMF, and ISO 42001.",
+                    "If a policy exists, verify it covers all deployed AI systems and aligns with applicable regulatory frameworks.",
+                    "Review robots.txt AI bot directives and web content for consistency with the stated governance posture."
+                ]
+            },
+            "AI_INFRASTRUCTURE_DETECTED": {
+                title: "AI Infrastructure Detected",
+                intro: _defaultIntro,
+                items: [
+                    "Confirm ownership of the detected AI infrastructure and verify it belongs to the target organization.",
+                    "Check whether the AI system is registered in the organization's asset inventory and AI system register.",
+                    "Assess security controls: authentication, network segmentation, logging, and access restrictions.",
+                    "Determine the AI system's risk classification and ensure appropriate governance is in place."
+                ]
+            },
+            "AI_PASSIVE_RECON_HIT": {
+                title: "AI Passive Reconnaissance Hit",
+                intro: _defaultIntro,
+                items: [
+                    "Validate the finding against known AI assets — confirm whether the detected infrastructure is authorized.",
+                    "Assess the exposure: what AI metadata is visible (DNS names, certificates, HTTP headers, job postings)?",
+                    "Reduce unnecessary metadata leakage by reviewing public DNS records, certificate SANs, and HTTP response headers.",
+                    "Add confirmed AI assets to the organization's AI inventory if not already tracked."
+                ]
+            },
+            "AI_SHADOW_SERVICE_DETECTED": {
+                title: "AI Shadow Service Detected",
+                intro: _defaultIntro,
+                items: [
+                    "Identify the owner or team responsible for the shadow AI service.",
+                    "Assess what data the service processes and whether it handles PII, proprietary, or regulated data.",
+                    "Determine whether the service should be formalized (brought under governance) or decommissioned.",
+                    "Update the AI inventory and notify the compliance team of the unsanctioned service."
+                ]
+            },
+            "AI_AGENT_INFRASTRUCTURE_DETECTED": {
+                title: "AI Agent Infrastructure Detected",
+                intro: _defaultIntro,
+                items: [
+                    "Verify that the AI agent infrastructure is authorized and has a designated owner.",
+                    "Check whether human-in-the-loop oversight exists for high-impact agent actions.",
+                    "Review the agent's tool permissions and ensure it follows the principle of least privilege.",
+                    "Test kill-switch and escalation mechanisms to confirm they function as designed."
+                ]
+            },
+            "AI_VECTORDB_EXPOSED": {
+                title: "AI Vector Database Exposed",
+                intro: _defaultIntro,
+                items: [
+                    "Restrict access to the vector database immediately — deploy authentication and network controls.",
+                    "Audit stored embeddings for sensitive data (PII, proprietary content, trade secrets).",
+                    "Implement encryption at rest and in transit for all vector database connections.",
+                    "Assess whether data poisoning or unauthorized reads may have occurred while the database was exposed."
+                ]
+            },
+            "AI_COMPUTE_CLUSTER_EXPOSED": {
+                title: "AI Compute Cluster Exposed",
+                intro: _defaultIntro,
+                items: [
+                    "Restrict access to the compute cluster — deploy network segmentation and authentication on management interfaces.",
+                    "Audit for unauthorized job submissions, cryptomining activity, or model exfiltration attempts.",
+                    "Assess model theft risk: could trained models be downloaded from the exposed cluster?",
+                    "Add the cluster to infrastructure monitoring and ensure it appears in the asset inventory."
+                ]
+            },
+            "AI_DATA_PIPELINE_EXPOSED": {
+                title: "AI Data Pipeline Exposed",
+                intro: _defaultIntro,
+                items: [
+                    "Restrict access to the data pipeline — deploy authentication and network controls.",
+                    "Audit data flows for PII, sensitive content, or regulated data passing through the pipeline.",
+                    "Implement encryption in transit and at rest for all pipeline data.",
+                    "Assess whether data poisoning or unauthorized data access may have occurred during the exposure."
+                ]
+            },
+            "AI_MODEL_REGISTRY_EXPOSED": {
+                title: "AI Model Registry Exposed",
+                intro: _defaultIntro,
+                items: [
+                    "Restrict access to authenticated users only and implement role-based access controls (RBAC).",
+                    "Audit the registry for unauthorized model uploads, modifications, or downloads.",
+                    "Implement model signing and integrity verification to detect tampering.",
+                    "Enable audit trails and alerts for all registry operations."
+                ]
+            },
+            "AI_VENDOR_WIDGET_DETECTED": {
+                title: "AI Vendor Widget Detected",
+                intro: _defaultIntro,
+                items: [
+                    "Verify that the AI vendor widget was authorized for use by the appropriate team or governance body.",
+                    "Review data sharing: what user data does the widget send to the vendor, and under what terms?",
+                    "Add the vendor to the AI supply chain inventory and conduct a vendor risk assessment.",
+                    "Ensure the vendor's AI practices align with your organization's governance and compliance requirements."
+                ]
+            },
+            "AI_HISTORICAL_EVIDENCE": {
+                title: "AI Historical Evidence",
+                intro: _defaultIntro,
+                items: [
+                    "Investigate whether the historically detected AI infrastructure is still active or has been decommissioned.",
+                    "Check for residual data, credentials, or endpoints from the historical AI system that may still be accessible.",
+                    "Update change management records to reflect the AI system's lifecycle status.",
+                    "If the system was decommissioned, verify that data disposal and access revocation were completed."
+                ]
+            },
+            "AI_MODEL_EXPOSED": {
+                title: "AI Model Exposed",
+                intro: _defaultIntro,
+                items: [
+                    "Confirm ownership of the exposed model and verify it belongs to the target organization.",
+                    "Verify access controls: the model endpoint should require authentication and be restricted to authorized users.",
+                    "Assess model theft risk: could the model weights or architecture be extracted through the exposed interface?",
+                    "Deploy API gateway controls, rate limiting, and access logging on the model endpoint."
+                ]
+            },
+            "AI_ENDPOINT_UNAUTHENTICATED": {
+                title: "AI Endpoint Unauthenticated",
+                intro: _defaultIntro,
+                items: [
+                    "Deploy authentication immediately — no AI inference endpoint should accept unauthenticated requests.",
+                    "Assess abuse: review logs for unauthorized usage, data exfiltration, or prompt injection attempts.",
+                    "Audit all other AI endpoints for the same authentication gap.",
+                    "Implement rate limiting and monitoring to detect future unauthorized access attempts."
+                ]
+            },
+            "AI_API_KEY_LEAKED": {
+                title: "AI API Key Leaked",
+                intro: _defaultIntro,
+                items: [
+                    "Rotate the leaked API key immediately and revoke the compromised credential.",
+                    "Investigate the scope: what AI services does the key grant access to, and what data could be reached?",
+                    "Implement automated secret scanning in CI/CD pipelines and pre-commit hooks to prevent recurrence.",
+                    "Audit access logs for the compromised key to determine if unauthorized usage occurred."
+                ]
+            },
+            "AI_MCP_SERVER_EXPOSED": {
+                title: "AI MCP Server Exposed",
+                intro: _defaultIntro,
+                items: [
+                    "Restrict access to the MCP server — it should not be reachable from the public internet.",
+                    "Review exposed tools and capabilities: what actions can be invoked through the MCP protocol?",
+                    "Verify that human oversight controls exist for tool invocations, especially for high-impact actions.",
+                    "Implement authentication, logging, and approval workflows for all MCP server interactions."
+                ]
+            },
+            "AI_LLM_VULN_DETECTED": {
+                title: "AI LLM Vulnerability Detected",
+                intro: _defaultIntro,
+                items: [
+                    "Validate the vulnerability and classify its type (e.g., prompt injection, jailbreak, data extraction, SSRF).",
+                    "Map the vulnerability to the OWASP LLM Top 10 to understand severity and common mitigations.",
+                    "Implement mitigations: input/output filtering, guardrails, system prompt hardening, or vendor patches as appropriate.",
+                    "Conduct red-team testing to verify the mitigation is effective before considering the issue resolved."
+                ]
             }
         };
 
