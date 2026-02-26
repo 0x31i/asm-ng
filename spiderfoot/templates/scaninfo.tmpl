@@ -572,73 +572,18 @@
             }
         }
 
-        // Build data detail HTML for expanded row
+        // Build data detail HTML for expanded row (analyst note only)
         function buildDataDetailHtml(d) {
-            var html = '<div class="data-detail-grid">';
-
-            // Identified timestamp (moved from the column we replaced)
-            if (d[0]) {
-                html += "<div class='finding-detail-section detail-identified'>";
-                html += "<div class='finding-detail-label'>Identified</div>";
-                html += "<div class='finding-detail-text'>" + d[0] + "</div></div>";
-            }
-            // Confidence
-            if (d[4] !== undefined) {
-                html += "<div class='finding-detail-section detail-confidence'>";
-                html += "<div class='finding-detail-label'>Confidence</div>";
-                html += "<div class='finding-detail-text'>" + d[4] + "%</div></div>";
-            }
-            // Visibility
-            if (d[5] !== undefined) {
-                html += "<div class='finding-detail-section detail-visibility'>";
-                html += "<div class='finding-detail-label'>Visibility</div>";
-                html += "<div class='finding-detail-text'>" + d[5] + "%</div></div>";
-            }
-            // Risk
-            if (d[6] !== undefined) {
-                html += "<div class='finding-detail-section detail-risk'>";
-                html += "<div class='finding-detail-label'>Risk</div>";
-                html += "<div class='finding-detail-text'>" + d[6] + "</div></div>";
-            }
-            // Event Type
-            if (d[10]) {
-                html += "<div class='finding-detail-section detail-event-type'>";
-                html += "<div class='finding-detail-label'>Event Type</div>";
-                html += "<div class='finding-detail-text'>" + d[10] + "</div></div>";
-            }
-            // Event Hash
-            if (d[7]) {
-                html += "<div class='finding-detail-section detail-event-hash'>";
-                html += "<div class='finding-detail-label'>Event Hash</div>";
-                html += "<div class='finding-detail-text' style='font-family: var(--font-mono); font-size: 11px;'>" + d[7] + "</div></div>";
-            }
-            // Source Module
-            if (d[3]) {
-                html += "<div class='finding-detail-section detail-source-module'>";
-                html += "<div class='finding-detail-label'>Source Module</div>";
-                html += "<div class='finding-detail-text'>" + d[3] + "</div></div>";
-            }
-            // Imported From
-            if (d[13]) {
-                html += "<div class='finding-detail-section detail-imported-from'>";
-                html += "<div class='finding-detail-label'>Imported From</div>";
-                html += "<div class='finding-detail-text'>" + d[13] + "</div></div>";
-            }
-
-            html += '</div>';
-
-            // Analyst Note section (full width, below the grid)
             var noteVal = (d[16] != null && d[16] !== undefined) ? d[16] : '';
             var eventHash = d[7] || '';
             var rowIdx = d._idx !== undefined ? d._idx : '';
-            html += "<div class='detail-analyst-note'>";
+            var html = "<div class='detail-analyst-note'>";
             html += "<div class='finding-detail-label'>Analyst Note</div>";
             html += "<div class='analyst-note-container'>";
             html += "<textarea id='analyst-row-note-" + sf.escapeHtml(eventHash) + "' class='analyst-note-textarea' placeholder='Add a note for this result...' rows='2' onclick='event.stopPropagation()'>" + sf.escapeHtml(noteVal) + "</textarea>";
             html += "<button class='btn-save-note' onclick='event.stopPropagation(); saveRowNote(\"" + sf.escapeHtml(eventHash) + "\", " + rowIdx + ")'>SAVE</button>";
             html += "<span id='note-save-status-" + sf.escapeHtml(eventHash) + "' class='note-save-status'></span>";
             html += "</div></div>";
-
             return html;
         }
 
