@@ -119,7 +119,7 @@ class sfp_ai_governance(SpiderFootPlugin):
         return ["DOMAIN_NAME", "INTERNET_NAME", "TARGET_WEB_CONTENT"]
 
     def producedEvents(self):
-        return ["AI_GOVERNANCE_FINDING", "AI_INFRASTRUCTURE_DETECTED"]
+        return ["AI_GOVERNANCE_FINDING"]
 
     def _probe_governance_urls(self, domain, event):
         """Probe well-known governance URLs for AI policy content."""
@@ -163,7 +163,10 @@ class sfp_ai_governance(SpiderFootPlugin):
                 found_policies.append(path)
 
                 detail = (f"AI governance policy found at "
-                          f"https://{domain}{path}")
+                          f"https://{domain}{path}. "
+                          f"ACTION: Review the policy for completeness against "
+                          f"EU AI Act Article 13, NIST AI RMF GOVERN 1.1, and "
+                          f"ISO 42001 Clause 5.2 requirements.")
 
                 evt = SpiderFootEvent(
                     "AI_GOVERNANCE_FINDING",
@@ -254,7 +257,10 @@ class sfp_ai_governance(SpiderFootPlugin):
         if blocked or allowed:
             detail = (f"AI bot directives in robots.txt for {domain}: "
                       f"blocked={', '.join(blocked) or 'none'}, "
-                      f"allowed={', '.join(allowed) or 'none'}")
+                      f"allowed={', '.join(allowed) or 'none'}. "
+                      f"ACTION: Verify these directives align with the "
+                      f"organization's AI data usage policy and assess "
+                      f"whether additional AI crawlers should be addressed.")
 
             evt = SpiderFootEvent(
                 "AI_GOVERNANCE_FINDING",
@@ -269,7 +275,10 @@ class sfp_ai_governance(SpiderFootPlugin):
 
         if found_keywords:
             detail = (f"AI governance keywords found in web content: "
-                      f"{', '.join(found_keywords[:10])}")
+                      f"{', '.join(found_keywords[:10])}. "
+                      f"ACTION: Assess whether these mentions constitute a "
+                      f"formal AI governance policy or are incidental "
+                      f"references that do not satisfy framework requirements.")
 
             dedup_key = f"governance_kw:{','.join(sorted(found_keywords[:5]))}"
             if dedup_key not in self.results:
@@ -311,7 +320,18 @@ class sfp_ai_governance(SpiderFootPlugin):
                 detail = (f"No AI governance policy detected for {domain}: "
                           f"probed {len(self.GOVERNANCE_URLS)} well-known "
                           f"governance URLs with no AI policy content found. "
-                          f"This indicates a lack of formal AI governance.")
+                          f"WHY IT MATTERS: EU AI Act Article 13 requires "
+                          f"transparency obligations for AI systems; NIST AI "
+                          f"RMF GOVERN 1.1 requires documented legal and "
+                          f"regulatory compliance; ISO 42001 Clause 5.2 "
+                          f"requires an AI policy appropriate to the "
+                          f"organization's purpose. "
+                          f"ACTION: (1) Determine whether the organization "
+                          f"deploys or uses AI systems. (2) If yes, draft and "
+                          f"publish an AI governance policy covering intended "
+                          f"use, risk management, and transparency. (3) Engage "
+                          f"legal/compliance to align the policy with "
+                          f"applicable AI regulations.")
 
                 evt = SpiderFootEvent(
                     "AI_GOVERNANCE_FINDING",

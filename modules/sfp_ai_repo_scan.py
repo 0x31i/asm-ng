@@ -47,6 +47,60 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
         'tokenizer.json', 'model.safetensors',
     ]
 
+    # AI tool configuration files/directories in repo root
+    AI_CONFIG_FILES = {
+        'CLAUDE.md': 'Claude Code / Anthropic',
+        '.claude': 'Claude Code / Anthropic',
+        '.cursorrules': 'Cursor IDE',
+        '.cursorignore': 'Cursor IDE',
+        '.github/copilot-instructions.md': 'GitHub Copilot',
+        'Modelfile': 'Ollama',
+        'ollama-modelfile': 'Ollama',
+        '.aider.conf.yml': 'Aider',
+        '.aider.model.settings.yml': 'Aider',
+        'comfyui.yaml': 'ComfyUI',
+    }
+
+    # Known AI packages in dependency files → provider label
+    AI_DEPENDENCY_PACKAGES = {
+        'openai': 'OpenAI',
+        'anthropic': 'Anthropic',
+        'langchain': 'LangChain',
+        'langchain-core': 'LangChain',
+        'langchain-community': 'LangChain',
+        'langchain-openai': 'LangChain + OpenAI',
+        'llamaindex': 'LlamaIndex',
+        'llama-index': 'LlamaIndex',
+        'transformers': 'HuggingFace Transformers',
+        'huggingface-hub': 'HuggingFace Hub',
+        'diffusers': 'HuggingFace Diffusers',
+        'torch': 'PyTorch',
+        'tensorflow': 'TensorFlow',
+        'keras': 'Keras',
+        'ollama': 'Ollama',
+        'vllm': 'vLLM',
+        'mlflow': 'MLflow',
+        'wandb': 'Weights & Biases',
+        'cohere': 'Cohere',
+        'replicate': 'Replicate',
+        'groq': 'Groq',
+        'chromadb': 'ChromaDB',
+        'pinecone-client': 'Pinecone',
+        'weaviate-client': 'Weaviate',
+        'qdrant-client': 'Qdrant',
+        'faiss-cpu': 'FAISS',
+        'faiss-gpu': 'FAISS',
+        'tiktoken': 'OpenAI Tiktoken',
+        'sentence-transformers': 'Sentence Transformers',
+        'autogen': 'AutoGen',
+        'crewai': 'CrewAI',
+        '@langchain/core': 'LangChain',
+        '@langchain/openai': 'LangChain + OpenAI',
+        'ai': 'Vercel AI SDK',
+        '@ai-sdk/openai': 'Vercel AI SDK + OpenAI',
+        'openai-node': 'OpenAI Node',
+    }
+
     # Distinctive API key patterns: (provider_name, regex_pattern)
     AI_KEY_PATTERNS = [
         ('OpenAI', r'sk-[a-zA-Z0-9]{20,}T3BlbkFJ[a-zA-Z0-9]{20,}'),
@@ -65,6 +119,12 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
         'llamaindex', 'openai', 'anthropic', 'ollama', 'vllm', 'mlflow',
         'wandb', 'weights & biases', 'model training', 'fine-tuning',
         'inference', 'embedding',
+        'claude', 'claude code', 'copilot', 'cursor', 'gemini',
+        'chatgpt', 'gpt-4', 'llama', 'mistral', 'groq', 'replicate',
+        'cohere', 'stable diffusion',
+        'rag', 'retrieval augmented', 'vector database',
+        'chromadb', 'pinecone', 'weaviate', 'qdrant',
+        'prompt engineering', 'model serving',
     ]
 
     opts = {
@@ -155,6 +215,7 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
         # Check file names against AI model file patterns
         ai_files_found = []
         env_example_files = []
+        ai_config_found = []
 
         for entry in files:
             if self.checkForStop():
@@ -170,6 +231,11 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
                     ai_files_found.append(name)
                     break
 
+            # Check for AI tool configuration files
+            if name in self.AI_CONFIG_FILES:
+                ai_config_found.append(
+                    f"{name} ({self.AI_CONFIG_FILES[name]})")
+
             # Track .env.example or similar files for key scanning
             if name in ('.env.example', '.env.sample', '.env.template',
                         '.env.local', '.env'):
@@ -184,6 +250,18 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
 
             evt = SpiderFootEvent(
                 "AI_MODEL_REGISTRY_EXPOSED",
+                detail,
+                self.__class__.__name__, event)
+            self.notifyListeners(evt)
+
+        # Emit AI_INFRASTRUCTURE_DETECTED if AI config files found
+        if ai_config_found:
+            detail = (f"AI tool configuration found in "
+                      f"github.com/{owner}/{repo}: "
+                      f"{', '.join(ai_config_found)}")
+
+            evt = SpiderFootEvent(
+                "AI_INFRASTRUCTURE_DETECTED",
                 detail,
                 self.__class__.__name__, event)
             self.notifyListeners(evt)
@@ -280,6 +358,201 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
                 self.__class__.__name__, event)
             self.notifyListeners(evt)
 
+    def _check_dependency_files(self, owner, repo, event):
+        """Scan requirements.txt and package.json for known AI packages."""
+        dep_files = {
+            'requirements.txt': 'python',
+            'package.json': 'node',
+        }
+
+        for filename, filetype in dep_files.items():
+            if self.checkForStop():
+                return
+
+            url = (f"https://api.github.com/repos/{owner}/{repo}"
+                   f"/contents/{filename}")
+
+            res = self.sf.fetchUrl(
+                url,
+                timeout=15,
+                useragent=self.opts.get('_useragent', 'ASM-NG'),
+                headers={
+                    'Accept': 'application/vnd.github.raw'
+                }
+            )
+
+            if not res or not res.get('content'):
+                continue
+
+            content = res['content']
+            found = []
+
+            if filetype == 'python':
+                for line in content.splitlines():
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+                    # Extract package name (before ==, >=, <=, ~=, etc.)
+                    pkg = re.split(r'[><=!~\[;@\s]', line)[0].lower()
+                    if pkg in self.AI_DEPENDENCY_PACKAGES:
+                        found.append(
+                            f"{pkg} ({self.AI_DEPENDENCY_PACKAGES[pkg]})")
+
+            elif filetype == 'node':
+                try:
+                    pkg_json = json.loads(content)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                all_deps = {}
+                for section in ('dependencies', 'devDependencies'):
+                    all_deps.update(pkg_json.get(section, {}))
+                for dep_name in all_deps:
+                    dep_lower = dep_name.lower()
+                    if dep_lower in self.AI_DEPENDENCY_PACKAGES:
+                        found.append(
+                            f"{dep_name} "
+                            f"({self.AI_DEPENDENCY_PACKAGES[dep_lower]})")
+
+            if found:
+                detail = (f"AI dependencies in "
+                          f"github.com/{owner}/{repo}/{filename}: "
+                          f"{', '.join(found)}")
+
+                evt = SpiderFootEvent(
+                    "AI_INFRASTRUCTURE_DETECTED",
+                    detail,
+                    self.__class__.__name__, event)
+                self.notifyListeners(evt)
+
+    def _check_repo_contributors(self, owner, repo, event):
+        """Check repository contributors for known AI bot accounts."""
+        url = f"https://api.github.com/repos/{owner}/{repo}/contributors"
+
+        res = self.sf.fetchUrl(
+            url,
+            timeout=15,
+            useragent=self.opts.get('_useragent', 'ASM-NG')
+        )
+
+        if not res or not res.get('content'):
+            self.debug(f"No contributors data for {owner}/{repo}.")
+            return
+
+        try:
+            contributors = json.loads(res['content'])
+        except (json.JSONDecodeError, ValueError):
+            self.debug(f"Failed to parse contributors for {owner}/{repo}.")
+            return
+
+        if not isinstance(contributors, list):
+            return
+
+        ai_bot_patterns = {
+            'claude': 'Claude / Anthropic',
+            'copilot-swe-agent': 'GitHub Copilot',
+            'devin-ai': 'Devin AI',
+            'coderabbit': 'CodeRabbit',
+            'sweep-ai': 'Sweep AI',
+            'aider': 'Aider',
+        }
+
+        found = []
+        for contrib in contributors:
+            if self.checkForStop():
+                return
+
+            login = contrib.get('login', '').lower()
+            commits = contrib.get('contributions', 0)
+
+            for pattern, label in ai_bot_patterns.items():
+                if pattern in login:
+                    display_login = contrib.get('login', login)
+                    found.append(
+                        f"{display_login} — {commits} commits ({label})")
+                    break
+
+        if found:
+            detail = (f"AI contributor(s) in "
+                      f"github.com/{owner}/{repo}: "
+                      f"{', '.join(found)}")
+
+            evt = SpiderFootEvent(
+                "AI_INFRASTRUCTURE_DETECTED",
+                detail,
+                self.__class__.__name__, event)
+            self.notifyListeners(evt)
+
+    def _check_repo_branches(self, owner, repo, event):
+        """Check repository branch names for AI tool naming patterns."""
+        url = (f"https://api.github.com/repos/{owner}/{repo}"
+               f"/branches?per_page=100")
+
+        res = self.sf.fetchUrl(
+            url,
+            timeout=15,
+            useragent=self.opts.get('_useragent', 'ASM-NG')
+        )
+
+        if not res or not res.get('content'):
+            self.debug(f"No branches data for {owner}/{repo}.")
+            return
+
+        try:
+            branches = json.loads(res['content'])
+        except (json.JSONDecodeError, ValueError):
+            self.debug(f"Failed to parse branches for {owner}/{repo}.")
+            return
+
+        if not isinstance(branches, list):
+            return
+
+        ai_branch_prefixes = {
+            'claude/': 'Claude Code',
+            'copilot/': 'GitHub Copilot',
+            'devin/': 'Devin AI',
+            'sweep/': 'Sweep AI',
+            'coderabbit/': 'CodeRabbit',
+            'aider/': 'Aider',
+            'cursor/': 'Cursor IDE',
+        }
+
+        # Group matched branches by prefix
+        matches_by_prefix = {}
+        for branch in branches:
+            if self.checkForStop():
+                return
+
+            name = branch.get('name', '')
+            name_lower = name.lower()
+            for prefix, label in ai_branch_prefixes.items():
+                if name_lower.startswith(prefix):
+                    matches_by_prefix.setdefault(prefix, []).append(name)
+                    break
+
+        if not matches_by_prefix:
+            return
+
+        parts = []
+        for prefix, names in matches_by_prefix.items():
+            label = ai_branch_prefixes[prefix]
+            # Show up to 3 example names, then count
+            examples = ', '.join(names[:3])
+            if len(names) > 3:
+                examples += f" (+{len(names) - 3} more)"
+            parts.append(
+                f"{examples} ({len(names)} {prefix}* branches"
+                f" — indicates {label} workflow)")
+
+        detail = (f"AI-named branches in "
+                  f"github.com/{owner}/{repo}: "
+                  f"{'; '.join(parts)}")
+
+        evt = SpiderFootEvent(
+            "AI_INFRASTRUCTURE_DETECTED",
+            detail,
+            self.__class__.__name__, event)
+        self.notifyListeners(evt)
+
     def handleEvent(self, event):
         eventName = event.eventType
         eventData = event.data
@@ -330,6 +603,21 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
         if self.checkForStop():
             return
         self._check_repo_readme(owner, repo, event)
+
+        # Check dependency files for AI packages
+        if self.checkForStop():
+            return
+        self._check_dependency_files(owner, repo, event)
+
+        # Check contributors for AI bot accounts
+        if self.checkForStop():
+            return
+        self._check_repo_contributors(owner, repo, event)
+
+        # Check branch names for AI tool patterns
+        if self.checkForStop():
+            return
+        self._check_repo_branches(owner, repo, event)
 
 
 # End of sfp_ai_repo_scan class

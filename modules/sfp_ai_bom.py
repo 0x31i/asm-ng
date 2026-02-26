@@ -82,13 +82,11 @@ class sfp_ai_bom(SpiderFootPlugin):
             "AI_SHADOW_SERVICE_DETECTED",
             "AI_VENDOR_WIDGET_DETECTED",
             "AI_HISTORICAL_EVIDENCE",
-            "AI_COMPLIANCE_GAP",
-            "AI_GOVERNANCE_FINDING",
             "SOFTWARE_USED",
         ]
 
     def producedEvents(self):
-        return ["AI_INFRASTRUCTURE_DETECTED"]
+        return []
 
     def _classify_component(self, event_type):
         """Map an event type to an AI-BOM component type string."""
@@ -104,8 +102,6 @@ class sfp_ai_bom(SpiderFootPlugin):
             'AI_SHADOW_SERVICE_DETECTED': 'shadow_ai_service',
             'AI_VENDOR_WIDGET_DETECTED': 'vendor_widget',
             'AI_HISTORICAL_EVIDENCE': 'historical_evidence',
-            'AI_COMPLIANCE_GAP': 'compliance_gap',
-            'AI_GOVERNANCE_FINDING': 'governance_finding',
             'AI_INFRASTRUCTURE_DETECTED': 'ai_infrastructure',
             'SOFTWARE_USED': 'software',
         }
@@ -146,12 +142,8 @@ class sfp_ai_bom(SpiderFootPlugin):
             bom["summary"]["by_type"][ctype] = \
                 bom["summary"]["by_type"].get(ctype, 0) + 1
 
-        bom_json = json.dumps(bom)
-        evt = SpiderFootEvent(
-            "AI_INFRASTRUCTURE_DETECTED",
-            "AI-BOM: " + bom_json,
-            self.__class__.__name__, event)
-        self.notifyListeners(evt)
+        self._bom_json = json.dumps(bom)
+        self.debug(f"AI-BOM generated with {len(self._components)} components")
 
     def handleEvent(self, event):
         eventName = event.eventType
@@ -161,10 +153,6 @@ class sfp_ai_bom(SpiderFootPlugin):
             return
 
         self.debug(f"Received event, {eventName}, from {event.module}")
-
-        # Skip our own AI-BOM output to avoid circular processing
-        if eventName == "AI_INFRASTRUCTURE_DETECTED" and eventData.startswith("AI-BOM: "):
-            return
 
         # For SOFTWARE_USED, only process if it references AI frameworks
         if eventName == "SOFTWARE_USED":
