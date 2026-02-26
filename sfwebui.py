@@ -6936,6 +6936,83 @@ class SpiderFootWebUi:
                 return {'success': False, 'message': str(e)}
 
     @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def typecomment(self: 'SpiderFootWebUi', id: str, eventType: str) -> dict:
+        """Load analyst type-level comment.
+
+        Args:
+            id (str): scan instance ID
+            eventType (str): event type
+
+        Returns:
+            dict: {success: True, comment: "text or null"}
+        """
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                scanInfo = dbh.scanInstanceGet(id)
+                target = scanInfo[1] if scanInfo else None
+                if not target:
+                    return {'success': False, 'message': 'Scan not found'}
+                comment = dbh.typeCommentGet(target, eventType)
+                return {'success': True, 'comment': comment}
+            except Exception as e:
+                self.log.error(f"Error loading type comment for scan {id}, type {eventType}: {e}", exc_info=True)
+                return {'success': False, 'message': str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def typecommentsave(self: 'SpiderFootWebUi', id: str, eventType: str, comment: str) -> dict:
+        """Save analyst type-level comment.
+
+        Args:
+            id (str): scan instance ID
+            eventType (str): event type
+            comment (str): comment text (empty = delete)
+
+        Returns:
+            dict: {success: True}
+        """
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                scanInfo = dbh.scanInstanceGet(id)
+                target = scanInfo[1] if scanInfo else None
+                if not target:
+                    return {'success': False, 'message': 'Scan not found'}
+                dbh.typeCommentSet(target, eventType, comment)
+                return {'success': True}
+            except Exception as e:
+                self.log.error(f"Error saving type comment for scan {id}, type {eventType}: {e}", exc_info=True)
+                return {'success': False, 'message': str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def rownotesave(self: 'SpiderFootWebUi', id: str, resultHash: str, note: str) -> dict:
+        """Save analyst per-row note.
+
+        Args:
+            id (str): scan instance ID
+            resultHash (str): event hash
+            note (str): note text (empty = delete)
+
+        Returns:
+            dict: {success: True}
+        """
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                scanInfo = dbh.scanInstanceGet(id)
+                target = scanInfo[1] if scanInfo else None
+                if not target:
+                    return {'success': False, 'message': 'Scan not found'}
+                eventDetails = dbh.scanEventResultByHash(id, resultHash)
+                if not eventDetails:
+                    return {'success': False, 'message': 'Event not found'}
+                dbh.rowNoteSet(target, eventDetails[0], eventDetails[1], eventDetails[2], note)
+                return {'success': True}
+            except Exception as e:
+                self.log.error(f"Error saving row note for scan {id}, hash {resultHash}: {e}", exc_info=True)
+                return {'success': False, 'message': str(e)}
+
+    @cherrypy.expose
     def scanfindingsexport(self: 'SpiderFootWebUi', id: str, filetype: str = "xlsx", report: str = "basic") -> str:
         """Export findings and correlations from a scan.
 
@@ -8083,6 +8160,14 @@ class SpiderFootWebUi:
                 except Exception:
                     pass  # Table may not exist in older databases
 
+            # Bulk load analyst row notes for this target+type
+            rowNotes = {}
+            if target:
+                try:
+                    rowNotes = dbh.rowNotesForTarget(target, eventType)
+                except Exception:
+                    pass  # Table may not exist in older databases
+
             # Pre-compute known asset matching sets
             ip_match_types = {'IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'}
             domain_match_types = {'DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
@@ -8122,6 +8207,9 @@ class SpiderFootWebUi:
                                 isKnownAsset = 1
                                 break
 
+                # Look up analyst row note
+                rowNote = rowNotes.get((eventTypeRaw, eventDataRaw, sourceDataRaw), None)
+
                 retdata.append([
                     lastseen,
                     html.escape(row[1]),
@@ -8138,7 +8226,8 @@ class SpiderFootWebUi:
                     isTargetValidated,  # Index 12: target-level validated flag
                     row[15],  # Index 13: imported_from_scan (scan ID if imported, None otherwise)
                     isKnownAsset,  # Index 14: known asset match (0=no, 1=match)
-                    row[16] if len(row) > 16 else 0  # Index 15: tracking (0=OPEN, 1=CLOSED, 2=TICKETED)
+                    row[16] if len(row) > 16 else 0,  # Index 15: tracking (0=OPEN, 1=CLOSED, 2=TICKETED)
+                    rowNote  # Index 16: analyst row note (text or null)
                 ])
 
             self.log.info(f"Event results: scan={id} type={eventType} rows={len(retdata)}")

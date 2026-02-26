@@ -342,7 +342,28 @@ class SpiderFootDb:
             imported_by     VARCHAR, \
             date_imported   INT NOT NULL \
         )",
-        "CREATE INDEX idx_asset_import_history_target ON tbl_asset_import_history (target)"
+        "CREATE INDEX idx_asset_import_history_target ON tbl_asset_import_history (target)",
+        "CREATE TABLE tbl_analyst_type_comments ( \
+            id              INTEGER PRIMARY KEY AUTOINCREMENT, \
+            target          VARCHAR NOT NULL, \
+            event_type      VARCHAR NOT NULL, \
+            comment_text    VARCHAR, \
+            date_modified   INT NOT NULL, \
+            UNIQUE(target, event_type) \
+        )",
+        "CREATE INDEX idx_type_comments_lookup ON tbl_analyst_type_comments (target, event_type)",
+        "CREATE TABLE tbl_analyst_row_notes ( \
+            id              INTEGER PRIMARY KEY AUTOINCREMENT, \
+            target          VARCHAR NOT NULL, \
+            event_type      VARCHAR NOT NULL, \
+            event_data      VARCHAR NOT NULL, \
+            source_data     VARCHAR, \
+            note_text       VARCHAR, \
+            date_modified   INT NOT NULL, \
+            UNIQUE(target, event_type, event_data, source_data) \
+        )",
+        "CREATE INDEX idx_row_notes_target ON tbl_analyst_row_notes (target)",
+        "CREATE INDEX idx_row_notes_lookup ON tbl_analyst_row_notes (target, event_type, event_data, source_data)"
     ]
 
     eventDetails = [
@@ -1124,6 +1145,30 @@ class SpiderFootDb:
                         self.dbh.execute(
                             "ALTER TABLE tbl_scan_config_new RENAME TO tbl_scan_config")
                         self.conn.commit()
+                except DatabaseError:
+                    pass
+
+            # Migration: Create analyst type comments table
+            try:
+                self.dbh.execute("SELECT COUNT(*) FROM tbl_analyst_type_comments")
+            except DatabaseError:
+                try:
+                    for qry in self.createSchemaQueries:
+                        if "tbl_analyst_type_comments" in qry:
+                            self.dbh.execute(qry)
+                    self.conn.commit()
+                except DatabaseError:
+                    pass
+
+            # Migration: Create analyst row notes table
+            try:
+                self.dbh.execute("SELECT COUNT(*) FROM tbl_analyst_row_notes")
+            except DatabaseError:
+                try:
+                    for qry in self.createSchemaQueries:
+                        if "tbl_analyst_row_notes" in qry:
+                            self.dbh.execute(qry)
+                    self.conn.commit()
                 except DatabaseError:
                     pass
 
@@ -6268,3 +6313,177 @@ class SpiderFootDb:
                 return rowcount
             except DatabaseError as e:
                 raise IOError("SQL error encountered when inheriting tracking from previous scans") from e
+
+    # ---- Analyst Comments & Row Notes ----
+
+    def typeCommentGet(self, target: str, eventType: str) -> str:
+        """Load the analyst comment for a specific target + event type.
+
+        Args:
+            target (str): the seed_target value
+            eventType (str): the event type
+
+        Returns:
+            str: comment text, or None if no comment exists
+        """
+        qry = "SELECT comment_text FROM tbl_analyst_type_comments WHERE target = ? AND event_type = ?"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target, eventType))
+                row = self.dbh.fetchone()
+                return row[0] if row else None
+            except DatabaseError as e:
+                raise IOError("SQL error fetching type comment") from e
+
+    def typeCommentSet(self, target: str, eventType: str, commentText: str) -> bool:
+        """Upsert an analyst comment for a target + event type. Empty text deletes the entry.
+
+        Args:
+            target (str): the seed_target value
+            eventType (str): the event type
+            commentText (str): the comment text (empty string = delete)
+
+        Returns:
+            bool: success
+        """
+        if not commentText or not commentText.strip():
+            return self.typeCommentDelete(target, eventType)
+
+        now = int(time.time() * 1000)
+        qry = self._replace_into(
+            'tbl_analyst_type_comments',
+            ['target', 'event_type', 'comment_text', 'date_modified'],
+            ['target', 'event_type']
+        )
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target, eventType, commentText, now))
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error saving type comment") from e
+
+        return True
+
+    def typeCommentDelete(self, target: str, eventType: str) -> bool:
+        """Delete an analyst comment for a target + event type.
+
+        Args:
+            target (str): the seed_target value
+            eventType (str): the event type
+
+        Returns:
+            bool: success
+        """
+        qry = "DELETE FROM tbl_analyst_type_comments WHERE target = ? AND event_type = ?"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target, eventType))
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error deleting type comment") from e
+
+        return True
+
+    def rowNoteGet(self, target: str, eventType: str, eventData: str, sourceData: str) -> str:
+        """Load a single analyst row note.
+
+        Args:
+            target (str): the seed_target value
+            eventType (str): the event type
+            eventData (str): the event data
+            sourceData (str): the source data
+
+        Returns:
+            str: note text, or None if no note exists
+        """
+        if sourceData is None:
+            qry = "SELECT note_text FROM tbl_analyst_row_notes WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+            params = (target, eventType, eventData)
+        else:
+            qry = "SELECT note_text FROM tbl_analyst_row_notes WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ?"
+            params = (target, eventType, eventData, sourceData)
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, params)
+                row = self.dbh.fetchone()
+                return row[0] if row else None
+            except DatabaseError as e:
+                raise IOError("SQL error fetching row note") from e
+
+    def rowNoteSet(self, target: str, eventType: str, eventData: str, sourceData: str, noteText: str) -> bool:
+        """Upsert an analyst row note. Empty text deletes the entry.
+
+        Args:
+            target (str): the seed_target value
+            eventType (str): the event type
+            eventData (str): the event data
+            sourceData (str): the source data
+            noteText (str): the note text (empty string = delete)
+
+        Returns:
+            bool: success
+        """
+        if not noteText or not noteText.strip():
+            if sourceData is None:
+                qry = "DELETE FROM tbl_analyst_row_notes WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+                params = (target, eventType, eventData)
+            else:
+                qry = "DELETE FROM tbl_analyst_row_notes WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ?"
+                params = (target, eventType, eventData, sourceData)
+
+            with self.dbhLock:
+                try:
+                    self.dbh.execute(qry, params)
+                    self.conn.commit()
+                except DatabaseError as e:
+                    raise IOError("SQL error deleting row note") from e
+            return True
+
+        now = int(time.time() * 1000)
+
+        with self.dbhLock:
+            try:
+                # Delete existing entry first (handles NULL source_data correctly)
+                if sourceData is None:
+                    del_qry = "DELETE FROM tbl_analyst_row_notes WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+                    self.dbh.execute(del_qry, (target, eventType, eventData))
+                else:
+                    del_qry = "DELETE FROM tbl_analyst_row_notes WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ?"
+                    self.dbh.execute(del_qry, (target, eventType, eventData, sourceData))
+                # Insert new entry
+                ins_qry = "INSERT INTO tbl_analyst_row_notes (target, event_type, event_data, source_data, note_text, date_modified) VALUES (?, ?, ?, ?, ?, ?)"
+                self.dbh.execute(ins_qry, (target, eventType, eventData, sourceData, noteText, now))
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error saving row note") from e
+
+        return True
+
+    def rowNotesForTarget(self, target: str, eventType: str = None) -> dict:
+        """Bulk load all analyst row notes for a target, optionally filtered by event type.
+
+        Args:
+            target (str): the seed_target value
+            eventType (str): optional event type filter
+
+        Returns:
+            dict: {(event_type, event_data, source_data): note_text}
+        """
+        if eventType and eventType != 'ALL':
+            qry = "SELECT event_type, event_data, source_data, note_text FROM tbl_analyst_row_notes WHERE target = ? AND event_type = ?"
+            params = (target, eventType)
+        else:
+            qry = "SELECT event_type, event_data, source_data, note_text FROM tbl_analyst_row_notes WHERE target = ?"
+            params = (target,)
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, params)
+                rows = self.dbh.fetchall()
+                return {(r[0], r[1], r[2]): r[3] for r in rows}
+            except DatabaseError as e:
+                raise IOError("SQL error fetching row notes for target") from e
