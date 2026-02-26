@@ -1,0 +1,18 @@
+id: ai_vendor_shadow_ai
+version: "1"
+meta:
+  name: Third-party AI vendor widgets detected across multiple pages
+  description: >
+    Multiple third-party AI vendor integrations were detected,
+    suggesting widespread AI SaaS adoption that may not be
+    formally tracked in an AI inventory. Each vendor integration
+    represents a data flow to an external AI provider.
+  risk: MEDIUM
+collections:
+  collect:
+    - method: exact
+      field: type
+      value: AI_VENDOR_WIDGET_DETECTED
+aggregation:
+  field: data
+headline: "AI vendor widget detected: {data}"

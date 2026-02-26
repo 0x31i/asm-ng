@@ -80,6 +80,10 @@ class sfp_ai_bom(SpiderFootPlugin):
             "AI_DATA_PIPELINE_EXPOSED",
             "AI_MODEL_REGISTRY_EXPOSED",
             "AI_SHADOW_SERVICE_DETECTED",
+            "AI_VENDOR_WIDGET_DETECTED",
+            "AI_HISTORICAL_EVIDENCE",
+            "AI_COMPLIANCE_GAP",
+            "AI_GOVERNANCE_FINDING",
             "SOFTWARE_USED",
         ]
 
@@ -98,6 +102,10 @@ class sfp_ai_bom(SpiderFootPlugin):
             'AI_DATA_PIPELINE_EXPOSED': 'data_pipeline',
             'AI_MODEL_REGISTRY_EXPOSED': 'model_registry',
             'AI_SHADOW_SERVICE_DETECTED': 'shadow_ai_service',
+            'AI_VENDOR_WIDGET_DETECTED': 'vendor_widget',
+            'AI_HISTORICAL_EVIDENCE': 'historical_evidence',
+            'AI_COMPLIANCE_GAP': 'compliance_gap',
+            'AI_GOVERNANCE_FINDING': 'governance_finding',
             'AI_INFRASTRUCTURE_DETECTED': 'ai_infrastructure',
             'SOFTWARE_USED': 'software',
         }

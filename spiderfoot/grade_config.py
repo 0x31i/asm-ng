@@ -949,6 +949,22 @@ DEFAULT_EVENT_TYPE_GRADING = {
         'category': 'AI Security', 'rank': 1, 'points': -20,
         'logic': 'unverified_exists',
     },
+    'AI_VENDOR_WIDGET_DETECTED': {
+        'category': 'AI Security', 'rank': 3, 'points': -10,
+        'logic': 'count_scaled',
+    },
+    'AI_HISTORICAL_EVIDENCE': {
+        'category': 'AI Security', 'rank': 4, 'points': -5,
+        'logic': 'informational',
+    },
+    'AI_COMPLIANCE_GAP': {
+        'category': 'AI Security', 'rank': 2, 'points': -15,
+        'logic': 'count_scaled',
+    },
+    'AI_GOVERNANCE_FINDING': {
+        'category': 'AI Security', 'rank': 2, 'points': -15,
+        'logic': 'count_scaled',
+    },
 }
 
 

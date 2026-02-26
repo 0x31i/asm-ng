@@ -1,0 +1,19 @@
+id: ai_governance_absent
+version: "1"
+meta:
+  name: No AI governance policy detected
+  description: >
+    No AI governance policy, responsible AI statement, or
+    AI ethics page was found on the target's website. This
+    indicates a lack of formal AI governance, increasing
+    risk of uncontrolled AI adoption and regulatory
+    non-compliance.
+  risk: MEDIUM
+collections:
+  collect:
+    - method: exact
+      field: type
+      value: AI_GOVERNANCE_FINDING
+aggregation:
+  field: data
+headline: "AI governance gap: {data}"
