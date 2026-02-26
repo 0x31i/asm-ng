@@ -155,6 +155,7 @@
     <div id="page-title-actions" class="page-title-actions">
       <button class="btn-module-info" id="btn-module-info" onclick="try{showModuleInfo();}catch(e){alert('MODULE INFO error: '+e.message);}"><i class="glyphicon glyphicon-info-sign"></i>&nbsp;&nbsp;MODULE INFO</button>
       <button class="btn-instructions" id="btn-instructions" onclick="try{showInstructions();}catch(e){alert('INSTRUCTIONS error: '+e.message);}"><i class="glyphicon glyphicon-education"></i>&nbsp;&nbsp;INSTRUCTIONS</button>
+      <button class="btn-comments" id="btn-comments" onclick="try{showComments();}catch(e){alert('COMMENTS error: '+e.message);}"><i class="glyphicon glyphicon-comment"></i>&nbsp;&nbsp;COMMENTS</button>
     </div>
   </div>
 
@@ -625,6 +626,19 @@
             }
 
             html += '</div>';
+
+            // Analyst Note section (full width, below the grid)
+            var noteVal = (d[16] != null && d[16] !== undefined) ? d[16] : '';
+            var eventHash = d[7] || '';
+            var rowIdx = d._idx !== undefined ? d._idx : '';
+            html += "<div class='detail-analyst-note'>";
+            html += "<div class='finding-detail-label'>Analyst Note</div>";
+            html += "<div class='analyst-note-container'>";
+            html += "<textarea id='analyst-row-note-" + sf.escapeHtml(eventHash) + "' class='analyst-note-textarea' placeholder='Add a note for this result...' rows='2' onclick='event.stopPropagation()'>" + sf.escapeHtml(noteVal) + "</textarea>";
+            html += "<button class='btn-save-note' onclick='event.stopPropagation(); saveRowNote(\"" + sf.escapeHtml(eventHash) + "\", " + rowIdx + ")'>SAVE</button>";
+            html += "<span id='note-save-status-" + sf.escapeHtml(eventHash) + "' class='note-save-status'></span>";
+            html += "</div></div>";
+
             return html;
         }
 
@@ -693,6 +707,7 @@
                     row += "<td><pre class='table-border-bg-inherit'>" + allData[i][3] + "</pre></td>";
                     row += "<td class='text-center'>" + getDataTrackingBadge(allData[i][15], allData[i][7]) + "</td>";
                     row += "</tr>";
+                    allData[i]._idx = i;
                     row += "<tr class='data-detail-row' style='display:none'><td colspan='6'><div class='finding-detail' style='display:none'>" + buildDataDetailHtml(allData[i]) + "</div></td></tr>";
                     tbody.append(row);
                 }
@@ -1997,6 +2012,7 @@
             _infoPanelMode = null;
             $("#btn-module-info").removeClass('active');
             $("#btn-instructions").removeClass('active');
+            $("#btn-comments").removeClass('active');
             var el = document.getElementById("info-panel-wrapper");
             if (el) {
                 el.style.display = "none";
@@ -2039,12 +2055,15 @@
         }
 
         function updatePanelButtonStates(mode) {
+            $("#btn-module-info").removeClass('active');
+            $("#btn-instructions").removeClass('active');
+            $("#btn-comments").removeClass('active');
             if (mode === 'module-info') {
                 $("#btn-module-info").addClass('active');
-                $("#btn-instructions").removeClass('active');
-            } else {
+            } else if (mode === 'instructions') {
                 $("#btn-instructions").addClass('active');
-                $("#btn-module-info").removeClass('active');
+            } else if (mode === 'comments') {
+                $("#btn-comments").addClass('active');
             }
         }
 
@@ -2162,6 +2181,72 @@
             }
         }
 
+        function showComments() {
+            try {
+                console.log("[v4] showComments called, currentType=" + currentType);
+                if (!currentType || currentType === "ALL") return;
+                var html = '<div class="analyst-comment-container">';
+                html += '<textarea id="analyst-type-comment" class="analyst-comment-textarea" placeholder="Add analyst comments for ' + sf.escapeHtml(currentType) + '..." rows="6"></textarea>';
+                html += '<div style="display:flex; align-items:center; gap:10px; margin-top:8px;">';
+                html += '<button class="btn-save-comment" onclick="saveTypeComment()">SAVE</button>';
+                html += '<span id="comment-save-status" class="comment-save-status"></span>';
+                html += '</div></div>';
+                openInfoPanel('comments', html, 'ANALYST COMMENTS \u2014 ' + currentType, 'glyphicon-comment');
+                // Load existing comment
+                sf.fetchData('${docroot}/typecomment', {id: scanId, eventType: currentType}, function(data) {
+                    if (data && data.success && data.comment) {
+                        var ta = document.getElementById('analyst-type-comment');
+                        if (ta) ta.value = data.comment;
+                    }
+                });
+            } catch(e) {
+                console.error("showComments error:", e);
+                alertify.error("Comments error: " + e.message);
+            }
+        }
+
+        function saveTypeComment() {
+            var ta = document.getElementById('analyst-type-comment');
+            var status = document.getElementById('comment-save-status');
+            if (!ta) return;
+            var comment = ta.value;
+            sf.fetchData('${docroot}/typecommentsave', {id: scanId, eventType: currentType, comment: comment}, function(data) {
+                if (status) {
+                    if (data && data.success) {
+                        status.textContent = 'Saved';
+                        status.className = 'comment-save-status saved';
+                    } else {
+                        status.textContent = 'Error';
+                        status.className = 'comment-save-status error';
+                    }
+                    setTimeout(function() { status.textContent = ''; status.className = 'comment-save-status'; }, 2000);
+                }
+            });
+        }
+
+        function saveRowNote(eventHash, idx) {
+            var ta = document.getElementById('analyst-row-note-' + eventHash);
+            var status = document.getElementById('note-save-status-' + eventHash);
+            if (!ta) return;
+            var note = ta.value;
+            sf.fetchData('${docroot}/rownotesave', {id: scanId, resultHash: eventHash, note: note}, function(data) {
+                if (status) {
+                    if (data && data.success) {
+                        status.textContent = 'Saved';
+                        status.className = 'note-save-status saved';
+                        // Update in-memory data so re-renders preserve the note
+                        if (typeof idx !== 'undefined' && currentViewData && currentViewData[idx]) {
+                            currentViewData[idx][16] = note || null;
+                        }
+                    } else {
+                        status.textContent = 'Error';
+                        status.className = 'note-save-status error';
+                    }
+                    setTimeout(function() { status.textContent = ''; status.className = 'note-save-status'; }, 2000);
+                }
+            });
+        }
+
         // Update button disabled states based on current type
         function updateInfoButtonStates() {
             // Close panel when switching types
@@ -2170,9 +2255,11 @@
             }
             var btnMod = document.getElementById("btn-module-info");
             var btnInst = document.getElementById("btn-instructions");
+            var btnComm = document.getElementById("btn-comments");
             if (!currentType || currentType === "ALL") {
                 if (btnMod) { btnMod.disabled = true; btnMod.classList.add('disabled'); }
                 if (btnInst) { btnInst.disabled = true; btnInst.classList.add('disabled'); }
+                if (btnComm) { btnComm.disabled = true; btnComm.classList.add('disabled'); }
                 return;
             }
             // Module info is always available (every type has producing modules)
@@ -2184,6 +2271,9 @@
             } else {
                 if (btnInst) { btnInst.disabled = true; btnInst.classList.add('disabled'); }
             }
+
+            // Comments: always available when a specific type is selected
+            if (btnComm) { btnComm.disabled = false; btnComm.classList.remove('disabled'); }
         }
 
         function navTo(target) {
@@ -7726,6 +7816,7 @@
                                 table += "</tr>";
 
                                 // Collapsible detail row
+                                data[i]._idx = i;
                                 table += "<tr class='data-detail-row' style='display:none'>";
                                 table += "<td colspan='6'><div class='finding-detail' style='display:none'>" + buildDataDetailHtml(data[i]) + "</div></td>";
                                 table += "</tr>";

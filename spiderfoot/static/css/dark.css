@@ -1972,6 +1972,47 @@ pre.table-border-bg-inherit {
   text-shadow: 0 0 6px rgba(255, 255, 255, 1), 0 0 14px rgba(14, 165, 233, 0.6);
 }
 
+/* Comments button - amber/gold theme */
+.btn-comments {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border: 1px solid #f59e0b;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.15);
+  color: #fde68a;
+  text-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-comments:hover {
+  background: rgba(245, 158, 11, 0.35);
+  border-color: #fcd34d;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.5), 0 0 4px rgba(255, 255, 255, 0.15);
+  text-shadow: 0 0 6px rgba(255, 255, 255, 1), 0 0 14px rgba(245, 158, 11, 0.8), 0 0 24px rgba(245, 158, 11, 0.4);
+}
+
+.btn-comments.disabled,
+.btn-comments[disabled] {
+  opacity: 0.3;
+  cursor: not-allowed;
+  text-shadow: none;
+  box-shadow: none;
+}
+
+.btn-comments.active {
+  background: rgba(245, 158, 11, 0.35);
+  border-color: #fcd34d;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.5), 0 0 4px rgba(255, 255, 255, 0.15);
+  text-shadow: 0 0 6px rgba(255, 255, 255, 1), 0 0 14px rgba(245, 158, 11, 0.6);
+}
+
 /* ============================================
    Expandable Info Panel - Dark Theme
    ============================================ */
@@ -2004,6 +2045,13 @@ pre.table-border-bg-inherit {
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(59, 130, 246, 0.08);
 }
 
+/* Amber glow accent for comments */
+.info-panel-wrapper.mode-comments .info-panel {
+  border-color: rgba(245, 158, 11, 0.25);
+  border-left: 3px solid #f59e0b;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(245, 158, 11, 0.08);
+}
+
 .info-panel-header {
   display: flex;
   align-items: center;
@@ -2034,6 +2082,11 @@ pre.table-border-bg-inherit {
 .mode-instructions .info-panel-title {
   color: var(--accent-blue-light);
   text-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.mode-comments .info-panel-title {
+  color: #fde68a;
+  text-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
 }
 
 .info-panel-close {
@@ -9602,4 +9655,155 @@ a.data-type-btn:hover {
 .data-sticky-th {
   background: rgba(0, 0, 0, 0.85) !important;
   color: #ffffff !important;
+}
+
+/* ============================================
+   Analyst Comments & Row Notes
+   ============================================ */
+
+/* Type-level comment textarea */
+.analyst-comment-container {
+  padding: 4px 0;
+}
+
+.analyst-comment-textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+}
+
+.analyst-comment-textarea:focus {
+  outline: none;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+}
+
+.analyst-comment-textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+/* Save comment button */
+.btn-save-comment {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 5px 16px;
+  border: 1px solid #f59e0b;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.2);
+  color: #fde68a;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-save-comment:hover {
+  background: rgba(245, 158, 11, 0.4);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+}
+
+/* Save status indicators */
+.comment-save-status,
+.note-save-status {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  transition: opacity 0.3s ease;
+}
+
+.comment-save-status.saved,
+.note-save-status.saved {
+  color: #34d399;
+  text-shadow: 0 0 6px rgba(52, 211, 153, 0.4);
+}
+
+.comment-save-status.error,
+.note-save-status.error {
+  color: #f87171;
+  text-shadow: 0 0 6px rgba(248, 113, 113, 0.4);
+}
+
+/* Per-row analyst note in detail section */
+.detail-analyst-note {
+  grid-column: 1 / -1;
+  padding: 10px 0 4px 0;
+  margin-top: 8px;
+  border-top: 1px solid var(--glass-border);
+  border-left: 3px solid rgba(245, 158, 11, 0.4);
+  padding-left: 12px;
+}
+
+.detail-analyst-note .finding-detail-label {
+  color: #fde68a;
+  margin-bottom: 6px;
+}
+
+.analyst-note-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.analyst-note-textarea {
+  flex: 1;
+  min-height: 36px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+}
+
+.analyst-note-textarea:focus {
+  outline: none;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+}
+
+.analyst-note-textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+/* Save note button */
+.btn-save-note {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border: 1px solid #f59e0b;
+  border-radius: 3px;
+  background: rgba(245, 158, 11, 0.2);
+  color: #fde68a;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  align-self: center;
+}
+
+.btn-save-note:hover {
+  background: rgba(245, 158, 11, 0.4);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
 }
