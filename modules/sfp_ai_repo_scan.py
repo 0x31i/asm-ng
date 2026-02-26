@@ -155,6 +155,8 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
             "PUBLIC_CODE_REPO",
             "AI_INFRASTRUCTURE_DETECTED",
             "LINKED_URL_EXTERNAL",
+            "EMAILADDR",
+            "USERNAME",
         ]
 
     def producedEvents(self):
@@ -553,6 +555,152 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
             self.__class__.__name__, event)
         self.notifyListeners(evt)
 
+    def _discover_github_by_email(self, email, event):
+        """Search GitHub for users matching an email address.
+
+        Uses the GitHub user search API with in:email qualifier to find
+        the actual GitHub account linked to an email address (e.g.
+        elias@sims.dev → 0x31i). Falls back to username-from-email
+        if the search returns nothing.
+        """
+        dedup_key = f"ghemail:{email.lower()}"
+        if dedup_key in self.results:
+            return
+        self.results[dedup_key] = True
+
+        # Search GitHub for users with this email
+        url = (f"https://api.github.com/search/users"
+               f"?q={email}+in:email")
+        res = self.sf.fetchUrl(
+            url,
+            timeout=15,
+            useragent=self.opts.get('_useragent', 'ASM-NG')
+        )
+
+        found_via_email = False
+        if res and res.get('content'):
+            try:
+                result = json.loads(res['content'])
+                items = result.get('items', [])
+                for item in items:
+                    login = item.get('login', '')
+                    if login:
+                        self.info(f"GitHub email search: {email} → {login}")
+                        self._discover_github_repos(login, event)
+                        found_via_email = True
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        # Fallback: try the email username as a GitHub username
+        username = email.split('@')[0]
+        if username and len(username) >= 2:
+            self._discover_github_repos(username, event)
+
+    def _discover_github_repos(self, username, event):
+        """Discover GitHub repos for a username and scan each one.
+
+        Checks if the username is a valid GitHub user, then fetches their
+        public repos and runs all AI checks on each one.
+        """
+        dedup_key = f"ghuser:{username.lower()}"
+        if dedup_key in self.results:
+            self.debug(f"Already looked up GitHub user {username}, skipping.")
+            return
+        self.results[dedup_key] = True
+
+        # Verify the GitHub user exists
+        url = f"https://api.github.com/users/{username}"
+        res = self.sf.fetchUrl(
+            url,
+            timeout=15,
+            useragent=self.opts.get('_useragent', 'ASM-NG')
+        )
+
+        if not res or not res.get('content'):
+            self.debug(f"No GitHub user found for: {username}")
+            return
+
+        try:
+            user_data = json.loads(res['content'])
+        except (json.JSONDecodeError, ValueError):
+            return
+
+        if not user_data.get('login'):
+            self.debug(f"{username} is not a valid GitHub user.")
+            return
+
+        actual_login = user_data['login']
+        self.info(f"Found GitHub user: {actual_login} — fetching repos")
+
+        # Fetch repos (up to 100 — respects max_repos in _scan_repo)
+        repos_url = (f"https://api.github.com/users/{actual_login}"
+                     f"/repos?per_page=100&sort=updated")
+        res = self.sf.fetchUrl(
+            repos_url,
+            timeout=15,
+            useragent=self.opts.get('_useragent', 'ASM-NG')
+        )
+
+        if not res or not res.get('content'):
+            self.debug(f"No repos returned for GitHub user {actual_login}.")
+            return
+
+        try:
+            repos = json.loads(res['content'])
+        except (json.JSONDecodeError, ValueError):
+            return
+
+        if not isinstance(repos, list):
+            return
+
+        for repo_obj in repos:
+            if self.checkForStop():
+                return
+
+            owner = repo_obj.get('owner', {}).get('login', actual_login)
+            repo_name = repo_obj.get('name', '')
+            if not repo_name:
+                continue
+
+            self._scan_repo(owner, repo_name, event)
+
+    def _scan_repo(self, owner, repo, event):
+        """Run all AI checks on a single repo (with dedup and limit)."""
+        dedup_key = f"repo:{owner}/{repo}"
+        if dedup_key in self.results:
+            self.debug(f"Already scanned {owner}/{repo}, skipping.")
+            return
+        self.results[dedup_key] = True
+
+        if self._repo_count >= self.opts['max_repos']:
+            self.debug(f"Reached max_repos limit ({self.opts['max_repos']}), "
+                       f"skipping {owner}/{repo}.")
+            return
+        self._repo_count += 1
+
+        self.info(f"Scanning repository: github.com/{owner}/{repo}")
+
+        if self.opts['check_file_listings']:
+            if self.checkForStop():
+                return
+            self._check_repo_contents(owner, repo, event)
+
+        if self.checkForStop():
+            return
+        self._check_repo_readme(owner, repo, event)
+
+        if self.checkForStop():
+            return
+        self._check_dependency_files(owner, repo, event)
+
+        if self.checkForStop():
+            return
+        self._check_repo_contributors(owner, repo, event)
+
+        if self.checkForStop():
+            return
+        self._check_repo_branches(owner, repo, event)
+
     def handleEvent(self, event):
         eventName = event.eventType
         eventData = event.data
@@ -566,6 +714,17 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
         if eventName == "AI_INFRASTRUCTURE_DETECTED":
             return
 
+        # EMAILADDR → search GitHub by email, then fallback to username
+        if eventName == "EMAILADDR":
+            self._discover_github_by_email(eventData, event)
+            return
+
+        # USERNAME → discover GitHub repos directly
+        if eventName == "USERNAME":
+            if eventData and len(eventData) >= 2:
+                self._discover_github_repos(eventData, event)
+            return
+
         # For LINKED_URL_EXTERNAL, only process GitHub/GitLab URLs
         if eventName == "LINKED_URL_EXTERNAL":
             if 'github.com' not in eventData and 'gitlab.com' not in eventData:
@@ -577,47 +736,7 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
             self.debug(f"Could not extract owner/repo from: {eventData}")
             return
 
-        # Dedup by repo
-        dedup_key = f"repo:{owner}/{repo}"
-        if dedup_key in self.results:
-            self.debug(f"Already scanned {owner}/{repo}, skipping.")
-            return
-        self.results[dedup_key] = True
-
-        # Respect max_repos limit
-        if self._repo_count >= self.opts['max_repos']:
-            self.debug(f"Reached max_repos limit ({self.opts['max_repos']}), "
-                       f"skipping {owner}/{repo}.")
-            return
-        self._repo_count += 1
-
-        self.info(f"Scanning repository: github.com/{owner}/{repo}")
-
-        # Check repository file listings for AI model files
-        if self.opts['check_file_listings']:
-            if self.checkForStop():
-                return
-            self._check_repo_contents(owner, repo, event)
-
-        # Check README for AI framework keywords
-        if self.checkForStop():
-            return
-        self._check_repo_readme(owner, repo, event)
-
-        # Check dependency files for AI packages
-        if self.checkForStop():
-            return
-        self._check_dependency_files(owner, repo, event)
-
-        # Check contributors for AI bot accounts
-        if self.checkForStop():
-            return
-        self._check_repo_contributors(owner, repo, event)
-
-        # Check branch names for AI tool patterns
-        if self.checkForStop():
-            return
-        self._check_repo_branches(owner, repo, event)
+        self._scan_repo(owner, repo, event)
 
 
 # End of sfp_ai_repo_scan class
