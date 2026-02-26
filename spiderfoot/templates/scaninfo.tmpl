@@ -8038,6 +8038,15 @@
                     var treeData = discoveryData['tree'];
                     var dataMap = discoveryData['data'];
 
+                    // Handle empty tree (e.g. imported events with no discovery path)
+                    if (!treeData || !treeData.name) {
+                        $("#loader").fadeOut(500);
+                        $("#mainbody").append("<div id='scansummary-content' class='alert alert-warning'>" +
+                            "<h4>No discovery path available.</h4>" +
+                            "These events may have been imported from another scan and lack source chain data.</div>");
+                        return;
+                    }
+
                     // Build a lookup from leaf hash to its path (array of node objects from root to leaf)
                     var leafPaths = {};
 
@@ -8334,6 +8343,12 @@
                 if (format == "viz-dendro") {
                     sf.fetchData("${docroot}/scanelementtypediscovery", {'id': instanceId, 'eventType': eventType }, function(data) {
                         $("#loader").fadeOut(500);
+                        if (!data || !data.tree || !data.tree.name) {
+                            $("#mainbody").append("<div id='scansummary-content' class='alert alert-warning'>" +
+                                "<h4>No discovery path available.</h4>" +
+                                "These events may have been imported from another scan and lack source chain data.</div>");
+                            return;
+                        }
                         $("#mainbody").append("<div id='scansummary-content' class='text-center'></div>");
                         sf_viz_dendrogram("#scansummary-content", data);
                     });
