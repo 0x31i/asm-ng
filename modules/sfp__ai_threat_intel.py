@@ -1121,6 +1121,7 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
         self.sf = sfc
         self.errorState = False
         self._historical_data_loaded = False  # Flag for lazy loading of historical data
+        self._emitted_iocs = set()  # Dedup extracted IOCs across events
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -1167,7 +1168,13 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
             "AI_THREAT_SCORE",
             "AI_ANOMALY_DETECTED",
             "AI_NLP_ANALYSIS",
-            "AI_CROSS_SCAN_CORRELATION"
+            "AI_CROSS_SCAN_CORRELATION",
+            # Extracted IOCs from NLP analysis are emitted as real events
+            # so downstream modules (GitHub, email, etc.) can consume them.
+            "EMAILADDR",
+            "INTERNET_NAME",
+            "SOCIAL_MEDIA",
+            "IP_ADDRESS",
         ]
 
     # Event types produced by AI/analysis modules. Processing these would
@@ -1334,9 +1341,9 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
                 if len(sfEvent.data) > 50:  # Minimum text length
                     nlp_results = self.nlp_analyzer.analyze_threat_text(sfEvent.data)
                     
-                    if (nlp_results['threat_categories'] and 
+                    if (nlp_results['threat_categories'] and
                         nlp_results['confidence'] > 0.5):
-                        
+
                         nlp_event = SpiderFootEvent(
                             "AI_NLP_ANALYSIS",
                             json.dumps(nlp_results),
@@ -1344,6 +1351,40 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
                             sfEvent
                         )
                         self.notifyListeners(nlp_event)
+
+                    # Emit extracted IOCs as proper SpiderFoot events so
+                    # downstream modules (GitHub, email, etc.) can act on them.
+                    for ioc in nlp_results.get('extracted_iocs', []):
+                        if not ioc or ioc in self._emitted_iocs:
+                            continue
+
+                        # Email addresses → EMAILADDR
+                        if re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', ioc):
+                            self._emitted_iocs.add(ioc)
+                            evt = SpiderFootEvent("EMAILADDR", ioc, self.__name__, sfEvent)
+                            self.notifyListeners(evt)
+
+                        # GitHub URLs → SOCIAL_MEDIA (format the GitHub module expects)
+                        elif re.match(r'https?://(?:www\.)?github\.com/[A-Za-z0-9_.-]+/?$', ioc, re.IGNORECASE):
+                            self._emitted_iocs.add(ioc)
+                            url = ioc.rstrip('/')
+                            evt = SpiderFootEvent(
+                                "SOCIAL_MEDIA", f"Github: <SFURL>{url}</SFURL>",
+                                self.__name__, sfEvent
+                            )
+                            self.notifyListeners(evt)
+
+                        # IP addresses → IP_ADDRESS
+                        elif re.match(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$', ioc):
+                            self._emitted_iocs.add(ioc)
+                            evt = SpiderFootEvent("IP_ADDRESS", ioc, self.__name__, sfEvent)
+                            self.notifyListeners(evt)
+
+                        # Domain names (not URLs, not IPs, not emails) → INTERNET_NAME
+                        elif re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.[a-zA-Z]{2,}$', ioc):
+                            self._emitted_iocs.add(ioc)
+                            evt = SpiderFootEvent("INTERNET_NAME", ioc, self.__name__, sfEvent)
+                            self.notifyListeners(evt)
 
             except Exception as e:
                 self.error(f"NLP analysis failed: {e}")
