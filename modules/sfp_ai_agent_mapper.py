@@ -44,20 +44,20 @@ class sfp_ai_agent_mapper(SpiderFootPlugin):
     # If response_check_key is None, any 2xx response confirms the framework.
     # If set, the key must appear in the parsed JSON response body.
     AGENT_PROBES = [
-        ('/crew/kickoff', None, 'CrewAI'),
+        ('/crew/kickoff', 'kickoff', 'CrewAI'),
         ('/api/v1/crews', 'crews', 'CrewAI'),
-        ('/invoke', None, 'LangServe'),
-        ('/playground', None, 'LangServe'),
-        ('/docs', 'openapi', 'LangServe/FastAPI'),
-        ('/api/agents', 'agents', 'AutoGen'),
-        ('/api/skills', 'skills', 'Semantic Kernel'),
-        ('/api/planner', None, 'Semantic Kernel'),
+        ('/invoke', 'output', 'LangServe'),
+        ('/playground', 'langserve', 'LangServe'),
+        ('/docs', 'langserve', 'LangServe/FastAPI'),
+        ('/api/agents', 'autogen', 'AutoGen'),
+        ('/api/skills', 'semantic', 'Semantic Kernel'),
+        ('/api/planner', 'planner', 'Semantic Kernel'),
         ('/.well-known/agent.json', 'agent', 'A2A Protocol'),
     ]
 
     # Ports commonly used by agent frameworks
     AGENT_CANDIDATE_PORTS = [
-        '80', '443', '3000', '8000', '8080', '8888', '5000', '4000'
+        '3000', '8000', '8080', '8888', '5000', '4000'
     ]
 
     opts = {
@@ -148,21 +148,19 @@ class sfp_ai_agent_mapper(SpiderFootPlugin):
                 if not code.startswith('2'):
                     continue
 
+                # Skip HTML responses — agent frameworks return JSON, not HTML
+                if '<html' in content[:500].lower() or '<!doctype' in content[:500].lower():
+                    continue
+
                 confirmed = False
 
-                if check_key is None:
-                    # Any 2xx response confirms the framework
-                    confirmed = True
-                else:
-                    # The check_key must appear in the JSON response
-                    try:
-                        body = json.loads(content)
-                        if isinstance(body, dict) and check_key in body:
-                            confirmed = True
-                    except (json.JSONDecodeError, ValueError):
-                        # Also check raw content as fallback
-                        if check_key.lower() in content.lower():
-                            confirmed = True
+                # The check_key must appear in the JSON response
+                try:
+                    body = json.loads(content)
+                    if isinstance(body, dict) and check_key in body:
+                        confirmed = True
+                except (json.JSONDecodeError, ValueError):
+                    pass
 
                 if not confirmed:
                     continue
