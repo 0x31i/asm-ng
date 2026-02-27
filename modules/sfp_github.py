@@ -12,6 +12,7 @@
 # -------------------------------------------------------------------------------
 
 import json
+import urllib.parse
 
 from spiderfoot import SpiderFootEvent, SpiderFootPlugin
 
@@ -22,7 +23,7 @@ class sfp_github(SpiderFootPlugin):
         'name': "Github",
         'summary': "Identify associated public code repositories on Github.",
         'flags': [],
-        'useCases': ["Footprint", "Passive"],
+        'useCases': ["Footprint", "Passive", "AI Attack Surface"],
         'categories': ["Social Media"],
         'dataSource': {
             'website': "https://github.com/",
@@ -39,30 +40,31 @@ class sfp_github(SpiderFootPlugin):
 
     # Default options
     opts = {
-        'namesonly': True
+        'namesonly': True,
+        'max_user_search_results': 3
     }
 
     # Option descriptions
     optdescs = {
-        'namesonly': "Match repositories by name only, not by their descriptions. Helps reduce false positives."
+        'namesonly': "Match repositories by name only, not by their descriptions. Helps reduce false positives.",
+        'max_user_search_results': "Maximum number of GitHub user search results to process per query."
     }
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
         self.results = self.tempStorage()
+        self._found_users = set()
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
-    # What events is this module interested in for input
     def watchedEvents(self):
-        return ["DOMAIN_NAME", "USERNAME", "SOCIAL_MEDIA"]
+        return ["DOMAIN_NAME", "USERNAME", "SOCIAL_MEDIA",
+                "HUMAN_NAME", "EMAILADDR", "COMPANY_NAME"]
 
-    # What events this module produces
-    # This is to support the end user in selecting modules based on events
-    # produced.
     def producedEvents(self):
-        return ["RAW_RIR_DATA", "GEOINFO", "PUBLIC_CODE_REPO"]
+        return ["RAW_RIR_DATA", "GEOINFO", "PUBLIC_CODE_REPO",
+                "SOCIAL_MEDIA", "USERNAME"]
 
     # Build up repo info for use as an event
     def buildRepoInfo(self, item):
@@ -84,6 +86,176 @@ class sfp_github(SpiderFootPlugin):
 
         return "\n".join([f"Name: {name}", f"URL: {html_url}", f"Description: {description}"])
 
+    def _searchGitHubUsers(self, query):
+        """Search GitHub users API and return the items list."""
+        encoded_query = urllib.parse.quote(query)
+        url = f"https://api.github.com/search/users?q={encoded_query}"
+        res = self.sf.fetchUrl(
+            url,
+            timeout=self.opts['_fetchtimeout'],
+            useragent=self.opts['_useragent']
+        )
+
+        if res['content'] is None:
+            self.error(f"Unable to fetch {url}")
+            return []
+
+        try:
+            ret = json.loads(res['content'])
+        except Exception as e:
+            self.debug(f"Error processing JSON response from GitHub search: {e}")
+            return []
+
+        if ret is None or ret.get('total_count', 0) == 0:
+            return []
+
+        return ret.get('items', [])
+
+    def _fetchUserProfile(self, login):
+        """Fetch a full GitHub user profile by login."""
+        res = self.sf.fetchUrl(
+            f"https://api.github.com/users/{login}",
+            timeout=self.opts['_fetchtimeout'],
+            useragent=self.opts['_useragent']
+        )
+
+        if res['content'] is None:
+            return None
+
+        try:
+            return json.loads(res['content'])
+        except Exception as e:
+            self.debug(f"Error processing JSON response for user {login}: {e}")
+            return None
+
+    def _isTargetAssociated(self, profile):
+        """Check if a GitHub profile is associated with the scan target.
+
+        Used for fuzzy searches (HUMAN_NAME, COMPANY_NAME) to reduce
+        false positives by verifying the profile links back to a
+        target domain or known company.
+        """
+        target = self.getTarget()
+        target_value = target.targetValue.lower()
+
+        # Check if profile blog/website contains a target domain
+        blog = (profile.get('blog') or '').lower()
+        if blog and target_value in blog:
+            return True
+
+        # Check if profile email contains a target domain
+        email = (profile.get('email') or '').lower()
+        if email and target_value in email:
+            return True
+
+        # Check all target domains (including affiliates) against blog/email
+        for domain in target.getNames():
+            domain = domain.lower()
+            if blog and domain in blog:
+                return True
+            if email and domain in email:
+                return True
+
+        # Check if profile company matches known company
+        company = (profile.get('company') or '').lower().lstrip('@')
+        if company and (target_value in company or company in target_value):
+            return True
+
+        return False
+
+    def _emitUserRepos(self, login, event):
+        """Fetch and emit PUBLIC_CODE_REPO events for a user's repos."""
+        url = f"https://api.github.com/users/{login}/repos"
+        res = self.sf.fetchUrl(
+            url,
+            timeout=self.opts['_fetchtimeout'],
+            useragent=self.opts['_useragent']
+        )
+
+        if res['content'] is None:
+            self.debug(f"Unable to fetch repos for {login}")
+            return
+
+        try:
+            repos = json.loads(res['content'])
+        except Exception as e:
+            self.debug(f"Error processing repos JSON for {login}: {e}")
+            return
+
+        if not isinstance(repos, list):
+            return
+
+        for item in repos:
+            if not isinstance(item, dict):
+                continue
+            repo_info = self.buildRepoInfo(item)
+            if repo_info is not None:
+                evt = SpiderFootEvent("PUBLIC_CODE_REPO", repo_info,
+                                      self.__name__, event)
+                self.notifyListeners(evt)
+
+    def _processSearchResults(self, items, event, needs_validation=False):
+        """Process GitHub user search results, emitting events for each match.
+
+        Args:
+            items: List of user items from the search API.
+            event: The source SpiderFootEvent.
+            needs_validation: If True, fetch full profile and check
+                _isTargetAssociated before emitting.
+        """
+        max_results = self.opts.get('max_user_search_results', 3)
+        processed = 0
+
+        for item in items:
+            if processed >= max_results:
+                break
+
+            login = item.get('login')
+            if not login:
+                continue
+
+            if login.lower() in self._found_users:
+                continue
+
+            profile = self._fetchUserProfile(login)
+            if profile is None or not profile.get('login'):
+                continue
+
+            if needs_validation and not self._isTargetAssociated(profile):
+                self.debug(f"Skipping {login} — not associated with target")
+                continue
+
+            self._found_users.add(login.lower())
+            processed += 1
+
+            # Emit SOCIAL_MEDIA
+            social_url = f"Github: <SFURL>https://github.com/{login}</SFURL>"
+            evt = SpiderFootEvent("SOCIAL_MEDIA", social_url,
+                                  self.__name__, event)
+            self.notifyListeners(evt)
+
+            # Emit USERNAME
+            evt = SpiderFootEvent("USERNAME", login, self.__name__, event)
+            self.notifyListeners(evt)
+
+            # Emit full name
+            full_name = profile.get('name')
+            if full_name:
+                evt = SpiderFootEvent(
+                    "RAW_RIR_DATA", f"Possible full name: {full_name}",
+                    self.__name__, event)
+                self.notifyListeners(evt)
+
+            # Emit location
+            location = profile.get('location')
+            if location and 3 <= len(location) <= 100:
+                evt = SpiderFootEvent("GEOINFO", location,
+                                      self.__name__, event)
+                self.notifyListeners(evt)
+
+            # Emit repos
+            self._emitUserRepos(login, event)
+
     def handleEvent(self, event):
         eventName = event.eventType
         eventData = event.data
@@ -97,7 +269,26 @@ class sfp_github(SpiderFootPlugin):
 
         self.results[eventData] = True
 
-        # Extract name and location from profile
+        # --- Search-based discovery for EMAILADDR, HUMAN_NAME, COMPANY_NAME ---
+        if eventName == "EMAILADDR":
+            query = f"{eventData} in:email type:user"
+            items = self._searchGitHubUsers(query)
+            self._processSearchResults(items, event, needs_validation=False)
+            return
+
+        if eventName == "HUMAN_NAME":
+            query = f"{eventData} in:name type:user"
+            items = self._searchGitHubUsers(query)
+            self._processSearchResults(items, event, needs_validation=True)
+            return
+
+        if eventName == "COMPANY_NAME":
+            query = f'"{eventData}" type:user'
+            items = self._searchGitHubUsers(query)
+            self._processSearchResults(items, event, needs_validation=True)
+            return
+
+        # --- Extract name/location/repos from a known GitHub profile ---
         if eventName == "SOCIAL_MEDIA":
             try:
                 network = eventData.split(": ")[0]
@@ -119,47 +310,31 @@ class sfp_github(SpiderFootPlugin):
                 self.debug(f"Couldn't get a username out of {url}")
                 return
 
-            res = self.sf.fetchUrl(
-                f"https://api.github.com/users/{username}",
-                timeout=self.opts['_fetchtimeout'],
-                useragent=self.opts['_useragent']
-            )
-
-            if res['content'] is None:
+            # Skip if already processed (prevents double work on self-loop)
+            if username.lower() in self._found_users:
+                self.debug(f"Already processed GitHub user {username}, skipping.")
                 return
 
-            try:
-                json_data = json.loads(res['content'])
-            except Exception as e:
-                self.debug(f"Error processing JSON response: {e}")
-                return
+            self._found_users.add(username.lower())
 
-            if not json_data.get('login'):
+            json_data = self._fetchUserProfile(username)
+            if json_data is None or not json_data.get('login'):
                 self.debug(f"{username} is not a valid GitHub profile")
                 return
 
             full_name = json_data.get('name')
-
-            if not full_name:
-                self.debug(f"{username} is not a valid GitHub profile")
-                return
-
-            e = SpiderFootEvent(
-                "RAW_RIR_DATA", f"Possible full name: {full_name}", self.__name__, event)
-            self.notifyListeners(e)
+            if full_name:
+                e = SpiderFootEvent(
+                    "RAW_RIR_DATA", f"Possible full name: {full_name}",
+                    self.__name__, event)
+                self.notifyListeners(e)
 
             location = json_data.get('location')
+            if location and 3 <= len(location) <= 100:
+                e = SpiderFootEvent("GEOINFO", location, self.__name__, event)
+                self.notifyListeners(e)
 
-            if location is None:
-                return
-
-            if len(location) < 3 or len(location) > 100:
-                self.debug(f"Skipping likely invalid location: {location}")
-                return
-
-            e = SpiderFootEvent("GEOINFO", location, self.__name__, event)
-            self.notifyListeners(e)
-
+            self._emitUserRepos(username, event)
             return
 
         if eventName == "DOMAIN_NAME":

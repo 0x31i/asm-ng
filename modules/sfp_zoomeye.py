@@ -22,7 +22,7 @@ class sfp_zoomeye(SpiderFootPlugin):
         "name": "ZoomEye",
         "summary": "Look up domain, IP address, and other information from ZoomEye.",
         "flags": ["apikey"],
-        "useCases": ["Passive", "Footprint", "Investigate"],
+        "useCases": ["Passive", "Footprint", "Investigate", "AI Attack Surface"],
         "categories": ["Search Engines"],
         "dataSource": {
             "website": "https://www.zoomeye.org/",

@@ -21,7 +21,7 @@ class sfp_builtwith(SpiderFootPlugin):
         'name': "BuiltWith",
         'summary': "Query BuiltWith.com's Domain API for information about your target's web technology stack, e-mail addresses and more.",
         'flags': ["apikey"],
-        'useCases': ["Footprint", "Investigate", "Passive"],
+        'useCases': ["Footprint", "Investigate", "Passive", "AI Attack Surface"],
         'categories': ["Search Engines"],
         'dataSource': {
             'website': "https://builtwith.com/",

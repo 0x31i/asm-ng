@@ -24,7 +24,7 @@ class sfp_emailformat(SpiderFootPlugin):
         'name': "EmailFormat",
         'summary': "Look up e-mail addresses on email-format.com.",
         'flags': [],
-        'useCases': ["Footprint", "Investigate", "Passive"],
+        'useCases': ["Footprint", "Investigate", "Passive", "AI Attack Surface"],
         'categories': ["Search Engines"],
         'dataSource': {
             'website': "https://www.email-format.com/",

@@ -21,7 +21,7 @@ class sfp_sublist3r(SpiderFootPlugin):
     meta = {
         "name": "Sublist3r PassiveDNS",
         "summary": "Passive subdomain enumeration using Sublist3r's API",
-        "useCases": ["Investigate", "Footprint", "Passive"],
+        "useCases": ["Investigate", "Footprint", "Passive", "AI Attack Surface"],
         "categories": ["Passive DNS"],
         "dataSource": {
             "website": "https://api.sublist3r.com",

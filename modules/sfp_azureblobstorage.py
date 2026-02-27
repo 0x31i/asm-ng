@@ -23,7 +23,7 @@ class sfp_azureblobstorage(SpiderFootPlugin):
         "name": "Azure Blob Finder",
         "summary": "Search for potential Azure blobs associated with the target and attempt to list their contents.",
         "flags": [],
-        "useCases": ["Footprint", "Passive"],
+        "useCases": ["Footprint", "Passive", "AI Attack Surface"],
         "categories": ["Crawling and Scanning"],
         "dataSource": {
             "website": "https://azure.microsoft.com/en-in/services/storage/blobs/",

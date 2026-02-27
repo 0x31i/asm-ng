@@ -24,7 +24,7 @@ class sfp_gravatar(SpiderFootPlugin):
         'name': "Gravatar",
         'summary': "Retrieve user information from Gravatar API.",
         'flags': [],
-        'useCases': ["Footprint", "Investigate", "Passive"],
+        'useCases': ["Footprint", "Investigate", "Passive", "AI Attack Surface"],
         'categories': ["Social Media"],
         'dataSource': {
             'website': "https://secure.gravatar.com/",

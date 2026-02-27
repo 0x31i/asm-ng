@@ -24,7 +24,7 @@ class sfp_whois(SpiderFootPlugin):
         'name': "Whois",
         'summary': "Perform a WHOIS look-up on domain names and owned netblocks.",
         'flags': [],
-        'useCases': ["Footprint", "Investigate", "Passive"],
+        'useCases': ["Footprint", "Investigate", "Passive", "AI Attack Surface"],
         'categories': ["Public Registries"]
     }
 

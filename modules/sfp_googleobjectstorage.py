@@ -24,7 +24,7 @@ class sfp_googleobjectstorage(SpiderFootPlugin):
         "name": "Google Object Storage Finder",
         "summary": "Search for potential Google Object Storage buckets associated with the target and attempt to list their contents.",
         "flags": [],
-        "useCases": ["Footprint", "Passive"],
+        "useCases": ["Footprint", "Passive", "AI Attack Surface"],
         "categories": ["Crawling and Scanning"],
         "dataSource": {
             "website": "https://cloud.google.com/storage",

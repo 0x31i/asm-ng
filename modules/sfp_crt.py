@@ -24,7 +24,7 @@ class sfp_crt(SpiderFootPlugin):
         'name': "Certificate Transparency",
         'summary': "Gather hostnames from historical certificates in crt.sh.",
         'flags': [],
-        'useCases': ["Footprint", "Investigate", "Passive"],
+        'useCases': ["Footprint", "Investigate", "Passive", "AI Attack Surface"],
         'categories': ["Search Engines"],
         'dataSource': {
             'website': "https://crt.sh/",

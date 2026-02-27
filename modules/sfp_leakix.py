@@ -22,7 +22,7 @@ class sfp_leakix(SpiderFootPlugin):
         'name': "LeakIX",
         'summary': "Search LeakIX for host data leaks, open ports, software and geoip.",
         'flags': ["apikey"],
-        'useCases': ["Footprint", "Investigate", "Passive"],
+        'useCases': ["Footprint", "Investigate", "Passive", "AI Attack Surface"],
         'categories': ["Leaks, Dumps and Breaches"],
         'dataSource': {
             'website': "https://leakix.net/",
