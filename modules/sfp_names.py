@@ -22,7 +22,7 @@ class sfp_names(SpiderFootPlugin):
         'name': "Human Name Extractor",
         'summary': "Attempt to identify human names in fetched content.",
         'flags': ["errorprone"],
-        'useCases': ["Footprint", "Passive"],
+        'useCases': ["Footprint", "Passive", "AI Attack Surface"],
         'categories': ["Content Analysis"]
     }
 

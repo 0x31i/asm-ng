@@ -22,7 +22,7 @@ class sfp_grayhatwarfare(SpiderFootPlugin):
         'name': "Grayhat Warfare",
         'summary': "Find bucket names matching the keyword extracted from a domain from Grayhat API.",
         'flags': ["apikey"],
-        'useCases': ["Footprint", "Investigate", "Passive"],
+        'useCases': ["Footprint", "Investigate", "Passive", "AI Attack Surface"],
         'categories': ["Reputation Systems"],
         'dataSource': {
             'website': "https://buckets.grayhatwarfare.com/",

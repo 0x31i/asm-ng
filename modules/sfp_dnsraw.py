@@ -26,7 +26,7 @@ class sfp_dnsraw(SpiderFootPlugin):
         'name': "DNS Raw Records",
         'summary': "Retrieves raw DNS records such as MX, TXT and others.",
         'flags': [],
-        'useCases': ["Footprint", "Investigate", "Passive"],
+        'useCases': ["Footprint", "Investigate", "Passive", "AI Attack Surface"],
         'categories': ["DNS"]
     }
 

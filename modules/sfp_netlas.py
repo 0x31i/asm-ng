@@ -27,7 +27,7 @@ class sfp_netlas(SpiderFootPlugin):
         "name": "Netlas",
         "summary": "Look up domain and IP address information from Netlas API.",
         "flags": ["apikey"],
-        "useCases": ["Passive", "Footprint", "Investigate"],
+        "useCases": ["Passive", "Footprint", "Investigate", "AI Attack Surface"],
         "categories": ["Search Engines"],
         "dataSource": {
             "website": "https://netlas.io/",

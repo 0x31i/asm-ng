@@ -24,7 +24,7 @@ class sfp_s3bucket(SpiderFootPlugin):
         "name": "Amazon S3 Bucket Finder",
         "summary": "Search for potential Amazon S3 buckets associated with the target and attempt to list their contents.",
         "flags": [],
-        "useCases": ["Footprint", "Passive"],
+        "useCases": ["Footprint", "Passive", "AI Attack Surface"],
         "categories": ["Crawling and Scanning"],
         "dataSource": {
             "website": "https://aws.amazon.com/s3/",

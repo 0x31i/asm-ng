@@ -21,7 +21,7 @@ class sfp_tool_wappalyzer(SpiderFootPlugin):
         "name": "Tool - Wappalyzer (API)",
         "summary": "Wappalyzer identifies technologies on websites using the official API.",
         "flags": ["tool", "apikey"],
-        "useCases": ["Footprint", "Investigate"],
+        "useCases": ["Footprint", "Investigate", "AI Attack Surface"],
         "categories": ["Content Analysis"],
         "labels": ["tool", "apikey"],
         "toolDetails": {

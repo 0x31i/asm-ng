@@ -34,7 +34,7 @@ class sfp_errors(SpiderFootPlugin):
         'name': "Error String Extractor",
         'summary': "Identify common error messages in content like SQL errors, etc.",
         'flags': [],
-        'useCases': ["Footprint", "Passive"],
+        'useCases': ["Footprint", "Passive", "AI Attack Surface"],
         'categories': ["Content Analysis"]
     }
 

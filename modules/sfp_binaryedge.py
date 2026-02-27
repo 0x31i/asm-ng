@@ -24,7 +24,7 @@ class sfp_binaryedge(SpiderFootPlugin):
         'name': "BinaryEdge",
         'summary': "Obtain information from BinaryEdge.io Internet scanning systems, including breaches, vulnerabilities, torrents and passive DNS.",
         'flags': ["apikey"],
-        'useCases': ["Footprint", "Investigate", "Passive"],
+        'useCases': ["Footprint", "Investigate", "Passive", "AI Attack Surface"],
         'categories': ["Search Engines"],
         'dataSource': {
             'website': "https://www.binaryedge.io/",

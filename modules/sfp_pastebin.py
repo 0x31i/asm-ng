@@ -22,7 +22,7 @@ class sfp_pastebin(SpiderFootPlugin):
         'name': "PasteBin",
         'summary': "PasteBin search (via Google Search API) to identify related content.",
         'flags': ["apikey"],
-        'useCases': ["Footprint", "Investigate", "Passive"],
+        'useCases': ["Footprint", "Investigate", "Passive", "AI Attack Surface"],
         'categories': ["Leaks, Dumps and Breaches"],
         'dataSource': {
             'website': "https://pastebin.com/",

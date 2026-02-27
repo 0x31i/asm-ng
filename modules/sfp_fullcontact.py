@@ -22,7 +22,7 @@ class sfp_fullcontact(SpiderFootPlugin):
         'name': "FullContact",
         'summary': "Gather domain and e-mail information from FullContact.com API.",
         'flags': ["apikey"],
-        'useCases': ["Footprint", "Investigate", "Passive"],
+        'useCases': ["Footprint", "Investigate", "Passive", "AI Attack Surface"],
         'categories': ["Search Engines"],
         'dataSource': {
             'website': "https://www.fullcontact.com",

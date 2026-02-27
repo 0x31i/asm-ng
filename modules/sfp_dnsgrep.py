@@ -28,7 +28,7 @@ class sfp_dnsgrep(SpiderFootPlugin):
         'name': "DNSGrep",
         'summary': "Obtain Passive DNS information from Rapid7 Sonar Project using DNSGrep API.",
         'flags': [],
-        'useCases': ["Footprint", "Investigate", "Passive"],
+        'useCases': ["Footprint", "Investigate", "Passive", "AI Attack Surface"],
         'categories': ["Passive DNS"],
         'dataSource': {
             'website': "https://opendata.rapid7.com/",

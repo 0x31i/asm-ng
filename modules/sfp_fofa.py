@@ -24,7 +24,7 @@ class sfp_fofa(SpiderFootPlugin):
         'name': "Fofa",
         'summary': "Look up domain, IP address, and other information from Fofa.",
         'flags': ["apikey"],
-        'useCases': ["Passive", "Footprint", "Investigate"],
+        'useCases': ["Passive", "Footprint", "Investigate", "AI Attack Surface"],
         'categories': ["Search Engines"],
         'dataSource': {
             'website': "https://fofa.info/",
