@@ -2598,6 +2598,8 @@
             grid += "<i class='glyphicon glyphicon-upload'></i>&nbsp;&nbsp;IMPORT LIST</button>";
             grid += "<button class='btn btn-sm assets-add-btn' onclick='assetsShowAddModal()'>";
             grid += "<i class='glyphicon glyphicon-plus'></i>&nbsp;&nbsp;ADD ASSET</button>";
+            grid += "<button class='btn btn-sm assets-import-btn' onclick='assetsShowTagModal()'>";
+            grid += "<i class='glyphicon glyphicon-tags'></i>&nbsp;&nbsp;MANAGE TAGS</button>";
             grid += "</div>";
             grid += "</div>";
 
@@ -2617,7 +2619,17 @@
             grid += "<select id='import-asset-type' class='form-control assets-input'>";
             grid += "<option value='ip'>IP ADDRESSES</option>";
             grid += "<option value='domain'>DOMAINS / SUBDOMAINS</option>";
-            grid += "<option value='employee'>EMPLOYEE NAMES</option>";
+            grid += "<option value='email'>EMAIL ADDRESSES</option>";
+            grid += "<option value='human_name'>HUMAN NAMES</option>";
+            grid += "</select></div>";
+            grid += "<div class='form-group'><label class='assets-label'>AFFINITY</label>";
+            grid += "<select id='import-asset-affinity' class='form-control assets-input'>";
+            grid += "<option value='DIRECT'>DIRECT</option>";
+            grid += "<option value='ASSOCIATED'>ASSOCIATED</option>";
+            grid += "</select></div>";
+            grid += "<div class='form-group'><label class='assets-label'>TAG (OPTIONAL)</label>";
+            grid += "<select id='import-asset-tag' class='form-control assets-input'>";
+            grid += "<option value=''>NONE</option>";
             grid += "</select></div>";
             grid += "<div class='form-group'><label class='assets-label'>FILE (.TXT, .CSV, .XLSX)</label>";
             grid += "<input type='file' id='import-asset-file' class='form-control assets-input' accept='.txt,.csv,.xlsx,.xls'></div>";
@@ -2640,7 +2652,8 @@
             grid += "<select id='add-asset-type' class='form-control assets-input'>";
             grid += "<option value='ip'>IP ADDRESS</option>";
             grid += "<option value='domain'>DOMAIN / SUBDOMAIN</option>";
-            grid += "<option value='employee'>EMPLOYEE NAME</option>";
+            grid += "<option value='email'>EMAIL ADDRESS</option>";
+            grid += "<option value='human_name'>HUMAN NAME</option>";
             grid += "</select></div>";
             grid += "<div class='form-group'><label class='assets-label'>VALUE</label>";
             grid += "<input type='text' id='add-asset-value' class='form-control assets-input' placeholder='e.g. 192.168.1.1 or corp.example.com'></div>";
@@ -2649,12 +2662,42 @@
             grid += "<option value='CLIENT_PROVIDED'>CLIENT PROVIDED</option>";
             grid += "<option value='ANALYST_CONFIRMED'>ANALYST CONFIRMED</option>";
             grid += "</select></div>";
+            grid += "<div class='form-group'><label class='assets-label'>AFFINITY</label>";
+            grid += "<select id='add-asset-affinity' class='form-control assets-input'>";
+            grid += "<option value='DIRECT'>DIRECT</option>";
+            grid += "<option value='ASSOCIATED'>ASSOCIATED</option>";
+            grid += "</select></div>";
+            grid += "<div class='form-group'><label class='assets-label'>TAG (OPTIONAL)</label>";
+            grid += "<select id='add-asset-tag' class='form-control assets-input'>";
+            grid += "<option value=''>NONE</option>";
+            grid += "</select></div>";
             grid += "<div class='form-group'><label class='assets-label'>NOTES (OPTIONAL)</label>";
             grid += "<input type='text' id='add-asset-notes' class='form-control assets-input' placeholder='Optional notes'></div>";
             grid += "</div>";
             grid += "<div class='assets-modal-footer'>";
             grid += "<button class='btn assets-btn-cancel' onclick='assetsCloseModals()'>CANCEL</button>";
             grid += "<button class='btn assets-btn-confirm' onclick='assetsDoAdd(\"" + instanceId + "\")'>ADD ASSET</button>";
+            grid += "</div></div></div>";
+
+            // Tag Management Modal
+            grid += "<div id='assets-tag-modal' class='assets-modal-overlay' style='display:none;'>";
+            grid += "<div class='assets-modal'>";
+            grid += "<div class='assets-modal-header'>";
+            grid += "<span class='assets-modal-title'>MANAGE ASSET TAGS</span>";
+            grid += "<button class='close-btn' onclick='assetsCloseModals()'>&times;</button>";
+            grid += "</div>";
+            grid += "<div class='assets-modal-body'>";
+            grid += "<div id='tag-list-container'></div>";
+            grid += "<div class='form-group' style='margin-top:12px;border-top:1px solid rgba(255,255,255,0.06);padding-top:12px;'>";
+            grid += "<label class='assets-label'>ADD NEW TAG</label>";
+            grid += "<div style='display:flex;gap:8px;align-items:center;'>";
+            grid += "<input type='text' id='new-tag-name' class='form-control assets-input' placeholder='TAG NAME' style='flex:1;'>";
+            grid += "<input type='color' id='new-tag-color' value='#64748b' style='width:40px;height:32px;border:none;background:none;cursor:pointer;'>";
+            grid += "<button class='btn assets-btn-confirm' onclick='assetsDoAddTag()'>ADD</button>";
+            grid += "</div></div>";
+            grid += "</div>";
+            grid += "<div class='assets-modal-footer'>";
+            grid += "<button class='btn assets-btn-cancel' onclick='assetsCloseModals()'>CLOSE</button>";
             grid += "</div></div></div>";
 
             $("#mainbody").append(grid);
@@ -2669,9 +2712,89 @@
             currentAssetsView = viewName;
         }
 
-        function assetsShowImportModal() { $("#assets-import-modal").show(); }
-        function assetsShowAddModal() { $("#assets-add-modal").show(); }
+        function assetsShowImportModal() {
+            assetsPopulateTagDropdowns();
+            $("#assets-import-modal").show();
+        }
+        function assetsShowAddModal() {
+            assetsPopulateTagDropdowns();
+            $("#assets-add-modal").show();
+        }
+        function assetsShowTagModal() {
+            assetsLoadTagList();
+            $("#assets-tag-modal").show();
+        }
         function assetsCloseModals() { $(".assets-modal-overlay").hide(); }
+
+        // Populate tag dropdowns in import/add modals
+        function assetsPopulateTagDropdowns() {
+            sf.fetchData('${docroot}/assettaglist', {target: assetsTarget}, function(tags) {
+                var opts = "<option value=''>NONE</option>";
+                for (var i = 0; i < tags.length; i++) {
+                    opts += "<option value='" + $('<span>').text(tags[i].tag).html() + "'>" + $('<span>').text(tags[i].tag).html() + "</option>";
+                }
+                $("#import-asset-tag").html(opts);
+                $("#add-asset-tag").html(opts);
+            });
+        }
+
+        // Load tag list for management modal
+        function assetsLoadTagList() {
+            sf.fetchData('${docroot}/assettaglist', {target: assetsTarget}, function(tags) {
+                if (tags.length === 0) {
+                    $("#tag-list-container").html("<p class='assets-empty-text'>NO TAGS DEFINED YET.</p>");
+                    return;
+                }
+                var html = "<table class='table table-bordered assets-table' style='margin-bottom:0;'>";
+                html += "<thead><tr><th>TAG</th><th>COLOR</th><th style='width:80px;'>ACTIONS</th></tr></thead><tbody>";
+                for (var i = 0; i < tags.length; i++) {
+                    var t = tags[i];
+                    var safeTag = $('<span>').text(t.tag).html();
+                    html += "<tr data-tag-id='" + t.id + "'>";
+                    html += "<td><span class='assets-tag-badge' style='background:" + t.color + "20;color:" + t.color + ";border:1px solid " + t.color + "33;'>" + safeTag + "</span></td>";
+                    html += "<td><input type='color' value='" + t.color + "' onchange='assetsUpdateTagColor(" + t.id + ", this.value)' style='width:32px;height:24px;border:none;background:none;cursor:pointer;'></td>";
+                    html += "<td><button class='btn btn-xs assets-icon-btn' onclick='assetsRemoveTag(" + t.id + ")' title='DELETE'>";
+                    html += "<i class='glyphicon glyphicon-trash'></i></button></td>";
+                    html += "</tr>";
+                }
+                html += "</tbody></table>";
+                $("#tag-list-container").html(html);
+            });
+        }
+
+        function assetsDoAddTag() {
+            var name = document.getElementById('new-tag-name').value.trim();
+            var color = document.getElementById('new-tag-color').value;
+            if (!name) { alertify.error("ENTER A TAG NAME."); return; }
+            sf.fetchData('${docroot}/assettagadd', {target: assetsTarget, tag: name, color: color}, function(ret) {
+                if (ret[0] === "SUCCESS") {
+                    alertify.success("TAG ADDED");
+                    document.getElementById('new-tag-name').value = '';
+                    assetsLoadTagList();
+                } else {
+                    alertify.error("ERROR: " + ret[1]);
+                }
+            });
+        }
+
+        function assetsRemoveTag(tagId) {
+            sf.fetchData('${docroot}/assettagremove', {id: tagId}, function(ret) {
+                if (ret[0] === "SUCCESS") {
+                    alertify.success("TAG REMOVED");
+                    assetsLoadTagList();
+                } else {
+                    alertify.error("ERROR: " + ret[1]);
+                }
+            });
+        }
+
+        function assetsUpdateTagColor(tagId, color) {
+            sf.fetchData('${docroot}/assettagupdate', {id: tagId, color: color}, function(ret) {
+                if (ret[0] === "SUCCESS") {
+                    assetsLoadTagList();
+                }
+            });
+        }
 
         // ---- SYNC VERIFIED → KNOWN ASSETS ----
         function assetsSyncVerified(instanceId) {
@@ -2696,7 +2819,7 @@
 
             // Fetch counts and matches in parallel
             var countsLoaded = false, matchesLoaded = false;
-            var counts = {total:0, client_provided:0, analyst_confirmed:0, by_type:{ip:0, domain:0, employee:0}};
+            var counts = {total:0, client_provided:0, analyst_confirmed:0, direct:0, associated:0, by_type:{ip:0, domain:0, email:0, human_name:0}};
             var matchData = [];
 
             sf.fetchData('${docroot}/knownassetcount', {target: assetsTarget}, function(data) {
@@ -2758,14 +2881,31 @@
             html += "<span class='assets-breakdown-label'>DOMAINS</span></div>";
 
             html += "<div class='assets-breakdown-card'>";
+            html += "<i class='glyphicon glyphicon-envelope'></i>";
+            html += "<span class='assets-breakdown-count'>" + (counts.by_type.email || 0) + "</span>";
+            html += "<span class='assets-breakdown-label'>EMAILS</span></div>";
+
+            html += "<div class='assets-breakdown-card'>";
             html += "<i class='glyphicon glyphicon-user'></i>";
-            html += "<span class='assets-breakdown-count'>" + (counts.by_type.employee || 0) + "</span>";
-            html += "<span class='assets-breakdown-label'>EMPLOYEES</span></div>";
+            html += "<span class='assets-breakdown-count'>" + (counts.by_type.human_name || 0) + "</span>";
+            html += "<span class='assets-breakdown-label'>HUMAN NAMES</span></div>";
 
             html += "<div class='assets-breakdown-card'>";
             html += "<i class='glyphicon glyphicon-warning-sign'></i>";
             html += "<span class='assets-breakdown-count'>" + matches.length + "</span>";
             html += "<span class='assets-breakdown-label'>SCAN MATCHES</span></div>";
+
+            // Affinity Breakdown Row
+            html += "<div class='assets-breakdown-row' style='margin-top:0;'>";
+            html += "<div class='assets-breakdown-card'>";
+            html += "<i class='glyphicon glyphicon-record'></i>";
+            html += "<span class='assets-breakdown-count'>" + (counts.direct || 0) + "</span>";
+            html += "<span class='assets-breakdown-label'>DIRECT</span></div>";
+
+            html += "<div class='assets-breakdown-card'>";
+            html += "<i class='glyphicon glyphicon-transfer'></i>";
+            html += "<span class='assets-breakdown-count'>" + (counts.associated || 0) + "</span>";
+            html += "<span class='assets-breakdown-label'>ASSOCIATED</span></div>";
             html += "</div>";
 
             // Quick action callout
@@ -2815,7 +2955,7 @@
 
         // ---- KNOWN ASSETS VIEW ----
         // Known assets active filters (multi-select)
-        var knownActiveFilters = { type: 'all', source: 'all' };
+        var knownActiveFilters = { type: 'all', affinity: 'all', source: 'all', tag: 'all' };
 
         function assetsShowKnown(instanceId) {
             assetsSetActiveBtn('known');
@@ -2826,13 +2966,23 @@
                 var html = "";
 
                 // Count by type and source
-                var ipCount = 0, domainCount = 0, empCount = 0, clientCount = 0, analystCount = 0;
+                var ipCount = 0, domainCount = 0, emailCount = 0, humanNameCount = 0;
+                var clientCount = 0, analystCount = 0, directCount = 0, associatedCount = 0;
+                var tagCounts = {}, untaggedCount = 0;
                 for (var i = 0; i < data.length; i++) {
                     if (data[i].asset_type === 'ip') ipCount++;
                     if (data[i].asset_type === 'domain') domainCount++;
-                    if (data[i].asset_type === 'employee') empCount++;
+                    if (data[i].asset_type === 'email') emailCount++;
+                    if (data[i].asset_type === 'human_name') humanNameCount++;
                     if (data[i].source === 'CLIENT_PROVIDED') clientCount++;
                     if (data[i].source === 'ANALYST_CONFIRMED') analystCount++;
+                    if (data[i].affinity === 'ASSOCIATED') associatedCount++;
+                    else directCount++;
+                    if (data[i].tag) {
+                        tagCounts[data[i].tag] = (tagCounts[data[i].tag] || 0) + 1;
+                    } else {
+                        untaggedCount++;
+                    }
                 }
 
                 // Filter bar - larger buttons, type filters and source filters
@@ -2845,8 +2995,19 @@
                 html += "<i class='glyphicon glyphicon-globe'></i>&nbsp;&nbsp;IPS (" + ipCount + ")</button>";
                 html += "<button class='assets-known-filter-btn" + (knownActiveFilters.type === 'domain' ? " assets-known-filter-active" : "") + "' onclick='knownFilterType(\"domain\", this)'>";
                 html += "<i class='glyphicon glyphicon-link'></i>&nbsp;&nbsp;DOMAINS (" + domainCount + ")</button>";
-                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.type === 'employee' ? " assets-known-filter-active" : "") + "' onclick='knownFilterType(\"employee\", this)'>";
-                html += "<i class='glyphicon glyphicon-user'></i>&nbsp;&nbsp;EMPLOYEES (" + empCount + ")</button>";
+                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.type === 'email' ? " assets-known-filter-active" : "") + "' onclick='knownFilterType(\"email\", this)'>";
+                html += "<i class='glyphicon glyphicon-envelope'></i>&nbsp;&nbsp;EMAILS (" + emailCount + ")</button>";
+                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.type === 'human_name' ? " assets-known-filter-active" : "") + "' onclick='knownFilterType(\"human_name\", this)'>";
+                html += "<i class='glyphicon glyphicon-user'></i>&nbsp;&nbsp;HUMAN NAMES (" + humanNameCount + ")</button>";
+                html += "</div>";
+                html += "<div class='assets-known-filter-group'>";
+                html += "<span class='assets-known-filter-label'>AFFINITY</span>";
+                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.affinity === 'all' ? " assets-known-filter-active" : "") + "' onclick='knownFilterAffinity(\"all\", this)'>";
+                html += "<i class='glyphicon glyphicon-th-list'></i>&nbsp;&nbsp;ALL</button>";
+                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.affinity === 'DIRECT' ? " assets-known-filter-active" : "") + "' onclick='knownFilterAffinity(\"DIRECT\", this)'>";
+                html += "<i class='glyphicon glyphicon-record'></i>&nbsp;&nbsp;DIRECT (" + directCount + ")</button>";
+                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.affinity === 'ASSOCIATED' ? " assets-known-filter-active" : "") + "' onclick='knownFilterAffinity(\"ASSOCIATED\", this)'>";
+                html += "<i class='glyphicon glyphicon-transfer'></i>&nbsp;&nbsp;ASSOCIATED (" + associatedCount + ")</button>";
                 html += "</div>";
                 html += "<div class='assets-known-filter-group'>";
                 html += "<span class='assets-known-filter-label'>SOURCE</span>";
@@ -2856,6 +3017,19 @@
                 html += "<i class='glyphicon glyphicon-briefcase'></i>&nbsp;&nbsp;CLIENT (" + clientCount + ")</button>";
                 html += "<button class='assets-known-filter-btn assets-known-filter-src" + (knownActiveFilters.source === 'ANALYST_CONFIRMED' ? " assets-known-filter-active" : "") + "' onclick='knownFilterSource(\"ANALYST_CONFIRMED\", this)'>";
                 html += "<i class='glyphicon glyphicon-check'></i>&nbsp;&nbsp;ANALYST (" + analystCount + ")</button>";
+                html += "</div>";
+                html += "<div class='assets-known-filter-group'>";
+                html += "<span class='assets-known-filter-label'>TAG</span>";
+                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.tag === 'all' ? " assets-known-filter-active" : "") + "' onclick='knownFilterTag(\"all\", this)'>";
+                html += "<i class='glyphicon glyphicon-th-list'></i>&nbsp;&nbsp;ALL</button>";
+                var tagKeys = Object.keys(tagCounts).sort();
+                for (var ti = 0; ti < tagKeys.length; ti++) {
+                    var tk = tagKeys[ti];
+                    html += "<button class='assets-known-filter-btn" + (knownActiveFilters.tag === tk ? " assets-known-filter-active" : "") + "' onclick='knownFilterTag(\"" + $('<span>').text(tk).html() + "\", this)'>";
+                    html += $('<span>').text(tk).html() + " (" + tagCounts[tk] + ")</button>";
+                }
+                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.tag === '_untagged' ? " assets-known-filter-active" : "") + "' onclick='knownFilterTag(\"_untagged\", this)'>";
+                html += "UNTAGGED (" + untaggedCount + ")</button>";
                 html += "</div>";
                 html += "<div style='flex:1;'></div>";
                 html += "<button class='btn assets-known-remove-sel-btn' onclick='assetsRemoveSelected(\"" + instanceId + "\")' style='display:none;' id='assets-remove-sel-btn'>";
@@ -2876,7 +3050,9 @@
                     html += "<th class='assets-known-col-select'><input type='checkbox' id='assets-select-all' onchange='assetsToggleSelectAll()'></th>";
                     html += "<th class='assets-known-col-type'>TYPE</th>";
                     html += "<th>VALUE</th>";
+                    html += "<th class='assets-known-col-source'>AFFINITY</th>";
                     html += "<th class='assets-known-col-source'>SOURCE</th>";
+                    html += "<th class='assets-known-col-source'>TAG</th>";
                     html += "<th class='assets-known-col-actions'>ACTIONS</th>";
                     html += "</tr></thead><tbody>";
 
@@ -2890,16 +3066,23 @@
 
                         // Check filters
                         var typeMatch = (knownActiveFilters.type === 'all' || knownActiveFilters.type === a.asset_type);
+                        var affinityMatch = (knownActiveFilters.affinity === 'all' || knownActiveFilters.affinity === (a.affinity || 'DIRECT'));
                         var sourceMatch = (knownActiveFilters.source === 'all' || knownActiveFilters.source === a.source);
-                        var hideStyle = (!typeMatch || !sourceMatch) ? " style='display:none;'" : "";
+                        var tagMatch = (knownActiveFilters.tag === 'all' || (knownActiveFilters.tag === '_untagged' && !a.tag) || knownActiveFilters.tag === a.tag);
+                        var hideStyle = (!typeMatch || !affinityMatch || !sourceMatch || !tagMatch) ? " style='display:none;'" : "";
 
                         // Main compact row
-                        html += "<tr class='assets-known-row' data-asset-id='" + a.id + "' data-asset-type='" + a.asset_type + "' data-asset-source='" + a.source + "'" + hideStyle + ">";
+                        html += "<tr class='assets-known-row' data-asset-id='" + a.id + "' data-asset-type='" + a.asset_type + "' data-asset-affinity='" + (a.affinity || 'DIRECT') + "' data-asset-source='" + a.source + "' data-asset-tag='" + (a.tag || '') + "'" + hideStyle + ">";
                         html += "<td class='assets-cell-select' onclick='knownToggleCb(this, event)'><input type='checkbox' class='asset-cb' value='" + a.id + "' onchange='assetsUpdateSelection()'></td>";
                         html += "<td class='assets-known-type-cell assets-expandable' onclick='knownToggleDetail(this)'><span class='assets-type-badge assets-type-" + a.asset_type + "'>" + a.asset_type.toUpperCase() + "</span></td>";
                         html += "<td class='assets-known-value-cell assets-expandable' onclick='knownToggleDetail(this)'><div class='assets-value-truncate'>" + valueWrapped + "</div>";
                         html += "<span class='assets-expand-hint'><i class='glyphicon glyphicon-chevron-down'></i></span></td>";
+                        var affinityClass = (a.affinity === 'ASSOCIATED') ? 'assets-affinity-associated' : 'assets-affinity-direct';
+                        var affinityLabel = (a.affinity === 'ASSOCIATED') ? 'ASSOCIATED' : 'DIRECT';
+                        html += "<td class='assets-known-source-cell assets-expandable' onclick='knownToggleDetail(this)'><span class='assets-affinity-badge " + affinityClass + "'>" + affinityLabel + "</span></td>";
                         html += "<td class='assets-known-source-cell assets-expandable' onclick='knownToggleDetail(this)'><span class='assets-source-badge " + sourceClass + "'>" + sourceLabel + "</span></td>";
+                        var tagHtml = a.tag ? "<span class='assets-tag-badge' style='background:" + (a._tagColor || '#64748b') + "20;color:" + (a._tagColor || '#64748b') + ";border:1px solid " + (a._tagColor || '#64748b') + "33;'>" + $('<span>').text(a.tag).html() + "</span>" : "<span style='color:rgba(255,255,255,0.2);font-size:10px;'>-</span>";
+                        html += "<td class='assets-known-source-cell assets-expandable' onclick='knownToggleDetail(this)'>" + tagHtml + "</td>";
                         html += "<td class='assets-known-action-cell'>";
                         html += "<button class='btn btn-xs assets-icon-btn assets-fp-action' onclick='event.stopPropagation();knownAssetAction(" + a.id + ", \"fp\")' title='FALSE POSITIVE'>";
                         html += "<i class='glyphicon glyphicon-ban-circle'></i></button>";
@@ -2909,9 +3092,11 @@
 
                         // Expandable detail row
                         html += "<tr class='assets-detail-row assets-known-detail' data-parent-asset='" + a.id + "' style='display:none;'>";
-                        html += "<td colspan='5'>";
+                        html += "<td colspan='7'>";
                         html += "<div class='assets-detail-grid'>";
+                        html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>AFFINITY</div><div class='assets-detail-card-value'><span class='assets-affinity-badge " + affinityClass + "'>" + affinityLabel + "</span></div></div>";
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>SOURCE</div><div class='assets-detail-card-value'><span class='assets-source-badge " + sourceClass + "'>" + sourceLabel + "</span></div></div>";
+                        html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>TAG</div><div class='assets-detail-card-value'>" + (a.tag ? tagHtml : '-') + "</div></div>";
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>DATE ADDED</div><div class='assets-detail-card-value'>" + d.toLocaleDateString() + "</div></div>";
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>ADDED BY</div><div class='assets-detail-card-value'>" + (a.added_by || '-') + "</div></div>";
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>NOTES</div><div class='assets-detail-card-value'>" + (a.notes ? $('<span>').text(a.notes).html() : '-') + "</div></div>";
@@ -2976,18 +3161,35 @@
         // Source filter - independent of type filter
         function knownFilterSource(filter, btn) {
             knownActiveFilters.source = filter;
+            $(".assets-known-filter-group:eq(2) .assets-known-filter-btn").removeClass("assets-known-filter-active");
+            $(btn).addClass("assets-known-filter-active");
+            knownApplyFilters();
+        }
+
+        function knownFilterAffinity(filter, btn) {
+            knownActiveFilters.affinity = filter;
             $(".assets-known-filter-group:eq(1) .assets-known-filter-btn").removeClass("assets-known-filter-active");
             $(btn).addClass("assets-known-filter-active");
             knownApplyFilters();
         }
 
-        // Apply both filters together
+        function knownFilterTag(filter, btn) {
+            knownActiveFilters.tag = filter;
+            $(".assets-known-filter-group:eq(3) .assets-known-filter-btn").removeClass("assets-known-filter-active");
+            $(btn).addClass("assets-known-filter-active");
+            knownApplyFilters();
+        }
+
+        // Apply all filters together
         function knownApplyFilters() {
             $("#known-assets-table tbody tr.assets-known-row").each(function() {
                 var $row = $(this);
                 var typeMatch = (knownActiveFilters.type === 'all' || knownActiveFilters.type === $row.data('asset-type'));
+                var affinityMatch = (knownActiveFilters.affinity === 'all' || knownActiveFilters.affinity === $row.data('asset-affinity'));
                 var sourceMatch = (knownActiveFilters.source === 'all' || knownActiveFilters.source === $row.data('asset-source'));
-                var show = typeMatch && sourceMatch;
+                var rowTag = $row.data('asset-tag') || '';
+                var tagMatch = (knownActiveFilters.tag === 'all' || (knownActiveFilters.tag === '_untagged' && !rowTag) || knownActiveFilters.tag === rowTag);
+                var show = typeMatch && affinityMatch && sourceMatch && tagMatch;
                 $row.toggle(show);
                 // Also hide detail row if main row is hidden
                 $row.next('.assets-known-detail').toggle(show && $row.hasClass('assets-row-expanded'));
@@ -3468,9 +3670,13 @@
                 alertify.error("PLEASE SELECT A FILE.");
                 return;
             }
+            var importAffinity = document.getElementById('import-asset-affinity').value;
+            var importTag = document.getElementById('import-asset-tag').value;
             var formData = new FormData();
             formData.append('target', assetsTarget);
             formData.append('asset_type', assetType);
+            formData.append('affinity', importAffinity);
+            if (importTag) formData.append('tag', importTag);
             formData.append('importfile', fileInput.files[0]);
 
             $.ajax({
@@ -3504,9 +3710,12 @@
                 alertify.error("PLEASE ENTER A VALUE.");
                 return;
             }
+            var addAffinity = document.getElementById('add-asset-affinity').value;
+            var addTag = document.getElementById('add-asset-tag').value;
             sf.fetchData('${docroot}/knownassetadd', {
                 target: assetsTarget, asset_type: assetType,
-                asset_value: assetValue, source: source, notes: notes || ''
+                asset_value: assetValue, source: source, notes: notes || '',
+                affinity: addAffinity, tag: addTag || ''
             }, function(ret) {
                 if (ret[0] === "SUCCESS") {
                     alertify.success("ASSET ADDED");
