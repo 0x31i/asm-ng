@@ -4447,7 +4447,7 @@ class SpiderFootWebUi:
 
         Args:
             target: scan target
-            asset_type: optional filter by type (ip, domain, employee)
+            asset_type: optional filter by type (ip, domain, email, human_name)
 
         Returns:
             str: JSON list of assets
@@ -4471,7 +4471,9 @@ class SpiderFootWebUi:
                         'import_batch': r[5],
                         'date_added': r[6],
                         'added_by': r[7],
-                        'notes': r[8]
+                        'notes': r[8],
+                        'affinity': r[9],
+                        'tag': r[10]
                     })
                 return json.dumps(result).encode('utf-8')
             except Exception as e:
@@ -4480,7 +4482,8 @@ class SpiderFootWebUi:
     @cherrypy.expose
     def knownassetadd(self: 'SpiderFootWebUi', target: str = None, asset_type: str = None,
                       asset_value: str = None, source: str = 'CLIENT_PROVIDED',
-                      notes: str = None) -> str:
+                      notes: str = None, affinity: str = 'DIRECT',
+                      tag: str = None) -> str:
         """Add a single known asset.
 
         Returns:
@@ -4491,17 +4494,21 @@ class SpiderFootWebUi:
         if not target or not asset_type or not asset_value:
             return json.dumps(["ERROR", "target, asset_type, and asset_value are required."]).encode('utf-8')
 
-        if asset_type not in ('ip', 'domain', 'employee'):
-            return json.dumps(["ERROR", "asset_type must be ip, domain, or employee."]).encode('utf-8')
+        if asset_type not in ('ip', 'domain', 'email', 'human_name'):
+            return json.dumps(["ERROR", "asset_type must be ip, domain, email, or human_name."]).encode('utf-8')
 
         if source not in ('CLIENT_PROVIDED', 'ANALYST_CONFIRMED'):
             source = 'CLIENT_PROVIDED'
+
+        if affinity not in ('DIRECT', 'ASSOCIATED'):
+            affinity = 'DIRECT'
 
         current_user = cherrypy.session.get('user', 'anonymous')
         with SpiderFootDb(self.config) as dbh:
             try:
                 dbh.knownAssetAdd(target, asset_type, asset_value.strip(),
-                                  source=source, addedBy=current_user, notes=notes)
+                                  source=source, addedBy=current_user, notes=notes,
+                                  affinity=affinity, tag=tag if tag else None)
                 return json.dumps(["SUCCESS", ""]).encode('utf-8')
             except Exception as e:
                 return json.dumps(["ERROR", str(e)]).encode('utf-8')
@@ -4535,8 +4542,9 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     def knownassetupdate(self: 'SpiderFootWebUi', id: str = None,
-                         notes: str = None, source: str = None) -> str:
-        """Update a known asset's notes or source.
+                         notes: str = None, source: str = None,
+                         affinity: str = None, tag: str = None) -> str:
+        """Update a known asset's notes, source, affinity, or tag.
 
         Returns:
             str: JSON status
@@ -4548,19 +4556,21 @@ class SpiderFootWebUi:
 
         with SpiderFootDb(self.config) as dbh:
             try:
-                dbh.knownAssetUpdate(int(id), notes=notes, source=source)
+                dbh.knownAssetUpdate(int(id), notes=notes, source=source,
+                                     affinity=affinity, tag=tag)
                 return json.dumps(["SUCCESS", ""]).encode('utf-8')
             except Exception as e:
                 return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
     @cherrypy.expose
     def knownassetimport(self: 'SpiderFootWebUi', target: str = None,
-                         asset_type: str = None, importfile: object = None) -> str:
+                         asset_type: str = None, importfile: object = None,
+                         affinity: str = 'DIRECT', tag: str = None) -> str:
         """Import known assets from a file (.txt, .csv, .xlsx).
 
         Args:
             target: scan target
-            asset_type: 'ip', 'domain', or 'employee'
+            asset_type: 'ip', 'domain', 'email', or 'human_name'
             importfile: uploaded file object
 
         Returns:
@@ -4571,8 +4581,8 @@ class SpiderFootWebUi:
         if not target or not asset_type or not importfile:
             return json.dumps(["ERROR", "target, asset_type, and importfile are required."]).encode('utf-8')
 
-        if asset_type not in ('ip', 'domain', 'employee'):
-            return json.dumps(["ERROR", "asset_type must be ip, domain, or employee."]).encode('utf-8')
+        if asset_type not in ('ip', 'domain', 'email', 'human_name'):
+            return json.dumps(["ERROR", "asset_type must be ip, domain, email, or human_name."]).encode('utf-8')
 
         current_user = cherrypy.session.get('user', 'anonymous')
         file_name = getattr(importfile, 'filename', 'unknown')
@@ -4648,7 +4658,9 @@ class SpiderFootWebUi:
                 count = dbh.knownAssetAddBulk(target, asset_type, assets,
                                               source='CLIENT_PROVIDED',
                                               importBatch=import_batch,
-                                              addedBy=current_user)
+                                              addedBy=current_user,
+                                              affinity=affinity if affinity in ('DIRECT', 'ASSOCIATED') else 'DIRECT',
+                                              tag=tag if tag else None)
                 dbh.assetImportHistoryAdd(target, asset_type, file_name, count, current_user)
                 return json.dumps(["SUCCESS", f"Imported {count} new assets ({len(assets)} total in file)."]).encode('utf-8')
             except Exception as e:
@@ -4761,10 +4773,11 @@ class SpiderFootWebUi:
     def knownassetexportzip(self: 'SpiderFootWebUi', target: str = None) -> bytes:
         """Export known assets as a ZIP containing separate CSVs per asset type.
 
-        Creates three CSV files bundled in a zip:
+        Creates four CSV files bundled in a zip:
         - IPs.csv
         - DOMAINS.csv
-        - EMPLOYEES.csv
+        - EMAILS.csv
+        - HUMAN_NAMES.csv
 
         Args:
             target (str): the scan target
@@ -4784,7 +4797,8 @@ class SpiderFootWebUi:
             asset_buckets = {
                 'ip': [],
                 'domain': [],
-                'employee': [],
+                'email': [],
+                'human_name': [],
             }
             for r in rows:
                 asset_type = r[2]
@@ -4796,7 +4810,8 @@ class SpiderFootWebUi:
             type_filenames = {
                 'ip': 'IPs.csv',
                 'domain': 'DOMAINS.csv',
-                'employee': 'EMPLOYEES.csv',
+                'email': 'EMAILS.csv',
+                'human_name': 'HUMAN_NAMES.csv',
             }
 
             zip_buf = BytesIO()
@@ -4881,8 +4896,8 @@ class SpiderFootWebUi:
                 ip_types = {'IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'}
                 domain_types = {'DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
                                 'CO_HOSTED_SITE', 'SIMILARDOMAIN', 'INTERNET_NAME_UNRESOLVED'}
-                employee_types = {'HUMAN_NAME', 'USERNAME', 'EMAILADDR',
-                                  'AFFILIATE_EMAILADDR', 'SOCIAL_MEDIA'}
+                email_types = {'EMAILADDR', 'AFFILIATE_EMAILADDR'}
+                human_name_types = {'HUMAN_NAME', 'USERNAME', 'SOCIAL_MEDIA'}
 
                 for ev in events:
                     fp_flag = ev[13]  # false_positive column
@@ -4899,8 +4914,10 @@ class SpiderFootWebUi:
                         asset_type = 'ip'
                     elif event_type in domain_types:
                         asset_type = 'domain'
-                    elif event_type in employee_types:
-                        asset_type = 'employee'
+                    elif event_type in email_types:
+                        asset_type = 'email'
+                    elif event_type in human_name_types:
+                        asset_type = 'human_name'
 
                     if asset_type:
                         try:
@@ -4921,8 +4938,10 @@ class SpiderFootWebUi:
                             asset_type = 'ip'
                         elif evt in domain_types:
                             asset_type = 'domain'
-                        elif evt in employee_types:
-                            asset_type = 'employee'
+                        elif evt in email_types:
+                            asset_type = 'email'
+                        elif evt in human_name_types:
+                            asset_type = 'human_name'
                         if asset_type:
                             try:
                                 dbh.knownAssetAdd(target, asset_type, evd,
@@ -4934,6 +4953,90 @@ class SpiderFootWebUi:
                     pass
 
                 return json.dumps(["SUCCESS", f"Synced {count} verified entries to known assets."]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
+
+    @cherrypy.expose
+    def assettaglist(self: 'SpiderFootWebUi', target: str = None) -> str:
+        """Get asset tags for a target.
+
+        Returns:
+            str: JSON list of tags
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not target:
+            return json.dumps([]).encode('utf-8')
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                return json.dumps(dbh.assetTagList(target)).encode('utf-8')
+            except Exception:
+                return json.dumps([]).encode('utf-8')
+
+    @cherrypy.expose
+    def assettagadd(self: 'SpiderFootWebUi', target: str = None,
+                    tag: str = None, color: str = '#64748b') -> str:
+        """Add an asset tag for a target.
+
+        Returns:
+            str: JSON status
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not target or not tag:
+            return json.dumps(["ERROR", "target and tag are required."]).encode('utf-8')
+
+        tag = tag.strip().upper()
+        if not tag:
+            return json.dumps(["ERROR", "tag cannot be empty."]).encode('utf-8')
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                tagId = dbh.assetTagAdd(target, tag, color)
+                return json.dumps(["SUCCESS", str(tagId)]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
+
+    @cherrypy.expose
+    def assettagremove(self: 'SpiderFootWebUi', id: str = None) -> str:
+        """Remove an asset tag.
+
+        Returns:
+            str: JSON status
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not id:
+            return json.dumps(["ERROR", "id is required."]).encode('utf-8')
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                dbh.assetTagRemove(int(id))
+                return json.dumps(["SUCCESS", ""]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
+
+    @cherrypy.expose
+    def assettagupdate(self: 'SpiderFootWebUi', id: str = None,
+                       tag: str = None, color: str = None) -> str:
+        """Update an asset tag.
+
+        Returns:
+            str: JSON status
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not id:
+            return json.dumps(["ERROR", "id is required."]).encode('utf-8')
+
+        if tag is not None:
+            tag = tag.strip().upper()
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                dbh.assetTagUpdate(int(id), tag=tag, color=color)
+                return json.dumps(["SUCCESS", ""]).encode('utf-8')
             except Exception as e:
                 return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
