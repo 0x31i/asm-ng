@@ -80,6 +80,30 @@ class sfp_huggingface(SpiderFootPlugin):
             "USERNAME",
         ]
 
+    def _isTargetAssociated(self, author):
+        """Check if a Hugging Face author/owner matches the scan target.
+
+        Args:
+            author: The HF resource author or organization name.
+
+        Returns:
+            True if the author appears related to the target.
+        """
+        if not author:
+            return False
+
+        target_value = self.getTarget().targetValue.lower()
+        author_lower = author.lower()
+
+        keyword = self.sf.domainKeyword(target_value, self.opts.get('_internettlds', {}))
+        if keyword and author_lower == keyword:
+            return True
+
+        if target_value in author_lower or author_lower in target_value:
+            return True
+
+        return False
+
     def _buildRepoInfo(self, name, url, description):
         """Build a PUBLIC_CODE_REPO event data string in the standard format."""
         return "\n".join([
@@ -124,7 +148,7 @@ class sfp_huggingface(SpiderFootPlugin):
 
         return data
 
-    def _processResults(self, resource_type, results, event):
+    def _processResults(self, resource_type, results, event, needs_validation=False):
         """Process search results from a Hugging Face API endpoint.
 
         For each result:
@@ -136,6 +160,7 @@ class sfp_huggingface(SpiderFootPlugin):
             resource_type: One of 'models', 'datasets', or 'spaces'.
             results: List of result dicts from the HF API.
             event: The parent SpiderFootEvent.
+            needs_validation: If True, skip results whose author doesn't match the target.
         """
         type_labels = {
             'models': 'Model',
@@ -158,6 +183,16 @@ class sfp_huggingface(SpiderFootPlugin):
 
             item_id = item.get('id') or item.get('modelId')
             if not item_id:
+                continue
+
+            # Extract the author (owner) from the item ID (format: "author/name")
+            author = item.get('author') or item.get('owner')
+            if not author and '/' in item_id:
+                author = item_id.split('/')[0]
+
+            # If validation required, skip results whose author doesn't match the target
+            if needs_validation and not self._isTargetAssociated(author):
+                self.debug(f"Skipping {item_id} — author '{author}' not associated with target")
                 continue
 
             # Deduplicate across all searches
@@ -191,11 +226,6 @@ class sfp_huggingface(SpiderFootPlugin):
                 else:
                     description = f"Hugging Face {type_label}"
 
-            # Extract the author (owner) from the item ID (format: "author/name")
-            author = item.get('author') or item.get('owner')
-            if not author and '/' in item_id:
-                author = item_id.split('/')[0]
-
             # Emit PUBLIC_CODE_REPO
             repo_info = self._buildRepoInfo(item_id, hf_url, description)
             evt = SpiderFootEvent("PUBLIC_CODE_REPO", repo_info,
@@ -220,12 +250,13 @@ class sfp_huggingface(SpiderFootPlugin):
 
             processed += 1
 
-    def _searchAllTypes(self, query, event):
+    def _searchAllTypes(self, query, event, needs_validation=False):
         """Search models, datasets, and spaces on Hugging Face for a query.
 
         Args:
             query: The search query string.
             event: The parent SpiderFootEvent.
+            needs_validation: If True, require author/owner to match the target.
         """
         for resource_type in ['models', 'datasets', 'spaces']:
             if self.checkForStop():
@@ -235,7 +266,7 @@ class sfp_huggingface(SpiderFootPlugin):
             results = self._searchHuggingFace(resource_type, query)
 
             if results:
-                self._processResults(resource_type, results, event)
+                self._processResults(resource_type, results, event, needs_validation=needs_validation)
 
             time.sleep(self.opts['delay'])
 
@@ -260,11 +291,11 @@ class sfp_huggingface(SpiderFootPlugin):
             if not keyword:
                 self.debug(f"Could not extract keyword from domain: {eventData}")
                 return
-            self._searchAllTypes(keyword, event)
+            self._searchAllTypes(keyword, event, needs_validation=True)
 
         elif eventName == "COMPANY_NAME":
             # Search directly with the company name
-            self._searchAllTypes(eventData, event)
+            self._searchAllTypes(eventData, event, needs_validation=True)
 
         elif eventName == "HUMAN_NAME":
             # Search for models/spaces by that author

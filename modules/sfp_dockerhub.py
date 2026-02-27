@@ -80,6 +80,30 @@ class sfp_dockerhub(SpiderFootPlugin):
     def producedEvents(self):
         return ["AI_INFRASTRUCTURE_DETECTED", "SOFTWARE_USED"]
 
+    def _isTargetAssociated(self, namespace):
+        """Check if a Docker Hub namespace matches the scan target.
+
+        Args:
+            namespace: The Docker Hub namespace (user/organization).
+
+        Returns:
+            True if the namespace appears related to the target.
+        """
+        if not namespace or namespace == 'library':
+            return False
+
+        target_value = self.getTarget().targetValue.lower()
+        namespace_lower = namespace.lower()
+
+        keyword = self.sf.domainKeyword(target_value, self.opts.get('_internettlds', {}))
+        if keyword and namespace_lower == keyword:
+            return True
+
+        if target_value in namespace_lower or namespace_lower in target_value:
+            return True
+
+        return False
+
     def _isAiRelated(self, name, description):
         """Check if an image name or description contains AI/ML keywords.
 
@@ -215,7 +239,7 @@ class sfp_dockerhub(SpiderFootPlugin):
 
         return results[:self.opts['max_results']]
 
-    def _processResults(self, results, event):
+    def _processResults(self, results, event, needs_validation=False):
         """Process a list of Docker Hub repository results, emitting events.
 
         For each image, emit SOFTWARE_USED. If AI-related keywords are found,
@@ -224,6 +248,7 @@ class sfp_dockerhub(SpiderFootPlugin):
         Args:
             results: List of repository dicts from the Docker Hub API.
             event: The parent SpiderFootEvent.
+            needs_validation: If True, skip results whose namespace doesn't match the target.
         """
         for item in results:
             if self.checkForStop():
@@ -237,6 +262,12 @@ class sfp_dockerhub(SpiderFootPlugin):
                 continue
 
             namespace = item.get('namespace', '')
+
+            # If validation required, skip results whose namespace doesn't match the target
+            if needs_validation and not self._isTargetAssociated(namespace):
+                self.debug(f"Skipping {namespace}/{repo_name} — namespace not associated with target")
+                continue
+
             if namespace and namespace != 'library':
                 dedup_key = f"{namespace}/{repo_name}"
             else:
@@ -303,18 +334,18 @@ class sfp_dockerhub(SpiderFootPlugin):
 
             self.debug(f"Searching Docker Hub for domain keyword: {keyword}")
             results = self._searchDockerHub(keyword)
-            self._processResults(results, event)
+            self._processResults(results, event, needs_validation=True)
 
             # Also try fetching the namespace directly in case
             # the organization has a Docker Hub account matching the keyword
             time.sleep(self.opts['delay'])
             namespace_results = self._fetchUserRepos(keyword)
-            self._processResults(namespace_results, event)
+            self._processResults(namespace_results, event, needs_validation=True)
 
         elif eventName == "COMPANY_NAME":
             self.debug(f"Searching Docker Hub for company: {eventData}")
             results = self._searchDockerHub(eventData)
-            self._processResults(results, event)
+            self._processResults(results, event, needs_validation=True)
 
         elif eventName == "USERNAME":
             self.debug(f"Fetching Docker Hub repos for user: {eventData}")
