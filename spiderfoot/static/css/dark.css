@@ -7391,6 +7391,111 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   box-shadow: 0 0 6px rgba(148, 163, 184, 0.2);
 }
 
+/* Bulk affinity button - dark */
+.assets-known-bulk-affinity-btn {
+  background: rgba(99, 102, 241, 0.15) !important;
+  color: #a5b4fc !important;
+  border: 1px solid rgba(99, 102, 241, 0.3) !important;
+  font-family: var(--font-mono);
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; padding: 7px 14px; border-radius: 0;
+}
+.assets-known-bulk-affinity-btn:hover {
+  background: rgba(99, 102, 241, 0.25) !important;
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.3);
+}
+
+/* Bulk tag button - dark */
+.assets-known-bulk-tag-btn {
+  background: rgba(34, 197, 94, 0.15) !important;
+  color: var(--accent-green, #4ade80) !important;
+  border: 1px solid rgba(34, 197, 94, 0.3) !important;
+  font-family: var(--font-mono);
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; padding: 7px 14px; border-radius: 0;
+}
+.assets-known-bulk-tag-btn:hover {
+  background: rgba(34, 197, 94, 0.25) !important;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.3);
+}
+
+/* Kebab button - dark */
+.assets-kebab-wrapper { display: inline-block; position: relative; }
+.assets-kebab-btn {
+  width: 28px !important; height: 28px !important;
+  padding: 0 !important; display: inline-flex !important;
+  align-items: center; justify-content: center;
+  background: transparent !important; border: 1px solid transparent !important;
+  color: rgba(255, 255, 255, 0.3) !important; font-size: 14px !important;
+  cursor: pointer; border-radius: 0; transition: all 0.15s ease;
+}
+.assets-kebab-btn:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+.assets-kebab-btn .glyphicon { font-size: 14px; top: 0; }
+
+/* Kebab dropdown - dark */
+.assets-kebab-dropdown {
+  position: fixed; z-index: 10000;
+  width: 200px; background: var(--bg-primary, #0f172a);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.05);
+  padding: 4px 0;
+  font-family: var(--font-mono);
+}
+.assets-kebab-menu-header {
+  padding: 6px 12px 2px; font-size: 9px; font-weight: 700;
+  color: rgba(255, 255, 255, 0.3); text-transform: uppercase; letter-spacing: 1px;
+}
+.assets-kebab-menu-item {
+  padding: 7px 12px; font-size: 11px; font-weight: 600;
+  color: rgba(255, 255, 255, 0.7); cursor: pointer; display: flex; align-items: center;
+  transition: background 0.1s ease;
+}
+.assets-kebab-menu-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+}
+.assets-kebab-menu-divider {
+  height: 1px; background: rgba(255, 255, 255, 0.06); margin: 4px 0;
+}
+.assets-kebab-tag-swatch {
+  display: inline-block; width: 10px; height: 10px; border-radius: 0;
+}
+.assets-kebab-tag-active {
+  background: rgba(34, 197, 94, 0.1); font-weight: 700;
+  color: var(--accent-green, #4ade80) !important;
+}
+.assets-kebab-remove-tag { color: #ef4444 !important; }
+.assets-kebab-remove-tag:hover { background: rgba(239, 68, 68, 0.1) !important; }
+.assets-kebab-fp { color: #fb923c !important; }
+.assets-kebab-fp:hover { background: rgba(234, 88, 12, 0.1) !important; }
+
+/* Row flash on update - dark */
+.assets-known-row-updated { animation: knownRowFlash 0.8s ease; }
+@keyframes knownRowFlash {
+  0% { background: rgba(34, 197, 94, 0.15); }
+  100% { background: transparent; }
+}
+
+/* Bulk tag picker option - dark */
+.assets-bulk-tag-option {
+  padding: 10px 14px; font-size: 12px; font-weight: 600;
+  color: rgba(255, 255, 255, 0.7); cursor: pointer;
+  display: flex; align-items: center;
+  font-family: var(--font-mono);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.1s ease;
+}
+.assets-bulk-tag-option:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+}
+.assets-bulk-tag-option:last-child { border-bottom: none; }
+
 /* Known assets compact table */
 .assets-known-compact {
   table-layout: fixed;
@@ -7423,7 +7528,7 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
 .assets-known-col-select { width: 36px; text-align: center; vertical-align: middle; }
 .assets-known-col-type { width: 90px; }
 .assets-known-col-source { width: 100px; }
-.assets-known-col-actions { width: 80px; text-align: center; }
+.assets-known-col-actions { width: 50px; text-align: center; }
 
 .assets-known-row {
   cursor: default;
