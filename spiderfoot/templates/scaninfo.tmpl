@@ -2700,6 +2700,20 @@
             grid += "<button class='btn assets-btn-cancel' onclick='assetsCloseModals()'>CLOSE</button>";
             grid += "</div></div></div>";
 
+            // Bulk Tag Picker Modal
+            grid += "<div id='assets-bulk-tag-modal' class='assets-modal-overlay' style='display:none;'>";
+            grid += "<div class='assets-modal'>";
+            grid += "<div class='assets-modal-header'>";
+            grid += "<span class='assets-modal-title'>ASSIGN TAG</span>";
+            grid += "<button class='close-btn' onclick='assetsCloseModals()'>&times;</button>";
+            grid += "</div>";
+            grid += "<div class='assets-modal-body'>";
+            grid += "<div id='bulk-tag-list-container'></div>";
+            grid += "</div>";
+            grid += "<div class='assets-modal-footer'>";
+            grid += "<button class='btn assets-btn-cancel' onclick='assetsCloseModals()'>CANCEL</button>";
+            grid += "</div></div></div>";
+
             $("#mainbody").append(grid);
 
             // Load the default view
@@ -2763,6 +2777,7 @@
         }
 
         function assetsDoAddTag() {
+            cachedAssetTags = null;
             var name = document.getElementById('new-tag-name').value.trim();
             var color = document.getElementById('new-tag-color').value;
             if (!name) { alertify.error("ENTER A TAG NAME."); return; }
@@ -2778,6 +2793,7 @@
         }
 
         function assetsRemoveTag(tagId) {
+            cachedAssetTags = null;
             sf.fetchData('${docroot}/assettagremove', {id: tagId}, function(ret) {
                 if (ret[0] === "SUCCESS") {
                     alertify.success("TAG REMOVED");
@@ -2789,6 +2805,7 @@
         }
 
         function assetsUpdateTagColor(tagId, color) {
+            cachedAssetTags = null;
             sf.fetchData('${docroot}/assettagupdate', {id: tagId, color: color}, function(ret) {
                 if (ret[0] === "SUCCESS") {
                     assetsLoadTagList();
@@ -2956,6 +2973,8 @@
         // ---- KNOWN ASSETS VIEW ----
         // Known assets active filters (multi-select)
         var knownActiveFilters = { type: 'all', affinity: 'all', source: 'all', tag: 'all' };
+        var cachedAssetTags = null;
+        var knownKebabActiveId = null;
 
         function assetsShowKnown(instanceId) {
             assetsSetActiveBtn('known');
@@ -3038,6 +3057,10 @@
                 html += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;FALSE POSITIVE</button>";
                 html += "<button class='btn assets-known-bulk-pending-btn' onclick='knownBulkAction(\"" + instanceId + "\", \"reset\")' style='display:none;' id='assets-bulk-pending-btn'>";
                 html += "<i class='glyphicon glyphicon-repeat'></i>&nbsp;&nbsp;PENDING</button>";
+                html += "<button class='btn assets-known-bulk-affinity-btn' onclick='knownBulkAffinityPrompt()' style='display:none;' id='assets-bulk-affinity-btn'>";
+                html += "<i class='glyphicon glyphicon-transfer'></i>&nbsp;&nbsp;CHANGE AFFINITY</button>";
+                html += "<button class='btn assets-known-bulk-tag-btn' onclick='knownBulkTagPrompt()' style='display:none;' id='assets-bulk-tag-btn'>";
+                html += "<i class='glyphicon glyphicon-tag'></i>&nbsp;&nbsp;ASSIGN TAG</button>";
                 html += "</div>";
 
                 if (data.length === 0) {
@@ -3084,11 +3107,10 @@
                         var tagHtml = a.tag ? "<span class='assets-tag-badge' style='background:" + (a._tagColor || '#64748b') + "20;color:" + (a._tagColor || '#64748b') + ";border:1px solid " + (a._tagColor || '#64748b') + "33;'>" + $('<span>').text(a.tag).html() + "</span>" : "<span style='color:rgba(255,255,255,0.2);font-size:10px;'>-</span>";
                         html += "<td class='assets-known-source-cell assets-expandable' onclick='knownToggleDetail(this)'>" + tagHtml + "</td>";
                         html += "<td class='assets-known-action-cell'>";
-                        html += "<button class='btn btn-xs assets-icon-btn assets-fp-action' onclick='event.stopPropagation();knownAssetAction(" + a.id + ", \"fp\")' title='FALSE POSITIVE'>";
-                        html += "<i class='glyphicon glyphicon-ban-circle'></i></button>";
-                        html += "<button class='btn btn-xs assets-icon-btn assets-reset-action' onclick='event.stopPropagation();knownAssetAction(" + a.id + ", \"reset\")' title='PENDING'>";
-                        html += "<i class='glyphicon glyphicon-repeat'></i></button>";
-                        html += "</td></tr>";
+                        html += "<div class='assets-kebab-wrapper'>";
+                        html += "<button class='btn btn-xs assets-kebab-btn' onclick='event.stopPropagation();knownToggleKebab(this, " + a.id + ")' title='ACTIONS'>";
+                        html += "<i class='glyphicon glyphicon-option-vertical'></i></button>";
+                        html += "</div></td></tr>";
 
                         // Expandable detail row
                         html += "<tr class='assets-detail-row assets-known-detail' data-parent-asset='" + a.id + "' style='display:none;'>";
@@ -3104,6 +3126,21 @@
                         html += "</div></td></tr>";
                     }
                     html += "</tbody></table>";
+
+                    // Shared kebab dropdown (single DOM element, repositioned per click)
+                    html += "<div id='assets-kebab-dropdown' class='assets-kebab-dropdown' style='display:none;'>";
+                    html += "<div class='assets-kebab-menu-header'>AFFINITY</div>";
+                    html += "<div class='assets-kebab-menu-item' id='kebab-affinity-toggle' onclick='knownKebabAffinity()'>";
+                    html += "<i class='glyphicon glyphicon-transfer'></i>&nbsp;&nbsp;<span id='kebab-affinity-label'>SET ASSOCIATED</span></div>";
+                    html += "<div class='assets-kebab-menu-divider'></div>";
+                    html += "<div class='assets-kebab-menu-header'>TAG</div>";
+                    html += "<div id='kebab-tag-list'></div>";
+                    html += "<div class='assets-kebab-menu-divider'></div>";
+                    html += "<div class='assets-kebab-menu-item assets-kebab-fp' onclick='knownKebabFp()'>";
+                    html += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;FALSE POSITIVE</div>";
+                    html += "<div class='assets-kebab-menu-item' onclick='knownKebabReset()'>";
+                    html += "<i class='glyphicon glyphicon-repeat'></i>&nbsp;&nbsp;RESET TO PENDING</div>";
+                    html += "</div>";
                 }
 
                 $("#assets-content").html(html);
@@ -3211,10 +3248,14 @@
                 $("#assets-remove-sel-btn").show().html("<i class='glyphicon glyphicon-trash'></i>&nbsp;&nbsp;REMOVE SELECTED (" + count + ")");
                 $("#assets-bulk-fp-btn").show().html("<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;FALSE POSITIVE (" + count + ")");
                 $("#assets-bulk-pending-btn").show().html("<i class='glyphicon glyphicon-repeat'></i>&nbsp;&nbsp;PENDING (" + count + ")");
+                $("#assets-bulk-affinity-btn").show().html("<i class='glyphicon glyphicon-transfer'></i>&nbsp;&nbsp;CHANGE AFFINITY (" + count + ")");
+                $("#assets-bulk-tag-btn").show().html("<i class='glyphicon glyphicon-tag'></i>&nbsp;&nbsp;ASSIGN TAG (" + count + ")");
             } else {
                 $("#assets-remove-sel-btn").hide();
                 $("#assets-bulk-fp-btn").hide();
                 $("#assets-bulk-pending-btn").hide();
+                $("#assets-bulk-affinity-btn").hide();
+                $("#assets-bulk-tag-btn").hide();
             }
         }
 
@@ -3230,8 +3271,8 @@
                     if (ret[0] === "SUCCESS") {
                         $row.addClass('assets-known-row-fp');
                         $actionCell.html(
-                            "<button class='btn btn-xs assets-icon-btn assets-reset-action' onclick='event.stopPropagation();knownAssetAction(" + assetId + ", \"undo_fp\")' title='UNDO - RESTORE ASSET'>" +
-                            "<i class='glyphicon glyphicon-repeat'></i></button>"
+                            "<div class='assets-kebab-wrapper'><button class='btn btn-xs assets-kebab-btn' onclick='event.stopPropagation();knownAssetAction(" + assetId + ", \"undo_fp\")' title='UNDO - RESTORE ASSET'>" +
+                            "<i class='glyphicon glyphicon-repeat'></i></button></div>"
                         );
                         alertify.success("MARKED AS FALSE POSITIVE");
                     } else {
@@ -3252,10 +3293,8 @@
                     if (ret[0] === "SUCCESS") {
                         $row.removeClass('assets-known-row-fp');
                         $actionCell.html(
-                            "<button class='btn btn-xs assets-icon-btn assets-fp-action' onclick='event.stopPropagation();knownAssetAction(" + assetId + ", \"fp\")' title='FALSE POSITIVE'>" +
-                            "<i class='glyphicon glyphicon-ban-circle'></i></button>" +
-                            "<button class='btn btn-xs assets-icon-btn assets-reset-action' onclick='event.stopPropagation();knownAssetAction(" + assetId + ", \"reset\")' title='PENDING'>" +
-                            "<i class='glyphicon glyphicon-repeat'></i></button>"
+                            "<div class='assets-kebab-wrapper'><button class='btn btn-xs assets-kebab-btn' onclick='event.stopPropagation();knownToggleKebab(this, " + assetId + ")' title='ACTIONS'>" +
+                            "<i class='glyphicon glyphicon-option-vertical'></i></button></div>"
                         );
                         alertify.success("ASSET RESTORED");
                     } else {
@@ -3266,10 +3305,8 @@
                 // Reset to pending - visual indication
                 $row.addClass('assets-known-row-pending');
                 $actionCell.html(
-                    "<button class='btn btn-xs assets-icon-btn assets-fp-action' onclick='event.stopPropagation();knownAssetAction(" + assetId + ", \"fp\")' title='FALSE POSITIVE'>" +
-                    "<i class='glyphicon glyphicon-ban-circle'></i></button>" +
-                    "<button class='btn btn-xs assets-icon-btn assets-reset-action' onclick='event.stopPropagation();knownAssetAction(" + assetId + ", \"reset\")' title='PENDING'>" +
-                    "<i class='glyphicon glyphicon-repeat'></i></button>"
+                    "<div class='assets-kebab-wrapper'><button class='btn btn-xs assets-kebab-btn' onclick='event.stopPropagation();knownToggleKebab(this, " + assetId + ")' title='ACTIONS'>" +
+                    "<i class='glyphicon glyphicon-option-vertical'></i></button></div>"
                 );
                 setTimeout(function() { $row.removeClass('assets-known-row-pending'); }, 600);
                 alertify.success("ASSET STATUS: PENDING");
@@ -3310,6 +3347,271 @@
                 }
             });
         }
+
+        // ---- KEBAB MENU & IN-PLACE UPDATE FUNCTIONS ----
+
+        function knownCloseKebab() {
+            $("#assets-kebab-dropdown").hide();
+            knownKebabActiveId = null;
+        }
+
+        function knownToggleKebab(btn, assetId) {
+            var $dd = $("#assets-kebab-dropdown");
+            // If already open for this asset, close it
+            if ($dd.is(":visible") && knownKebabActiveId === assetId) {
+                knownCloseKebab();
+                return;
+            }
+            knownKebabActiveId = assetId;
+
+            // Position dropdown relative to the button
+            var $btn = $(btn);
+            var offset = $btn.offset();
+            var btnH = $btn.outerHeight();
+
+            // Populate affinity toggle label based on current row data
+            var $row = $("tr.assets-known-row[data-asset-id='" + assetId + "']");
+            var currentAffinity = $row.data('asset-affinity') || 'DIRECT';
+            var newAffinity = (currentAffinity === 'DIRECT') ? 'ASSOCIATED' : 'DIRECT';
+            $("#kebab-affinity-label").text("SET " + newAffinity);
+
+            // Populate tag list (cached)
+            var currentTag = $row.data('asset-tag') || '';
+            knownPopulateKebabTags(currentTag);
+
+            $dd.css({
+                top: offset.top + btnH + 4,
+                left: offset.left - 160 + $btn.outerWidth(),
+                display: 'block'
+            });
+
+            // Adjust if dropdown goes off-screen right
+            var ddWidth = $dd.outerWidth();
+            if (offset.left - 160 + $btn.outerWidth() + ddWidth > $(window).width()) {
+                $dd.css('left', offset.left - ddWidth + $btn.outerWidth());
+            }
+        }
+
+        function knownPopulateKebabTags(currentTag) {
+            if (cachedAssetTags !== null) {
+                renderKebabTags(cachedAssetTags, currentTag);
+                return;
+            }
+            $("#kebab-tag-list").html("<div class='assets-kebab-menu-item' style='opacity:0.5;'>LOADING...</div>");
+            sf.fetchData('${docroot}/assettaglist', {target: assetsTarget}, function(tags) {
+                cachedAssetTags = tags;
+                renderKebabTags(tags, currentTag);
+            });
+        }
+
+        function renderKebabTags(tags, currentTag) {
+            var html = "";
+            for (var i = 0; i < tags.length; i++) {
+                var t = tags[i];
+                var safeTag = $('<span>').text(t.tag).html();
+                var isActive = (currentTag === t.tag);
+                html += "<div class='assets-kebab-menu-item assets-kebab-tag-item" + (isActive ? " assets-kebab-tag-active" : "") + "' onclick='knownKebabSetTag(\"" + safeTag.replace(/"/g, '&quot;') + "\")'>";
+                html += "<span class='assets-kebab-tag-swatch' style='background:" + t.color + ";'></span>&nbsp;&nbsp;" + safeTag;
+                if (isActive) html += " &nbsp;<i class='glyphicon glyphicon-ok' style='font-size:10px;'></i>";
+                html += "</div>";
+            }
+            html += "<div class='assets-kebab-menu-item assets-kebab-remove-tag' onclick='knownKebabSetTag(\"\")'>";
+            html += "<i class='glyphicon glyphicon-remove'></i>&nbsp;&nbsp;REMOVE TAG</div>";
+            $("#kebab-tag-list").html(html);
+        }
+
+        function knownKebabAffinity() {
+            if (!knownKebabActiveId) return;
+            var $row = $("tr.assets-known-row[data-asset-id='" + knownKebabActiveId + "']");
+            var currentAffinity = $row.data('asset-affinity') || 'DIRECT';
+            var newAffinity = (currentAffinity === 'DIRECT') ? 'ASSOCIATED' : 'DIRECT';
+            knownCloseKebab();
+            knownUpdateAssetProperty(knownKebabActiveId, 'affinity', newAffinity);
+        }
+
+        function knownKebabSetTag(tagValue) {
+            if (!knownKebabActiveId) return;
+            knownCloseKebab();
+            knownUpdateAssetProperty(knownKebabActiveId, 'tag', tagValue);
+        }
+
+        function knownKebabFp() {
+            if (!knownKebabActiveId) return;
+            var id = knownKebabActiveId;
+            knownCloseKebab();
+            knownAssetAction(id, 'fp');
+        }
+
+        function knownKebabReset() {
+            if (!knownKebabActiveId) return;
+            var id = knownKebabActiveId;
+            knownCloseKebab();
+            knownAssetAction(id, 'reset');
+        }
+
+        function knownUpdateAssetProperty(id, prop, val) {
+            var params = {id: id};
+            params[prop] = val;
+            sf.fetchData('${docroot}/knownassetupdate', params, function(ret) {
+                if (ret[0] === "SUCCESS") {
+                    knownUpdateRowInPlace(id, prop, val);
+                    alertify.success(prop.toUpperCase() + " UPDATED");
+                } else {
+                    alertify.error("ERROR: " + ret[1]);
+                }
+            });
+        }
+
+        function knownUpdateRowInPlace(id, prop, val) {
+            var $row = $("tr.assets-known-row[data-asset-id='" + id + "']");
+            if (!$row.length) return;
+            var $detailRow = $row.next('.assets-known-detail');
+
+            if (prop === 'affinity') {
+                $row.data('asset-affinity', val).attr('data-asset-affinity', val);
+                var affinityClass = (val === 'ASSOCIATED') ? 'assets-affinity-associated' : 'assets-affinity-direct';
+                var affinityLabel = (val === 'ASSOCIATED') ? 'ASSOCIATED' : 'DIRECT';
+                // Update main row badge
+                $row.find('.assets-affinity-badge').attr('class', 'assets-affinity-badge ' + affinityClass).text(affinityLabel);
+                // Update detail row badge
+                if ($detailRow.length) {
+                    $detailRow.find('.assets-detail-card').each(function() {
+                        if ($(this).find('.assets-detail-card-label').text() === 'AFFINITY') {
+                            $(this).find('.assets-detail-card-value').html("<span class='assets-affinity-badge " + affinityClass + "'>" + affinityLabel + "</span>");
+                        }
+                    });
+                }
+            } else if (prop === 'tag') {
+                $row.data('asset-tag', val).attr('data-asset-tag', val);
+                var tagColor = '#64748b';
+                // Try to find color from cached tags
+                if (cachedAssetTags) {
+                    for (var i = 0; i < cachedAssetTags.length; i++) {
+                        if (cachedAssetTags[i].tag === val) {
+                            tagColor = cachedAssetTags[i].color;
+                            break;
+                        }
+                    }
+                }
+                var tagHtml;
+                if (val) {
+                    var safeTag = $('<span>').text(val).html();
+                    tagHtml = "<span class='assets-tag-badge' style='background:" + tagColor + "20;color:" + tagColor + ";border:1px solid " + tagColor + "33;'>" + safeTag + "</span>";
+                } else {
+                    tagHtml = "<span style='color:rgba(255,255,255,0.2);font-size:10px;'>-</span>";
+                }
+                // Update main row tag cell (the one with the tag badge)
+                $row.find('.assets-tag-badge, .assets-known-source-cell:last span').parent().filter('.assets-known-source-cell:last').html(tagHtml);
+                // More reliable: find the 6th td (TAG column)
+                $row.find('td').eq(5).html(tagHtml);
+                // Update detail row
+                if ($detailRow.length) {
+                    $detailRow.find('.assets-detail-card').each(function() {
+                        if ($(this).find('.assets-detail-card-label').text() === 'TAG') {
+                            $(this).find('.assets-detail-card-value').html(val ? tagHtml : '-');
+                        }
+                    });
+                }
+            }
+
+            // Flash animation
+            $row.addClass('assets-known-row-updated');
+            setTimeout(function() { $row.removeClass('assets-known-row-updated'); }, 800);
+
+            // Re-apply filters so row hides if it no longer matches active filter
+            knownApplyFilters();
+        }
+
+        // ---- BULK AFFINITY / TAG ACTIONS ----
+
+        function knownBulkAffinityPrompt() {
+            alertify.confirm(
+                "<div style='text-align:center;font-family:monospace;'>" +
+                "<p style='margin-bottom:12px;font-weight:700;'>CHANGE AFFINITY FOR SELECTED ASSETS</p>" +
+                "<button class='btn assets-known-bulk-affinity-btn' style='display:inline-block;margin:4px;' onclick='knownBulkAffinity(\"DIRECT\");alertify.closeAll();'>DIRECT</button>" +
+                "<button class='btn assets-known-bulk-affinity-btn' style='display:inline-block;margin:4px;' onclick='knownBulkAffinity(\"ASSOCIATED\");alertify.closeAll();'>ASSOCIATED</button>" +
+                "</div>",
+                function() {} // OK callback (unused, buttons handle it)
+            ).setting({
+                'labels': {ok: 'CANCEL', cancel: ''},
+                'closable': true
+            });
+            // Hide the default cancel button
+            setTimeout(function() {
+                $(".alertify .ajs-footer .ajs-cancel").hide();
+            }, 50);
+        }
+
+        function knownBulkAffinity(newAffinity) {
+            var ids = [];
+            $(".asset-cb:checked").each(function() { ids.push($(this).val()); });
+            if (ids.length === 0) return;
+            for (var i = 0; i < ids.length; i++) {
+                knownUpdateAssetProperty(parseInt(ids[i]), 'affinity', newAffinity);
+            }
+            $("#assets-select-all").prop("checked", false);
+            $(".asset-cb").prop("checked", false);
+            assetsUpdateSelection();
+        }
+
+        function knownBulkTagPrompt() {
+            var $modal = $("#assets-bulk-tag-modal");
+            var $container = $("#bulk-tag-list-container");
+            $container.html("<p style='opacity:0.5;font-size:11px;'>LOADING TAGS...</p>");
+            $modal.show();
+
+            var populateBulkTags = function(tags) {
+                var html = "";
+                for (var i = 0; i < tags.length; i++) {
+                    var t = tags[i];
+                    var safeTag = $('<span>').text(t.tag).html();
+                    html += "<div class='assets-bulk-tag-option' onclick='knownBulkTag(\"" + safeTag.replace(/"/g, '&quot;') + "\");assetsCloseModals();'>";
+                    html += "<span class='assets-kebab-tag-swatch' style='background:" + t.color + ";'></span>&nbsp;&nbsp;" + safeTag + "</div>";
+                }
+                html += "<div class='assets-bulk-tag-option assets-kebab-remove-tag' onclick='knownBulkTag(\"\");assetsCloseModals();'>";
+                html += "<i class='glyphicon glyphicon-remove'></i>&nbsp;&nbsp;REMOVE TAG</div>";
+                if (tags.length === 0) {
+                    html = "<p style='opacity:0.5;font-size:11px;'>NO TAGS DEFINED. CREATE TAGS VIA MANAGE TAGS FIRST.</p>" + html;
+                }
+                $container.html(html);
+            };
+
+            if (cachedAssetTags !== null) {
+                populateBulkTags(cachedAssetTags);
+            } else {
+                sf.fetchData('${docroot}/assettaglist', {target: assetsTarget}, function(tags) {
+                    cachedAssetTags = tags;
+                    populateBulkTags(tags);
+                });
+            }
+        }
+
+        function knownBulkTag(tagValue) {
+            var ids = [];
+            $(".asset-cb:checked").each(function() { ids.push($(this).val()); });
+            if (ids.length === 0) return;
+            for (var i = 0; i < ids.length; i++) {
+                knownUpdateAssetProperty(parseInt(ids[i]), 'tag', tagValue);
+            }
+            $("#assets-select-all").prop("checked", false);
+            $(".asset-cb").prop("checked", false);
+            assetsUpdateSelection();
+        }
+
+        // Close kebab on outside click
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('#assets-kebab-dropdown, .assets-kebab-btn').length) {
+                knownCloseKebab();
+            }
+        });
+
+        // Close kebab on scroll
+        $(window).on('scroll', function() {
+            knownCloseKebab();
+        });
+        $("#assets-content").on('scroll', function() {
+            knownCloseKebab();
+        });
 
         // ---- POTENTIAL MATCHES VIEW ----
         var assetsHideResolved = true; // default: resolved rows hidden

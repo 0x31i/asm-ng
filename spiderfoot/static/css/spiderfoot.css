@@ -6598,7 +6598,7 @@ i.glyphicon-white,
 .assets-known-col-select { width: 36px; text-align: center; vertical-align: middle; }
 .assets-known-col-type { width: 90px; }
 .assets-known-col-source { width: 100px; }
-.assets-known-col-actions { width: 80px; text-align: center; }
+.assets-known-col-actions { width: 50px; text-align: center; }
 
 .assets-known-row { cursor: default; }
 
@@ -6687,6 +6687,95 @@ i.glyphicon-white,
   letter-spacing: 0.5px; padding: 7px 14px; border-radius: 4px;
 }
 .assets-known-bulk-pending-btn:hover { background: rgba(100,116,139,0.2) !important; }
+
+/* Bulk affinity button */
+.assets-known-bulk-affinity-btn {
+  background: rgba(99,102,241,0.1) !important;
+  color: #6366f1 !important;
+  border: 1px solid rgba(99,102,241,0.2) !important;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; padding: 7px 14px; border-radius: 4px;
+}
+.assets-known-bulk-affinity-btn:hover { background: rgba(99,102,241,0.2) !important; }
+
+/* Bulk tag button */
+.assets-known-bulk-tag-btn {
+  background: rgba(34,197,94,0.1) !important;
+  color: #16a34a !important;
+  border: 1px solid rgba(34,197,94,0.2) !important;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; padding: 7px 14px; border-radius: 4px;
+}
+.assets-known-bulk-tag-btn:hover { background: rgba(34,197,94,0.2) !important; }
+
+/* Kebab button */
+.assets-kebab-wrapper { display: inline-block; position: relative; }
+.assets-kebab-btn {
+  width: 28px !important; height: 28px !important;
+  padding: 0 !important; display: inline-flex !important;
+  align-items: center; justify-content: center;
+  background: transparent !important; border: 1px solid transparent !important;
+  color: #94a3b8 !important; font-size: 14px !important; cursor: pointer;
+  border-radius: 4px; transition: all 0.15s ease;
+}
+.assets-kebab-btn:hover {
+  background: rgba(100,116,139,0.12) !important;
+  color: #475569 !important;
+  border-color: rgba(100,116,139,0.2) !important;
+}
+.assets-kebab-btn .glyphicon { font-size: 14px; top: 0; }
+
+/* Kebab dropdown */
+.assets-kebab-dropdown {
+  position: fixed; z-index: 10000;
+  width: 200px; background: #ffffff;
+  border: 1px solid #e2e8f0; border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.08);
+  padding: 4px 0;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+}
+.assets-kebab-menu-header {
+  padding: 6px 12px 2px; font-size: 9px; font-weight: 700;
+  color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;
+}
+.assets-kebab-menu-item {
+  padding: 7px 12px; font-size: 11px; font-weight: 600;
+  color: #334155; cursor: pointer; display: flex; align-items: center;
+  transition: background 0.1s ease;
+}
+.assets-kebab-menu-item:hover { background: #f1f5f9; }
+.assets-kebab-menu-divider {
+  height: 1px; background: #e2e8f0; margin: 4px 0;
+}
+.assets-kebab-tag-swatch {
+  display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+}
+.assets-kebab-tag-active {
+  background: rgba(34,197,94,0.08); font-weight: 700;
+}
+.assets-kebab-remove-tag { color: #ef4444 !important; }
+.assets-kebab-remove-tag:hover { background: rgba(239,68,68,0.06) !important; }
+.assets-kebab-fp { color: #ea580c !important; }
+.assets-kebab-fp:hover { background: rgba(234,88,12,0.06) !important; }
+
+/* Row flash on update */
+.assets-known-row-updated { animation: knownRowFlash 0.8s ease; }
+@keyframes knownRowFlash {
+  0% { background: rgba(34,197,94,0.15); }
+  100% { background: transparent; }
+}
+
+/* Bulk tag picker option */
+.assets-bulk-tag-option {
+  padding: 10px 14px; font-size: 12px; font-weight: 600;
+  color: #334155; cursor: pointer; display: flex; align-items: center;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  border-bottom: 1px solid #f1f5f9; transition: background 0.1s ease;
+}
+.assets-bulk-tag-option:hover { background: #f1f5f9; }
+.assets-bulk-tag-option:last-child { border-bottom: none; }
 
 /* FP row styling */
 .assets-known-row-fp { opacity: 0.4; }
