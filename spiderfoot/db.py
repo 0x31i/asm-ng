@@ -370,7 +370,22 @@ class SpiderFootDb:
             UNIQUE(target, event_type, event_data, source_data) \
         )",
         "CREATE INDEX idx_row_notes_target ON tbl_analyst_row_notes (target)",
-        "CREATE INDEX idx_row_notes_lookup ON tbl_analyst_row_notes (target, event_type, event_data, source_data)"
+        "CREATE INDEX idx_row_notes_lookup ON tbl_analyst_row_notes (target, event_type, event_data, source_data)",
+        "CREATE TABLE IF NOT EXISTS tbl_grade_snapshots ( \
+            scan_instance_id    VARCHAR NOT NULL PRIMARY KEY, \
+            seed_target         VARCHAR NOT NULL, \
+            overall_score       REAL NOT NULL, \
+            overall_grade       VARCHAR(2) NOT NULL, \
+            category_scores     TEXT NOT NULL, \
+            finding_counts      TEXT NOT NULL, \
+            total_findings      INT NOT NULL DEFAULT 0, \
+            unique_findings     INT NOT NULL DEFAULT 0, \
+            correlation_counts  TEXT DEFAULT NULL, \
+            scan_started        INT NOT NULL, \
+            scan_ended          INT NOT NULL, \
+            created             INT NOT NULL \
+        )",
+        "CREATE INDEX idx_grade_snapshots_target ON tbl_grade_snapshots (seed_target, scan_started)"
     ]
 
     eventDetails = [
@@ -1240,6 +1255,29 @@ class SpiderFootDb:
                 except DatabaseError:
                     pass
 
+            # Migration: Create tbl_grade_snapshots table
+            try:
+                self.dbh.execute("SELECT COUNT(*) FROM tbl_grade_snapshots")
+            except DatabaseError:
+                try:
+                    schema = get_pg_schema_queries(self.createSchemaQueries) if self.db_type == 'postgresql' else self.createSchemaQueries
+                    for qry in schema:
+                        if "tbl_grade_snapshots" in qry:
+                            self.dbh.execute(qry)
+                    self.conn.commit()
+                except DatabaseError:
+                    pass
+
+            # Migration: Add snapshot_excluded column to tbl_grade_snapshots
+            try:
+                self.dbh.execute("SELECT snapshot_excluded FROM tbl_grade_snapshots LIMIT 1")
+            except DatabaseError:
+                try:
+                    self.dbh.execute("ALTER TABLE tbl_grade_snapshots ADD COLUMN snapshot_excluded INT NOT NULL DEFAULT 0")
+                    self.conn.commit()
+                except DatabaseError:
+                    pass
+
             # Restore normal transaction mode after migrations
             if pg_autocommit:
                 self.conn.autocommit = False
@@ -2055,13 +2093,16 @@ class SpiderFootDb:
                     "SQL error encountered when retrieving scan instance") from e
 
     def scanCountForTarget(self, target: str) -> int:
-        """Count the number of scans for a given target.
+        """Count the number of terminal scans for a given target.
+
+        Only counts FINISHED, ABORTED, and ERROR-FAILED scans — those
+        that should have grade snapshots.
 
         Args:
             target (str): the target (seed_target value)
 
         Returns:
-            int: number of scans for the target
+            int: number of terminal scans for the target
 
         Raises:
             TypeError: arg type was invalid
@@ -2070,7 +2111,8 @@ class SpiderFootDb:
         if not isinstance(target, str):
             raise TypeError(f"target is {type(target)}; expected str()") from None
 
-        qry = "SELECT COUNT(*) FROM tbl_scan_instance WHERE seed_target = ?"
+        qry = "SELECT COUNT(*) FROM tbl_scan_instance WHERE seed_target = ? " \
+              "AND status IN ('FINISHED', 'ABORTED', 'ERROR-FAILED')"
 
         with self.dbhLock:
             try:
@@ -2808,6 +2850,11 @@ class SpiderFootDb:
                 self.dbh.execute("DELETE FROM tbl_scan_nessus_results WHERE scan_instance_id = ?", qvars)
                 self.dbh.execute("DELETE FROM tbl_scan_burp_results WHERE scan_instance_id = ?", qvars)
                 self.dbh.execute("DELETE FROM tbl_scan_results WHERE scan_instance_id = ?", qvars)
+                # Delete grade snapshot if exists
+                try:
+                    self.dbh.execute("DELETE FROM tbl_grade_snapshots WHERE scan_instance_id = ?", qvars)
+                except DatabaseError:
+                    pass  # table may not exist yet
                 # Delete parent table last
                 self.dbh.execute("DELETE FROM tbl_scan_instance WHERE guid = ?", qvars)
                 self.conn.commit()
@@ -2817,6 +2864,316 @@ class SpiderFootDb:
                     f"SQL error encountered when deleting scan: {e}") from e
 
         return True
+
+    # --- Grade Snapshot Methods ---
+
+    def gradeSnapshotStore(self, scanId: str, target: str, gradeData: dict,
+                           totalFindings: int, uniqueFindings: int,
+                           correlationCounts: dict, scanStarted: int,
+                           scanEnded: int) -> bool:
+        """Upsert a grade snapshot row for a completed scan.
+
+        Args:
+            scanId (str): scan instance ID
+            target (str): seed target value
+            gradeData (dict): result from calculate_full_grade()
+            totalFindings (int): total finding count
+            uniqueFindings (int): unique finding count
+            correlationCounts (dict): {CRITICAL: N, HIGH: N, ...} or None
+            scanStarted (int): scan start epoch (milliseconds)
+            scanEnded (int): scan end epoch (milliseconds)
+
+        Returns:
+            bool: success
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(scanId, str):
+            raise TypeError(f"scanId is {type(scanId)}; expected str()") from None
+
+        import json as _json
+
+        category_scores = {}
+        for cat_name, cat_data in gradeData.get('categories', {}).items():
+            category_scores[cat_name] = {
+                'score': cat_data.get('score', 0),
+                'grade': cat_data.get('grade', '-'),
+                'weight': cat_data.get('weight', 0),
+                'raw_score': cat_data.get('raw_score', 0),
+            }
+
+        # Build finding_counts from category details
+        finding_counts = {}
+        for cat_name, cat_data in gradeData.get('categories', {}).items():
+            for detail in cat_data.get('details', []):
+                etype = detail.get('type', '')
+                if etype:
+                    finding_counts[etype] = {
+                        'total': detail.get('total', 0),
+                        'unique': detail.get('unique', 0),
+                    }
+
+        now = int(time.time() * 1000)
+
+        # Use INSERT OR REPLACE for SQLite, or equivalent upsert
+        qry = "INSERT OR REPLACE INTO tbl_grade_snapshots " \
+              "(scan_instance_id, seed_target, overall_score, overall_grade, " \
+              "category_scores, finding_counts, total_findings, unique_findings, " \
+              "correlation_counts, scan_started, scan_ended, created) " \
+              "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+
+        qvars = [
+            scanId, target,
+            gradeData.get('overall_score', 0),
+            gradeData.get('overall_grade', '-'),
+            _json.dumps(category_scores),
+            _json.dumps(finding_counts),
+            totalFindings, uniqueFindings,
+            _json.dumps(correlationCounts) if correlationCounts else None,
+            scanStarted, scanEnded, now
+        ]
+
+        with self.dbhLock:
+            try:
+                if self.db_type == 'postgresql':
+                    qry = qry.replace("INSERT OR REPLACE", "INSERT")
+                    qry = qry.rstrip() + \
+                        " ON CONFLICT (scan_instance_id) DO UPDATE SET " \
+                        "seed_target=EXCLUDED.seed_target, overall_score=EXCLUDED.overall_score, " \
+                        "overall_grade=EXCLUDED.overall_grade, category_scores=EXCLUDED.category_scores, " \
+                        "finding_counts=EXCLUDED.finding_counts, total_findings=EXCLUDED.total_findings, " \
+                        "unique_findings=EXCLUDED.unique_findings, correlation_counts=EXCLUDED.correlation_counts, " \
+                        "scan_started=EXCLUDED.scan_started, scan_ended=EXCLUDED.scan_ended, " \
+                        "created=EXCLUDED.created"
+                self.dbh.execute(qry, qvars)
+                self.conn.commit()
+                _log.info(f"Grade snapshot stored: scan={scanId} grade={gradeData.get('overall_grade', '-')} score={gradeData.get('overall_score', 0)}")
+            except DatabaseError as e:
+                raise IOError(f"SQL error storing grade snapshot: {e}") from e
+
+        return True
+
+    def gradeSnapshotsForTarget(self, target: str, limit: int = 100, include_excluded: bool = False) -> list:
+        """Return all grade snapshots for a target, ordered by scan_started ASC.
+
+        Args:
+            target (str): seed target value
+            limit (int): max rows to return
+            include_excluded (bool): if True, return excluded snapshots too (with flag)
+
+        Returns:
+            list: list of dicts with parsed JSON fields
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(target, str):
+            raise TypeError(f"target is {type(target)}; expected str()") from None
+
+        import json as _json
+
+        qry = "SELECT scan_instance_id, seed_target, overall_score, overall_grade, " \
+              "category_scores, finding_counts, total_findings, unique_findings, " \
+              "correlation_counts, scan_started, scan_ended, created, snapshot_excluded " \
+              "FROM tbl_grade_snapshots WHERE seed_target = ? "
+        qvars = [target]
+
+        if not include_excluded:
+            qry += "AND snapshot_excluded = 0 "
+
+        qry += "ORDER BY scan_started ASC LIMIT ?"
+        qvars.append(limit)
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, qvars)
+                rows = self.dbh.fetchall()
+            except DatabaseError as e:
+                raise IOError(f"SQL error fetching grade snapshots: {e}") from e
+
+        results = []
+        for row in rows:
+            snap = {
+                'scan_id': row[0],
+                'seed_target': row[1],
+                'overall_score': row[2],
+                'overall_grade': row[3],
+                'category_scores': {},
+                'finding_counts': {},
+                'total_findings': row[6],
+                'unique_findings': row[7],
+                'correlation_counts': None,
+                'scan_started': row[9],
+                'scan_ended': row[10],
+                'created': row[11],
+                'excluded': row[12] if len(row) > 12 else 0,
+            }
+            try:
+                snap['category_scores'] = _json.loads(row[4]) if row[4] else {}
+            except (ValueError, TypeError):
+                pass
+            try:
+                snap['finding_counts'] = _json.loads(row[5]) if row[5] else {}
+            except (ValueError, TypeError):
+                pass
+            try:
+                snap['correlation_counts'] = _json.loads(row[8]) if row[8] else None
+            except (ValueError, TypeError):
+                pass
+            results.append(snap)
+
+        return results
+
+    def gradeSnapshotExists(self, scanId: str) -> bool:
+        """Check if a grade snapshot exists for a scan.
+
+        Args:
+            scanId (str): scan instance ID
+
+        Returns:
+            bool: True if snapshot exists
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(scanId, str):
+            raise TypeError(f"scanId is {type(scanId)}; expected str()") from None
+
+        qry = "SELECT 1 FROM tbl_grade_snapshots WHERE scan_instance_id = ?"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [scanId])
+                return self.dbh.fetchone() is not None
+            except DatabaseError as e:
+                raise IOError(f"SQL error checking grade snapshot: {e}") from e
+
+    def gradeSnapshotDelete(self, scanId: str) -> bool:
+        """Delete a grade snapshot for a scan.
+
+        Args:
+            scanId (str): scan instance ID
+
+        Returns:
+            bool: success
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(scanId, str):
+            raise TypeError(f"scanId is {type(scanId)}; expected str()") from None
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(
+                    "DELETE FROM tbl_grade_snapshots WHERE scan_instance_id = ?",
+                    [scanId])
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError(f"SQL error deleting grade snapshot: {e}") from e
+
+        return True
+
+    def gradeSnapshotSetExcluded(self, scanId: str, excluded: int) -> bool:
+        """Set the snapshot_excluded flag for a scan's grade snapshot.
+
+        Args:
+            scanId (str): scan instance ID
+            excluded (int): 1 to exclude from trend, 0 to include
+
+        Returns:
+            bool: success
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(scanId, str):
+            raise TypeError(f"scanId is {type(scanId)}; expected str()") from None
+
+        excluded = 1 if int(excluded) else 0
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(
+                    "UPDATE tbl_grade_snapshots SET snapshot_excluded = ? WHERE scan_instance_id = ?",
+                    [excluded, scanId])
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError(f"SQL error updating snapshot excluded flag: {e}") from e
+
+        return True
+
+    def scanCorrelationSeverityCounts(self, instanceId: str) -> dict:
+        """Return correlation severity counts for a scan.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            dict: {CRITICAL: N, HIGH: N, MEDIUM: N, LOW: N, INFO: N}
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(
+                f"instanceId is {type(instanceId)}; expected str()") from None
+
+        qry = "SELECT rule_risk, count(*) AS total FROM \
+            tbl_scan_correlation_results \
+            WHERE scan_instance_id = ? GROUP BY rule_risk"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [instanceId])
+                rows = self.dbh.fetchall()
+            except DatabaseError as e:
+                raise IOError(
+                    "SQL error fetching correlation severity counts") from e
+
+        counts = {}
+        for row in rows:
+            counts[row[0]] = row[1]
+        return counts
+
+    def scanCompletedForTarget(self, target: str, limit: int = 50) -> list:
+        """Return terminal scan instances for a target, ordered by started ASC.
+
+        Includes FINISHED, ABORTED, and ERROR-FAILED scans — all terminal
+        states that have collected results worth grading.
+
+        Args:
+            target (str): seed target value
+            limit (int): max rows
+
+        Returns:
+            list: list of tuples (guid, name, seed_target, created, started, ended, status)
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(target, str):
+            raise TypeError(f"target is {type(target)}; expected str()") from None
+
+        qry = "SELECT guid, name, seed_target, created, started, ended, status " \
+              "FROM tbl_scan_instance WHERE seed_target = ? " \
+              "AND status IN ('FINISHED', 'ABORTED', 'ERROR-FAILED') " \
+              "ORDER BY started ASC LIMIT ?"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [target, limit])
+                return self.dbh.fetchall()
+            except DatabaseError as e:
+                raise IOError(f"SQL error fetching completed scans: {e}") from e
 
     def scanResultsUpdateFP(self, instanceId: str, resultHashes: list, fpFlag: int) -> bool:
         """Set the false positive flag for a result.
@@ -4159,13 +4516,14 @@ class SpiderFootDb:
                 raise IOError(
                     "SQL error encountered when fetching configuration") from e
 
-    def scanEventStore(self, instanceId: str, sfEvent, truncateSize: int = 0) -> None:
+    def scanEventStore(self, instanceId: str, sfEvent, truncateSize: int = 0, false_positive: int = 0) -> None:
         """Store an event in the database.
 
         Args:
             instanceId (str): scan instance ID
             sfEvent (SpiderFootEvent): event to be stored in the database
             truncateSize (int): truncate size for event data
+            false_positive (int): 1 if this event is a known false positive, 0 otherwise
 
         Raises:
             TypeError: arg type was invalid
@@ -4257,12 +4615,13 @@ class SpiderFootDb:
         # retrieve scan results
         qry = "INSERT INTO tbl_scan_results \
             (scan_instance_id, hash, type, generated, confidence, \
-            visibility, risk, module, data, source_event_hash) \
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            visibility, risk, module, data, source_event_hash, false_positive) \
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
         qvals = [instanceId, sfEvent.hash, sfEvent.eventType, sfEvent.generated,
                  sfEvent.confidence, sfEvent.visibility, sfEvent.risk,
-                 sfEvent.module, storeData, sfEvent.sourceEventHash]
+                 sfEvent.module, storeData, sfEvent.sourceEventHash,
+                 false_positive]
 
         with self.dbhLock:
             try:

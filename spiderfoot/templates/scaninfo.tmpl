@@ -2124,6 +2124,1292 @@
                     "Implement mitigations: input/output filtering, guardrails, system prompt hardening, or vendor patches as appropriate.",
                     "Conduct red-team testing to verify the mitigation is effective before considering the issue resolved."
                 ]
+            },
+
+            // --- Affiliate Infrastructure ---
+            "AFFILIATE_COMPANY_NAME": {
+                title: "Affiliate Company Name",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the affiliate relationship is current and authorized by the organization.",
+                    "Assess whether the affiliate's security posture meets your organization's third-party risk requirements.",
+                    "Document all affiliate relationships in a vendor/partner registry for ongoing oversight.",
+                    "Monitor for changes in the affiliate's ownership or reputation that could impact your risk profile."
+                ]
+            },
+            "AFFILIATE_DOMAIN_NAME": {
+                title: "Affiliate Domain Name",
+                intro: _defaultIntro,
+                items: [
+                    "Confirm the affiliate domain is legitimate and still associated with an active business relationship.",
+                    "Check whether the domain hosts any content that references or links to your organization.",
+                    "Verify the domain's WHOIS and DNS configuration for signs of expiration or hijacking.",
+                    "Include affiliate domains in your external attack surface monitoring program."
+                ]
+            },
+            "AFFILIATE_DOMAIN_UNREGISTERED": {
+                title: "Affiliate Domain Unregistered",
+                intro: _defaultIntro,
+                items: [
+                    "Investigate why the affiliate domain is unregistered — it may have expired or been abandoned.",
+                    "Assess the risk of domain takeover: could an attacker register this domain to impersonate the affiliate?",
+                    "Consider registering the domain defensively if it could be used in phishing or brand abuse.",
+                    "Notify the affiliate of the lapsed registration if the relationship is still active."
+                ]
+            },
+            "AFFILIATE_DOMAIN_WHOIS": {
+                title: "Affiliate Domain WHOIS",
+                intro: _defaultIntro,
+                items: [
+                    "Review WHOIS data to confirm the affiliate domain is registered to the expected organization.",
+                    "Check registration and expiration dates — flag domains nearing expiration for proactive outreach.",
+                    "Identify any privacy-masked WHOIS records that may obscure true ownership.",
+                    "Cross-reference registrant details with known affiliate contacts for validation."
+                ]
+            },
+            "AFFILIATE_EMAILADDR": {
+                title: "Affiliate Email Address",
+                intro: _defaultIntro,
+                items: [
+                    "Confirm the email address belongs to a known contact at the affiliate organization.",
+                    "Check whether the address appears in any breach databases and notify the affiliate if compromised.",
+                    "Ensure communications with affiliate email addresses use encrypted channels where appropriate.",
+                    "Remove or update stale affiliate email contacts from internal distribution lists."
+                ]
+            },
+            "AFFILIATE_INTERNET_NAME": {
+                title: "Affiliate Internet Name",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the hostname resolves to infrastructure owned or operated by the known affiliate.",
+                    "Check for any security misconfigurations (open ports, exposed services) on the affiliate host.",
+                    "Assess whether the affiliate hostname handles any data or traffic related to your organization.",
+                    "Include affiliate hostnames in your threat intelligence monitoring feeds."
+                ]
+            },
+            "AFFILIATE_INTERNET_NAME_HIJACKABLE": {
+                title: "Affiliate Internet Name Hijackable",
+                intro: _defaultIntro,
+                items: [
+                    "Confirm the subdomain takeover risk — verify the DNS record points to an unclaimed resource (e.g., dangling CNAME).",
+                    "Notify the affiliate immediately and recommend they remove or reclaim the DNS record.",
+                    "Assess impact: could an attacker serve malicious content under this hostname to target your users?",
+                    "Monitor for exploitation attempts and consider blocking the hostname at your perimeter if unresolved."
+                ]
+            },
+            "AFFILIATE_INTERNET_NAME_UNRESOLVED": {
+                title: "Affiliate Internet Name Unresolved",
+                intro: _defaultIntro,
+                items: [
+                    "Investigate why the affiliate hostname does not resolve — DNS misconfiguration, decommissioned host, or expired domain.",
+                    "Check for dangling DNS records that could enable subdomain takeover.",
+                    "Notify the affiliate to clean up stale DNS entries.",
+                    "Remove any internal references or links to the unresolved hostname."
+                ]
+            },
+            "AFFILIATE_IPADDR": {
+                title: "Affiliate IP Address",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the IP address belongs to the expected affiliate organization via WHOIS or ASN lookup.",
+                    "Check threat intelligence feeds for any malicious activity associated with the IP.",
+                    "Ensure firewall rules referencing affiliate IPs are current and appropriately scoped.",
+                    "Monitor for IP reassignment that could indicate the affiliate has moved or lost control of the address."
+                ]
+            },
+            "AFFILIATE_IPV6_ADDRESS": {
+                title: "Affiliate IPv6 Address",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the IPv6 address belongs to the expected affiliate via WHOIS or ASN lookup.",
+                    "Ensure your security tools and firewalls properly handle IPv6 affiliate traffic.",
+                    "Check threat intelligence feeds for any malicious activity associated with the IPv6 address.",
+                    "Confirm that IPv6-specific security policies are applied consistently alongside IPv4 rules."
+                ]
+            },
+            "AFFILIATE_WEB_CONTENT": {
+                title: "Affiliate Web Content",
+                intro: _defaultIntro,
+                items: [
+                    "Review the affiliate web content for any references to your organization, brands, or products.",
+                    "Check for sensitive data leakage — internal project names, employee details, or proprietary information.",
+                    "Verify the content does not misrepresent your organization or violate partnership agreements.",
+                    "Monitor affiliate web content periodically for unauthorized changes or malicious injections."
+                ]
+            },
+            "AFFILIATE_DESCRIPTION_ABSTRACT": {
+                title: "Affiliate Description",
+                intro: _defaultIntro,
+                items: [
+                    "Review the affiliate description for accuracy and relevance to the known relationship.",
+                    "Confirm the affiliate's stated business aligns with the authorized partnership scope.",
+                    "Flag any discrepancies between the description and your organization's records of the affiliate.",
+                    "Update your vendor/partner registry with the latest affiliate description data."
+                ]
+            },
+            "AFFILIATE_DESCRIPTION_CATEGORY": {
+                title: "Affiliate Description Category",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the affiliate's industry or category classification matches your records.",
+                    "Assess whether the category implies additional regulatory or compliance requirements for your partnership.",
+                    "Flag affiliates in high-risk categories (e.g., financial services, healthcare) for enhanced due diligence.",
+                    "Keep category information current in your third-party risk management system."
+                ]
+            },
+
+            // --- Blacklisted / Malicious ---
+            "BLACKLISTED_AFFILIATE_INTERNET_NAME": {
+                title: "Blacklisted Affiliate Internet Name",
+                intro: _defaultIntro,
+                items: [
+                    "Investigate why the affiliate hostname is blacklisted — malware hosting, phishing, or spam activity.",
+                    "Notify the affiliate and request remediation of the underlying issue.",
+                    "Block traffic to/from the blacklisted hostname at your perimeter until resolved.",
+                    "Monitor for delisting and reassess the affiliate's risk level."
+                ]
+            },
+            "BLACKLISTED_AFFILIATE_IPADDR": {
+                title: "Blacklisted Affiliate IP Address",
+                intro: _defaultIntro,
+                items: [
+                    "Investigate why the affiliate IP is blacklisted — check threat intelligence for associated malicious activity.",
+                    "Notify the affiliate and request immediate remediation (e.g., compromised host, open relay).",
+                    "Review and restrict any firewall rules allowing traffic from the blacklisted IP.",
+                    "Monitor for delisting confirmation before re-enabling trust."
+                ]
+            },
+            "BLACKLISTED_COHOST": {
+                title: "Blacklisted Co-Hosted Site",
+                intro: _defaultIntro,
+                items: [
+                    "Identify which co-hosted site triggered the blacklisting and assess shared infrastructure risk.",
+                    "Determine if your assets share an IP or hosting environment with the blacklisted site.",
+                    "Request the hosting provider investigate and remediate the blacklisted neighbor.",
+                    "Consider migrating to dedicated hosting if co-hosting blacklisting is a recurring issue."
+                ]
+            },
+            "BLACKLISTED_INTERNET_NAME": {
+                title: "Blacklisted Internet Name",
+                intro: _defaultIntro,
+                items: [
+                    "Investigate the root cause of blacklisting — compromised host, spam, malware distribution, or phishing.",
+                    "Remediate the underlying issue immediately (e.g., clean infected systems, remove malicious content).",
+                    "Submit delisting requests to the relevant blacklist operators once remediation is confirmed.",
+                    "Implement monitoring to detect future blacklisting events promptly."
+                ]
+            },
+            "BLACKLISTED_NETBLOCK": {
+                title: "Blacklisted Netblock",
+                intro: _defaultIntro,
+                items: [
+                    "Identify which IPs within the netblock triggered the blacklisting.",
+                    "Remediate compromised hosts or misconfigured services causing the listing.",
+                    "Submit delisting requests once the root cause is resolved.",
+                    "Monitor the netblock reputation continuously and set up alerts for future listings."
+                ]
+            },
+            "MALICIOUS_AFFILIATE_INTERNET_NAME": {
+                title: "Malicious Affiliate Internet Name",
+                intro: _defaultIntro,
+                items: [
+                    "Assess the nature of the malicious activity — malware, C2 communication, phishing, or exploitation.",
+                    "Block all traffic to/from the malicious affiliate hostname immediately.",
+                    "Notify the affiliate and demand remediation with evidence of the malicious activity.",
+                    "Review your incident response logs for any historical connections to this hostname."
+                ]
+            },
+            "MALICIOUS_AFFILIATE_IPADDR": {
+                title: "Malicious Affiliate IP Address",
+                intro: _defaultIntro,
+                items: [
+                    "Block the malicious affiliate IP at your perimeter firewall immediately.",
+                    "Investigate your network logs for any past connections to or from this IP.",
+                    "Notify the affiliate with details of the malicious activity and request remediation.",
+                    "Reassess the affiliate relationship risk and update your third-party risk register."
+                ]
+            },
+            "MALICIOUS_ASN": {
+                title: "Malicious ASN",
+                intro: _defaultIntro,
+                items: [
+                    "Investigate the ASN to determine the scope of malicious activity (e.g., bulletproof hosting, botnet infrastructure).",
+                    "Review your network for any traffic to/from IP ranges within the malicious ASN.",
+                    "Consider blocking or rate-limiting traffic from the ASN if risk is confirmed.",
+                    "Report the ASN to relevant abuse contacts and threat intelligence sharing communities."
+                ]
+            },
+            "MALICIOUS_BITCOIN_ADDRESS": {
+                title: "Malicious Bitcoin Address",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the context — is this address associated with ransomware, fraud, or sanctions-listed entities?",
+                    "Check if any organizational systems or users have transacted with this address.",
+                    "Report the address to law enforcement and relevant blockchain analysis services.",
+                    "Block or flag the address in any cryptocurrency monitoring tools your organization uses."
+                ]
+            },
+            "MALICIOUS_COHOST": {
+                title: "Malicious Co-Hosted Site",
+                intro: _defaultIntro,
+                items: [
+                    "Determine if your infrastructure shares hosting resources with the malicious site.",
+                    "Assess the risk of IP reputation damage or cross-contamination from the co-hosted malicious content.",
+                    "Contact the hosting provider to report the malicious neighbor and request action.",
+                    "Consider migrating to isolated hosting to avoid shared-IP reputation risks."
+                ]
+            },
+            "MALICIOUS_INTERNET_NAME": {
+                title: "Malicious Internet Name",
+                intro: _defaultIntro,
+                items: [
+                    "Investigate the malicious activity — malware distribution, phishing, or command-and-control communication.",
+                    "If the hostname belongs to your organization, remediate the compromise immediately.",
+                    "Block the hostname at DNS and perimeter firewall levels.",
+                    "Search internal logs for any historical connections to the malicious hostname."
+                ]
+            },
+            "MALICIOUS_NETBLOCK": {
+                title: "Malicious Netblock",
+                intro: _defaultIntro,
+                items: [
+                    "Identify the specific IPs within the netblock associated with malicious activity.",
+                    "Block or restrict traffic from the malicious netblock at your network perimeter.",
+                    "Investigate internal logs for connections to/from IPs in this netblock.",
+                    "Report the netblock to the relevant RIR abuse contact and threat intelligence providers."
+                ]
+            },
+            "MALICIOUS_PHONE_NUMBER": {
+                title: "Malicious Phone Number",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the context — is the number associated with vishing, smishing, fraud, or social engineering?",
+                    "Block the number on organizational phone systems and report it to the carrier.",
+                    "Alert employees if the number has been used in targeted social engineering attacks.",
+                    "Document the number in your threat intelligence records for future reference."
+                ]
+            },
+
+            // --- Co-Hosted Sites ---
+            "CO_HOSTED_SITE": {
+                title: "Co-Hosted Site",
+                intro: _defaultIntro,
+                items: [
+                    "Identify all sites sharing hosting infrastructure with your assets.",
+                    "Assess the risk profile of co-hosted neighbors — malicious or high-risk sites can impact your IP reputation.",
+                    "Determine if shared hosting is acceptable for the sensitivity of your hosted content.",
+                    "Consider dedicated hosting for critical assets to eliminate co-hosting risk."
+                ]
+            },
+            "CO_HOSTED_SITE_DOMAIN": {
+                title: "Co-Hosted Site Domain",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the co-hosted domain is not associated with malicious, fraudulent, or policy-violating content.",
+                    "Check whether the co-hosted domain could cause brand confusion or reputational harm.",
+                    "Review your hosting provider's acceptable use policies for shared environments.",
+                    "Monitor co-hosted domains periodically for changes in content or reputation."
+                ]
+            },
+            "CO_HOSTED_SITE_DOMAIN_WHOIS": {
+                title: "Co-Hosted Site Domain WHOIS",
+                intro: _defaultIntro,
+                items: [
+                    "Review WHOIS data to identify the owner of the co-hosted domain.",
+                    "Assess whether the co-hosted domain owner poses any reputation or legal risk.",
+                    "Flag co-hosted domains with privacy-masked WHOIS for further investigation.",
+                    "Document co-hosted domain ownership in your risk assessment records."
+                ]
+            },
+
+            // --- Credentials & Accounts ---
+            "ACCOUNT_EXTERNAL_USER_SHARED_COMPROMISED": {
+                title: "Shared Account Compromised",
+                intro: _defaultIntro,
+                items: [
+                    "Identify the shared account and all users who have access to it.",
+                    "Reset the credentials immediately and enforce unique, individual accounts where possible.",
+                    "Investigate whether the compromised credentials were used for unauthorized access.",
+                    "Implement MFA and eliminate shared account usage in favor of individual identity-based access."
+                ]
+            },
+            "HASH_COMPROMISED": {
+                title: "Password Hash Compromised",
+                intro: _defaultIntro,
+                items: [
+                    "Identify the affected user accounts associated with the compromised password hash.",
+                    "Force password resets for all affected accounts immediately.",
+                    "Investigate the breach source — was the hash obtained from a data leak, database dump, or credential stuffing?",
+                    "Ensure password storage uses strong, salted hashing algorithms (e.g., bcrypt, Argon2) and enforce MFA."
+                ]
+            },
+            "SIMILAR_ACCOUNT_EXTERNAL": {
+                title: "Similar External Account",
+                intro: _defaultIntro,
+                items: [
+                    "Determine if the similar account is an impersonation attempt or a coincidental name match.",
+                    "If impersonation is suspected, report the account to the platform for takedown.",
+                    "Alert employees or customers who may be targeted by the impersonating account.",
+                    "Monitor for additional impersonation accounts across other platforms."
+                ]
+            },
+
+            // --- Crypto / Financial ---
+            "BITCOIN_ADDRESS": {
+                title: "Bitcoin Address",
+                intro: _defaultIntro,
+                items: [
+                    "Verify whether the Bitcoin address is officially associated with the organization or a known contact.",
+                    "Check blockchain analysis services for the address's transaction history and risk classification.",
+                    "Flag any association with illicit activity (ransomware, darknet markets, sanctions-listed entities).",
+                    "Document the address and its context in your digital asset inventory."
+                ]
+            },
+            "BITCOIN_BALANCE": {
+                title: "Bitcoin Balance",
+                intro: _defaultIntro,
+                items: [
+                    "Review the balance in context — does it align with expected organizational cryptocurrency holdings?",
+                    "Investigate unexpected or large balances that may indicate unauthorized transactions.",
+                    "Ensure proper custody and security controls are in place for organizational crypto wallets.",
+                    "Cross-reference with the associated Bitcoin address for any threat intelligence hits."
+                ]
+            },
+            "CREDIT_CARD_NUMBER": {
+                title: "Credit Card Number",
+                intro: _defaultIntro,
+                items: [
+                    "Immediately assess the exposure scope — where was this card number found and who has access?",
+                    "Notify the card issuer and affected cardholder to initiate fraud monitoring or card replacement.",
+                    "Investigate the source of exposure (e.g., web form, code repo, log file) and remediate the leak.",
+                    "Review PCI DSS compliance controls to prevent future cardholder data exposure."
+                ]
+            },
+            "ETHEREUM_ADDRESS": {
+                title: "Ethereum Address",
+                intro: _defaultIntro,
+                items: [
+                    "Verify whether the Ethereum address is officially associated with the organization.",
+                    "Check blockchain analysis platforms for transaction history and risk indicators.",
+                    "Flag associations with smart contract exploits, scam tokens, or sanctions-listed entities.",
+                    "Document the address and its purpose in your digital asset inventory."
+                ]
+            },
+            "ETHEREUM_BALANCE": {
+                title: "Ethereum Balance",
+                intro: _defaultIntro,
+                items: [
+                    "Review the balance against expected organizational Ethereum holdings.",
+                    "Investigate any discrepancies that could indicate unauthorized transfers.",
+                    "Ensure wallet security: hardware wallets, multi-sig, and access controls are in place.",
+                    "Monitor the address for unusual transaction patterns."
+                ]
+            },
+            "IBAN_NUMBER": {
+                title: "IBAN Number",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the IBAN belongs to the organization and assess why it is externally visible.",
+                    "Remove the IBAN from any public-facing resources where it should not be exposed.",
+                    "Monitor the account for unauthorized transaction attempts resulting from the exposure.",
+                    "Review data handling practices to prevent future exposure of banking details."
+                ]
+            },
+            "LEI": {
+                title: "Legal Entity Identifier (LEI)",
+                intro: _defaultIntro,
+                items: [
+                    "Confirm the LEI is registered to the correct legal entity and is current.",
+                    "Verify the LEI data (entity name, address, ownership) is accurate in the GLEIF database.",
+                    "Ensure the LEI is renewed before expiration to maintain regulatory compliance.",
+                    "Use the LEI to cross-reference corporate structure and identify subsidiary relationships."
+                ]
+            },
+
+            // --- DNS Extended ---
+            "DNS_SRV": {
+                title: "DNS SRV Record",
+                intro: _defaultIntro,
+                items: [
+                    "Review SRV records for services that should not be publicly discoverable (e.g., internal LDAP, SIP, XMPP).",
+                    "Remove or restrict SRV records for decommissioned or internal-only services.",
+                    "Verify that services advertised via SRV records are properly secured and authenticated.",
+                    "Monitor for unauthorized SRV record additions that could indicate DNS compromise."
+                ]
+            },
+
+            // --- Darknet / Leaks ---
+            "DARKNET_MENTION_URL": {
+                title: "Darknet Mention URL",
+                intro: _defaultIntro,
+                items: [
+                    "Investigate the darknet URL to understand the context — is your organization mentioned in data sales, discussions, or targeting?",
+                    "Assess the threat level: is sensitive data being offered for sale or is this a general mention?",
+                    "Engage your threat intelligence team or provider to monitor the URL for updates.",
+                    "Initiate incident response if active data exposure or targeting is confirmed."
+                ]
+            },
+            "DARKNET_MENTION_CONTENT": {
+                title: "Darknet Mention Content",
+                intro: _defaultIntro,
+                items: [
+                    "Analyze the content for specific organizational data — credentials, customer records, intellectual property, or internal documents.",
+                    "Determine the freshness and authenticity of the exposed data.",
+                    "If credentials are exposed, force resets for affected accounts immediately.",
+                    "Escalate to incident response and legal teams if sensitive data is confirmed exposed."
+                ]
+            },
+            "LEAKSITE_URL": {
+                title: "Leak Site URL",
+                intro: _defaultIntro,
+                items: [
+                    "Determine which leak site has posted content related to your organization.",
+                    "Assess whether the posting indicates a ransomware attack, data breach, or extortion attempt.",
+                    "Engage incident response and legal counsel immediately.",
+                    "Monitor the leak site for additional postings or data releases."
+                ]
+            },
+            "LEAKSITE_CONTENT": {
+                title: "Leak Site Content",
+                intro: _defaultIntro,
+                items: [
+                    "Analyze the leaked content to determine scope — what types of data are exposed (PII, credentials, financials, IP)?",
+                    "Identify affected individuals, systems, and business units.",
+                    "Initiate breach notification procedures if personal data is confirmed exposed.",
+                    "Preserve evidence and coordinate with law enforcement and legal counsel."
+                ]
+            },
+
+            // --- Defaced ---
+            "DEFACED_INTERNET_NAME": {
+                title: "Defaced Internet Name",
+                intro: _defaultIntro,
+                items: [
+                    "Verify whether the defacement report is current and the site is still compromised.",
+                    "Investigate the attack vector — vulnerable CMS, compromised credentials, or server misconfiguration.",
+                    "Restore the site from a known-good backup and patch the exploited vulnerability.",
+                    "Implement web application firewall (WAF) rules and file integrity monitoring to prevent recurrence."
+                ]
+            },
+            "DEFACED_IPADDR": {
+                title: "Defaced IP Address",
+                intro: _defaultIntro,
+                items: [
+                    "Confirm the defacement and identify all sites hosted on the affected IP.",
+                    "Investigate the root cause — was the server itself compromised or a specific application?",
+                    "Restore services from clean backups and patch all vulnerabilities.",
+                    "Implement intrusion detection and file integrity monitoring on the server."
+                ]
+            },
+            "DEFACED_AFFILIATE_INTERNET_NAME": {
+                title: "Defaced Affiliate Internet Name",
+                intro: _defaultIntro,
+                items: [
+                    "Notify the affiliate of the defacement and confirm whether remediation is underway.",
+                    "Assess whether the defaced affiliate site could be used to target your organization's users.",
+                    "Block or warn users accessing the defaced affiliate site until it is restored.",
+                    "Review the affiliate's security posture as part of your third-party risk assessment."
+                ]
+            },
+            "DEFACED_AFFILIATE_IPADDR": {
+                title: "Defaced Affiliate IP Address",
+                intro: _defaultIntro,
+                items: [
+                    "Notify the affiliate of the defacement affecting their IP address.",
+                    "Assess shared infrastructure risk — are any of your services co-hosted on the affected IP?",
+                    "Block traffic to the affected IP until the affiliate confirms remediation.",
+                    "Update your third-party risk register with the defacement incident."
+                ]
+            },
+            "DEFACED_COHOST": {
+                title: "Defaced Co-Hosted Site",
+                intro: _defaultIntro,
+                items: [
+                    "Determine if the defacement of the co-hosted site poses risk to your assets on the same infrastructure.",
+                    "Contact the hosting provider to report the incident and confirm isolation between tenants.",
+                    "Monitor your own hosted assets for signs of compromise or unauthorized modification.",
+                    "Consider migrating to dedicated hosting if co-hosting defacement is a recurring concern."
+                ]
+            },
+
+            // --- Description / Metadata ---
+            "DESCRIPTION_ABSTRACT": {
+                title: "Description Abstract",
+                intro: _defaultIntro,
+                items: [
+                    "Review the description for accuracy and relevance to the target asset.",
+                    "Check for any sensitive or internal information inadvertently exposed in public descriptions.",
+                    "Update or request removal of inaccurate descriptions from external sources.",
+                    "Document the description metadata in your asset inventory for reference."
+                ]
+            },
+            "DESCRIPTION_CATEGORY": {
+                title: "Description Category",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the category classification is accurate for the identified asset or entity.",
+                    "Assess whether the category implies additional regulatory or compliance obligations.",
+                    "Flag incorrect categorizations that could lead to inadequate security controls.",
+                    "Update your asset inventory with the correct category information."
+                ]
+            },
+            "DEVICE_TYPE": {
+                title: "Device Type",
+                intro: _defaultIntro,
+                items: [
+                    "Confirm the detected device type matches expected infrastructure (e.g., router, IoT device, server).",
+                    "Assess whether the device type should be exposed to the internet — many device types should be behind a firewall.",
+                    "Check for default credentials and known vulnerabilities specific to the detected device type.",
+                    "Ensure the device is included in your asset inventory and patch management program."
+                ]
+            },
+            "OPERATING_SYSTEM": {
+                title: "Operating System",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the detected OS version is accurate and currently supported by the vendor.",
+                    "Flag end-of-life or unsupported operating systems for immediate upgrade or isolation.",
+                    "Ensure OS-level patches are applied consistently and on schedule.",
+                    "Restrict OS version disclosure in HTTP headers, banners, and error messages to limit attacker reconnaissance."
+                ]
+            },
+
+            // --- Email Extended ---
+            "EMAILADDR_DELIVERABLE": {
+                title: "Deliverable Email Address",
+                intro: _defaultIntro,
+                items: [
+                    "Confirm the email address belongs to a current employee or authorized contact.",
+                    "Assess the exposure context — is this address listed publicly where it could be harvested for phishing?",
+                    "Ensure the mailbox has MFA enabled and is protected by email security controls.",
+                    "Remove the address from unnecessary public listings to reduce spam and phishing risk."
+                ]
+            },
+            "EMAILADDR_DISPOSABLE": {
+                title: "Disposable Email Address",
+                intro: _defaultIntro,
+                items: [
+                    "Investigate why a disposable email address is associated with your organization — it may indicate fraud or abuse.",
+                    "Block disposable email domains at registration and contact form endpoints.",
+                    "Review accounts created with disposable addresses for suspicious activity.",
+                    "Update email validation rules to reject known disposable email providers."
+                ]
+            },
+            "EMAILADDR_GENERIC": {
+                title: "Generic Email Address",
+                intro: _defaultIntro,
+                items: [
+                    "Verify that generic addresses (e.g., info@, admin@, support@) are monitored and have responsible owners.",
+                    "Ensure generic mailboxes have strong access controls and MFA — they are common phishing targets.",
+                    "Remove or redirect generic addresses that are no longer in use.",
+                    "Limit the use of generic addresses for sensitive communications or account registrations."
+                ]
+            },
+            "EMAILADDR_UNDELIVERABLE": {
+                title: "Undeliverable Email Address",
+                intro: _defaultIntro,
+                items: [
+                    "Investigate why the address is undeliverable — decommissioned mailbox, typo, or DNS issue.",
+                    "Remove undeliverable addresses from public-facing resources and contact lists.",
+                    "Check if the undeliverable address was previously valid and may appear in breach databases.",
+                    "Update internal records and distribution lists to remove stale email addresses."
+                ]
+            },
+
+            // --- Identity / PII ---
+            "DATE_HUMAN_DOB": {
+                title: "Date of Birth",
+                intro: _defaultIntro,
+                items: [
+                    "Assess the exposure severity — dates of birth are PII and can be used for identity theft.",
+                    "Identify the source of exposure and remove the data from public-facing assets immediately.",
+                    "Notify affected individuals if their date of birth was exposed alongside other identifying information.",
+                    "Review data handling and privacy controls to prevent future PII exposure."
+                ]
+            },
+            "JOB_TITLE": {
+                title: "Job Title",
+                intro: _defaultIntro,
+                items: [
+                    "Review exposed job titles for sensitive roles (e.g., security, executive, IT admin) that could be targeted.",
+                    "Assess spear-phishing risk — attackers use job titles to craft convincing pretexts.",
+                    "Limit unnecessary exposure of employee job titles on public-facing websites and directories.",
+                    "Provide social engineering awareness training for employees in highly targeted roles."
+                ]
+            },
+            "PERSON_NAME": {
+                title: "Person Name",
+                intro: _defaultIntro,
+                items: [
+                    "Validate whether the exposed person name belongs to a current employee or associate.",
+                    "Assess the risk — names combined with other exposed data (email, title, phone) increase social engineering risk.",
+                    "Limit unnecessary exposure of employee names on public resources where possible.",
+                    "Alert individuals whose names appear alongside sensitive data about potential targeting."
+                ]
+            },
+            "PHONE_NUMBER_COMPROMISED": {
+                title: "Phone Number Compromised",
+                intro: _defaultIntro,
+                items: [
+                    "Identify the affected individual and notify them of the compromised phone number.",
+                    "Assess the risk of SIM-swapping, vishing, or smishing attacks targeting the number.",
+                    "Enable additional account protections (MFA not reliant on SMS) for accounts tied to the compromised number.",
+                    "Monitor for social engineering attempts targeting the affected individual."
+                ]
+            },
+            "PHONE_NUMBER_TYPE": {
+                title: "Phone Number Type",
+                intro: _defaultIntro,
+                items: [
+                    "Identify the phone number type (mobile, landline, VoIP) and assess the associated risk profile.",
+                    "VoIP numbers may be more easily spoofed — ensure caller verification processes account for this.",
+                    "Mobile numbers used for SMS-based MFA should have SIM-swap protection enabled with the carrier.",
+                    "Document phone number types in your contact and asset registries for risk assessment."
+                ]
+            },
+
+            // --- Network / BGP ---
+            "BGP_AS_MEMBER": {
+                title: "BGP AS Member",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the AS membership is accurate and the listed prefixes belong to your organization.",
+                    "Check for any unauthorized route announcements or prefix hijacking within the AS.",
+                    "Ensure RPKI (Resource Public Key Infrastructure) is deployed to validate route origins.",
+                    "Monitor BGP routing tables for anomalous announcements affecting your prefixes."
+                ]
+            },
+            "BGP_AS_OWNER": {
+                title: "BGP AS Owner",
+                intro: _defaultIntro,
+                items: [
+                    "Confirm the ASN ownership is correctly registered with the relevant RIR.",
+                    "Verify all prefixes announced by the ASN are authorized and documented.",
+                    "Implement RPKI ROA (Route Origin Authorizations) to protect against BGP hijacking.",
+                    "Review peering arrangements and ensure routing policies are current and secure."
+                ]
+            },
+            "NETBLOCK_MEMBER": {
+                title: "Netblock Member",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the netblock membership and confirm all IP ranges belong to your organization.",
+                    "Check for unauthorized hosts or services running within the netblock.",
+                    "Ensure the netblock is properly documented in your IP address management (IPAM) system.",
+                    "Monitor the netblock for reputation issues (blacklisting, abuse reports)."
+                ]
+            },
+            "NETBLOCK_OWNER": {
+                title: "Netblock Owner",
+                intro: _defaultIntro,
+                items: [
+                    "Confirm netblock ownership is correctly recorded with the relevant RIR (ARIN, RIPE, APNIC, etc.).",
+                    "Verify all IP addresses within the netblock are accounted for in your asset inventory.",
+                    "Ensure abuse contact information for the netblock is current and monitored.",
+                    "Review the netblock for any unauthorized sub-allocations or delegations."
+                ]
+            },
+            "NETBLOCKV6_MEMBER": {
+                title: "IPv6 Netblock Member",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the IPv6 netblock membership and confirm all addresses belong to your organization.",
+                    "Ensure IPv6 security policies are applied consistently alongside IPv4 controls.",
+                    "Check for unauthorized services or hosts within the IPv6 address range.",
+                    "Include IPv6 netblocks in your IP address management and monitoring systems."
+                ]
+            },
+            "NETBLOCKV6_OWNER": {
+                title: "IPv6 Netblock Owner",
+                intro: _defaultIntro,
+                items: [
+                    "Confirm IPv6 netblock ownership is correctly registered with the relevant RIR.",
+                    "Verify all IPv6 allocations are documented and accounted for in your IPAM system.",
+                    "Ensure abuse contact information for the IPv6 netblock is current.",
+                    "Monitor for unauthorized IPv6 prefix announcements or address usage."
+                ]
+            },
+            "NETBLOCK_WHOIS": {
+                title: "Netblock WHOIS",
+                intro: _defaultIntro,
+                items: [
+                    "Review WHOIS data to confirm netblock registration details are accurate and current.",
+                    "Verify organization name, abuse contacts, and technical contacts are correct.",
+                    "Flag any discrepancies between WHOIS records and your internal network documentation.",
+                    "Ensure WHOIS records do not expose sensitive internal contact details unnecessarily."
+                ]
+            },
+
+            // --- Cloud / Storage ---
+            "CLOUD_STORAGE_BUCKET": {
+                title: "Cloud Storage Bucket",
+                intro: _defaultIntro,
+                items: [
+                    "Confirm the bucket belongs to your organization and is documented in your cloud asset inventory.",
+                    "Verify access controls — ensure the bucket is not publicly accessible unless explicitly intended.",
+                    "Review bucket contents for sensitive data (PII, credentials, backups, logs).",
+                    "Enable access logging and monitoring to detect unauthorized access attempts."
+                ]
+            },
+            "CLOUD_STORAGE_BUCKET_OPEN": {
+                title: "Open Cloud Storage Bucket",
+                intro: _defaultIntro,
+                items: [
+                    "Restrict access immediately — open buckets are a critical data exposure risk.",
+                    "Audit the bucket contents to determine what data was publicly accessible and for how long.",
+                    "Implement bucket policies and IAM controls to enforce least-privilege access.",
+                    "Enable cloud security posture management (CSPM) to detect future misconfigurations automatically."
+                ]
+            },
+
+            // --- Hosting & Providers ---
+            "PROVIDER_HOSTING": {
+                title: "Hosting Provider",
+                intro: _defaultIntro,
+                items: [
+                    "Confirm the hosting provider is authorized and documented in your vendor registry.",
+                    "Assess the provider's security posture — certifications, SLA, and incident response capabilities.",
+                    "Verify that hosting arrangements comply with data residency and regulatory requirements.",
+                    "Monitor for hosting provider changes that could indicate unauthorized infrastructure migration."
+                ]
+            },
+            "PROVIDER_JAVASCRIPT": {
+                title: "JavaScript Provider",
+                intro: _defaultIntro,
+                items: [
+                    "Identify all third-party JavaScript libraries loaded from external providers.",
+                    "Assess supply chain risk — compromised JS providers can inject malicious code into your site.",
+                    "Implement Subresource Integrity (SRI) hashes for all externally loaded scripts.",
+                    "Consider self-hosting critical JavaScript dependencies to reduce third-party risk."
+                ]
+            },
+            "PROVIDER_TELCO": {
+                title: "Telecommunications Provider",
+                intro: _defaultIntro,
+                items: [
+                    "Confirm the telco provider is associated with known organizational infrastructure.",
+                    "Verify that the provider relationship is documented in your vendor management system.",
+                    "Assess any implications for network security, data routing, or regulatory compliance.",
+                    "Monitor for provider changes that could affect service continuity or security."
+                ]
+            },
+
+            // --- Domains Extended ---
+            "INTERNET_NAME_UNRESOLVED": {
+                title: "Unresolved Internet Name",
+                intro: _defaultIntro,
+                items: [
+                    "Investigate why the hostname does not resolve — decommissioned server, DNS misconfiguration, or expired domain.",
+                    "Check for dangling DNS records (CNAME, A, AAAA) that could enable subdomain takeover.",
+                    "Remove stale DNS records pointing to decommissioned infrastructure.",
+                    "Update internal documentation and asset inventories to reflect the current state."
+                ]
+            },
+            "SIMILARDOMAIN": {
+                title: "Similar Domain",
+                intro: _defaultIntro,
+                items: [
+                    "Assess whether the similar domain is a typosquat, phishing domain, or brand impersonation attempt.",
+                    "Check the domain's content and registration details for malicious intent.",
+                    "Initiate a domain dispute or takedown request if the domain is being used maliciously.",
+                    "Register common typosquat variants of your primary domains to prevent future abuse."
+                ]
+            },
+            "SIMILARDOMAIN_WHOIS": {
+                title: "Similar Domain WHOIS",
+                intro: _defaultIntro,
+                items: [
+                    "Review WHOIS data to determine who registered the similar domain.",
+                    "Compare registration dates and registrant details to assess whether the domain is a targeted attack.",
+                    "Use registrant information to identify patterns — the same actor may have registered multiple lookalike domains.",
+                    "Preserve WHOIS data as evidence if legal action or a domain dispute is warranted."
+                ]
+            },
+
+            // --- SSL Certificates ---
+            "SSL_CERTIFICATE_EXPIRED": {
+                title: "Expired SSL Certificate",
+                intro: _defaultIntro,
+                items: [
+                    "Renew or replace the expired certificate immediately — expired certs break trust and may block user access.",
+                    "Investigate why the certificate was not renewed before expiration — fix the process gap.",
+                    "Implement automated certificate management (e.g., Let's Encrypt, ACME) to prevent future lapses.",
+                    "Audit all certificates for upcoming expirations and set up monitoring alerts."
+                ]
+            },
+            "SSL_CERTIFICATE_RAW": {
+                title: "SSL Certificate Raw Data",
+                intro: _defaultIntro,
+                items: [
+                    "Review the certificate details: issuer, subject, SANs, validity period, and key strength.",
+                    "Verify the certificate is issued by a trusted CA and uses strong cryptographic parameters (RSA 2048+ or ECDSA).",
+                    "Check SANs for hostnames that should not be publicly associated with your organization.",
+                    "Ensure the certificate chain is complete and properly configured on the server."
+                ]
+            },
+
+            // --- URLs Extended ---
+            "URL_ADBLOCKED_EXTERNAL": {
+                title: "Ad-Blocked External URL",
+                intro: _defaultIntro,
+                items: [
+                    "Investigate why the external URL is on ad-block lists — it may be serving malicious ads or tracking scripts.",
+                    "Assess whether your site depends on resources from the blocked URL that affect functionality.",
+                    "Remove or replace references to ad-blocked external URLs to ensure consistent user experience.",
+                    "Review all third-party ad and tracking integrations for security and privacy compliance."
+                ]
+            },
+            "URL_ADBLOCKED_INTERNAL": {
+                title: "Ad-Blocked Internal URL",
+                intro: _defaultIntro,
+                items: [
+                    "Determine why an internal URL is appearing on ad-block lists — false positive or actual ad/tracking behavior.",
+                    "If legitimate functionality is being blocked, adjust URL naming conventions to avoid triggering filters.",
+                    "Review the internal URL's content and behavior to ensure it does not violate privacy expectations.",
+                    "Test site functionality with popular ad blockers to identify user experience impacts."
+                ]
+            },
+            "URL_FLASH": {
+                title: "Flash URL",
+                intro: _defaultIntro,
+                items: [
+                    "Flash content is end-of-life and a significant security risk — plan immediate removal or migration.",
+                    "Identify all Flash-dependent functionality and prioritize conversion to HTML5 or modern alternatives.",
+                    "Block Flash execution at the browser and endpoint level if not already enforced.",
+                    "Remove Flash files (.swf) from web servers and update any pages that reference them."
+                ]
+            },
+            "URL_FLASH_HISTORIC": {
+                title: "Historic Flash URL",
+                intro: _defaultIntro,
+                items: [
+                    "Verify whether the Flash content is still accessible or has been removed from the server.",
+                    "If still present, remove Flash files immediately — they represent a known attack vector.",
+                    "Check web archives and backups for residual Flash content that may have been missed.",
+                    "Document the migration away from Flash as complete in your remediation tracker."
+                ]
+            },
+            "URL_FORM_HISTORIC": {
+                title: "Historic Form URL",
+                intro: _defaultIntro,
+                items: [
+                    "Check whether the historic form URL is still accessible and functioning.",
+                    "If the form is active, verify it has proper input validation, CSRF protection, and access controls.",
+                    "Remove or redirect deprecated form endpoints to prevent abuse.",
+                    "Review form submissions logs for any unauthorized or suspicious activity."
+                ]
+            },
+            "URL_JAVASCRIPT_HISTORIC": {
+                title: "Historic JavaScript URL",
+                intro: _defaultIntro,
+                items: [
+                    "Verify whether the historic JavaScript file is still served and referenced by any pages.",
+                    "If present, audit the script for vulnerabilities, outdated libraries, or malicious modifications.",
+                    "Remove unused JavaScript files from the server to reduce the attack surface.",
+                    "Ensure any active JavaScript files are covered by Content Security Policy (CSP) directives."
+                ]
+            },
+            "URL_JAVA_APPLET": {
+                title: "Java Applet URL",
+                intro: _defaultIntro,
+                items: [
+                    "Java applets are deprecated and a significant security risk — plan immediate removal.",
+                    "Identify the business functionality the applet provides and migrate to a modern alternative.",
+                    "Block Java applet execution at the browser and endpoint policy level.",
+                    "Remove applet files from the web server and update referencing pages."
+                ]
+            },
+            "URL_JAVA_APPLET_HISTORIC": {
+                title: "Historic Java Applet URL",
+                intro: _defaultIntro,
+                items: [
+                    "Verify whether the Java applet file is still present on the server.",
+                    "Remove any residual applet files and references from web pages and server directories.",
+                    "Confirm that no active functionality depends on the historic Java applet.",
+                    "Document the removal in your remediation tracker."
+                ]
+            },
+            "URL_STATIC_HISTORIC": {
+                title: "Historic Static URL",
+                intro: _defaultIntro,
+                items: [
+                    "Check whether the historic static resource is still accessible on the server.",
+                    "Remove outdated static files that could contain sensitive information or outdated libraries.",
+                    "Verify that no active pages reference the historic static content.",
+                    "Implement a static asset lifecycle policy to clean up obsolete resources regularly."
+                ]
+            },
+            "URL_UPLOAD_HISTORIC": {
+                title: "Historic Upload URL",
+                intro: _defaultIntro,
+                items: [
+                    "Verify whether the upload endpoint is still active — exposed upload forms are a common attack vector.",
+                    "If active, ensure proper file type validation, size limits, antivirus scanning, and access controls.",
+                    "Remove or disable deprecated upload endpoints immediately.",
+                    "Review server directories for any malicious files uploaded through the historic endpoint."
+                ]
+            },
+            "URL_WEB_FRAMEWORK_HISTORIC": {
+                title: "Historic Web Framework URL",
+                intro: _defaultIntro,
+                items: [
+                    "Check whether the historic web framework URL exposes version information or debug interfaces.",
+                    "Remove or restrict access to framework-specific endpoints (e.g., admin panels, debug consoles, status pages).",
+                    "Ensure the web framework is updated to a supported version if still in use.",
+                    "Audit for known vulnerabilities specific to the detected framework version."
+                ]
+            },
+
+            // --- Web / HTTP ---
+            "TARGET_WEB_COOKIE": {
+                title: "Web Cookie",
+                intro: _defaultIntro,
+                items: [
+                    "Review cookie attributes: ensure Secure, HttpOnly, and SameSite flags are set appropriately.",
+                    "Check for cookies containing sensitive data (session tokens, PII) without proper protection.",
+                    "Verify cookie expiration times are reasonable — avoid excessively long-lived session cookies.",
+                    "Ensure compliance with privacy regulations (GDPR, CCPA) regarding cookie consent and tracking."
+                ]
+            },
+            "WEBSERVER_BANNER": {
+                title: "Web Server Banner",
+                intro: _defaultIntro,
+                items: [
+                    "Assess what information the server banner discloses — software name, version, OS details.",
+                    "Suppress or generalize server banners to limit reconnaissance value for attackers.",
+                    "Ensure disclosed software versions are current and patched.",
+                    "Standardize banner suppression across all web-facing servers."
+                ]
+            },
+            "WEBSERVER_HTTPHEADERS": {
+                title: "Web Server HTTP Headers",
+                intro: _defaultIntro,
+                items: [
+                    "Review all HTTP response headers for security best practices (CSP, HSTS, X-Frame-Options, X-Content-Type-Options).",
+                    "Remove headers that leak sensitive information (X-Powered-By, Server version details).",
+                    "Ensure security headers are consistently applied across all web-facing endpoints.",
+                    "Test header configurations using tools like securityheaders.com for compliance validation."
+                ]
+            },
+            "ERROR_MESSAGE": {
+                title: "Error Message",
+                intro: _defaultIntro,
+                items: [
+                    "Review exposed error messages for sensitive information disclosure (stack traces, file paths, database details).",
+                    "Implement custom error pages that provide user-friendly messages without technical details.",
+                    "Ensure error handling in application code does not expose internal system information.",
+                    "Log detailed error information server-side while presenting sanitized messages to users."
+                ]
+            },
+            "SEARCH_ENGINE_WEB_CONTENT": {
+                title: "Search Engine Web Content",
+                intro: _defaultIntro,
+                items: [
+                    "Review what content search engines have indexed — look for sensitive pages, documents, or internal resources.",
+                    "Use robots.txt and meta noindex directives to prevent indexing of sensitive content.",
+                    "Request removal of sensitive cached content from search engines using their webmaster tools.",
+                    "Monitor search engine results regularly for newly indexed sensitive content."
+                ]
+            },
+
+            // --- Linked URLs ---
+            "LINKED_URL_INTERNAL": {
+                title: "Linked Internal URL",
+                intro: _defaultIntro,
+                items: [
+                    "Verify all linked internal URLs resolve correctly and do not expose unintended resources.",
+                    "Check for internal URLs that reference development, staging, or admin environments.",
+                    "Remove or restrict links to internal resources that should not be publicly discoverable.",
+                    "Ensure internal URL structures do not reveal sensitive application architecture details."
+                ]
+            },
+            "LINKED_URL_EXTERNAL": {
+                title: "Linked External URL",
+                intro: _defaultIntro,
+                items: [
+                    "Verify all linked external URLs point to legitimate, trusted destinations.",
+                    "Check for links to compromised, deprecated, or malicious external sites.",
+                    "Assess supply chain risk from external resources loaded by your pages (scripts, stylesheets, fonts).",
+                    "Monitor external link targets periodically for domain expiration or content changes."
+                ]
+            },
+
+            // --- Raw Data ---
+            "RAW_DNS_RECORDS": {
+                title: "Raw DNS Records",
+                intro: _defaultIntro,
+                items: [
+                    "Review all DNS records for accuracy — remove stale, orphaned, or unauthorized entries.",
+                    "Check for records that expose internal infrastructure (e.g., internal hostnames, private IPs in TXT records).",
+                    "Verify DNSSEC is enabled to protect against DNS spoofing and cache poisoning.",
+                    "Document the complete DNS record set in your asset inventory for baseline comparison."
+                ]
+            },
+            "RAW_FILE_META_DATA": {
+                title: "Raw File Metadata",
+                intro: _defaultIntro,
+                items: [
+                    "Review file metadata for sensitive information — author names, internal paths, software versions, GPS coordinates.",
+                    "Strip metadata from documents before publishing (use tools like ExifTool or mat2).",
+                    "Implement metadata removal as part of your document publishing workflow.",
+                    "Audit publicly accessible documents periodically for unintended metadata exposure."
+                ]
+            },
+            "RAW_RIR_DATA": {
+                title: "Raw RIR Data",
+                intro: _defaultIntro,
+                items: [
+                    "Review RIR (Regional Internet Registry) data for accuracy of your organization's registered resources.",
+                    "Verify contact information, network allocations, and abuse contacts are current.",
+                    "Flag any discrepancies between RIR records and your internal network documentation.",
+                    "Ensure sensitive operational details are not unnecessarily exposed in RIR remarks or descriptions."
+                ]
+            },
+            "BASE64_DATA": {
+                title: "Base64 Encoded Data",
+                intro: _defaultIntro,
+                items: [
+                    "Decode and review the Base64 content to determine what data is being encoded.",
+                    "Check for sensitive data hidden in Base64 encoding (credentials, API keys, PII, configuration data).",
+                    "Investigate the source and purpose of the encoded data — is it a legitimate application feature or data leakage?",
+                    "Remove or secure any Base64-encoded sensitive data found in publicly accessible resources."
+                ]
+            },
+
+            // --- Ports ---
+            "UDP_PORT_OPEN": {
+                title: "Open UDP Port",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the open UDP port is intentional and the associated service is required.",
+                    "Assess risk — open UDP ports are often targeted for amplification attacks (DNS, NTP, SNMP, memcached).",
+                    "Apply firewall rules to restrict UDP port access to only authorized sources.",
+                    "Disable or close unnecessary UDP services and monitor for abuse."
+                ]
+            },
+            "UDP_PORT_OPEN_INFO": {
+                title: "Open UDP Port Info",
+                intro: _defaultIntro,
+                items: [
+                    "Review the service details running on the open UDP port.",
+                    "Check for version information that could reveal known vulnerabilities.",
+                    "Ensure the service is patched, properly configured, and access-restricted.",
+                    "Suppress service banners and version strings to limit reconnaissance value."
+                ]
+            },
+
+            // --- AI Extended ---
+            "AI_AGENT_TOOL_EXPOSED": {
+                title: "AI Agent Tool Exposed",
+                intro: _defaultIntro,
+                items: [
+                    "Assess what tools and capabilities are exposed through the AI agent interface.",
+                    "Restrict access immediately — exposed agent tools can be abused for unauthorized actions.",
+                    "Implement authentication, authorization, and human-in-the-loop controls for all agent tool invocations.",
+                    "Audit logs for any unauthorized tool executions that occurred while the tool was exposed."
+                ]
+            },
+            "AI_ANOMALY_DETECTED": {
+                title: "AI Anomaly Detected",
+                intro: _defaultIntro,
+                items: [
+                    "Review the anomaly details to understand what deviation from normal behavior was detected.",
+                    "Investigate the root cause — is this a false positive, misconfiguration, or genuine security incident?",
+                    "Correlate the anomaly with other data sources (logs, alerts, network traffic) for context.",
+                    "Tune AI detection models based on validated findings to reduce false positives and improve accuracy."
+                ]
+            },
+            "AI_CROSS_SCAN_CORRELATION": {
+                title: "AI Cross-Scan Correlation",
+                intro: _defaultIntro,
+                items: [
+                    "Review the correlated findings across multiple scans to understand the broader pattern.",
+                    "Prioritize remediation based on the combined risk picture — correlated findings often indicate systemic issues.",
+                    "Investigate whether the correlation reveals a persistent threat or ongoing campaign.",
+                    "Use the correlation data to improve your detection rules and scanning configurations."
+                ]
+            },
+            "AI_IOC_CORRELATION": {
+                title: "AI IOC Correlation",
+                intro: _defaultIntro,
+                items: [
+                    "Validate the correlated indicators of compromise (IOCs) against known threat intelligence sources.",
+                    "Assess the confidence level — are the correlated IOCs from reliable sources and recent?",
+                    "Block confirmed malicious IOCs at your perimeter and endpoint security controls.",
+                    "Share validated IOCs with your threat intelligence sharing community (ISACs, STIX/TAXII feeds)."
+                ]
+            },
+            "AI_NLP_ANALYSIS": {
+                title: "AI NLP Analysis",
+                intro: _defaultIntro,
+                items: [
+                    "Review the NLP analysis results for accuracy — AI-generated text analysis can produce false positives.",
+                    "Assess the security implications of the analyzed content (e.g., sensitive data in documents, threat mentions).",
+                    "Use NLP findings as leads for further manual investigation, not as definitive conclusions.",
+                    "Provide feedback on NLP accuracy to improve future analysis quality."
+                ]
+            },
+            "AI_RAG_DATA_EXPOSED": {
+                title: "AI RAG Data Exposed",
+                intro: _defaultIntro,
+                items: [
+                    "Identify what data is accessible through the exposed RAG (Retrieval-Augmented Generation) system.",
+                    "Restrict access immediately — exposed RAG systems can leak sensitive documents and knowledge bases.",
+                    "Implement access controls and query filtering to prevent unauthorized data retrieval.",
+                    "Audit the RAG data sources to ensure only approved content is indexed and retrievable."
+                ]
+            },
+            "AI_SINGLE_SCAN_CORRELATION": {
+                title: "AI Single-Scan Correlation",
+                intro: _defaultIntro,
+                items: [
+                    "Review the correlated findings within the scan to understand relationships between discovered assets and issues.",
+                    "Prioritize findings that appear connected — correlated issues may indicate a single root cause.",
+                    "Use the correlation to build a more complete picture of the target's attack surface.",
+                    "Document correlation patterns to improve future scan analysis and triage efficiency."
+                ]
+            },
+            "AI_THREAT_PREDICTION": {
+                title: "AI Threat Prediction",
+                intro: _defaultIntro,
+                items: [
+                    "Evaluate the threat prediction against current threat intelligence and your organization's risk profile.",
+                    "Treat predictions as early warnings — proactively strengthen defenses for predicted threat vectors.",
+                    "Cross-reference predictions with actual incidents and near-misses for validation.",
+                    "Adjust security priorities based on validated threat predictions that align with observed trends."
+                ]
+            },
+            "AI_THREAT_SCORE": {
+                title: "AI Threat Score",
+                intro: _defaultIntro,
+                items: [
+                    "Review the threat score methodology — understand what factors contribute to the calculated score.",
+                    "Use threat scores for prioritization, not as absolute risk measurements.",
+                    "Compare scores across assets to identify your highest-risk targets for remediation.",
+                    "Validate high scores with manual analysis before committing significant remediation resources."
+                ]
+            },
+            "AI_THREAT_SIGNATURE": {
+                title: "AI Threat Signature",
+                intro: _defaultIntro,
+                items: [
+                    "Validate the detected threat signature against known threat intelligence databases.",
+                    "Assess the confidence level and false positive rate of the AI-generated signature.",
+                    "Deploy confirmed signatures to your detection infrastructure (IDS/IPS, SIEM, EDR).",
+                    "Monitor for evasion attempts that may bypass the detected signature pattern."
+                ]
+            },
+            "AI_TRAINING_DATA_EXPOSED": {
+                title: "AI Training Data Exposed",
+                intro: _defaultIntro,
+                items: [
+                    "Identify what training data is exposed and assess its sensitivity (PII, proprietary data, trade secrets).",
+                    "Restrict access to the training data immediately — exposed training data can reveal model biases and weaknesses.",
+                    "Investigate how the training data became accessible (misconfigured storage, API leak, model inversion).",
+                    "Implement data access controls and monitor for unauthorized access to AI training datasets."
+                ]
+            },
+
+            // --- Misc ---
+            "COMPANY_NAME": {
+                title: "Company Name",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the company name matches the expected target organization and its known subsidiaries.",
+                    "Check for unauthorized use of the company name in domains, social media, or business registrations.",
+                    "Assess brand impersonation risk if the company name appears in unexpected contexts.",
+                    "Document all discovered company name references in your attack surface inventory."
+                ]
+            },
+            "COUNTRY_NAME": {
+                title: "Country Name",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the country association is accurate for the related asset (IP, domain, hosting).",
+                    "Assess data residency implications — ensure data handling complies with local regulations (GDPR, data sovereignty).",
+                    "Flag assets located in high-risk jurisdictions or sanctioned countries for additional review.",
+                    "Document geographic distribution of assets for compliance and incident response planning."
+                ]
+            },
+            "FOURCHAN_POST": {
+                title: "4chan Post",
+                intro: _defaultIntro,
+                items: [
+                    "Analyze the post content for sensitive organizational data, threat discussions, or targeting information.",
+                    "Assess the credibility and recency of the post — 4chan content may be unreliable or outdated.",
+                    "If sensitive data is exposed, initiate incident response and identify the source of the leak.",
+                    "Monitor the thread and related boards for follow-up posts or escalation."
+                ]
+            },
+            "JUNK_FILE": {
+                title: "Junk File",
+                intro: _defaultIntro,
+                items: [
+                    "Identify and remove junk files from web servers (backup files, temp files, editor artifacts like .swp, ~, .bak).",
+                    "Check junk files for sensitive content — backup and temp files often contain credentials or configuration data.",
+                    "Implement web server rules to block access to common junk file extensions.",
+                    "Add junk file detection to your deployment pipeline to prevent accidental publication."
+                ]
+            },
+            "PROXY_HOST": {
+                title: "Proxy Host",
+                intro: _defaultIntro,
+                items: [
+                    "Determine if the proxy is an authorized organizational asset or an external anonymizing service.",
+                    "Assess the risk — traffic through unknown proxies may be intercepted or manipulated.",
+                    "If the proxy is unauthorized, investigate why organizational traffic is being routed through it.",
+                    "Ensure authorized proxies have proper logging, access controls, and TLS inspection capabilities."
+                ]
+            },
+            "TOR_EXIT_NODE": {
+                title: "Tor Exit Node",
+                intro: _defaultIntro,
+                items: [
+                    "Determine if the Tor exit node is associated with your infrastructure — this could indicate compromise or misconfiguration.",
+                    "Assess whether traffic from Tor exit nodes should be allowed, rate-limited, or blocked at your perimeter.",
+                    "Review access logs for suspicious activity originating from the identified Tor exit node.",
+                    "Implement CAPTCHA or enhanced authentication for requests from known Tor exit nodes if appropriate."
+                ]
+            },
+            "VPN_HOST": {
+                title: "VPN Host",
+                intro: _defaultIntro,
+                items: [
+                    "Determine if the VPN host is an authorized organizational VPN endpoint or a third-party service.",
+                    "If third-party, assess why organizational assets are associated with an external VPN provider.",
+                    "Verify that authorized VPN endpoints are properly configured with strong encryption and authentication.",
+                    "Monitor for unauthorized VPN services that may be used to bypass security controls."
+                ]
+            },
+            "WEB_ANALYTICS_ID": {
+                title: "Web Analytics ID",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the analytics ID belongs to your organization's official analytics account.",
+                    "Use the analytics ID to discover other sites sharing the same tracking code — these may be related assets.",
+                    "Check for unauthorized use of your analytics ID on sites you do not control.",
+                    "Ensure analytics data collection complies with privacy regulations and cookie consent requirements."
+                ]
+            },
+            "WIFI_ACCESS_POINT": {
+                title: "WiFi Access Point",
+                intro: _defaultIntro,
+                items: [
+                    "Verify the WiFi access point belongs to your organization and is in your network asset inventory.",
+                    "Check for rogue access points that could be used for evil twin or MITM attacks.",
+                    "Ensure the access point uses WPA3 or WPA2-Enterprise with proper authentication.",
+                    "Review access point placement and signal strength to minimize exposure beyond your physical perimeter."
+                ]
+            },
+            "WIKIPEDIA_PAGE_EDIT": {
+                title: "Wikipedia Page Edit",
+                intro: _defaultIntro,
+                items: [
+                    "Review the edit content to determine if organizational information was added, modified, or removed.",
+                    "Assess whether the edit reveals internal information that should not be public.",
+                    "If edits were made from organizational IP addresses, review your acceptable use policies.",
+                    "Monitor the organization's Wikipedia page for vandalism or unauthorized edits."
+                ]
             }
         };
 
@@ -3121,7 +4407,22 @@
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>TAG</div><div class='assets-detail-card-value'>" + (a.tag ? tagHtml : '-') + "</div></div>";
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>DATE ADDED</div><div class='assets-detail-card-value'>" + d.toLocaleDateString() + "</div></div>";
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>ADDED BY</div><div class='assets-detail-card-value'>" + (a.added_by || '-') + "</div></div>";
-                        html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>NOTES</div><div class='assets-detail-card-value'>" + (a.notes ? $('<span>').text(a.notes).html() : '-') + "</div></div>";
+
+                        // FOUND IN card — links to DATA tab filtered by element type
+                        var sfTypes = knownAssetTypeToSfTypes(a.asset_type);
+                        var foundInHtml = "";
+                        for (var fi = 0; fi < sfTypes.length; fi++) {
+                            if (fi > 0) foundInHtml += " &nbsp; ";
+                            foundInHtml += "<a class='assets-found-in-link' onclick='dataEventData(\"" + instanceId + "\", \"" + sfTypes[fi][1] + "\", \"" + sfTypes[fi][0] + "\", \"full\")'>" + sfTypes[fi][1].toUpperCase() + "</a>";
+                        }
+                        html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>FOUND IN</div><div class='assets-detail-card-value'>" + (foundInHtml || '-') + "</div></div>";
+
+                        // NOTES card — click to edit inline
+                        html += "<div class='assets-detail-card assets-notes-card' data-asset-id='" + a.id + "' onclick='knownEditNotes(this, " + a.id + ")'>";
+                        html += "<div class='assets-detail-card-label'>NOTES</div>";
+                        html += "<div class='assets-detail-card-value assets-notes-value'>" + (a.notes ? $('<span>').text(a.notes).html() : "<span class='assets-notes-placeholder'>CLICK TO ADD NOTES</span>") + "</div>";
+                        html += "</div>";
+
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>FULL VALUE</div><div class='assets-detail-card-value' style='word-break:break-all;'>" + safeValue + "</div></div>";
                         html += "</div></td></tr>";
                     }
@@ -3364,10 +4665,10 @@
             }
             knownKebabActiveId = assetId;
 
-            // Position dropdown relative to the button
+            // Position dropdown relative to the button (use getBoundingClientRect
+            // since the dropdown is position:fixed and needs viewport coordinates)
             var $btn = $(btn);
-            var offset = $btn.offset();
-            var btnH = $btn.outerHeight();
+            var rect = btn.getBoundingClientRect();
 
             // Populate affinity toggle label based on current row data
             var $row = $("tr.assets-known-row[data-asset-id='" + assetId + "']");
@@ -3380,15 +4681,20 @@
             knownPopulateKebabTags(currentTag);
 
             $dd.css({
-                top: offset.top + btnH + 4,
-                left: offset.left - 160 + $btn.outerWidth(),
+                top: rect.bottom + 4,
+                left: rect.right - 200,
                 display: 'block'
             });
 
             // Adjust if dropdown goes off-screen right
             var ddWidth = $dd.outerWidth();
-            if (offset.left - 160 + $btn.outerWidth() + ddWidth > $(window).width()) {
-                $dd.css('left', offset.left - ddWidth + $btn.outerWidth());
+            if (rect.right - 200 + ddWidth > $(window).width()) {
+                $dd.css('left', rect.right - ddWidth);
+            }
+            // Adjust if dropdown goes off-screen bottom
+            var ddHeight = $dd.outerHeight();
+            if (rect.bottom + 4 + ddHeight > $(window).height()) {
+                $dd.css('top', rect.top - ddHeight - 4);
             }
         }
 
@@ -3449,6 +4755,55 @@
             knownAssetAction(id, 'reset');
         }
 
+        // ---- ASSET TYPE → SF DATA TYPE MAPPING ----
+        function knownAssetTypeToSfTypes(assetType) {
+            var map = {
+                'ip': [['IP_ADDRESS', 'IP Address'], ['IPV6_ADDRESS', 'IPv6 Address']],
+                'domain': [['DOMAIN_NAME', 'Domain Name'], ['INTERNET_NAME', 'Internet Name']],
+                'email': [['EMAILADDR', 'Email Address']],
+                'human_name': [['HUMAN_NAME', 'Human Name']]
+            };
+            return map[assetType] || [];
+        }
+
+        // ---- INLINE NOTES EDITING ----
+        function knownEditNotes(card, assetId) {
+            // Prevent row toggle
+            event.stopPropagation();
+
+            var $card = $(card);
+            // Don't re-enter edit mode if already editing
+            if ($card.find('.assets-notes-textarea').length) return;
+
+            var $val = $card.find('.assets-notes-value');
+            var currentText = $val.find('.assets-notes-placeholder').length ? '' : $val.text().trim();
+
+            var editHtml = "<textarea class='assets-notes-textarea' rows='3' placeholder='Add notes...'>" + $('<span>').text(currentText).html() + "</textarea>";
+            editHtml += "<div class='assets-notes-actions'>";
+            editHtml += "<button class='assets-notes-save-btn' onclick='knownSaveNotes(event, this, " + assetId + ")'>SAVE</button>";
+            editHtml += "<button class='assets-notes-cancel-btn' onclick='knownCancelNotes(event, this)'>CANCEL</button>";
+            editHtml += "</div>";
+
+            // Store original content for cancel
+            $card.data('original-html', $val.html());
+            $val.html(editHtml);
+            $val.find('.assets-notes-textarea').focus();
+        }
+
+        function knownSaveNotes(e, btn, assetId) {
+            e.stopPropagation();
+            var $card = $(btn).closest('.assets-notes-card');
+            var newVal = $card.find('.assets-notes-textarea').val().trim();
+            knownUpdateAssetProperty(assetId, 'notes', newVal);
+        }
+
+        function knownCancelNotes(e, btn) {
+            e.stopPropagation();
+            var $card = $(btn).closest('.assets-notes-card');
+            var $val = $card.find('.assets-notes-value');
+            $val.html($card.data('original-html'));
+        }
+
         function knownUpdateAssetProperty(id, prop, val) {
             var params = {id: id};
             params[prop] = val;
@@ -3480,6 +4835,19 @@
                             $(this).find('.assets-detail-card-value').html("<span class='assets-affinity-badge " + affinityClass + "'>" + affinityLabel + "</span>");
                         }
                     });
+                }
+            } else if (prop === 'notes') {
+                // Update notes card in detail row
+                if ($detailRow.length) {
+                    var $notesCard = $detailRow.find('.assets-notes-card');
+                    if ($notesCard.length) {
+                        var $notesVal = $notesCard.find('.assets-notes-value');
+                        if (val) {
+                            $notesVal.html($('<span>').text(val).html());
+                        } else {
+                            $notesVal.html("<span class='assets-notes-placeholder'>CLICK TO ADD NOTES</span>");
+                        }
+                    }
                 }
             } else if (prop === 'tag') {
                 $row.data('asset-tag', val).attr('data-asset-tag', val);
@@ -5835,6 +7203,36 @@
             grid += "</div>"; // end right column
             grid += "</div>"; // end row 1
 
+            // === ROW 1.5: SNAPSHOT — Security Posture Trend (hidden until data loads) ===
+            grid += "<div class='row' id='snapshot-row' style='display:none;'>";
+            grid += "<div class='col-sm-12'>";
+            grid += "<div class='panel panel-default' style='border: 1px solid var(--glass-border); background: var(--bg-secondary);'>";
+            grid += "<div class='panel-heading' style='display:flex; justify-content:space-between; align-items:center;'>";
+            grid += "<span><i class='glyphicon glyphicon-stats'></i>&nbsp;&nbsp;SNAPSHOT &mdash; SECURITY POSTURE TREND</span>";
+            grid += "<span id='snapshot-trajectory-badge' style='font-family:var(--font-mono);font-size:11px;letter-spacing:1px;'></span>";
+            grid += "</div>";
+            grid += "<div class='panel-body' style='padding:0;'>";
+
+            // Chart + Key Metrics side by side
+            grid += "<div class='row' style='margin:0;'>";
+            // D3 Line Chart area
+            grid += "<div class='col-sm-8' style='padding:15px;'>";
+            grid += "<div id='snapshot-chart' style='width:100%;height:280px;position:relative;'></div>";
+            grid += "<div id='snapshot-legend' style='display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;'></div>";
+            grid += "</div>";
+            // Key Metrics grid
+            grid += "<div class='col-sm-4' style='padding:15px;'>";
+            grid += "<div id='snapshot-metrics' style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;'></div>";
+            grid += "</div>";
+            grid += "</div>";
+
+            // Comparison table
+            grid += "<div style='padding:0 15px 15px 15px;'>";
+            grid += "<div id='snapshot-table-container' style='overflow-x:auto;'></div>";
+            grid += "</div>";
+
+            grid += "</div></div></div></div>"; // end panel, col, row 1.5
+
             // === ROW 2: Four intel panels across (equal width) ===
             grid += "<div class='row intel-row'>";
             grid += "<div class='col-sm-3'>";
@@ -6236,6 +7634,28 @@
                 }
             );
 
+            // SNAPSHOT trend data loader
+            dataloaders.push(function() {
+                sf.fetchData('${docroot}/scantrend', {'id': instanceId}, function(trendData) {
+                    if (trendData && trendData.snapshots && trendData.snapshots.length > 1) {
+                        $('#snapshot-row').show();
+                        renderSnapshotChart(trendData, instanceId);
+                        renderSnapshotMetrics(trendData);
+                        renderSnapshotTable(trendData, instanceId);
+                        injectDeltaBadges(trendData);
+                        // Update trajectory badge in header
+                        var tj = trendData.trajectory || 'stable';
+                        var tjColor = tj === 'improving' ? '#22c55e' : (tj === 'degrading' ? '#ef4444' : '#6b7280');
+                        var tjArrow = tj === 'improving' ? '&#x25B2;' : (tj === 'degrading' ? '&#x25BC;' : '&#x25C6;');
+                        $('#snapshot-trajectory-badge').html(
+                            "<span style='color:" + tjColor + ";'>" + tjArrow + " " + tj.toUpperCase() + "</span>"
+                        );
+                    }
+                }, function() {
+                    // Error or no data - keep hidden
+                });
+            });
+
             loadersrunning = true;
             for (var i = 0; i < dataloaders.length; i++) {
                 dataloaders[i]();
@@ -6252,6 +7672,446 @@
                 renderGradePanel(data, iid);
                 btn.prop('disabled', false).find('i').removeClass('glyphicon-spin');
             });
+        }
+
+        // ===== SNAPSHOT RENDERING FUNCTIONS =====
+
+        // Category color map for trend chart lines
+        var snapshotCategoryColors = {
+            'Network Security': '#dc2626',
+            'Web App Security': '#ea580c',
+            'Information Leakage': '#eab308',
+            'General Health': '#3b82f6',
+            'External Account Exposure': '#06b6d4',
+            'DNS Health': '#22c55e',
+            'IP Reputation': '#d946ef',
+            'AI Security': '#8b5cf6',
+            'Information / Reference': '#6b7280'
+        };
+
+        // Resolve CSS variable values for use in D3 SVG attributes (CSS vars don't work in SVG fill/stroke)
+        function cssVar(name) {
+            return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        }
+
+        function renderSnapshotChart(trendData, instanceId) {
+            var container = document.getElementById('snapshot-chart');
+            if (!container || !trendData.snapshots || trendData.snapshots.length < 2) return;
+
+            var snaps = trendData.snapshots;
+            var margin = {top: 20, right: 20, bottom: 40, left: 45};
+            var width = container.offsetWidth - margin.left - margin.right;
+            var height = 280 - margin.top - margin.bottom;
+
+            // Clear any previous chart
+            d3.select('#snapshot-chart').selectAll('*').remove();
+
+            var svg = d3.select('#snapshot-chart').append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+            // Parse dates and scores
+            var parseDate = function(d) { return new Date(d); };
+            var xExtent = d3.extent(snaps, function(d) { return parseDate(d.date); });
+            var x = d3.time.scale().domain(xExtent).range([0, width]);
+            var y = d3.scale.linear().domain([0, 100]).range([height, 0]);
+
+            // Grade band backgrounds
+            var gradeBands = [
+                {min: 90, max: 100, color: 'rgba(34, 197, 94, 0.06)', label: 'A'},
+                {min: 80, max: 90, color: 'rgba(59, 130, 246, 0.06)', label: 'B'},
+                {min: 70, max: 80, color: 'rgba(245, 158, 11, 0.06)', label: 'C'},
+                {min: 60, max: 70, color: 'rgba(249, 115, 22, 0.06)', label: 'D'},
+                {min: 0, max: 60, color: 'rgba(239, 68, 68, 0.06)', label: 'F'}
+            ];
+
+            gradeBands.forEach(function(band) {
+                svg.append('rect')
+                    .attr('x', 0).attr('y', y(band.max))
+                    .attr('width', width).attr('height', y(band.min) - y(band.max))
+                    .attr('fill', band.color);
+                svg.append('text')
+                    .attr('x', width + 5).attr('y', y((band.min + band.max) / 2) + 4)
+                    .style('font-size', '9px').style('fill', cssVar('--text-muted'))
+                    .style('font-family', 'var(--font-mono)').text(band.label);
+            });
+
+            // Grade threshold lines
+            [90, 80, 70, 60].forEach(function(threshold) {
+                svg.append('line')
+                    .attr('x1', 0).attr('y1', y(threshold))
+                    .attr('x2', width).attr('y2', y(threshold))
+                    .attr('stroke', cssVar('--glass-border')).attr('stroke-width', 0.5)
+                    .attr('stroke-dasharray', '3,3');
+            });
+
+            // X axis
+            var xAxis = d3.svg.axis().scale(x).orient('bottom')
+                .ticks(Math.min(snaps.length, 8))
+                .tickFormat(d3.time.format('%b %d'));
+            svg.append('g')
+                .attr('transform', 'translate(0,' + height + ')')
+                .call(xAxis)
+                .selectAll('text')
+                .style('font-size', '9px').style('fill', cssVar('--text-secondary'))
+                .style('font-family', 'var(--font-mono)');
+
+            // Y axis
+            var yAxis = d3.svg.axis().scale(y).orient('left').ticks(5);
+            svg.append('g').call(yAxis)
+                .selectAll('text')
+                .style('font-size', '9px').style('fill', cssVar('--text-secondary'))
+                .style('font-family', 'var(--font-mono)');
+
+            // Style axis paths
+            svg.selectAll('.domain').attr('stroke', cssVar('--glass-border'));
+            svg.selectAll('.tick line').attr('stroke', cssVar('--glass-border'));
+
+            // Split snapshots into active (non-excluded) and all
+            var activeSnaps = snaps.filter(function(d) { return !d.excluded; });
+
+            // Overall line with area fill (only active snapshots)
+            var overallLine = d3.svg.line()
+                .x(function(d) { return x(parseDate(d.date)); })
+                .y(function(d) { return y(d.overall_score); })
+                .interpolate('monotone');
+
+            var overallArea = d3.svg.area()
+                .x(function(d) { return x(parseDate(d.date)); })
+                .y0(height)
+                .y1(function(d) { return y(d.overall_score); })
+                .interpolate('monotone');
+
+            var latestActive = activeSnaps.length > 0 ? activeSnaps[activeSnaps.length - 1] : snaps[snaps.length - 1];
+            var gc = gradeGlowColor(latestActive.overall_grade);
+
+            if (activeSnaps.length > 0) {
+                svg.append('path')
+                    .datum(activeSnaps)
+                    .attr('d', overallArea)
+                    .attr('fill', gc.text).attr('opacity', 0.15);
+
+                svg.append('path')
+                    .datum(activeSnaps)
+                    .attr('d', overallLine)
+                    .attr('fill', 'none').attr('stroke', gc.text)
+                    .attr('stroke-width', 3).attr('class', 'snapshot-line-overall');
+            }
+
+            // Data points for overall — active as filled, excluded as hollow
+            svg.selectAll('.snapshot-dot-overall')
+                .data(snaps).enter().append('circle')
+                .attr('class', 'snapshot-dot-overall')
+                .attr('cx', function(d) { return x(parseDate(d.date)); })
+                .attr('cy', function(d) { return y(d.overall_score); })
+                .attr('r', function(d) { return d.excluded ? 3 : 4; })
+                .attr('fill', function(d) { return d.excluded ? 'none' : gc.text; })
+                .attr('stroke', function(d) { return d.excluded ? gc.text : '#fff'; })
+                .attr('stroke-width', function(d) { return d.excluded ? 1 : 1.5; })
+                .attr('stroke-dasharray', function(d) { return d.excluded ? '2,2' : 'none'; })
+                .style('opacity', function(d) { return d.excluded ? 0.4 : 1; })
+                .style('cursor', 'pointer')
+                .on('click', function(d) {
+                    window.location.hash = '#id=' + d.scan_id + '&tab=summary';
+                    location.reload();
+                })
+                .append('title').text(function(d) {
+                    var dt = new Date(d.date);
+                    var prefix = d.excluded ? '[EXCLUDED] ' : '';
+                    return prefix + dt.toLocaleDateString() + ' - ' + d.overall_grade + ' (' + d.overall_score.toFixed(1) + ')';
+                });
+
+            // Category lines (dashed, toggleable)
+            var categoryNames = [];
+            var allCats = snaps[snaps.length - 1].categories || {};
+            for (var catName in allCats) {
+                if (allCats[catName].weight > 0) categoryNames.push(catName);
+            }
+
+            var catLineVisibility = {};
+            categoryNames.forEach(function(catName) {
+                catLineVisibility[catName] = false; // hidden by default
+
+                var catLine = d3.svg.line()
+                    .x(function(d) { return x(parseDate(d.date)); })
+                    .y(function(d) {
+                        var cats = d.categories || {};
+                        return y(cats[catName] ? cats[catName].score : 0);
+                    })
+                    .interpolate('monotone');
+
+                svg.append('path')
+                    .datum(snaps)
+                    .attr('d', catLine)
+                    .attr('fill', 'none')
+                    .attr('stroke', snapshotCategoryColors[catName] || '#6b7280')
+                    .attr('stroke-width', 1.5)
+                    .attr('stroke-dasharray', '5,3')
+                    .attr('class', 'snapshot-cat-line')
+                    .attr('data-category', catName)
+                    .style('display', 'none');
+            });
+
+            // Legend
+            var legendEl = document.getElementById('snapshot-legend');
+            if (!legendEl) return;
+            legendEl.innerHTML = '';
+
+            // Overall toggle (always visible)
+            var overallLegend = document.createElement('span');
+            overallLegend.style.cssText = 'cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid ' + gc.text + ';color:' + gc.text + ';background:var(--bg-tertiary);';
+            overallLegend.innerHTML = '&#9679; Overall';
+            overallLegend.setAttribute('data-active', 'true');
+            overallLegend.onclick = function() {
+                var active = this.getAttribute('data-active') === 'true';
+                this.setAttribute('data-active', active ? 'false' : 'true');
+                this.style.opacity = active ? '0.3' : '1';
+                d3.selectAll('.snapshot-line-overall, .snapshot-dot-overall').style('display', active ? 'none' : null);
+            };
+            legendEl.appendChild(overallLegend);
+
+            categoryNames.forEach(function(catName) {
+                var color = snapshotCategoryColors[catName] || '#6b7280';
+                var el = document.createElement('span');
+                el.style.cssText = 'cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid ' + color + ';color:var(--text-muted);opacity:0.5;';
+                el.innerHTML = '&#9679; ' + catName;
+                el.setAttribute('data-active', 'false');
+                el.setAttribute('data-cat', catName);
+                el.onclick = function() {
+                    var active = this.getAttribute('data-active') === 'true';
+                    this.setAttribute('data-active', active ? 'false' : 'true');
+                    this.style.opacity = active ? '0.5' : '1';
+                    this.style.color = active ? 'var(--text-muted)' : color;
+                    d3.selectAll('.snapshot-cat-line[data-category="' + catName + '"]').style('display', active ? 'none' : null);
+                };
+                legendEl.appendChild(el);
+            });
+        }
+
+        function renderSnapshotMetrics(trendData) {
+            var container = document.getElementById('snapshot-metrics');
+            if (!container || !trendData.deltas) return;
+
+            var d = trendData.deltas;
+            var cards = [];
+
+            // 1. Overall Change
+            var oc = d.overall_change || 0;
+            var ocColor = oc > 0 ? '#22c55e' : (oc < 0 ? '#ef4444' : '#6b7280');
+            var ocArrow = oc > 0 ? '&#x25B2;' : (oc < 0 ? '&#x25BC;' : '&#x25C6;');
+            cards.push({label: 'CHANGE', value: (oc > 0 ? '+' : '') + oc.toFixed(1), color: ocColor, icon: ocArrow});
+
+            // 2. Resolved Types
+            var resolved = (d.since_previous && d.since_previous.resolved_finding_types) ? d.since_previous.resolved_finding_types.length : 0;
+            cards.push({label: 'RESOLVED', value: resolved, color: '#22c55e', icon: '&#x2713;'});
+
+            // 3. New Types
+            var newTypes = (d.since_previous && d.since_previous.new_finding_types) ? d.since_previous.new_finding_types.length : 0;
+            cards.push({label: 'NEW', value: newTypes, color: newTypes > 0 ? '#f59e0b' : '#6b7280', icon: '&#x2605;'});
+
+            // 4. Trajectory
+            var tj = d.trajectory || 'stable';
+            var tjColor = tj === 'improving' ? '#22c55e' : (tj === 'degrading' ? '#ef4444' : '#6b7280');
+            var tjArrow = tj === 'improving' ? '&#x25B2;' : (tj === 'degrading' ? '&#x25BC;' : '&#x25C6;');
+            cards.push({label: 'TREND', value: tj.toUpperCase().substring(0, 6), color: tjColor, icon: tjArrow});
+
+            // 5. Worst Category
+            var wc = d.worst_category;
+            if (wc) {
+                var wcGc = gradeGlowColor(wc.grade);
+                cards.push({label: 'WORST', value: wc.grade, sublabel: wc.name.substring(0, 12), color: wcGc.text, icon: ''});
+            } else {
+                cards.push({label: 'WORST', value: '-', color: '#6b7280', icon: ''});
+            }
+
+            // 6. Best Category
+            var bc = d.best_category;
+            if (bc) {
+                var bcGc = gradeGlowColor(bc.grade);
+                cards.push({label: 'BEST', value: bc.grade, sublabel: bc.name.substring(0, 12), color: bcGc.text, icon: ''});
+            } else {
+                cards.push({label: 'BEST', value: '-', color: '#6b7280', icon: ''});
+            }
+
+            var html = '';
+            cards.forEach(function(card) {
+                html += "<div style='background:var(--bg-tertiary);border:1px solid var(--glass-border);border-radius:6px;padding:10px 8px;text-align:center;'>";
+                html += "<div style='font-size:22px;font-weight:700;color:" + card.color + ";font-family:var(--font-mono);line-height:1;'>";
+                if (card.icon) html += "<span style='font-size:12px;'>" + card.icon + "</span> ";
+                html += card.value + "</div>";
+                html += "<div style='font-size:9px;color:var(--text-muted);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:1px;margin-top:4px;'>" + card.label + "</div>";
+                if (card.sublabel) {
+                    html += "<div style='font-size:8px;color:var(--text-secondary);font-family:var(--font-mono);margin-top:2px;'>" + card.sublabel + "</div>";
+                }
+                html += "</div>";
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderSnapshotTable(trendData, instanceId) {
+            var container = document.getElementById('snapshot-table-container');
+            if (!container || !trendData.snapshots || trendData.snapshots.length < 2) return;
+
+            var snaps = trendData.snapshots;
+            // Show last 8 scans max
+            var displaySnaps = snaps.slice(-8);
+
+            // Collect all categories with weight > 0
+            var categories = [];
+            var lastCats = displaySnaps[displaySnaps.length - 1].categories || {};
+            for (var catName in lastCats) {
+                if (lastCats[catName].weight > 0) categories.push(catName);
+            }
+
+            var html = "<table style='width:100%;font-family:var(--font-mono);font-size:11px;border-collapse:collapse;'>";
+
+            // Header row with scan dates
+            html += "<thead><tr>";
+            html += "<th style='text-align:left;padding:6px 10px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);min-width:140px;'>CATEGORY</th>";
+            displaySnaps.forEach(function(s) {
+                var dt = new Date(s.date);
+                var dateStr = (dt.getMonth() + 1) + '/' + dt.getDate();
+                var isCurrent = (s.scan_id === instanceId);
+                var isExcluded = s.excluded ? true : false;
+                var dateStyle = isExcluded ? 'text-decoration:line-through;opacity:0.4;' : '';
+                html += "<th style='text-align:center;padding:6px 8px;color:" + (isCurrent ? 'var(--text-primary)' : 'var(--text-muted)') + ";border-bottom:1px solid var(--glass-border);min-width:50px;font-weight:" + (isCurrent ? '700' : '400') + ";'>";
+                html += "<span style='" + dateStyle + "'>" + dateStr + "</span>";
+                html += "</th>";
+            });
+            html += "<th style='text-align:center;padding:6px 8px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);min-width:40px;'>TREND</th>";
+            html += "</tr></thead><tbody>";
+
+            // Category rows
+            categories.forEach(function(catName) {
+                var color = snapshotCategoryColors[catName] || '#6b7280';
+                html += "<tr>";
+                html += "<td style='padding:5px 10px;border-bottom:1px solid var(--glass-border);'>";
+                html += "<span style='display:inline-block;width:3px;height:12px;background:" + color + ";border-radius:1px;margin-right:6px;vertical-align:middle;'></span>";
+                html += "<span style='color:var(--text-secondary);'>" + catName + "</span></td>";
+
+                var firstScore = null, latestScore = null;
+                displaySnaps.forEach(function(s) {
+                    var isExcluded = s.excluded ? true : false;
+                    var cats = s.categories || {};
+                    var catData = cats[catName];
+                    var grade = catData ? catData.grade : '-';
+                    var score = catData ? catData.score : 0;
+                    if (!isExcluded) {
+                        if (firstScore === null && catData) firstScore = score;
+                        if (catData) latestScore = score;
+                    }
+                    var gc = gradeGlowColor(grade);
+                    var colOpacity = isExcluded ? 'opacity:0.3;' : '';
+                    html += "<td style='text-align:center;padding:5px 8px;border-bottom:1px solid var(--glass-border);" + colOpacity + "'>";
+                    html += "<span style='display:inline-block;width:28px;height:22px;line-height:22px;border-radius:3px;font-size:11px;font-weight:600;color:" + gc.text + ";background:var(--bg-tertiary);border:1px solid " + gc.text + ";'>" + grade + "</span>";
+                    html += "</td>";
+                });
+
+                // Trend indicator (only from non-excluded scans)
+                var change = (firstScore !== null && latestScore !== null) ? latestScore - firstScore : 0;
+                var trendSymbol, trendColor;
+                if (change >= 10) { trendSymbol = '&#x25B2;&#x25B2;'; trendColor = '#22c55e'; }
+                else if (change >= 2) { trendSymbol = '&#x25B2;'; trendColor = '#22c55e'; }
+                else if (change <= -10) { trendSymbol = '&#x25BC;&#x25BC;'; trendColor = '#ef4444'; }
+                else if (change <= -2) { trendSymbol = '&#x25BC;'; trendColor = '#f59e0b'; }
+                else { trendSymbol = '&#x25C6;'; trendColor = '#6b7280'; }
+
+                html += "<td style='text-align:center;padding:5px 8px;border-bottom:1px solid var(--glass-border);color:" + trendColor + ";font-size:10px;'>" + trendSymbol + "</td>";
+                html += "</tr>";
+            });
+
+            // Overall row (bold separator)
+            html += "<tr style='border-top:2px solid var(--glass-border);'>";
+            html += "<td style='padding:6px 10px;font-weight:700;color:var(--text-primary);'>Overall</td>";
+            var firstOverall = null, latestOverall = null;
+            displaySnaps.forEach(function(s) {
+                var isExcluded = s.excluded ? true : false;
+                var grade = s.overall_grade || '-';
+                var score = s.overall_score || 0;
+                if (!isExcluded) {
+                    if (firstOverall === null) firstOverall = score;
+                    latestOverall = score;
+                }
+                var gc = gradeGlowColor(grade);
+                var isCurrent = (s.scan_id === instanceId);
+                var colOpacity = isExcluded ? 'opacity:0.3;' : '';
+                html += "<td style='text-align:center;padding:6px 8px;" + colOpacity + "'>";
+                html += "<span style='display:inline-block;width:28px;height:22px;line-height:22px;border-radius:3px;font-size:12px;font-weight:700;color:" + gc.text + ";background:" + (isCurrent && !isExcluded ? 'var(--bg-elevated)' : 'var(--bg-tertiary)') + ";border:1px solid " + gc.text + ";box-shadow:" + (isCurrent && !isExcluded ? '0 0 8px ' + gc.glow : 'none') + ";'>" + grade + "</span>";
+                html += "</td>";
+            });
+
+            var overallChange = (latestOverall !== null && firstOverall !== null) ? latestOverall - firstOverall : 0;
+            var otSymbol, otColor;
+            if (overallChange >= 10) { otSymbol = '&#x25B2;&#x25B2;'; otColor = '#22c55e'; }
+            else if (overallChange >= 2) { otSymbol = '&#x25B2;'; otColor = '#22c55e'; }
+            else if (overallChange <= -10) { otSymbol = '&#x25BC;&#x25BC;'; otColor = '#ef4444'; }
+            else if (overallChange <= -2) { otSymbol = '&#x25BC;'; otColor = '#f59e0b'; }
+            else { otSymbol = '&#x25C6;'; otColor = '#6b7280'; }
+
+            html += "<td style='text-align:center;padding:6px 8px;color:" + otColor + ";font-size:12px;font-weight:700;'>" + otSymbol + "</td>";
+            html += "</tr></tbody></table>";
+
+            container.innerHTML = html;
+        }
+
+        function injectDeltaBadges(trendData) {
+            if (!trendData || !trendData.deltas || !trendData.deltas.since_previous) return;
+
+            var sp = trendData.deltas.since_previous;
+            var scoreChange = sp.score_change || 0;
+            if (scoreChange === 0) return;
+
+            var badgeColor = scoreChange > 0 ? '#22c55e' : '#ef4444';
+            var badgeText = (scoreChange > 0 ? '+' : '') + scoreChange.toFixed(1) + ' since last scan';
+
+            // Wait for grade panel to render, then inject badge
+            setTimeout(function() {
+                var gradeCircle = document.querySelector('#grade-panel-body');
+                if (!gradeCircle) return;
+
+                // Find the score display and add delta badge after it
+                var scoreEl = gradeCircle.querySelector('[id^="grade-overall-score"]');
+                if (!scoreEl) {
+                    // Try to find by looking at the overall score text
+                    var allSpans = gradeCircle.querySelectorAll('span, div');
+                    for (var i = 0; i < allSpans.length; i++) {
+                        if (allSpans[i].textContent.match(/OVERALL SECURITY RATING/i)) {
+                            scoreEl = allSpans[i];
+                            break;
+                        }
+                    }
+                }
+
+                if (scoreEl) {
+                    var badge = document.createElement('div');
+                    badge.style.cssText = 'text-align:center;margin-top:4px;';
+                    badge.innerHTML = "<span style='font-family:var(--font-mono);font-size:10px;color:" + badgeColor + ";background:rgba(0,0,0,0.3);padding:2px 8px;border-radius:10px;letter-spacing:0.5px;'>" + badgeText + "</span>";
+                    scoreEl.parentNode.insertBefore(badge, scoreEl.nextSibling);
+                }
+
+                // Inject per-category deltas
+                var catDeltas = trendData.deltas.category_deltas || {};
+                for (var catName in catDeltas) {
+                    var cd = catDeltas[catName];
+                    if (Math.abs(cd.change) < 1) continue;
+                    var cdColor = cd.change > 0 ? '#22c55e' : '#ef4444';
+                    var cdText = (cd.change > 0 ? '+' : '') + cd.change.toFixed(0);
+                    // Find category cards in the grade panel and inject small delta
+                    var catHeaders = gradeCircle.querySelectorAll('[data-category-name]');
+                    for (var j = 0; j < catHeaders.length; j++) {
+                        if (catHeaders[j].getAttribute('data-category-name') === catName) {
+                            var deltaSpan = document.createElement('span');
+                            deltaSpan.style.cssText = 'font-size:9px;color:' + cdColor + ';margin-left:6px;font-family:var(--font-mono);';
+                            deltaSpan.textContent = '(' + cdText + ')';
+                            catHeaders[j].appendChild(deltaSpan);
+                            break;
+                        }
+                    }
+                }
+            }, 2000); // Wait for grade panel to load
         }
 
         // Grade color map
@@ -6333,7 +8193,7 @@
                 // Left: color bar + name + mini badge
                 h += "<div style='display:flex;align-items:center;gap:10px;flex:1;'>";
                 h += "<div style='width:4px;height:28px;border-radius:2px;background:" + cat.color + ";flex-shrink:0;'></div>";
-                h += "<span style='font-weight:600;font-size:13px;color:var(--text-primary);text-transform:uppercase;font-family:var(--font-mono);letter-spacing:0.5px;'>" + catName + "</span>";
+                h += "<span data-category-name='" + catName + "' style='font-weight:600;font-size:13px;color:var(--text-primary);text-transform:uppercase;font-family:var(--font-mono);letter-spacing:0.5px;'>" + catName + "</span>";
                 // Mini grade badge with glow
                 h += "<span style='display:inline-block;width:26px;height:22px;line-height:22px;text-align:center;border-radius:4px;font-family:var(--font-mono);font-size:11px;font-weight:700;color:#fff;background:" + cc.grad + ";box-shadow:0 0 8px " + cc.glow + ";text-shadow:0 0 6px rgba(255,255,255,0.7);'>" + cat.grade + "</span>";
                 h += "</div>";
@@ -9167,6 +11027,17 @@
             sf.fetchData('${docroot}/scanopts', {'id': instanceId}, function(data) {
                 var table = "<div id='scansummary-content'>";
 
+                // SNAPSHOT Trend — exclude/include scans from posture trend
+                table += "<div class='manage-section'>";
+                table += "<div class='manage-section-header collapsed' onclick='toggleManageSection(this)'>";
+                table += "<i class='glyphicon glyphicon-chevron-right section-chevron'></i>";
+                table += "<h4><i class='glyphicon glyphicon-stats'></i>&nbsp;SNAPSHOT Trend</h4>";
+                table += "</div>";
+                table += "<div class='manage-section-body' style='display:none'>";
+                table += "<p class='text-muted small' style='margin-bottom:12px;'>Choose which scans contribute to the SNAPSHOT security posture trend for this target. Exclude test scans or partial runs to keep the trend accurate.</p>";
+                table += "<div id='snapshot-exclusion-list'><div style='text-align:center;padding:15px;'><img src=\"${docroot}/static/img/loader.gif\"></div></div>";
+                table += "</div></div>";
+
                 // Meta Information - collapsible, collapsed by default
                 table += "<div class='manage-section'>";
                 table += "<div class='manage-section-header collapsed' onclick='toggleManageSection(this)'>";
@@ -9266,6 +11137,85 @@
 
                 $("#loader").fadeOut(500);
                 $("#mainbody").append(table);
+
+                // Load SNAPSHOT exclusion list
+                loadSnapshotExclusionList(instanceId);
+            });
+        }
+
+        function loadSnapshotExclusionList(instanceId) {
+            var container = document.getElementById('snapshot-exclusion-list');
+            if (!container) return;
+
+            sf.fetchData('${docroot}/scantrend', {id: instanceId}, function(trendData) {
+                if (!trendData || !trendData.snapshots || trendData.snapshots.length === 0) {
+                    container.innerHTML = "<p class='text-muted' style='padding:10px;'>No snapshots available for this target.</p>";
+                    return;
+                }
+
+                var snaps = trendData.snapshots;
+                var html = "<table class='table table-bordered table-striped' style='font-family:var(--font-mono);font-size:12px;margin-bottom:0;'>";
+                html += "<thead><tr><th style='width:40px;'>Include</th><th>Scan Name</th><th>Date</th><th>Grade</th><th>Score</th><th style='width:100px;'>Scan Status</th><th style='width:100px;'>Trend</th></tr></thead><tbody>";
+
+                snaps.forEach(function(s) {
+                    var isExcluded = s.excluded ? true : false;
+                    var isCurrent = (s.scan_id === instanceId);
+                    var dt = new Date(s.date);
+                    var dateStr = dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                    var gc = gradeGlowColor(s.overall_grade);
+                    var rowStyle = isExcluded ? 'opacity:0.5;' : '';
+                    var currentBadge = isCurrent ? " <span class='label label-info' style='font-size:9px;'>CURRENT</span>" : '';
+                    var scanName = s.scan_name || s.scan_id.substring(0, 8);
+                    var scanStatus = s.scan_status || '';
+                    var statusColor = scanStatus === 'FINISHED' ? '#22c55e' : (scanStatus === 'ABORTED' ? '#f59e0b' : '#ef4444');
+
+                    html += "<tr style='" + rowStyle + "'>";
+                    html += "<td style='text-align:center;vertical-align:middle;'>";
+                    html += "<input type='checkbox' class='snapshot-exclude-cb' data-scan-id='" + s.scan_id + "' " + (isExcluded ? '' : 'checked') + " style='cursor:pointer;width:16px;height:16px;'>";
+                    html += "</td>";
+                    html += "<td>" + scanName + currentBadge + "</td>";
+                    html += "<td>" + dateStr + "</td>";
+                    html += "<td style='text-align:center;'><span style='display:inline-block;width:28px;height:22px;line-height:22px;border-radius:3px;font-size:11px;font-weight:700;color:" + gc.text + ";background:var(--bg-tertiary);border:1px solid " + gc.text + ";'>" + s.overall_grade + "</span></td>";
+                    html += "<td style='text-align:center;'>" + s.overall_score.toFixed(1) + "</td>";
+                    html += "<td style='text-align:center;'><span style='color:" + statusColor + ";'>" + scanStatus + "</span></td>";
+                    html += "<td style='text-align:center;'>" + (isExcluded ? "<span class='text-muted'>Excluded</span>" : "<span style='color:#22c55e;'>Included</span>") + "</td>";
+                    html += "</tr>";
+                });
+
+                html += "</tbody></table>";
+                container.innerHTML = html;
+
+                // Wire up checkbox toggle handlers
+                container.querySelectorAll('.snapshot-exclude-cb').forEach(function(cb) {
+                    cb.addEventListener('change', function() {
+                        var scanId = this.getAttribute('data-scan-id');
+                        var newExcluded = this.checked ? 0 : 1;
+                        var checkbox = this;
+                        var wasChecked = !this.checked;
+                        checkbox.disabled = true;
+                        $.ajax({
+                            type: 'POST',
+                            url: '${docroot}/snapshotexclude',
+                            data: {id: scanId, excluded: String(newExcluded)},
+                            dataType: 'json',
+                            timeout: 15000
+                        }).done(function(resp) {
+                            checkbox.disabled = false;
+                            if (resp && resp.success) {
+                                loadSnapshotExclusionList(instanceId);
+                            } else {
+                                checkbox.checked = wasChecked;
+                                alertify.error('Failed to update: ' + (resp && resp.message ? resp.message : 'unknown error'));
+                            }
+                        }).fail(function(xhr, status, err) {
+                            checkbox.disabled = false;
+                            checkbox.checked = wasChecked;
+                            alertify.error('Request failed: ' + (err || status));
+                        });
+                    });
+                });
+            }, function() {
+                container.innerHTML = "<p class='text-muted' style='padding:10px;'>Failed to load snapshot data.</p>";
             });
         }
 

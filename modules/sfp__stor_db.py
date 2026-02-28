@@ -78,6 +78,9 @@ class sfp__stor_db(SpiderFootPlugin):
 
         truncateSize = self.opts['maxstorage'] if self.opts['maxstorage'] != 0 and len(sfEvent.data) > self.opts['maxstorage'] else 0
 
+        # Check if the event was flagged as a target-level false positive
+        fp_flag = getattr(sfEvent, '_falsePositive', 0)
+
         self.debug("Storing an event: " + sfEvent.eventType)
 
         # Retry with backoff for transient database errors (e.g. "database is locked").
@@ -89,9 +92,9 @@ class sfp__stor_db(SpiderFootPlugin):
             try:
                 if truncateSize:
                     self.__sfdb__.scanEventStore(
-                        self.getScanId(), sfEvent, truncateSize)
+                        self.getScanId(), sfEvent, truncateSize, false_positive=fp_flag)
                 else:
-                    self.__sfdb__.scanEventStore(self.getScanId(), sfEvent)
+                    self.__sfdb__.scanEventStore(self.getScanId(), sfEvent, false_positive=fp_flag)
                 return  # success
             except IOError as e:
                 err_str = str(e)

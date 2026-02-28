@@ -156,6 +156,10 @@ class SpiderFootScanner():
             self.__setStatus("ERROR-FAILED", None, time.time() * 1000)
             raise ValueError(f"Invalid target: {e}") from None
 
+        # Target-level FP suppression sets (populated at scan start)
+        self.__targetFps = set()
+        self.__targetFpTypeData = set()
+
         # Save the config current set for this scan
         self.__config['_modulesenabled'] = self.__moduleList
         self.__dbh.scanConfigSet(
@@ -451,6 +455,17 @@ class SpiderFootScanner():
             self.__moduleInstances = OrderedDict(
                 sorted(self.__moduleInstances.items(), key=lambda m: m[-1]._priority))
 
+            # Pre-load target-level false positives for suppression
+            try:
+                fpSet = self.__dbh.targetFalsePositivesForTarget(self.__targetValue)
+                self.__targetFps = fpSet
+                for (et, ed, sd) in fpSet:
+                    self.__targetFpTypeData.add((et, ed))
+                if self.__targetFpTypeData:
+                    self.__sf.status(f"Loaded {len(self.__targetFpTypeData)} target-level FP suppressions.")
+            except Exception:
+                pass  # Non-fatal — scan proceeds without suppression
+
             # Now we are ready to roll..
             self.__setStatus("RUNNING")
 
@@ -526,6 +541,11 @@ class SpiderFootScanner():
                 except Exception as e:
                     self.__sf.error(f"Scan [{self.__scanId}] tracking inheritance failed: {e}")
 
+                try:
+                    self._captureGradeSnapshot()
+                except Exception as e:
+                    self.__sf.error(f"Scan [{self.__scanId}] grade snapshot failed: {e}")
+
                 self.__sf.status(f"Scan [{self.__scanId}] completed.")
             else:
                 # Scan failed or was aborted - ensure it has a terminal status
@@ -575,6 +595,120 @@ class SpiderFootScanner():
         aggregator = ResultAggregator()
         agg_count = aggregator.aggregate(list(results.values()), method='count')
         self.__sf.status(f"Correlated {agg_count} results for scan {self.__scanId}")
+
+    def _captureGradeSnapshot(self) -> None:
+        """Capture and store a grade snapshot for the completed scan."""
+        from spiderfoot.grade_config import calculate_full_grade, load_grade_config_overrides
+
+        # Query event type counts (same logic as sfwebui._calculateScanGrade)
+        qry = """SELECT r.type,
+            count(CASE WHEN CAST(r.false_positive AS INTEGER) = 0 THEN 1 END) AS unval_total,
+            count(DISTINCT CASE WHEN CAST(r.false_positive AS INTEGER) = 0 THEN r.data END) AS unval_unique,
+            count(*) AS all_total,
+            count(DISTINCT r.data) AS all_unique
+            FROM tbl_scan_results r
+            WHERE r.scan_instance_id = ?
+            GROUP BY r.type ORDER BY r.type"""
+
+        with self.__dbh.dbhLock:
+            self.__dbh.dbh.execute(qry, [self.__scanId])
+            scan_data = self.__dbh.dbh.fetchall()
+
+        event_type_counts = {}
+        total_findings = 0
+        unique_findings = 0
+        for row in scan_data:
+            event_type = row[0]
+            if event_type == 'ROOT':
+                continue
+            all_total = row[3]
+            total_findings += row[1]
+            unique_findings += row[2]
+            event_type_counts[event_type] = {
+                'total': row[1],
+                'unique': row[2],
+                'all_total': all_total,
+                'all_unique': row[4],
+                'existed': all_total > 0,
+            }
+
+        # Include Nessus vulnerability counts
+        try:
+            nessus_results = self.__dbh.scanNessusList(self.__scanId)
+            if nessus_results:
+                ne_crit = sum(1 for r in nessus_results if r[1] == 'Critical' and (not r[18] or r[18] == 0))
+                ne_high = sum(1 for r in nessus_results if r[1] == 'High' and (not r[18] or r[18] == 0))
+                ne_med = sum(1 for r in nessus_results if r[1] == 'Medium' and (not r[18] or r[18] == 0))
+                open_total = ne_crit + ne_high + ne_med
+                event_type_counts['EXTERNAL_VULNERABILITIES'] = {
+                    'total': open_total, 'unique': open_total,
+                    'crit': ne_crit, 'high': ne_high, 'med': ne_med,
+                    'existed': True,
+                }
+        except Exception:
+            pass
+
+        # Include Burp vulnerability counts
+        try:
+            burp_results = self.__dbh.scanBurpList(self.__scanId)
+            if burp_results:
+                wa_high = sum(1 for r in burp_results if r[1] == 'High' and (not r[18] or r[18] == 0))
+                wa_med = sum(1 for r in burp_results if r[1] == 'Medium' and (not r[18] or r[18] == 0))
+                wa_low = sum(1 for r in burp_results if r[1] == 'Low' and (not r[18] or r[18] == 0))
+                open_total = wa_high + wa_med + wa_low
+                event_type_counts['WEBAPP_VULNERABILITIES'] = {
+                    'total': open_total, 'unique': open_total,
+                    'crit': 0, 'high': wa_high, 'med': wa_med,
+                    'existed': True,
+                }
+        except Exception:
+            pass
+
+        # Calculate grade
+        config_overrides = load_grade_config_overrides(self.__config)
+        grade_data = calculate_full_grade(event_type_counts, config_overrides)
+
+        if not grade_data or not grade_data.get('enabled', True):
+            return
+
+        # Get scan metadata
+        scan_info = self.__dbh.scanInstanceGet(self.__scanId)
+        if not scan_info:
+            return
+
+        target = scan_info[1]  # seed_target
+        scan_started = int(scan_info[3] * 1000) if scan_info[3] else 0  # convert back to ms
+        scan_ended = int(scan_info[4] * 1000) if scan_info[4] else int(time.time() * 1000)
+
+        # Get correlation severity counts
+        try:
+            corr_counts = self.__dbh.scanCorrelationSeverityCounts(self.__scanId)
+        except Exception:
+            corr_counts = None
+
+        # Store the snapshot
+        self.__dbh.gradeSnapshotStore(
+            self.__scanId, target, grade_data,
+            total_findings, unique_findings, corr_counts,
+            scan_started, scan_ended
+        )
+
+        self.__sf.status(
+            f"Scan [{self.__scanId}] grade snapshot captured: "
+            f"{grade_data.get('overall_grade', '-')} ({grade_data.get('overall_score', 0):.1f})")
+
+    def _isTargetFalsePositive(self, sfEvent) -> bool:
+        """Check if an event matches a target-level false positive.
+
+        Args:
+            sfEvent (SpiderFootEvent): event to check
+
+        Returns:
+            bool: True if the event matches a known FP
+        """
+        if not self.__targetFpTypeData:
+            return False
+        return (sfEvent.eventType, sfEvent.data) in self.__targetFpTypeData
 
     def waitForThreads(self) -> None:
         """Wait for threads.
@@ -642,6 +776,11 @@ class SpiderFootScanner():
                     raise TypeError(
                         f"sfEvent is {type(sfEvent)}; expected SpiderFootEvent")
 
+                # Check if this event is a known target-level FP
+                isFp = self._isTargetFalsePositive(sfEvent)
+                if isFp:
+                    sfEvent._falsePositive = 1
+
                 # for every module
                 for mod in self.__moduleInstances.values():
                     # if it's been aborted
@@ -653,6 +792,9 @@ class SpiderFootScanner():
                     if not mod.errorState and mod.incomingEventQueue is not None:
                         watchedEvents = mod.watchedEvents()
                         if sfEvent.eventType in watchedEvents or "*" in watchedEvents:
+                            # FP events only go to storage modules — suppress cascade
+                            if isFp and "__stor" not in mod.__name__:
+                                continue
                             mod.incomingEventQueue.put(deepcopy(sfEvent))
 
         finally:
