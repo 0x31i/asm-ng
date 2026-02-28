@@ -7036,13 +7036,24 @@ class SpiderFootWebUi:
                         snapshot_data = None
                         try:
                             target = scan_info.get('target', '')
+                            self.log.info(f"Full report: snapshot fetch for target={target!r}")
                             if target:
                                 # Get all finished scans for this target
                                 all_scans = dbh.scanInstanceList()
+                                self.log.info(f"Full report: total scans in DB={len(all_scans)}")
+
+                                # Debug: log first scan's structure to verify column indices
+                                if all_scans:
+                                    s0 = all_scans[0]
+                                    self.log.info(f"Full report: sample scan row len={len(s0)} "
+                                                  f"cols: [0]={s0[0]!r} [2]={s0[2]!r} [6]={s0[6]!r}")
+
                                 target_scans = [
                                     s for s in all_scans
                                     if s[2] == target and s[6] in ('FINISHED', 'ABORTED')
                                 ]
+                                self.log.info(f"Full report: target_scans for {target!r} = {len(target_scans)}")
+
                                 # Sort oldest first (by started timestamp)
                                 target_scans.sort(key=lambda s: s[4] or 0)
 
@@ -7064,9 +7075,10 @@ class SpiderFootWebUi:
                                                     for cn, cd in ts_grade.get('categories', {}).items()
                                                 },
                                             })
-                                        except Exception:
-                                            pass
+                                        except Exception as ge:
+                                            self.log.warning(f"Full report: grade calc failed for {ts[0]}: {ge}")
 
+                                    self.log.info(f"Full report: graded snapshots={len(snapshots)}")
                                     if len(snapshots) >= 2:
                                         first = snapshots[0]
                                         latest = snapshots[-1]
@@ -7096,6 +7108,11 @@ class SpiderFootWebUi:
                                             'best_category': best_cat,
                                             'scan_count': len(snapshots),
                                         }
+                                        self.log.info(f"Full report: snapshot_data built OK — "
+                                                      f"{len(snapshots)} scans, change={overall_change}, trend={trajectory}")
+                                else:
+                                    self.log.info(f"Full report: skipping snapshot panel — "
+                                                  f"need >=2 scans, have {len(target_scans)}")
                         except Exception as e:
                             self.log.warning(f"Full report: snapshot data fetch failed: {e}")
 
