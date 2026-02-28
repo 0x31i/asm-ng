@@ -1220,10 +1220,22 @@ def build_findings_sheet(ws, findings_rows: list):
     set_tab_color(ws, '000000')
 
     headers = ['Priority', 'Category', 'Tab', 'Item', 'Description', 'Recommendation']
-    apply_header_row(ws, headers)
-    freeze_header(ws)
 
-    for row_num, row_data in enumerate(findings_rows, 2):
+    # Title banner
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
+    title = ws['A1']
+    title.value = f'FINDINGS  ({len(findings_rows)} results)'
+    title.font = Font(name='Calibri', size=12, bold=True, color='FFFFFFFF')
+    title.fill = HEADER_FILL
+    title.alignment = Alignment(horizontal='left', vertical='center')
+    for c in range(2, len(headers) + 1):
+        ws.cell(row=1, column=c).fill = HEADER_FILL
+    ws.row_dimensions[1].height = 28
+
+    apply_header_row(ws, headers, row=2)
+    freeze_header(ws, row=3)
+
+    for row_num, row_data in enumerate(findings_rows, 3):
         for col_num, cell_value in enumerate(row_data, 1):
             cell = ws.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
             cell.font = DATA_FONT
@@ -1237,10 +1249,10 @@ def build_findings_sheet(ws, findings_rows: list):
 
     # Alternating rows
     if findings_rows:
-        apply_alternating_rows(ws, 2, len(findings_rows) + 1)
+        apply_alternating_rows(ws, 3, len(findings_rows) + 2)
 
     # Excel Table for sort/filter
-    add_data_table(ws, header_row=1, num_data_rows=len(findings_rows), num_columns=len(headers))
+    add_data_table(ws, header_row=2, num_data_rows=len(findings_rows), num_columns=len(headers))
 
     col_widths = [12, 22, 18, 40, 50, 50]
     for i, w in enumerate(col_widths, 1):
@@ -1261,10 +1273,22 @@ def build_correlations_sheet(ws, correlation_rows: list):
     set_tab_color(ws, '374151')
 
     headers = ['Correlation', 'Rule Name', 'Risk', 'Description', 'Rule Logic', 'Event Count', 'Event Types']
-    apply_header_row(ws, headers)
-    freeze_header(ws)
 
-    for row_num, row_data in enumerate(correlation_rows, 2):
+    # Title banner
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
+    title = ws['A1']
+    title.value = f'CORRELATIONS  ({len(correlation_rows)} results)'
+    title.font = Font(name='Calibri', size=12, bold=True, color='FFFFFFFF')
+    title.fill = HEADER_FILL
+    title.alignment = Alignment(horizontal='left', vertical='center')
+    for c in range(2, len(headers) + 1):
+        ws.cell(row=1, column=c).fill = HEADER_FILL
+    ws.row_dimensions[1].height = 28
+
+    apply_header_row(ws, headers, row=2)
+    freeze_header(ws, row=3)
+
+    for row_num, row_data in enumerate(correlation_rows, 3):
         for col_num, cell_value in enumerate(row_data, 1):
             cell = ws.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
             cell.font = DATA_FONT
@@ -1284,10 +1308,10 @@ def build_correlations_sheet(ws, correlation_rows: list):
             risk_cell.font = Font(name='Calibri', size=10, bold=True, color='FFFFFFFF')
 
     if correlation_rows:
-        apply_alternating_rows(ws, 2, len(correlation_rows) + 1)
+        apply_alternating_rows(ws, 3, len(correlation_rows) + 2)
 
     # Excel Table for sort/filter
-    add_data_table(ws, header_row=1, num_data_rows=len(correlation_rows), num_columns=len(headers))
+    add_data_table(ws, header_row=2, num_data_rows=len(correlation_rows), num_columns=len(headers))
 
     col_widths = [30, 25, 10, 50, 40, 12, 40]
     for i, w in enumerate(col_widths, 1):
@@ -1316,10 +1340,22 @@ def build_nessus_sheet(ws, nessus_rows: list):
         "Synopsis", "Solution", "See Also", "Service Name", "Port",
         "Protocol", "Request", "Plugin Output", "CVSS3 Base Score", "Tracking"
     ]
-    apply_header_row(ws, headers)
-    freeze_header(ws)
 
-    for row_num, row_data in enumerate(nessus_rows, 2):
+    # Title banner
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
+    title = ws['A1']
+    title.value = f'EXTERNAL VULNERABILITIES  ({len(nessus_rows)} results)'
+    title.font = Font(name='Calibri', size=12, bold=True, color='FFFFFFFF')
+    title.fill = HEADER_FILL
+    title.alignment = Alignment(horizontal='left', vertical='center')
+    for c in range(2, len(headers) + 1):
+        ws.cell(row=1, column=c).fill = HEADER_FILL
+    ws.row_dimensions[1].height = 28
+
+    apply_header_row(ws, headers, row=2)
+    freeze_header(ws, row=3)
+
+    for row_num, row_data in enumerate(nessus_rows, 3):
         for col_num, cell_value in enumerate(row_data, 1):
             cell = ws.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
             cell.font = DATA_FONT
@@ -1332,10 +1368,10 @@ def build_nessus_sheet(ws, nessus_rows: list):
             apply_severity_fill(ws.cell(row=row_num, column=1), severity)
 
     if nessus_rows:
-        apply_alternating_rows(ws, 2, len(nessus_rows) + 1)
+        apply_alternating_rows(ws, 3, len(nessus_rows) + 2)
 
     # Excel Table for sort/filter
-    add_data_table(ws, header_row=1, num_data_rows=len(nessus_rows), num_columns=len(headers))
+    add_data_table(ws, header_row=2, num_data_rows=len(nessus_rows), num_columns=len(headers))
 
     col_widths = [12, 8, 30, 10, 14, 20, 18, 50, 40, 40, 30, 12, 8, 8, 40, 40, 10, 10]
     for i, w in enumerate(col_widths, 1):
@@ -1366,10 +1402,22 @@ def build_burp_sheet(ws, burp_rows: list):
         "References", "Vulnerability Classifications",
         "Request", "Response", "Tracking"
     ]
-    apply_header_row(ws, headers)
-    freeze_header(ws)
 
-    for row_num, row_data in enumerate(burp_rows, 2):
+    # Title banner
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
+    title = ws['A1']
+    title.value = f'WEB APPLICATION VULNERABILITIES  ({len(burp_rows)} results)'
+    title.font = Font(name='Calibri', size=12, bold=True, color='FFFFFFFF')
+    title.fill = HEADER_FILL
+    title.alignment = Alignment(horizontal='left', vertical='center')
+    for c in range(2, len(headers) + 1):
+        ws.cell(row=1, column=c).fill = HEADER_FILL
+    ws.row_dimensions[1].height = 28
+
+    apply_header_row(ws, headers, row=2)
+    freeze_header(ws, row=3)
+
+    for row_num, row_data in enumerate(burp_rows, 3):
         for col_num, cell_value in enumerate(row_data, 1):
             cell = ws.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
             cell.font = DATA_FONT
@@ -1382,10 +1430,10 @@ def build_burp_sheet(ws, burp_rows: list):
             apply_severity_fill(ws.cell(row=row_num, column=1), severity)
 
     if burp_rows:
-        apply_alternating_rows(ws, 2, len(burp_rows) + 1)
+        apply_alternating_rows(ws, 3, len(burp_rows) + 2)
 
     # Excel Table for sort/filter
-    add_data_table(ws, header_row=1, num_data_rows=len(burp_rows), num_columns=len(headers))
+    add_data_table(ws, header_row=2, num_data_rows=len(burp_rows), num_columns=len(headers))
 
     col_widths = [12, 8, 14, 20, 30, 14, 30, 20, 12, 50, 50, 40, 30, 30, 30, 40, 40, 10]
     for i, w in enumerate(col_widths, 1):
