@@ -4171,41 +4171,41 @@
             html += "<span class='assets-card-label'>PENDING MATCHES</span></div></div>";
             html += "</div>";
 
-            // Type Breakdown Row
-            html += "<div class='assets-breakdown-row'>";
-            html += "<div class='assets-breakdown-card'>";
+            // Type Breakdown Row (4 columns)
+            html += "<div class='assets-breakdown-row assets-breakdown-row-4'>";
+            html += "<div class='assets-breakdown-card assets-breakdown-card-ip'>";
             html += "<i class='glyphicon glyphicon-map-marker'></i>";
             html += "<span class='assets-breakdown-count'>" + (counts.by_type.ip || 0) + "</span>";
             html += "<span class='assets-breakdown-label'>IP ADDRESSES</span></div>";
 
-            html += "<div class='assets-breakdown-card'>";
+            html += "<div class='assets-breakdown-card assets-breakdown-card-domain'>";
             html += "<i class='glyphicon glyphicon-globe'></i>";
             html += "<span class='assets-breakdown-count'>" + (counts.by_type.domain || 0) + "</span>";
             html += "<span class='assets-breakdown-label'>DOMAINS</span></div>";
 
-            html += "<div class='assets-breakdown-card'>";
+            html += "<div class='assets-breakdown-card assets-breakdown-card-email'>";
             html += "<i class='glyphicon glyphicon-envelope'></i>";
             html += "<span class='assets-breakdown-count'>" + (counts.by_type.email || 0) + "</span>";
             html += "<span class='assets-breakdown-label'>EMAILS</span></div>";
 
-            html += "<div class='assets-breakdown-card'>";
+            html += "<div class='assets-breakdown-card assets-breakdown-card-human'>";
             html += "<i class='glyphicon glyphicon-user'></i>";
             html += "<span class='assets-breakdown-count'>" + (counts.by_type.human_name || 0) + "</span>";
             html += "<span class='assets-breakdown-label'>HUMAN NAMES</span></div>";
 
-            html += "<div class='assets-breakdown-card'>";
+            // Mixed Breakdown Row (3 columns)
+            html += "<div class='assets-breakdown-row assets-breakdown-row-3' style='margin-top:0;'>";
+            html += "<div class='assets-breakdown-card assets-breakdown-card-matches'>";
             html += "<i class='glyphicon glyphicon-warning-sign'></i>";
             html += "<span class='assets-breakdown-count'>" + matches.length + "</span>";
             html += "<span class='assets-breakdown-label'>SCAN MATCHES</span></div>";
 
-            // Affinity Breakdown Row
-            html += "<div class='assets-breakdown-row' style='margin-top:0;'>";
-            html += "<div class='assets-breakdown-card'>";
+            html += "<div class='assets-breakdown-card assets-breakdown-card-direct'>";
             html += "<i class='glyphicon glyphicon-record'></i>";
             html += "<span class='assets-breakdown-count'>" + (counts.direct || 0) + "</span>";
             html += "<span class='assets-breakdown-label'>DIRECT</span></div>";
 
-            html += "<div class='assets-breakdown-card'>";
+            html += "<div class='assets-breakdown-card assets-breakdown-card-associated'>";
             html += "<i class='glyphicon glyphicon-transfer'></i>";
             html += "<span class='assets-breakdown-count'>" + (counts.associated || 0) + "</span>";
             html += "<span class='assets-breakdown-label'>ASSOCIATED</span></div>";
@@ -4290,51 +4290,32 @@
                     }
                 }
 
-                // Filter bar - larger buttons, type filters and source filters
+                // Filter bar - compact pills, color-coded groups, two-row layout
                 html += "<div class='assets-known-filter-bar assets-known-sticky-bar' id='assets-known-sticky-bar'>";
-                html += "<div class='assets-known-filter-group'>";
-                html += "<span class='assets-known-filter-label'>TYPE</span>";
-                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.type === 'all' ? " assets-known-filter-active" : "") + "' onclick='knownFilterType(\"all\", this)'>";
+
+                // Row 1: TYPE + AFFINITY + bulk action buttons
+                html += "<div class='assets-known-filter-row'>";
+                html += "<div class='assets-known-filter-group assets-known-filter-group-type'>";
+                html += "<span class='assets-known-filter-label assets-known-filter-label-type'>TYPE</span>";
+                html += "<button class='assets-known-filter-btn assets-known-filter-type" + (knownActiveFilters.type === 'all' ? " assets-known-filter-active assets-known-filter-active-type" : "") + "' onclick='knownFilterType(\"all\", this)'>";
                 html += "<i class='glyphicon glyphicon-th-list'></i>&nbsp;&nbsp;ALL (" + data.length + ")</button>";
-                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.type === 'ip' ? " assets-known-filter-active" : "") + "' onclick='knownFilterType(\"ip\", this)'>";
+                html += "<button class='assets-known-filter-btn assets-known-filter-type" + (knownActiveFilters.type === 'ip' ? " assets-known-filter-active assets-known-filter-active-type" : "") + "' onclick='knownFilterType(\"ip\", this)'>";
                 html += "<i class='glyphicon glyphicon-globe'></i>&nbsp;&nbsp;IPS (" + ipCount + ")</button>";
-                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.type === 'domain' ? " assets-known-filter-active" : "") + "' onclick='knownFilterType(\"domain\", this)'>";
+                html += "<button class='assets-known-filter-btn assets-known-filter-type" + (knownActiveFilters.type === 'domain' ? " assets-known-filter-active assets-known-filter-active-type" : "") + "' onclick='knownFilterType(\"domain\", this)'>";
                 html += "<i class='glyphicon glyphicon-link'></i>&nbsp;&nbsp;DOMAINS (" + domainCount + ")</button>";
-                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.type === 'email' ? " assets-known-filter-active" : "") + "' onclick='knownFilterType(\"email\", this)'>";
+                html += "<button class='assets-known-filter-btn assets-known-filter-type" + (knownActiveFilters.type === 'email' ? " assets-known-filter-active assets-known-filter-active-type" : "") + "' onclick='knownFilterType(\"email\", this)'>";
                 html += "<i class='glyphicon glyphicon-envelope'></i>&nbsp;&nbsp;EMAILS (" + emailCount + ")</button>";
-                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.type === 'human_name' ? " assets-known-filter-active" : "") + "' onclick='knownFilterType(\"human_name\", this)'>";
+                html += "<button class='assets-known-filter-btn assets-known-filter-type" + (knownActiveFilters.type === 'human_name' ? " assets-known-filter-active assets-known-filter-active-type" : "") + "' onclick='knownFilterType(\"human_name\", this)'>";
                 html += "<i class='glyphicon glyphicon-user'></i>&nbsp;&nbsp;HUMAN NAMES (" + humanNameCount + ")</button>";
                 html += "</div>";
-                html += "<div class='assets-known-filter-group'>";
-                html += "<span class='assets-known-filter-label'>AFFINITY</span>";
-                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.affinity === 'all' ? " assets-known-filter-active" : "") + "' onclick='knownFilterAffinity(\"all\", this)'>";
+                html += "<div class='assets-known-filter-group assets-known-filter-group-affinity'>";
+                html += "<span class='assets-known-filter-label assets-known-filter-label-affinity'>AFFINITY</span>";
+                html += "<button class='assets-known-filter-btn assets-known-filter-affinity" + (knownActiveFilters.affinity === 'all' ? " assets-known-filter-active assets-known-filter-active-affinity" : "") + "' onclick='knownFilterAffinity(\"all\", this)'>";
                 html += "<i class='glyphicon glyphicon-th-list'></i>&nbsp;&nbsp;ALL</button>";
-                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.affinity === 'DIRECT' ? " assets-known-filter-active" : "") + "' onclick='knownFilterAffinity(\"DIRECT\", this)'>";
+                html += "<button class='assets-known-filter-btn assets-known-filter-affinity" + (knownActiveFilters.affinity === 'DIRECT' ? " assets-known-filter-active assets-known-filter-active-affinity" : "") + "' onclick='knownFilterAffinity(\"DIRECT\", this)'>";
                 html += "<i class='glyphicon glyphicon-record'></i>&nbsp;&nbsp;DIRECT (" + directCount + ")</button>";
-                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.affinity === 'ASSOCIATED' ? " assets-known-filter-active" : "") + "' onclick='knownFilterAffinity(\"ASSOCIATED\", this)'>";
+                html += "<button class='assets-known-filter-btn assets-known-filter-affinity" + (knownActiveFilters.affinity === 'ASSOCIATED' ? " assets-known-filter-active assets-known-filter-active-affinity" : "") + "' onclick='knownFilterAffinity(\"ASSOCIATED\", this)'>";
                 html += "<i class='glyphicon glyphicon-transfer'></i>&nbsp;&nbsp;ASSOCIATED (" + associatedCount + ")</button>";
-                html += "</div>";
-                html += "<div class='assets-known-filter-group'>";
-                html += "<span class='assets-known-filter-label'>SOURCE</span>";
-                html += "<button class='assets-known-filter-btn assets-known-filter-src" + (knownActiveFilters.source === 'all' ? " assets-known-filter-active" : "") + "' onclick='knownFilterSource(\"all\", this)'>";
-                html += "<i class='glyphicon glyphicon-th-list'></i>&nbsp;&nbsp;ALL</button>";
-                html += "<button class='assets-known-filter-btn assets-known-filter-src" + (knownActiveFilters.source === 'CLIENT_PROVIDED' ? " assets-known-filter-active" : "") + "' onclick='knownFilterSource(\"CLIENT_PROVIDED\", this)'>";
-                html += "<i class='glyphicon glyphicon-briefcase'></i>&nbsp;&nbsp;CLIENT (" + clientCount + ")</button>";
-                html += "<button class='assets-known-filter-btn assets-known-filter-src" + (knownActiveFilters.source === 'ANALYST_CONFIRMED' ? " assets-known-filter-active" : "") + "' onclick='knownFilterSource(\"ANALYST_CONFIRMED\", this)'>";
-                html += "<i class='glyphicon glyphicon-check'></i>&nbsp;&nbsp;ANALYST (" + analystCount + ")</button>";
-                html += "</div>";
-                html += "<div class='assets-known-filter-group'>";
-                html += "<span class='assets-known-filter-label'>TAG</span>";
-                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.tag === 'all' ? " assets-known-filter-active" : "") + "' onclick='knownFilterTag(\"all\", this)'>";
-                html += "<i class='glyphicon glyphicon-th-list'></i>&nbsp;&nbsp;ALL</button>";
-                var tagKeys = Object.keys(tagCounts).sort();
-                for (var ti = 0; ti < tagKeys.length; ti++) {
-                    var tk = tagKeys[ti];
-                    html += "<button class='assets-known-filter-btn" + (knownActiveFilters.tag === tk ? " assets-known-filter-active" : "") + "' onclick='knownFilterTag(\"" + $('<span>').text(tk).html() + "\", this)'>";
-                    html += $('<span>').text(tk).html() + " (" + tagCounts[tk] + ")</button>";
-                }
-                html += "<button class='assets-known-filter-btn" + (knownActiveFilters.tag === '_untagged' ? " assets-known-filter-active" : "") + "' onclick='knownFilterTag(\"_untagged\", this)'>";
-                html += "UNTAGGED (" + untaggedCount + ")</button>";
                 html += "</div>";
                 html += "<div style='flex:1;'></div>";
                 html += "<button class='btn assets-known-remove-sel-btn' onclick='assetsRemoveSelected(\"" + instanceId + "\")' style='display:none;' id='assets-remove-sel-btn'>";
@@ -4347,6 +4328,34 @@
                 html += "<i class='glyphicon glyphicon-transfer'></i>&nbsp;&nbsp;CHANGE AFFINITY</button>";
                 html += "<button class='btn assets-known-bulk-tag-btn' onclick='knownBulkTagPrompt()' style='display:none;' id='assets-bulk-tag-btn'>";
                 html += "<i class='glyphicon glyphicon-tag'></i>&nbsp;&nbsp;ASSIGN TAG</button>";
+                html += "</div>";
+
+                // Row 2: SOURCE + TAG
+                html += "<div class='assets-known-filter-row'>";
+                html += "<div class='assets-known-filter-group assets-known-filter-group-source'>";
+                html += "<span class='assets-known-filter-label assets-known-filter-label-source'>SOURCE</span>";
+                html += "<button class='assets-known-filter-btn assets-known-filter-src assets-known-filter-source" + (knownActiveFilters.source === 'all' ? " assets-known-filter-active assets-known-filter-active-source" : "") + "' onclick='knownFilterSource(\"all\", this)'>";
+                html += "<i class='glyphicon glyphicon-th-list'></i>&nbsp;&nbsp;ALL</button>";
+                html += "<button class='assets-known-filter-btn assets-known-filter-src assets-known-filter-source" + (knownActiveFilters.source === 'CLIENT_PROVIDED' ? " assets-known-filter-active assets-known-filter-active-source" : "") + "' onclick='knownFilterSource(\"CLIENT_PROVIDED\", this)'>";
+                html += "<i class='glyphicon glyphicon-briefcase'></i>&nbsp;&nbsp;CLIENT (" + clientCount + ")</button>";
+                html += "<button class='assets-known-filter-btn assets-known-filter-src assets-known-filter-source" + (knownActiveFilters.source === 'ANALYST_CONFIRMED' ? " assets-known-filter-active assets-known-filter-active-source" : "") + "' onclick='knownFilterSource(\"ANALYST_CONFIRMED\", this)'>";
+                html += "<i class='glyphicon glyphicon-check'></i>&nbsp;&nbsp;ANALYST (" + analystCount + ")</button>";
+                html += "</div>";
+                html += "<div class='assets-known-filter-group assets-known-filter-group-tag'>";
+                html += "<span class='assets-known-filter-label assets-known-filter-label-tag'>TAG</span>";
+                html += "<button class='assets-known-filter-btn assets-known-filter-tag" + (knownActiveFilters.tag === 'all' ? " assets-known-filter-active assets-known-filter-active-tag" : "") + "' onclick='knownFilterTag(\"all\", this)'>";
+                html += "<i class='glyphicon glyphicon-th-list'></i>&nbsp;&nbsp;ALL</button>";
+                var tagKeys = Object.keys(tagCounts).sort();
+                for (var ti = 0; ti < tagKeys.length; ti++) {
+                    var tk = tagKeys[ti];
+                    html += "<button class='assets-known-filter-btn assets-known-filter-tag" + (knownActiveFilters.tag === tk ? " assets-known-filter-active assets-known-filter-active-tag" : "") + "' onclick='knownFilterTag(\"" + $('<span>').text(tk).html() + "\", this)'>";
+                    html += $('<span>').text(tk).html() + " (" + tagCounts[tk] + ")</button>";
+                }
+                html += "<button class='assets-known-filter-btn assets-known-filter-tag" + (knownActiveFilters.tag === '_untagged' ? " assets-known-filter-active assets-known-filter-active-tag" : "") + "' onclick='knownFilterTag(\"_untagged\", this)'>";
+                html += "UNTAGGED (" + untaggedCount + ")</button>";
+                html += "</div>";
+                html += "</div>";
+
                 html += "</div>";
 
                 if (data.length === 0) {
@@ -4491,30 +4500,30 @@
         // Type filter - independent of source filter
         function knownFilterType(filter, btn) {
             knownActiveFilters.type = filter;
-            $(".assets-known-filter-group:eq(0) .assets-known-filter-btn").removeClass("assets-known-filter-active");
-            $(btn).addClass("assets-known-filter-active");
+            $(".assets-known-filter-group-type .assets-known-filter-btn").removeClass("assets-known-filter-active assets-known-filter-active-type");
+            $(btn).addClass("assets-known-filter-active assets-known-filter-active-type");
             knownApplyFilters();
         }
 
         // Source filter - independent of type filter
         function knownFilterSource(filter, btn) {
             knownActiveFilters.source = filter;
-            $(".assets-known-filter-group:eq(2) .assets-known-filter-btn").removeClass("assets-known-filter-active");
-            $(btn).addClass("assets-known-filter-active");
+            $(".assets-known-filter-group-source .assets-known-filter-btn").removeClass("assets-known-filter-active assets-known-filter-active-source");
+            $(btn).addClass("assets-known-filter-active assets-known-filter-active-source");
             knownApplyFilters();
         }
 
         function knownFilterAffinity(filter, btn) {
             knownActiveFilters.affinity = filter;
-            $(".assets-known-filter-group:eq(1) .assets-known-filter-btn").removeClass("assets-known-filter-active");
-            $(btn).addClass("assets-known-filter-active");
+            $(".assets-known-filter-group-affinity .assets-known-filter-btn").removeClass("assets-known-filter-active assets-known-filter-active-affinity");
+            $(btn).addClass("assets-known-filter-active assets-known-filter-active-affinity");
             knownApplyFilters();
         }
 
         function knownFilterTag(filter, btn) {
             knownActiveFilters.tag = filter;
-            $(".assets-known-filter-group:eq(3) .assets-known-filter-btn").removeClass("assets-known-filter-active");
-            $(btn).addClass("assets-known-filter-active");
+            $(".assets-known-filter-group-tag .assets-known-filter-btn").removeClass("assets-known-filter-active assets-known-filter-active-tag");
+            $(btn).addClass("assets-known-filter-active assets-known-filter-active-tag");
             knownApplyFilters();
         }
 
