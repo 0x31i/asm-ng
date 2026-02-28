@@ -591,12 +591,12 @@ def _build_snapshot_panel(ws, snapshot_data, dark_fill, label_font, value_font, 
 
     # Column widths for right side
     ws.column_dimensions['H'].width = 2   # spacer
-    ws.column_dimensions['I'].width = 14
-    ws.column_dimensions['J'].width = 10
-    ws.column_dimensions['K'].width = 10
-    ws.column_dimensions['L'].width = 14
-    ws.column_dimensions['M'].width = 10
-    ws.column_dimensions['N'].width = 10
+    ws.column_dimensions['I'].width = 16
+    ws.column_dimensions['J'].width = 12
+    ws.column_dimensions['K'].width = 12
+    ws.column_dimensions['L'].width = 16
+    ws.column_dimensions['M'].width = 12
+    ws.column_dimensions['N'].width = 12
 
     banner_fill = PatternFill(start_color='FF111827', end_color='FF111827', fill_type='solid')
     banner_font = Font(name='Calibri', size=12, bold=True, color='FFFFFFFF')
