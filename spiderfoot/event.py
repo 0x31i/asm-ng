@@ -47,6 +47,7 @@ class SpiderFootEvent:
     _sourceEventHash = None
     _moduleDataSource = None
     _actualSource = None
+    _falsePositive = 0
     __id = None
 
     def __init__(self, eventType: str, data: str, module: str, sourceEvent: Optional['SpiderFootEvent'] = None) -> None:
@@ -65,6 +66,7 @@ class SpiderFootEvent:
         self.confidence = 100
         self.visibility = 100
         self.risk = 0
+        self._falsePositive = 0
         self.sourceEvent = sourceEvent
         self.__id = f"{self.eventType}{self.generated}{self.module}{random.SystemRandom().randint(0, 99999999)}"
 

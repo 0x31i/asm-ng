@@ -6123,6 +6123,214 @@ class SpiderFootWebUi:
 
         return result
 
+    def _backfillSnapshots(self, dbh, target: str) -> int:
+        """Backfill grade snapshots for completed scans missing them.
+
+        Args:
+            dbh: SpiderFootDb instance
+            target (str): seed target value
+
+        Returns:
+            int: number of snapshots backfilled
+        """
+        completed_scans = dbh.scanCompletedForTarget(target, limit=50)
+        backfilled = 0
+
+        for scan in completed_scans:
+            scan_id = scan[0]
+            try:
+                if dbh.gradeSnapshotExists(scan_id):
+                    continue
+            except Exception:
+                continue
+
+            try:
+                grade_data = self._calculateScanGrade(dbh, scan_id)
+                if not grade_data or not grade_data.get('enabled', True):
+                    continue
+
+                # Get finding counts from scan results
+                summary = dbh.scanResultSummary(scan_id, 'type')
+                total_findings = sum(row[3] for row in summary if row[0] != 'ROOT') if summary else 0
+                unique_findings = sum(row[4] for row in summary if row[0] != 'ROOT') if summary else 0
+
+                # Get correlation counts
+                try:
+                    corr_counts = dbh.scanCorrelationSeverityCounts(scan_id)
+                except Exception:
+                    corr_counts = None
+
+                scan_started = scan[4] if scan[4] else 0  # started (raw ms)
+                scan_ended = scan[5] if scan[5] else 0    # ended (raw ms)
+
+                dbh.gradeSnapshotStore(
+                    scan_id, target, grade_data,
+                    total_findings, unique_findings, corr_counts,
+                    scan_started, scan_ended
+                )
+                backfilled += 1
+            except Exception as e:
+                self.log.warning(f"Backfill snapshot failed for scan {scan_id}: {e}")
+                continue
+
+        if backfilled:
+            self.log.info(f"Backfilled {backfilled} grade snapshots for target={target}")
+
+        return backfilled
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scantrend(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Return grade trend data for a scan's target across all scans.
+
+        Includes lazy backfill of missing snapshots on first access.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: trend data with snapshots, deltas, and trajectory
+        """
+        if not id:
+            return self.jsonify_error('404', "No scan specified")
+
+        try:
+            with SpiderFootDb(self.config) as dbh:
+                # Get scan info to find the target
+                scan_info = dbh.scanInstanceGet(id)
+                if not scan_info:
+                    return self.jsonify_error('404', "Scan not found")
+
+                target = scan_info[1]  # seed_target
+                scan_count = dbh.scanCountForTarget(target)
+
+                # Get existing snapshots
+                snapshots = dbh.gradeSnapshotsForTarget(target)
+
+                # Lazy backfill if snapshots < completed scan count
+                if len(snapshots) < scan_count:
+                    try:
+                        self._backfillSnapshots(dbh, target)
+                        snapshots = dbh.gradeSnapshotsForTarget(target)
+                    except Exception as e:
+                        self.log.warning(f"Snapshot backfill failed for target={target}: {e}")
+
+                if not snapshots:
+                    return {
+                        'target': target,
+                        'current_scan_id': id,
+                        'scan_count': scan_count,
+                        'snapshots': [],
+                        'deltas': {},
+                        'trajectory': 'unknown'
+                    }
+
+                # Build snapshot response
+                snap_list = []
+                for s in snapshots:
+                    snap_list.append({
+                        'scan_id': s['scan_id'],
+                        'date': s['scan_started'],
+                        'overall_score': s['overall_score'],
+                        'overall_grade': s['overall_grade'],
+                        'categories': s['category_scores'],
+                        'total_findings': s['total_findings'],
+                        'unique_findings': s['unique_findings'],
+                        'correlations': s['correlation_counts'],
+                    })
+
+                # Calculate deltas
+                deltas = {}
+                trajectory = 'stable'
+
+                if len(snap_list) >= 2:
+                    first = snap_list[0]
+                    latest = snap_list[-1]
+                    previous = snap_list[-2]
+
+                    overall_change = latest['overall_score'] - first['overall_score']
+                    since_prev_change = latest['overall_score'] - previous['overall_score']
+
+                    if overall_change > 2:
+                        trajectory = 'improving'
+                    elif overall_change < -2:
+                        trajectory = 'degrading'
+
+                    # Find new and resolved finding types
+                    prev_types = set(previous.get('categories', {}).keys()) if previous.get('categories') else set()
+                    latest_types = set(latest.get('categories', {}).keys()) if latest.get('categories') else set()
+
+                    # Category deltas
+                    category_deltas = {}
+                    worst_cat = None
+                    best_cat = None
+                    most_improved = None
+                    most_degraded = None
+
+                    latest_cats = latest.get('categories', {})
+                    prev_cats = previous.get('categories', {})
+
+                    for cat_name, cat_data in latest_cats.items():
+                        cat_score = cat_data.get('score', 0)
+                        prev_score = prev_cats.get(cat_name, {}).get('score', 0) if prev_cats else 0
+                        change = cat_score - prev_score
+                        direction = 'improving' if change > 2 else ('degrading' if change < -2 else 'stable')
+                        category_deltas[cat_name] = {'change': round(change, 1), 'direction': direction}
+
+                        if cat_data.get('weight', 0) > 0:
+                            if worst_cat is None or cat_score < worst_cat['score']:
+                                worst_cat = {'name': cat_name, 'score': cat_score, 'grade': cat_data.get('grade', '-')}
+                            if best_cat is None or cat_score > best_cat['score']:
+                                best_cat = {'name': cat_name, 'score': cat_score, 'grade': cat_data.get('grade', '-')}
+                            if most_improved is None or change > most_improved['change']:
+                                most_improved = {'name': cat_name, 'change': round(change, 1)}
+                            if most_degraded is None or change < most_degraded['change']:
+                                most_degraded = {'name': cat_name, 'change': round(change, 1)}
+
+                    # Finding velocity
+                    latest_fc = set(latest.get('categories', {}).keys())
+                    prev_fc = set(previous.get('categories', {}).keys())
+                    new_types = list(latest_fc - prev_fc)
+                    resolved_types = list(prev_fc - latest_fc)
+
+                    deltas = {
+                        'overall_change': round(overall_change, 1),
+                        'trajectory': trajectory,
+                        'since_previous': {
+                            'score_change': round(since_prev_change, 1),
+                            'new_finding_types': new_types[:10],
+                            'resolved_finding_types': resolved_types[:10],
+                        },
+                        'category_deltas': category_deltas,
+                        'worst_category': worst_cat,
+                        'best_category': best_cat,
+                        'most_improved': most_improved,
+                        'most_degraded': most_degraded,
+                        'finding_velocity': {
+                            'new_types_count': len(new_types),
+                            'resolved_types_count': len(resolved_types),
+                            'net_change': latest['total_findings'] - previous['total_findings'],
+                        },
+                        'asset_surface': {
+                            'current_unique': latest['unique_findings'],
+                            'previous_unique': previous['unique_findings'],
+                            'change': latest['unique_findings'] - previous['unique_findings'],
+                        }
+                    }
+
+                return {
+                    'target': target,
+                    'current_scan_id': id,
+                    'scan_count': scan_count,
+                    'snapshots': snap_list,
+                    'deltas': deltas,
+                    'trajectory': trajectory,
+                }
+
+        except Exception as e:
+            self.log.error(f"scantrend failed for id={id}: {e}", exc_info=True)
+            return self.jsonify_error('500', f"Failed to load trend data: {e}")
+
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def scanislatest(self: 'SpiderFootWebUi', id: str) -> dict:

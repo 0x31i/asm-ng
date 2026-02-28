@@ -113,7 +113,7 @@ class TestModuleStor_db(SpiderFootTestBase):
 
         # Verify that scanEventStore was called with size limit
         self.mock_dbh.scanEventStore.assert_called_with(
-            "test_scan_id", test_event, 10
+            "test_scan_id", test_event, 10, false_positive=0
         )
 
     def test_storage_disabled(self):

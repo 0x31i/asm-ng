@@ -7203,6 +7203,36 @@
             grid += "</div>"; // end right column
             grid += "</div>"; // end row 1
 
+            // === ROW 1.5: SNAPSHOT — Security Posture Trend (hidden until data loads) ===
+            grid += "<div class='row' id='snapshot-row' style='display:none;'>";
+            grid += "<div class='col-sm-12'>";
+            grid += "<div class='panel panel-default' style='border: 1px solid var(--glass-border); background: var(--bg-secondary);'>";
+            grid += "<div class='panel-heading' style='display:flex; justify-content:space-between; align-items:center;'>";
+            grid += "<span><i class='glyphicon glyphicon-stats'></i>&nbsp;&nbsp;SNAPSHOT &mdash; SECURITY POSTURE TREND</span>";
+            grid += "<span id='snapshot-trajectory-badge' style='font-family:var(--font-mono);font-size:11px;letter-spacing:1px;'></span>";
+            grid += "</div>";
+            grid += "<div class='panel-body' style='padding:0;'>";
+
+            // Chart + Key Metrics side by side
+            grid += "<div class='row' style='margin:0;'>";
+            // D3 Line Chart area
+            grid += "<div class='col-sm-8' style='padding:15px;'>";
+            grid += "<div id='snapshot-chart' style='width:100%;height:280px;position:relative;'></div>";
+            grid += "<div id='snapshot-legend' style='display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;'></div>";
+            grid += "</div>";
+            // Key Metrics grid
+            grid += "<div class='col-sm-4' style='padding:15px;'>";
+            grid += "<div id='snapshot-metrics' style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;'></div>";
+            grid += "</div>";
+            grid += "</div>";
+
+            // Comparison table
+            grid += "<div style='padding:0 15px 15px 15px;'>";
+            grid += "<div id='snapshot-table-container' style='overflow-x:auto;'></div>";
+            grid += "</div>";
+
+            grid += "</div></div></div></div>"; // end panel, col, row 1.5
+
             // === ROW 2: Four intel panels across (equal width) ===
             grid += "<div class='row intel-row'>";
             grid += "<div class='col-sm-3'>";
@@ -7604,6 +7634,28 @@
                 }
             );
 
+            // SNAPSHOT trend data loader
+            dataloaders.push(function() {
+                sf.fetchData('${docroot}/scantrend', {'id': instanceId}, function(trendData) {
+                    if (trendData && trendData.snapshots && trendData.snapshots.length > 1) {
+                        $('#snapshot-row').show();
+                        renderSnapshotChart(trendData, instanceId);
+                        renderSnapshotMetrics(trendData);
+                        renderSnapshotTable(trendData, instanceId);
+                        injectDeltaBadges(trendData);
+                        // Update trajectory badge in header
+                        var tj = trendData.trajectory || 'stable';
+                        var tjColor = tj === 'improving' ? '#22c55e' : (tj === 'degrading' ? '#ef4444' : '#6b7280');
+                        var tjArrow = tj === 'improving' ? '&#x25B2;' : (tj === 'degrading' ? '&#x25BC;' : '&#x25C6;');
+                        $('#snapshot-trajectory-badge').html(
+                            "<span style='color:" + tjColor + ";'>" + tjArrow + " " + tj.toUpperCase() + "</span>"
+                        );
+                    }
+                }, function() {
+                    // Error or no data - keep hidden
+                });
+            });
+
             loadersrunning = true;
             for (var i = 0; i < dataloaders.length; i++) {
                 dataloaders[i]();
@@ -7620,6 +7672,417 @@
                 renderGradePanel(data, iid);
                 btn.prop('disabled', false).find('i').removeClass('glyphicon-spin');
             });
+        }
+
+        // ===== SNAPSHOT RENDERING FUNCTIONS =====
+
+        // Category color map for trend chart lines
+        var snapshotCategoryColors = {
+            'Network Security': '#dc2626',
+            'Web App Security': '#ea580c',
+            'Information Leakage': '#eab308',
+            'General Health': '#3b82f6',
+            'External Account Exposure': '#06b6d4',
+            'DNS Health': '#22c55e',
+            'IP Reputation': '#d946ef',
+            'AI Security': '#8b5cf6',
+            'Information / Reference': '#6b7280'
+        };
+
+        function renderSnapshotChart(trendData, instanceId) {
+            var container = document.getElementById('snapshot-chart');
+            if (!container || !trendData.snapshots || trendData.snapshots.length < 2) return;
+
+            var snaps = trendData.snapshots;
+            var margin = {top: 20, right: 20, bottom: 40, left: 45};
+            var width = container.offsetWidth - margin.left - margin.right;
+            var height = 280 - margin.top - margin.bottom;
+
+            // Clear any previous chart
+            d3.select('#snapshot-chart').selectAll('*').remove();
+
+            var svg = d3.select('#snapshot-chart').append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+            // Parse dates and scores
+            var parseDate = function(d) { return new Date(d); };
+            var xExtent = d3.extent(snaps, function(d) { return parseDate(d.date); });
+            var x = d3.time.scale().domain(xExtent).range([0, width]);
+            var y = d3.scale.linear().domain([0, 100]).range([height, 0]);
+
+            // Grade band backgrounds
+            var gradeBands = [
+                {min: 90, max: 100, color: 'rgba(34, 197, 94, 0.06)', label: 'A'},
+                {min: 80, max: 90, color: 'rgba(59, 130, 246, 0.06)', label: 'B'},
+                {min: 70, max: 80, color: 'rgba(245, 158, 11, 0.06)', label: 'C'},
+                {min: 60, max: 70, color: 'rgba(249, 115, 22, 0.06)', label: 'D'},
+                {min: 0, max: 60, color: 'rgba(239, 68, 68, 0.06)', label: 'F'}
+            ];
+
+            gradeBands.forEach(function(band) {
+                svg.append('rect')
+                    .attr('x', 0).attr('y', y(band.max))
+                    .attr('width', width).attr('height', y(band.min) - y(band.max))
+                    .attr('fill', band.color);
+                svg.append('text')
+                    .attr('x', width + 5).attr('y', y((band.min + band.max) / 2) + 4)
+                    .style('font-size', '9px').style('fill', 'var(--text-muted)')
+                    .style('font-family', 'var(--font-mono)').text(band.label);
+            });
+
+            // Grade threshold lines
+            [90, 80, 70, 60].forEach(function(threshold) {
+                svg.append('line')
+                    .attr('x1', 0).attr('y1', y(threshold))
+                    .attr('x2', width).attr('y2', y(threshold))
+                    .attr('stroke', 'var(--glass-border)').attr('stroke-width', 0.5)
+                    .attr('stroke-dasharray', '3,3');
+            });
+
+            // X axis
+            var xAxis = d3.svg.axis().scale(x).orient('bottom')
+                .ticks(Math.min(snaps.length, 8))
+                .tickFormat(d3.time.format('%b %d'));
+            svg.append('g')
+                .attr('transform', 'translate(0,' + height + ')')
+                .call(xAxis)
+                .selectAll('text')
+                .style('font-size', '9px').style('fill', 'var(--text-secondary)')
+                .style('font-family', 'var(--font-mono)');
+
+            // Y axis
+            var yAxis = d3.svg.axis().scale(y).orient('left').ticks(5);
+            svg.append('g').call(yAxis)
+                .selectAll('text')
+                .style('font-size', '9px').style('fill', 'var(--text-secondary)')
+                .style('font-family', 'var(--font-mono)');
+
+            // Style axis paths
+            svg.selectAll('.domain').attr('stroke', 'var(--glass-border)');
+            svg.selectAll('.tick line').attr('stroke', 'var(--glass-border)');
+
+            // Overall line with area fill
+            var overallLine = d3.svg.line()
+                .x(function(d) { return x(parseDate(d.date)); })
+                .y(function(d) { return y(d.overall_score); })
+                .interpolate('monotone');
+
+            var overallArea = d3.svg.area()
+                .x(function(d) { return x(parseDate(d.date)); })
+                .y0(height)
+                .y1(function(d) { return y(d.overall_score); })
+                .interpolate('monotone');
+
+            var gc = gradeGlowColor(snaps[snaps.length - 1].overall_grade);
+
+            svg.append('path')
+                .datum(snaps)
+                .attr('d', overallArea)
+                .attr('fill', gc.text).attr('opacity', 0.1);
+
+            svg.append('path')
+                .datum(snaps)
+                .attr('d', overallLine)
+                .attr('fill', 'none').attr('stroke', gc.text)
+                .attr('stroke-width', 3).attr('class', 'snapshot-line-overall');
+
+            // Data points for overall
+            svg.selectAll('.snapshot-dot-overall')
+                .data(snaps).enter().append('circle')
+                .attr('class', 'snapshot-dot-overall')
+                .attr('cx', function(d) { return x(parseDate(d.date)); })
+                .attr('cy', function(d) { return y(d.overall_score); })
+                .attr('r', 4).attr('fill', gc.text).attr('stroke', '#fff').attr('stroke-width', 1.5)
+                .style('cursor', 'pointer')
+                .on('click', function(d) {
+                    window.location.hash = '#id=' + d.scan_id + '&tab=summary';
+                    location.reload();
+                })
+                .append('title').text(function(d) {
+                    var dt = new Date(d.date);
+                    return dt.toLocaleDateString() + ' - ' + d.overall_grade + ' (' + d.overall_score.toFixed(1) + ')';
+                });
+
+            // Category lines (dashed, toggleable)
+            var categoryNames = [];
+            var allCats = snaps[snaps.length - 1].categories || {};
+            for (var catName in allCats) {
+                if (allCats[catName].weight > 0) categoryNames.push(catName);
+            }
+
+            var catLineVisibility = {};
+            categoryNames.forEach(function(catName) {
+                catLineVisibility[catName] = false; // hidden by default
+
+                var catLine = d3.svg.line()
+                    .x(function(d) { return x(parseDate(d.date)); })
+                    .y(function(d) {
+                        var cats = d.categories || {};
+                        return y(cats[catName] ? cats[catName].score : 0);
+                    })
+                    .interpolate('monotone');
+
+                svg.append('path')
+                    .datum(snaps)
+                    .attr('d', catLine)
+                    .attr('fill', 'none')
+                    .attr('stroke', snapshotCategoryColors[catName] || '#6b7280')
+                    .attr('stroke-width', 1.5)
+                    .attr('stroke-dasharray', '5,3')
+                    .attr('class', 'snapshot-cat-line')
+                    .attr('data-category', catName)
+                    .style('display', 'none');
+            });
+
+            // Legend
+            var legendEl = document.getElementById('snapshot-legend');
+            if (!legendEl) return;
+            legendEl.innerHTML = '';
+
+            // Overall toggle (always visible)
+            var overallLegend = document.createElement('span');
+            overallLegend.style.cssText = 'cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid ' + gc.text + ';color:' + gc.text + ';background:rgba(0,0,0,0.2);';
+            overallLegend.innerHTML = '&#9679; Overall';
+            overallLegend.setAttribute('data-active', 'true');
+            overallLegend.onclick = function() {
+                var active = this.getAttribute('data-active') === 'true';
+                this.setAttribute('data-active', active ? 'false' : 'true');
+                this.style.opacity = active ? '0.3' : '1';
+                d3.selectAll('.snapshot-line-overall, .snapshot-dot-overall').style('display', active ? 'none' : null);
+            };
+            legendEl.appendChild(overallLegend);
+
+            categoryNames.forEach(function(catName) {
+                var color = snapshotCategoryColors[catName] || '#6b7280';
+                var el = document.createElement('span');
+                el.style.cssText = 'cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid ' + color + ';color:var(--text-muted);opacity:0.5;';
+                el.innerHTML = '&#9679; ' + catName;
+                el.setAttribute('data-active', 'false');
+                el.setAttribute('data-cat', catName);
+                el.onclick = function() {
+                    var active = this.getAttribute('data-active') === 'true';
+                    this.setAttribute('data-active', active ? 'false' : 'true');
+                    this.style.opacity = active ? '0.5' : '1';
+                    this.style.color = active ? 'var(--text-muted)' : color;
+                    d3.selectAll('.snapshot-cat-line[data-category="' + catName + '"]').style('display', active ? 'none' : null);
+                };
+                legendEl.appendChild(el);
+            });
+        }
+
+        function renderSnapshotMetrics(trendData) {
+            var container = document.getElementById('snapshot-metrics');
+            if (!container || !trendData.deltas) return;
+
+            var d = trendData.deltas;
+            var cards = [];
+
+            // 1. Overall Change
+            var oc = d.overall_change || 0;
+            var ocColor = oc > 0 ? '#22c55e' : (oc < 0 ? '#ef4444' : '#6b7280');
+            var ocArrow = oc > 0 ? '&#x25B2;' : (oc < 0 ? '&#x25BC;' : '&#x25C6;');
+            cards.push({label: 'CHANGE', value: (oc > 0 ? '+' : '') + oc.toFixed(1), color: ocColor, icon: ocArrow});
+
+            // 2. Resolved Types
+            var resolved = (d.since_previous && d.since_previous.resolved_finding_types) ? d.since_previous.resolved_finding_types.length : 0;
+            cards.push({label: 'RESOLVED', value: resolved, color: '#22c55e', icon: '&#x2713;'});
+
+            // 3. New Types
+            var newTypes = (d.since_previous && d.since_previous.new_finding_types) ? d.since_previous.new_finding_types.length : 0;
+            cards.push({label: 'NEW', value: newTypes, color: newTypes > 0 ? '#f59e0b' : '#6b7280', icon: '&#x2605;'});
+
+            // 4. Trajectory
+            var tj = d.trajectory || 'stable';
+            var tjColor = tj === 'improving' ? '#22c55e' : (tj === 'degrading' ? '#ef4444' : '#6b7280');
+            var tjArrow = tj === 'improving' ? '&#x25B2;' : (tj === 'degrading' ? '&#x25BC;' : '&#x25C6;');
+            cards.push({label: 'TREND', value: tj.toUpperCase().substring(0, 6), color: tjColor, icon: tjArrow});
+
+            // 5. Worst Category
+            var wc = d.worst_category;
+            if (wc) {
+                var wcGc = gradeGlowColor(wc.grade);
+                cards.push({label: 'WORST', value: wc.grade, sublabel: wc.name.substring(0, 12), color: wcGc.text, icon: ''});
+            } else {
+                cards.push({label: 'WORST', value: '-', color: '#6b7280', icon: ''});
+            }
+
+            // 6. Best Category
+            var bc = d.best_category;
+            if (bc) {
+                var bcGc = gradeGlowColor(bc.grade);
+                cards.push({label: 'BEST', value: bc.grade, sublabel: bc.name.substring(0, 12), color: bcGc.text, icon: ''});
+            } else {
+                cards.push({label: 'BEST', value: '-', color: '#6b7280', icon: ''});
+            }
+
+            var html = '';
+            cards.forEach(function(card) {
+                html += "<div style='background:var(--bg-tertiary);border:1px solid var(--glass-border);border-radius:6px;padding:10px 8px;text-align:center;'>";
+                html += "<div style='font-size:22px;font-weight:700;color:" + card.color + ";font-family:var(--font-mono);line-height:1;'>";
+                if (card.icon) html += "<span style='font-size:12px;'>" + card.icon + "</span> ";
+                html += card.value + "</div>";
+                html += "<div style='font-size:9px;color:var(--text-muted);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:1px;margin-top:4px;'>" + card.label + "</div>";
+                if (card.sublabel) {
+                    html += "<div style='font-size:8px;color:var(--text-muted);font-family:var(--font-mono);margin-top:2px;opacity:0.7;'>" + card.sublabel + "</div>";
+                }
+                html += "</div>";
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderSnapshotTable(trendData, instanceId) {
+            var container = document.getElementById('snapshot-table-container');
+            if (!container || !trendData.snapshots || trendData.snapshots.length < 2) return;
+
+            var snaps = trendData.snapshots;
+            // Show last 8 scans max
+            var displaySnaps = snaps.slice(-8);
+
+            // Collect all categories with weight > 0
+            var categories = [];
+            var lastCats = displaySnaps[displaySnaps.length - 1].categories || {};
+            for (var catName in lastCats) {
+                if (lastCats[catName].weight > 0) categories.push(catName);
+            }
+
+            var html = "<table style='width:100%;font-family:var(--font-mono);font-size:11px;border-collapse:collapse;'>";
+
+            // Header row with scan dates
+            html += "<thead><tr>";
+            html += "<th style='text-align:left;padding:6px 10px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);min-width:140px;'>CATEGORY</th>";
+            displaySnaps.forEach(function(s) {
+                var dt = new Date(s.date);
+                var dateStr = (dt.getMonth() + 1) + '/' + dt.getDate();
+                var isCurrent = (s.scan_id === instanceId);
+                html += "<th style='text-align:center;padding:6px 8px;color:" + (isCurrent ? 'var(--text-primary)' : 'var(--text-muted)') + ";border-bottom:1px solid var(--glass-border);min-width:50px;font-weight:" + (isCurrent ? '700' : '400') + ";'>" + dateStr + "</th>";
+            });
+            html += "<th style='text-align:center;padding:6px 8px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);min-width:40px;'>TREND</th>";
+            html += "</tr></thead><tbody>";
+
+            // Category rows
+            categories.forEach(function(catName) {
+                var color = snapshotCategoryColors[catName] || '#6b7280';
+                html += "<tr>";
+                html += "<td style='padding:5px 10px;border-bottom:1px solid rgba(255,255,255,0.03);'>";
+                html += "<span style='display:inline-block;width:3px;height:12px;background:" + color + ";border-radius:1px;margin-right:6px;vertical-align:middle;'></span>";
+                html += "<span style='color:var(--text-secondary);'>" + catName + "</span></td>";
+
+                var firstScore = null, latestScore = null;
+                displaySnaps.forEach(function(s) {
+                    var cats = s.categories || {};
+                    var catData = cats[catName];
+                    var grade = catData ? catData.grade : '-';
+                    var score = catData ? catData.score : 0;
+                    if (firstScore === null && catData) firstScore = score;
+                    if (catData) latestScore = score;
+                    var gc = gradeGlowColor(grade);
+                    html += "<td style='text-align:center;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.03);'>";
+                    html += "<span style='display:inline-block;width:28px;height:22px;line-height:22px;border-radius:3px;font-size:11px;font-weight:600;color:" + gc.text + ";background:rgba(0,0,0,0.2);border:1px solid " + gc.text + ";'>" + grade + "</span>";
+                    html += "</td>";
+                });
+
+                // Trend indicator
+                var change = (firstScore !== null && latestScore !== null) ? latestScore - firstScore : 0;
+                var trendSymbol, trendColor;
+                if (change >= 10) { trendSymbol = '&#x25B2;&#x25B2;'; trendColor = '#22c55e'; }
+                else if (change >= 2) { trendSymbol = '&#x25B2;'; trendColor = '#22c55e'; }
+                else if (change <= -10) { trendSymbol = '&#x25BC;&#x25BC;'; trendColor = '#ef4444'; }
+                else if (change <= -2) { trendSymbol = '&#x25BC;'; trendColor = '#f59e0b'; }
+                else { trendSymbol = '&#x25C6;'; trendColor = '#6b7280'; }
+
+                html += "<td style='text-align:center;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.03);color:" + trendColor + ";font-size:10px;'>" + trendSymbol + "</td>";
+                html += "</tr>";
+            });
+
+            // Overall row (bold separator)
+            html += "<tr style='border-top:2px solid var(--glass-border);'>";
+            html += "<td style='padding:6px 10px;font-weight:700;color:var(--text-primary);'>Overall</td>";
+            var firstOverall = null, latestOverall = null;
+            displaySnaps.forEach(function(s) {
+                var grade = s.overall_grade || '-';
+                var score = s.overall_score || 0;
+                if (firstOverall === null) firstOverall = score;
+                latestOverall = score;
+                var gc = gradeGlowColor(grade);
+                var isCurrent = (s.scan_id === instanceId);
+                html += "<td style='text-align:center;padding:6px 8px;'>";
+                html += "<span style='display:inline-block;width:28px;height:22px;line-height:22px;border-radius:3px;font-size:12px;font-weight:700;color:" + gc.text + ";background:" + (isCurrent ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.2)') + ";border:1px solid " + gc.text + ";box-shadow:" + (isCurrent ? '0 0 8px ' + gc.glow : 'none') + ";'>" + grade + "</span>";
+                html += "</td>";
+            });
+
+            var overallChange = (latestOverall !== null && firstOverall !== null) ? latestOverall - firstOverall : 0;
+            var otSymbol, otColor;
+            if (overallChange >= 10) { otSymbol = '&#x25B2;&#x25B2;'; otColor = '#22c55e'; }
+            else if (overallChange >= 2) { otSymbol = '&#x25B2;'; otColor = '#22c55e'; }
+            else if (overallChange <= -10) { otSymbol = '&#x25BC;&#x25BC;'; otColor = '#ef4444'; }
+            else if (overallChange <= -2) { otSymbol = '&#x25BC;'; otColor = '#f59e0b'; }
+            else { otSymbol = '&#x25C6;'; otColor = '#6b7280'; }
+
+            html += "<td style='text-align:center;padding:6px 8px;color:" + otColor + ";font-size:12px;font-weight:700;'>" + otSymbol + "</td>";
+            html += "</tr></tbody></table>";
+
+            container.innerHTML = html;
+        }
+
+        function injectDeltaBadges(trendData) {
+            if (!trendData || !trendData.deltas || !trendData.deltas.since_previous) return;
+
+            var sp = trendData.deltas.since_previous;
+            var scoreChange = sp.score_change || 0;
+            if (scoreChange === 0) return;
+
+            var badgeColor = scoreChange > 0 ? '#22c55e' : '#ef4444';
+            var badgeText = (scoreChange > 0 ? '+' : '') + scoreChange.toFixed(1) + ' since last scan';
+
+            // Wait for grade panel to render, then inject badge
+            setTimeout(function() {
+                var gradeCircle = document.querySelector('#grade-panel-body');
+                if (!gradeCircle) return;
+
+                // Find the score display and add delta badge after it
+                var scoreEl = gradeCircle.querySelector('[id^="grade-overall-score"]');
+                if (!scoreEl) {
+                    // Try to find by looking at the overall score text
+                    var allSpans = gradeCircle.querySelectorAll('span, div');
+                    for (var i = 0; i < allSpans.length; i++) {
+                        if (allSpans[i].textContent.match(/OVERALL SECURITY RATING/i)) {
+                            scoreEl = allSpans[i];
+                            break;
+                        }
+                    }
+                }
+
+                if (scoreEl) {
+                    var badge = document.createElement('div');
+                    badge.style.cssText = 'text-align:center;margin-top:4px;';
+                    badge.innerHTML = "<span style='font-family:var(--font-mono);font-size:10px;color:" + badgeColor + ";background:rgba(0,0,0,0.3);padding:2px 8px;border-radius:10px;letter-spacing:0.5px;'>" + badgeText + "</span>";
+                    scoreEl.parentNode.insertBefore(badge, scoreEl.nextSibling);
+                }
+
+                // Inject per-category deltas
+                var catDeltas = trendData.deltas.category_deltas || {};
+                for (var catName in catDeltas) {
+                    var cd = catDeltas[catName];
+                    if (Math.abs(cd.change) < 1) continue;
+                    var cdColor = cd.change > 0 ? '#22c55e' : '#ef4444';
+                    var cdText = (cd.change > 0 ? '+' : '') + cd.change.toFixed(0);
+                    // Find category cards in the grade panel and inject small delta
+                    var catHeaders = gradeCircle.querySelectorAll('[data-category-name]');
+                    for (var j = 0; j < catHeaders.length; j++) {
+                        if (catHeaders[j].getAttribute('data-category-name') === catName) {
+                            var deltaSpan = document.createElement('span');
+                            deltaSpan.style.cssText = 'font-size:9px;color:' + cdColor + ';margin-left:6px;font-family:var(--font-mono);';
+                            deltaSpan.textContent = '(' + cdText + ')';
+                            catHeaders[j].appendChild(deltaSpan);
+                            break;
+                        }
+                    }
+                }
+            }, 2000); // Wait for grade panel to load
         }
 
         // Grade color map
@@ -7701,7 +8164,7 @@
                 // Left: color bar + name + mini badge
                 h += "<div style='display:flex;align-items:center;gap:10px;flex:1;'>";
                 h += "<div style='width:4px;height:28px;border-radius:2px;background:" + cat.color + ";flex-shrink:0;'></div>";
-                h += "<span style='font-weight:600;font-size:13px;color:var(--text-primary);text-transform:uppercase;font-family:var(--font-mono);letter-spacing:0.5px;'>" + catName + "</span>";
+                h += "<span data-category-name='" + catName + "' style='font-weight:600;font-size:13px;color:var(--text-primary);text-transform:uppercase;font-family:var(--font-mono);letter-spacing:0.5px;'>" + catName + "</span>";
                 // Mini grade badge with glow
                 h += "<span style='display:inline-block;width:26px;height:22px;line-height:22px;text-align:center;border-radius:4px;font-family:var(--font-mono);font-size:11px;font-weight:700;color:#fff;background:" + cc.grad + ";box-shadow:0 0 8px " + cc.glow + ";text-shadow:0 0 6px rgba(255,255,255,0.7);'>" + cat.grade + "</span>";
                 h += "</div>";
