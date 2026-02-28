@@ -7222,7 +7222,7 @@
             grid += "</div>";
             // Key Metrics grid
             grid += "<div class='col-sm-4' style='padding:15px;'>";
-            grid += "<div id='snapshot-metrics' style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;'></div>";
+            grid += "<div id='snapshot-metrics' style='display:grid;grid-template-columns:1fr 1fr;gap:8px;'></div>";
             grid += "</div>";
             grid += "</div>";
 
@@ -7903,47 +7903,55 @@
             var ocArrow = oc > 0 ? '&#x25B2;' : (oc < 0 ? '&#x25BC;' : '&#x25C6;');
             cards.push({label: 'CHANGE', value: (oc > 0 ? '+' : '') + oc.toFixed(1), color: ocColor, icon: ocArrow});
 
-            // 2. Resolved Types
-            var resolved = (d.since_previous && d.since_previous.resolved_finding_types) ? d.since_previous.resolved_finding_types.length : 0;
-            cards.push({label: 'RESOLVED', value: resolved, color: '#22c55e', icon: '&#x2713;'});
-
-            // 3. New Types
-            var newTypes = (d.since_previous && d.since_previous.new_finding_types) ? d.since_previous.new_finding_types.length : 0;
-            cards.push({label: 'NEW', value: newTypes, color: newTypes > 0 ? '#f59e0b' : '#6b7280', icon: '&#x2605;'});
-
-            // 4. Trajectory
+            // 2. Trajectory
             var tj = d.trajectory || 'stable';
             var tjColor = tj === 'improving' ? '#22c55e' : (tj === 'degrading' ? '#ef4444' : '#6b7280');
             var tjArrow = tj === 'improving' ? '&#x25B2;' : (tj === 'degrading' ? '&#x25BC;' : '&#x25C6;');
-            cards.push({label: 'TREND', value: tj.toUpperCase().substring(0, 6), color: tjColor, icon: tjArrow});
+            cards.push({label: 'TREND', value: tj.toUpperCase(), color: tjColor, icon: tjArrow});
 
-            // 5. Worst Category
+            // 3. Worst Category
             var wc = d.worst_category;
             if (wc) {
                 var wcGc = gradeGlowColor(wc.grade);
-                cards.push({label: 'WORST', value: wc.grade, sublabel: wc.name.substring(0, 12), color: wcGc.text, icon: ''});
+                cards.push({label: 'WORST', value: wc.grade, sublabel: wc.name, color: wcGc.text, icon: ''});
             } else {
                 cards.push({label: 'WORST', value: '-', color: '#6b7280', icon: ''});
             }
 
-            // 6. Best Category
+            // 4. Best Category
             var bc = d.best_category;
             if (bc) {
                 var bcGc = gradeGlowColor(bc.grade);
-                cards.push({label: 'BEST', value: bc.grade, sublabel: bc.name.substring(0, 12), color: bcGc.text, icon: ''});
+                cards.push({label: 'BEST', value: bc.grade, sublabel: bc.name, color: bcGc.text, icon: ''});
             } else {
                 cards.push({label: 'BEST', value: '-', color: '#6b7280', icon: ''});
             }
 
+            // 5. Timeframe
+            var snaps = trendData.snapshots || [];
+            var tfVal = '-';
+            if (snaps.length >= 2) {
+                var firstDate = snaps[0].date || 0;
+                var lastDate = snaps[snaps.length - 1].date || 0;
+                if (firstDate && lastDate) {
+                    var days = Math.max(1, Math.round((lastDate - firstDate) / 86400000));
+                    tfVal = days + 'd';
+                }
+            }
+            cards.push({label: 'TIMEFRAME', value: tfVal, color: '#8b5cf6', icon: ''});
+
+            // 6. Scan Count
+            cards.push({label: 'SCANS', value: trendData.scan_count || snaps.length, color: '#06b6d4', icon: ''});
+
             var html = '';
             cards.forEach(function(card) {
-                html += "<div style='background:var(--bg-tertiary);border:1px solid var(--glass-border);border-radius:6px;padding:10px 8px;text-align:center;'>";
-                html += "<div style='font-size:22px;font-weight:700;color:" + card.color + ";font-family:var(--font-mono);line-height:1;'>";
+                html += "<div style='background:var(--bg-tertiary);border:1px solid var(--glass-border);border-radius:6px;padding:10px 8px;text-align:center;min-width:0;overflow:hidden;'>";
+                html += "<div style='font-size:22px;font-weight:700;color:" + card.color + ";font-family:var(--font-mono);line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>";
                 if (card.icon) html += "<span style='font-size:12px;'>" + card.icon + "</span> ";
                 html += card.value + "</div>";
                 html += "<div style='font-size:9px;color:var(--text-muted);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:1px;margin-top:4px;'>" + card.label + "</div>";
                 if (card.sublabel) {
-                    html += "<div style='font-size:8px;color:var(--text-secondary);font-family:var(--font-mono);margin-top:2px;'>" + card.sublabel + "</div>";
+                    html += "<div style='font-size:8px;color:var(--text-secondary);font-family:var(--font-mono);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" + card.sublabel + "</div>";
                 }
                 html += "</div>";
             });

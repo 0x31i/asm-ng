@@ -7471,86 +7471,57 @@ class SpiderFootWebUi:
                         }
 
                         # Fetch snapshot trend data for Executive Summary
+                        # Uses pre-stored grade snapshots from tbl_grade_snapshots
                         snapshot_data = None
                         try:
                             target = scan_info.get('target', '')
-                            self.log.info(f"Full report: snapshot fetch for target={target!r}")
                             if target:
-                                # Get all finished scans for this target
-                                all_scans = dbh.scanInstanceList()
-                                self.log.info(f"Full report: total scans in DB={len(all_scans)}")
+                                snapshots_raw = dbh.gradeSnapshotsForTarget(target)
+                                active = [s for s in snapshots_raw if not s.get('excluded', 0)]
+                                self.log.info(f"Full report: snapshots for {target!r}: "
+                                              f"{len(snapshots_raw)} total, {len(active)} active")
 
-                                # Debug: log first scan's structure to verify column indices
-                                if all_scans:
-                                    s0 = all_scans[0]
-                                    self.log.info(f"Full report: sample scan row len={len(s0)} "
-                                                  f"cols: [0]={s0[0]!r} [2]={s0[2]!r} [6]={s0[6]!r}")
+                                if len(active) >= 2:
+                                    first = active[0]
+                                    latest = active[-1]
+                                    overall_change = round(latest['overall_score'] - first['overall_score'], 1)
+                                    trajectory = 'improving' if overall_change > 2 else (
+                                        'degrading' if overall_change < -2 else 'stable')
 
-                                target_scans = [
-                                    s for s in all_scans
-                                    if s[2] == target and s[6] in ('FINISHED', 'ABORTED')
-                                ]
-                                self.log.info(f"Full report: target_scans for {target!r} = {len(target_scans)}")
+                                    # Find worst/best from latest categories
+                                    worst_cat = best_cat = None
+                                    cats = latest.get('category_scores', {})
+                                    for cn, cd in cats.items():
+                                        w = cd.get('weight', 0)
+                                        if w <= 0:
+                                            continue
+                                        sc = cd.get('score', 0)
+                                        gr = cd.get('grade', '-')
+                                        if worst_cat is None or sc < worst_cat['score']:
+                                            worst_cat = {'name': cn, 'score': sc, 'grade': gr}
+                                        if best_cat is None or sc > best_cat['score']:
+                                            best_cat = {'name': cn, 'score': sc, 'grade': gr}
 
-                                # Sort oldest first (by started timestamp)
-                                target_scans.sort(key=lambda s: s[4] or 0)
+                                    # Build snapshot list for Excel (date as epoch seconds)
+                                    snap_list = []
+                                    for s in active:
+                                        snap_list.append({
+                                            'scan_id': s['scan_id'],
+                                            'date': s['scan_started'] / 1000,  # ms -> seconds
+                                            'overall_grade': s['overall_grade'],
+                                            'overall_score': s['overall_score'],
+                                        })
 
-                                if len(target_scans) >= 2:
-                                    # Calculate grades for each scan
-                                    snapshots = []
-                                    for ts in target_scans:
-                                        try:
-                                            ts_grade = self._calculateScanGrade(dbh, ts[0])
-                                            snapshots.append({
-                                                'scan_id': ts[0],
-                                                'date': ts[4] or ts[3] or 0,
-                                                'overall_grade': ts_grade.get('overall_grade', '-'),
-                                                'overall_score': ts_grade.get('overall_score', 0),
-                                                'category_scores': {
-                                                    cn: {'score': cd.get('score', 0),
-                                                         'grade': cd.get('grade', '-'),
-                                                         'weight': cd.get('weight', 0)}
-                                                    for cn, cd in ts_grade.get('categories', {}).items()
-                                                },
-                                            })
-                                        except Exception as ge:
-                                            self.log.warning(f"Full report: grade calc failed for {ts[0]}: {ge}")
-
-                                    self.log.info(f"Full report: graded snapshots={len(snapshots)}")
-                                    if len(snapshots) >= 2:
-                                        first = snapshots[0]
-                                        latest = snapshots[-1]
-                                        overall_change = round(latest['overall_score'] - first['overall_score'], 1)
-                                        trajectory = 'improving' if overall_change > 2 else (
-                                            'degrading' if overall_change < -2 else 'stable')
-
-                                        # Find worst/best from latest categories
-                                        worst_cat = best_cat = None
-                                        cats = latest.get('category_scores', {})
-                                        for cn, cd in cats.items():
-                                            w = cd.get('weight', 0)
-                                            if w <= 0:
-                                                continue
-                                            sc = cd.get('score', 0)
-                                            gr = cd.get('grade', '-')
-                                            if worst_cat is None or sc < worst_cat['score']:
-                                                worst_cat = {'name': cn, 'score': sc, 'grade': gr}
-                                            if best_cat is None or sc > best_cat['score']:
-                                                best_cat = {'name': cn, 'score': sc, 'grade': gr}
-
-                                        snapshot_data = {
-                                            'snapshots': snapshots,
-                                            'overall_change': overall_change,
-                                            'trajectory': trajectory,
-                                            'worst_category': worst_cat,
-                                            'best_category': best_cat,
-                                            'scan_count': len(snapshots),
-                                        }
-                                        self.log.info(f"Full report: snapshot_data built OK — "
-                                                      f"{len(snapshots)} scans, change={overall_change}, trend={trajectory}")
-                                else:
-                                    self.log.info(f"Full report: skipping snapshot panel — "
-                                                  f"need >=2 scans, have {len(target_scans)}")
+                                    snapshot_data = {
+                                        'snapshots': snap_list,
+                                        'overall_change': overall_change,
+                                        'trajectory': trajectory,
+                                        'worst_category': worst_cat,
+                                        'best_category': best_cat,
+                                        'scan_count': len(snap_list),
+                                    }
+                                    self.log.info(f"Full report: snapshot panel OK — "
+                                                  f"{len(snap_list)} scans, change={overall_change}")
                         except Exception as e:
                             self.log.warning(f"Full report: snapshot data fetch failed: {e}")
 
