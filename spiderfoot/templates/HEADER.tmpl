@@ -160,15 +160,15 @@
         pass
 %>
 % if _default_pw:
-    <div class="alert alert-danger alert-dismissible" id="default-password-warning" style="margin-top: 10px; border-left: 4px solid #dc3545; font-weight: 500;">
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-        </button>
-        <strong>Security Warning:</strong> You are using the default password. Please change it immediately via
+    <div id="default-password-warning">
+        <button type="button" class="dpw-close" onclick="this.parentElement.style.display='none';" aria-label="Close">&times;</button>
+        <i class="glyphicon glyphicon-lock dpw-icon"></i>
+        <span class="dpw-label">SECURITY</span>
+        <span class="dpw-text">DEFAULT PASSWORD DETECTED &mdash; CHANGE IMMEDIATELY VIA
 % if user_role == 'admin':
-        <a href="${docroot}/users" style="color: #dc3545; text-decoration: underline;">User Management</a>.
+        <a href="${docroot}/users" class="dpw-link">USER MANAGEMENT</a></span>
 % else:
-        your administrator.
+        YOUR ADMINISTRATOR</span>
 % endif
     </div>
 % endif

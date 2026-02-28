@@ -860,6 +860,70 @@ tr.danger td {
   color: var(--text-primary) !important;
 }
 
+/* Default Password Warning — sharp mono style */
+#default-password-warning {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 12px 18px;
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-left: 3px solid #dc2626;
+  border-radius: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  position: relative;
+}
+.dpw-icon {
+  color: #dc2626;
+  font-size: 14px;
+}
+.dpw-label {
+  background: #dc2626;
+  color: #ffffff;
+  padding: 2px 8px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  border-radius: 0;
+}
+.dpw-text {
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.8px;
+}
+.dpw-link {
+  color: #dc2626 !important;
+  text-decoration: none !important;
+  border-bottom: 1px solid rgba(220, 38, 38, 0.4);
+  transition: all 0.15s ease;
+}
+.dpw-link:hover {
+  color: #b91c1c !important;
+  border-bottom-color: #b91c1c;
+}
+.dpw-close {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+  font-family: var(--font-mono);
+}
+.dpw-close:hover { opacity: 1; color: #dc2626; }
+
 /* ============================================
    Badges - Pill Style
    ============================================ */
@@ -9352,4 +9416,5 @@ a.data-type-btn:hover {
   background: rgba(255, 255, 255, 0.92) !important;
   color: #1f2937 !important;
 }
+
 
