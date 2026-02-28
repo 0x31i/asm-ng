@@ -4319,20 +4319,6 @@
                 html += "</div>";
                 html += "</div>";
 
-                // Bulk action buttons (own row, hidden until selection)
-                html += "<div class='assets-known-filter-row assets-known-bulk-row' id='assets-known-bulk-row' style='display:none;'>";
-                html += "<button class='btn assets-known-remove-sel-btn' onclick='assetsRemoveSelected(\"" + instanceId + "\")' id='assets-remove-sel-btn'>";
-                html += "<i class='glyphicon glyphicon-trash'></i>&nbsp;&nbsp;REMOVE SELECTED</button>";
-                html += "<button class='btn assets-known-bulk-fp-btn' onclick='knownBulkAction(\"" + instanceId + "\", \"fp\")' id='assets-bulk-fp-btn'>";
-                html += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;FALSE POSITIVE</button>";
-                html += "<button class='btn assets-known-bulk-pending-btn' onclick='knownBulkAction(\"" + instanceId + "\", \"reset\")' id='assets-bulk-pending-btn'>";
-                html += "<i class='glyphicon glyphicon-repeat'></i>&nbsp;&nbsp;PENDING</button>";
-                html += "<button class='btn assets-known-bulk-affinity-btn' onclick='knownBulkAffinityPrompt()' id='assets-bulk-affinity-btn'>";
-                html += "<i class='glyphicon glyphicon-transfer'></i>&nbsp;&nbsp;CHANGE AFFINITY</button>";
-                html += "<button class='btn assets-known-bulk-tag-btn' onclick='knownBulkTagPrompt()' id='assets-bulk-tag-btn'>";
-                html += "<i class='glyphicon glyphicon-tag'></i>&nbsp;&nbsp;ASSIGN TAG</button>";
-                html += "</div>";
-
                 // Row 2: SOURCE + TAG
                 html += "<div class='assets-known-filter-row'>";
                 html += "<div class='assets-known-filter-group assets-known-filter-group-source'>";
@@ -4357,6 +4343,20 @@
                 html += "<button class='assets-known-filter-btn assets-known-filter-tag" + (knownActiveFilters.tag === '_untagged' ? " assets-known-filter-active assets-known-filter-active-tag" : "") + "' onclick='knownFilterTag(\"_untagged\", this)'>";
                 html += "UNTAGGED (" + untaggedCount + ")</button>";
                 html += "</div>";
+                html += "</div>";
+
+                // Bulk action buttons (own row, hidden until selection — appears below all filters)
+                html += "<div class='assets-known-filter-row assets-known-bulk-row' id='assets-known-bulk-row' style='display:none;'>";
+                html += "<button class='btn assets-known-remove-sel-btn' onclick='assetsRemoveSelected(\"" + instanceId + "\")' id='assets-remove-sel-btn'>";
+                html += "<i class='glyphicon glyphicon-trash'></i>&nbsp;&nbsp;REMOVE SELECTED</button>";
+                html += "<button class='btn assets-known-bulk-fp-btn' onclick='knownBulkAction(\"" + instanceId + "\", \"fp\")' id='assets-bulk-fp-btn'>";
+                html += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;FALSE POSITIVE</button>";
+                html += "<button class='btn assets-known-bulk-pending-btn' onclick='knownBulkAction(\"" + instanceId + "\", \"reset\")' id='assets-bulk-pending-btn'>";
+                html += "<i class='glyphicon glyphicon-repeat'></i>&nbsp;&nbsp;PENDING</button>";
+                html += "<button class='btn assets-known-bulk-affinity-btn' onclick='knownBulkAffinityPrompt()' id='assets-bulk-affinity-btn'>";
+                html += "<i class='glyphicon glyphicon-transfer'></i>&nbsp;&nbsp;CHANGE AFFINITY</button>";
+                html += "<button class='btn assets-known-bulk-tag-btn' onclick='knownBulkTagPrompt()' id='assets-bulk-tag-btn'>";
+                html += "<i class='glyphicon glyphicon-tag'></i>&nbsp;&nbsp;ASSIGN TAG</button>";
                 html += "</div>";
 
                 html += "</div>";
