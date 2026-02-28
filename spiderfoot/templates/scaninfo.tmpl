@@ -7923,23 +7923,8 @@
                 .attr('stroke', gc.text).attr('stroke-width', 1)
                 .attr('opacity', 0.3);
 
-            // Main dots
-            svg.selectAll('.snapshot-dot-main')
-            var gc = gradeGlowColor(snaps[snaps.length - 1].overall_grade);
-
-            svg.append('path')
-                .datum(snaps)
-                .attr('d', overallArea)
-                .attr('fill', gc.text).attr('opacity', 0.15);
-
-            svg.append('path')
-                .datum(snaps)
-                .attr('d', overallLine)
-                .attr('fill', 'none').attr('stroke', gc.text)
-                .attr('stroke-width', 3).attr('class', 'snapshot-line-overall');
-
-            // Data points for overall
-            svg.selectAll('.snapshot-dot-overall')
+            // Data points for overall (interactive dots with tooltips)
+            svg.selectAll('.snapshot-dot-interactive')
                 .data(snaps).enter().append('circle')
                 .attr('class', 'snapshot-dot-overall')
                 .attr('cx', function(d) { return x(parseDate(d.date)); })
