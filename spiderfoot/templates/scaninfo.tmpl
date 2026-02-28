@@ -7847,10 +7847,6 @@
                 .attr('opacity', 0.15).attr('stroke-dasharray', 'none');
 
             // ── Line + Area generators ────────────────────────────────────
-            // Style axis paths
-            svg.selectAll('.domain').attr('stroke', cssVar('--glass-border'));
-            svg.selectAll('.tick line').attr('stroke', cssVar('--glass-border'));
-
             // Overall line with area fill
             var overallLine = d3.svg.line()
                 .x(function(d) { return x(parseDate(d.date)); })
