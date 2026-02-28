@@ -9,8 +9,10 @@ import re
 
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from openpyxl.chart import BarChart, Reference
+from openpyxl.chart import BarChart, LineChart, Reference
 from openpyxl.chart.series import DataPoint
+from openpyxl.chart.layout import Layout, ManualLayout
+from openpyxl.chart.label import DataLabelList
 from openpyxl.formatting.rule import DataBarRule
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
@@ -1041,6 +1043,105 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
                          color=hex_to_argb(ov_color))
         ov_t.alignment = Alignment(horizontal='center')
         ov_t.border = overall_border_top
+
+    # ── SCORE TREND CHART ────────────────────────────────────────────────
+    # Write chart source data in chronological order in a hidden block
+    # below all visible content, then build a LineChart from it.
+    if len(snapshots) >= 2:
+        sr += 2  # leave gap after last section
+        chart_data_start = sr
+
+        # Header row for chart data
+        ws.cell(row=sr, column=1, value='_CHART_DATE').font = Font(
+            name='Calibri', size=1, color='FFF9FAFB')  # near-invisible
+        ws.cell(row=sr, column=2, value='_CHART_SCORE').font = Font(
+            name='Calibri', size=1, color='FFF9FAFB')
+        # Grade threshold reference columns
+        ws.cell(row=sr, column=3, value='A (90)').font = Font(
+            name='Calibri', size=1, color='FFF9FAFB')
+        ws.cell(row=sr, column=4, value='B (80)').font = Font(
+            name='Calibri', size=1, color='FFF9FAFB')
+        ws.cell(row=sr, column=5, value='C (70)').font = Font(
+            name='Calibri', size=1, color='FFF9FAFB')
+        ws.cell(row=sr, column=6, value='D (60)').font = Font(
+            name='Calibri', size=1, color='FFF9FAFB')
+        sr += 1
+
+        for snap in snapshots:  # chronological order
+            snap_date = snap.get('date', 0)
+            if snap_date:
+                try:
+                    date_label = _time.strftime('%b %d', _time.localtime(snap_date))
+                except (OSError, ValueError):
+                    date_label = '-'
+            else:
+                date_label = '-'
+            ws.cell(row=sr, column=1, value=date_label).font = Font(
+                name='Calibri', size=1, color='FFF9FAFB')
+            ws.cell(row=sr, column=2, value=snap.get('overall_score', 0)).font = Font(
+                name='Calibri', size=1, color='FFF9FAFB')
+            # Constant threshold lines
+            ws.cell(row=sr, column=3, value=90)
+            ws.cell(row=sr, column=4, value=80)
+            ws.cell(row=sr, column=5, value=70)
+            ws.cell(row=sr, column=6, value=60)
+            ws.row_dimensions[sr].height = 1  # hide data rows
+            sr += 1
+
+        chart_data_end = sr - 1
+
+        # Build the LineChart
+        chart = LineChart()
+        chart.title = 'SCORE TREND'
+        chart.y_axis.title = 'Score'
+        chart.y_axis.scaling.min = 0
+        chart.y_axis.scaling.max = 100
+        chart.x_axis.title = None
+        chart.style = 2  # minimal preset style
+        chart.width = 28  # ~10 columns wide
+        chart.height = 14  # ~18 rows tall
+        chart.legend.position = 'b'
+
+        # Category labels (dates on x-axis)
+        cats = Reference(ws, min_col=1, min_row=chart_data_start + 1,
+                         max_row=chart_data_end)
+
+        # Overall score series (primary line)
+        score_data = Reference(ws, min_col=2, min_row=chart_data_start,
+                               max_row=chart_data_end)
+        chart.add_data(score_data, titles_from_data=True)
+        chart.set_categories(cats)
+
+        # Style the main score line
+        s0 = chart.series[0]
+        s0.graphicalProperties.line.width = 28000  # ~2.5pt in EMU
+        s0.graphicalProperties.line.solidFill = 'f59e0b'  # amber
+        s0.smooth = True
+
+        # Add data labels showing score on each point
+        s0.dLbls = DataLabelList()
+        s0.dLbls.showVal = True
+        s0.dLbls.numFmt = '0.0'
+
+        # Grade threshold reference lines (dashed, subtle)
+        threshold_colors = ['22c55e', '3b82f6', 'f59e0b', 'f97316']
+        for ti in range(4):
+            thr_data = Reference(ws, min_col=3 + ti, min_row=chart_data_start,
+                                 max_row=chart_data_end)
+            chart.add_data(thr_data, titles_from_data=True)
+            ts = chart.series[1 + ti]
+            ts.graphicalProperties.line.width = 9500  # ~0.75pt
+            ts.graphicalProperties.line.solidFill = threshold_colors[ti]
+            ts.graphicalProperties.line.dashStyle = 'dash'
+            ts.smooth = False
+
+        # Anchor chart right after the category comparison section
+        chart_anchor_row = chart_data_start - 1
+        ws.add_chart(chart, f'A{chart_anchor_row}')
+
+        # Hide the chart source data rows (1px height, invisible font)
+        for r in range(chart_data_start, sr):
+            ws.row_dimensions[r].height = 1
 
     # ── Print setup (landscape, fit to page) ──────────────────────────────
     ws.page_setup.orientation = 'landscape'
