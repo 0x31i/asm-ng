@@ -618,8 +618,17 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
     snapshots = snapshot_data.get('snapshots', [])
     overall_change = snapshot_data.get('overall_change', 0)
     trajectory = snapshot_data.get('trajectory', 'stable')
-    worst = snapshot_data.get('worst_category') or {}
-    best = snapshot_data.get('best_category') or {}
+    _worst_raw = snapshot_data.get('worst_category') or ''
+    _best_raw = snapshot_data.get('best_category') or ''
+    # Accept both dict {'grade': 'F', 'name': 'Web App Security'} and plain string forms
+    if isinstance(_worst_raw, dict):
+        worst = _worst_raw
+    else:
+        worst = {'grade': snapshot_data.get('worst_grade', '-'), 'name': str(_worst_raw)}
+    if isinstance(_best_raw, dict):
+        best = _best_raw
+    else:
+        best = {'grade': snapshot_data.get('best_grade', '-'), 'name': str(_best_raw)}
     scan_count = snapshot_data.get('scan_count', len(snapshots))
     timeframe_days = snapshot_data.get('timeframe_days', 0)
     first_date = snapshot_data.get('first_date', 0)
@@ -1049,8 +1058,8 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
     if len(snapshots) >= 2:
         from openpyxl.chart.shapes import GraphicalProperties as ChartGP
         from openpyxl.chart.text import RichText
-        from openpyxl.chart.legend import LegendEntry
         from openpyxl.chart.marker import Marker
+        from openpyxl.chart.axis import ChartLines
         from openpyxl.drawing.text import (
             Paragraph, ParagraphProperties, CharacterProperties,
             Font as DrawingFont,
@@ -1061,8 +1070,8 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
 
         # Header row for chart data (invisible text)
         _hide_font = Font(name='Calibri', size=1, color='FFF9FAFB')
-        for ci, hdr in enumerate(['Date', 'Score', 'A', 'B', 'C', 'D'], 1):
-            ws.cell(row=sr, column=ci, value=hdr).font = _hide_font
+        ws.cell(row=sr, column=1, value='Date').font = _hide_font
+        ws.cell(row=sr, column=2, value='Overall Score').font = _hide_font
         ws.row_dimensions[sr].height = 1
         sr += 1
 
@@ -1077,10 +1086,6 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
                 date_label = '-'
             ws.cell(row=sr, column=1, value=date_label).font = _hide_font
             ws.cell(row=sr, column=2, value=snap.get('overall_score', 0))
-            ws.cell(row=sr, column=3, value=90)
-            ws.cell(row=sr, column=4, value=80)
-            ws.cell(row=sr, column=5, value=70)
-            ws.cell(row=sr, column=6, value=60)
             ws.row_dimensions[sr].height = 1
             sr += 1
 
@@ -1088,14 +1093,14 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
 
         # ── Build the dark-themed LineChart ────────────────────────────
         chart = LineChart()
-        chart.width = 28
-        chart.height = 15
+        chart.width = 22   # cm — fits nicely beside the data
+        chart.height = 16  # cm — tall enough for clear reading
 
-        # Dark chart area background (#111827)
+        # Dark chart area background (#111827) with border
         chart_frame = ChartGP()
         chart_frame.solidFill = '111827'
-        chart_frame.line.solidFill = '374151'
-        chart_frame.line.width = 12700  # 1pt border
+        chart_frame.line.solidFill = '4B5563'
+        chart_frame.line.width = 12700  # 1pt
         chart.graphical_properties = chart_frame
 
         # Dark plot area background (#1F2937)
@@ -1106,17 +1111,18 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
 
         # ── Axis styling (light text on dark) ──────────────────────────
         _axis_font = CharacterProperties(
-            latin=DrawingFont(typeface='Calibri'), sz=800, solidFill='9CA3AF')
+            latin=DrawingFont(typeface='Calibri'), sz=900, solidFill='D1D5DB')
         _axis_text = RichText(
             p=[Paragraph(pPr=ParagraphProperties(defRPr=_axis_font),
                          endParaRPr=_axis_font)])
 
-        from openpyxl.chart.axis import ChartLines
-
+        # Y-axis: 0-100, dark gridlines, no title
         chart.y_axis.scaling.min = 0
         chart.y_axis.scaling.max = 100
+        chart.y_axis.numFmt = '0'
         chart.y_axis.txPr = _axis_text
         chart.y_axis.title = None
+        chart.y_axis.delete = False
         # Subtle dark gridlines
         grid_lines = ChartLines()
         grid_gp = ChartGP()
@@ -1124,82 +1130,67 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
         grid_gp.line.width = 6350  # 0.5pt
         grid_lines.graphicalProperties = grid_gp
         chart.y_axis.majorGridlines = grid_lines
-        chart.y_axis.delete = False
 
-        chart.x_axis.txPr = _axis_text
+        # X-axis: date labels, light text
+        _x_font = CharacterProperties(
+            latin=DrawingFont(typeface='Calibri'), sz=900, b=True,
+            solidFill='D1D5DB')
+        chart.x_axis.txPr = RichText(
+            p=[Paragraph(pPr=ParagraphProperties(defRPr=_x_font),
+                         endParaRPr=_x_font)])
         chart.x_axis.title = None
         chart.x_axis.delete = False
 
-        # ── Title styling (white on dark) ──────────────────────────────
+        # ── Title (prominent white text) ──────────────────────────────
         _title_font = CharacterProperties(
-            latin=DrawingFont(typeface='Calibri'), sz=1100, b=True,
-            solidFill='F9FAFB')
+            latin=DrawingFont(typeface='Calibri'), sz=1400, b=True,
+            solidFill='FFFFFF')
         chart.title = 'SCORE TREND'
         chart.title.txPr = RichText(
             p=[Paragraph(pPr=ParagraphProperties(defRPr=_title_font),
                          endParaRPr=_title_font)])
 
-        # ── Legend styling ─────────────────────────────────────────────
-        _legend_font = CharacterProperties(
-            latin=DrawingFont(typeface='Calibri'), sz=800, solidFill='9CA3AF')
-        chart.legend.position = 'b'
-        chart.legend.txPr = RichText(
-            p=[Paragraph(pPr=ParagraphProperties(defRPr=_legend_font),
-                         endParaRPr=_legend_font)])
+        # ── No legend (single series, self-explanatory) ───────────────
+        chart.legend = None
 
         # ── Data + categories ──────────────────────────────────────────
         cats = Reference(ws, min_col=1, min_row=chart_data_start + 1,
                          max_row=chart_data_end)
-
         score_data = Reference(ws, min_col=2, min_row=chart_data_start,
                                max_row=chart_data_end)
         chart.add_data(score_data, titles_from_data=True)
         chart.set_categories(cats)
 
-        # ── Style main score line (amber, thick, smooth, with markers) ─
+        # ── Style the score line ───────────────────────────────────────
         s0 = chart.series[0]
-        s0.graphicalProperties.line.width = 28000  # ~2.5pt
-        s0.graphicalProperties.line.solidFill = 'f59e0b'
+        s0.graphicalProperties.line.width = 32000  # ~2.8pt thick
+        s0.graphicalProperties.line.solidFill = 'f59e0b'  # amber
         s0.smooth = True
-        # Circle markers with amber fill and white stroke
-        s0.marker = Marker(symbol='circle', size=7)
+
+        # Large circle markers: amber fill, thick white ring
+        s0.marker = Marker(symbol='circle', size=12)
         s0_marker_gp = ChartGP()
         s0_marker_gp.solidFill = 'f59e0b'
         s0_marker_gp.line.solidFill = 'ffffff'
-        s0_marker_gp.line.width = 12700  # 1pt
+        s0_marker_gp.line.width = 19050  # 1.5pt white ring
         s0.marker.graphicalProperties = s0_marker_gp
-        # Data labels: score values, white text
+
+        # Data labels: score values positioned above markers
         _dlbl_font = CharacterProperties(
-            latin=DrawingFont(typeface='Calibri'), sz=800, b=True,
-            solidFill='F9FAFB')
+            latin=DrawingFont(typeface='Calibri'), sz=1000, b=True,
+            solidFill='FFFFFF')
         s0.dLbls = DataLabelList()
         s0.dLbls.showVal = True
         s0.dLbls.showCatName = False
         s0.dLbls.showSerName = False
         s0.dLbls.numFmt = '0.0'
+        s0.dLbls.dLblPos = 't'  # position labels above markers
         s0.dLbls.txPr = RichText(
             p=[Paragraph(pPr=ParagraphProperties(defRPr=_dlbl_font),
                          endParaRPr=_dlbl_font)])
 
-        # ── Grade threshold reference lines (dashed, no markers) ───────
-        threshold_colors = ['22c55e', '3b82f6', 'f59e0b', 'f97316']
-        for ti in range(4):
-            thr_data = Reference(ws, min_col=3 + ti, min_row=chart_data_start,
-                                 max_row=chart_data_end)
-            chart.add_data(thr_data, titles_from_data=True)
-            ts = chart.series[1 + ti]
-            ts.graphicalProperties.line.width = 6350   # 0.5pt
-            ts.graphicalProperties.line.solidFill = threshold_colors[ti]
-            ts.graphicalProperties.line.dashStyle = 'dash'
-            ts.smooth = False
-            # Hide markers
-            ts.marker = Marker(symbol='none')
-            # Hide these from the legend (keep only "Score")
-            chart.legend.legendEntry.append(LegendEntry(idx=1 + ti, delete=True))
-
-        # ── Anchor chart below category comparison ─────────────────────
-        chart_anchor_row = chart_data_start - 1
-        ws.add_chart(chart, f'A{chart_anchor_row}')
+        # ── Anchor chart to the right of the main content (H1) ────────
+        ws.add_chart(chart, 'H1')
 
     # ── Print setup (landscape, fit to page) ──────────────────────────────
     ws.page_setup.orientation = 'landscape'
