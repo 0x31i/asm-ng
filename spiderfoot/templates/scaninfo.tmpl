@@ -7226,7 +7226,7 @@
             grid += "<div class='row' style='margin:0;'>";
             // D3 Line Chart area
             grid += "<div class='col-sm-8' style='padding:15px;'>";
-            grid += "<div id='snapshot-chart' style='width:100%;height:280px;position:relative;border-radius:4px;overflow:hidden;'></div>";
+            grid += "<div id='snapshot-chart' style='width:100%;height:280px;position:relative;'></div>";
             grid += "<div id='snapshot-legend' style='display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;'></div>";
             grid += "</div>";
             // Key Metrics grid
@@ -7720,20 +7720,9 @@
             d3.select('#snapshot-chart').selectAll('*').remove();
             d3.select('#snapshot-tooltip').remove();
 
-            var isDarkTheme = localStorage.getItem("theme") === "dark-theme";
-            var chartBg = isDarkTheme ? '#0a0f1a' : '#ffffff';
-
             var rootSvg = d3.select('#snapshot-chart').append('svg')
                 .attr('width', width + margin.left + margin.right)
-                .attr('height', height + margin.top + margin.bottom)
-                .style('background', chartBg);
-
-            // Explicit background rect (for SVG export compatibility)
-            rootSvg.append('rect')
-                .attr('width', width + margin.left + margin.right)
-                .attr('height', height + margin.top + margin.bottom)
-                .attr('fill', chartBg)
-                .attr('rx', 4);
+                .attr('height', height + margin.top + margin.bottom);
 
             // ── SVG defs: gradient + glow filter ──────────────────────────
             var defs = rootSvg.append('defs');
