@@ -7830,7 +7830,7 @@
             xAxisG.selectAll('text')
                 .style('font-size', '9px').style('fill', cssVar('--text-secondary'))
                 .style('font-family', 'var(--font-mono)');
-            xAxisG.selectAll('.domain').attr('stroke', 'none');
+            xAxisG.selectAll('.domain').attr('stroke', 'none').attr('fill', 'none');
             xAxisG.selectAll('.tick line').attr('stroke', cssVar('--glass-border'))
                 .attr('opacity', 0.4);
 
@@ -7842,7 +7842,7 @@
             yAxisG.selectAll('text')
                 .style('font-size', '9px').style('fill', cssVar('--text-secondary'))
                 .style('font-family', 'var(--font-mono)');
-            yAxisG.selectAll('.domain').attr('stroke', 'none');
+            yAxisG.selectAll('.domain').attr('stroke', 'none').attr('fill', 'none');
             yAxisG.selectAll('.tick line').attr('stroke', cssVar('--glass-border'))
                 .attr('opacity', 0.15).attr('stroke-dasharray', 'none');
 
