@@ -6349,7 +6349,7 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
-    def snapshotexclude(self: 'SpiderFootWebUi', id: str, excluded: str) -> dict:
+    def snapshotexclude(self: 'SpiderFootWebUi', id: str = '', excluded: str = '0') -> dict:
         """Toggle the snapshot_excluded flag for a scan's grade snapshot.
 
         Args:
@@ -6359,9 +6359,17 @@ class SpiderFootWebUi:
         Returns:
             dict: success status
         """
+        if not id:
+            return {'success': False, 'message': 'No scan ID specified'}
+
+        try:
+            excluded_int = int(excluded)
+        except (ValueError, TypeError):
+            return {'success': False, 'message': f'Invalid excluded value: {excluded}'}
+
         with SpiderFootDb(self.config) as dbh:
             try:
-                dbh.gradeSnapshotSetExcluded(id, int(excluded))
+                dbh.gradeSnapshotSetExcluded(id, excluded_int)
                 return {'success': True}
             except Exception as e:
                 self.log.error(f"Error updating snapshot excluded for scan {id}: {e}", exc_info=True)

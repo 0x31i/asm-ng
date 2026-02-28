@@ -11191,15 +11191,26 @@
                         var scanId = this.getAttribute('data-scan-id');
                         var newExcluded = this.checked ? 0 : 1;
                         var checkbox = this;
+                        var wasChecked = !this.checked;
                         checkbox.disabled = true;
-                        sf.fetchData('${docroot}/snapshotexclude', {id: scanId, excluded: newExcluded}, function(resp) {
+                        $.ajax({
+                            type: 'POST',
+                            url: '${docroot}/snapshotexclude',
+                            data: {id: scanId, excluded: String(newExcluded)},
+                            dataType: 'json',
+                            timeout: 15000
+                        }).done(function(resp) {
                             checkbox.disabled = false;
                             if (resp && resp.success) {
                                 loadSnapshotExclusionList(instanceId);
                             } else {
-                                // Revert on failure
-                                checkbox.checked = !checkbox.checked;
+                                checkbox.checked = wasChecked;
+                                alertify.error('Failed to update: ' + (resp && resp.message ? resp.message : 'unknown error'));
                             }
+                        }).fail(function(xhr, status, err) {
+                            checkbox.disabled = false;
+                            checkbox.checked = wasChecked;
+                            alertify.error('Request failed: ' + (err || status));
                         });
                     });
                 });
