@@ -813,7 +813,7 @@ class SpiderFootWebUi:
 
         for row in data:
             sheetName = "".join(
-                [c for c in str(row.pop(sheetNameIndex)) if c.upper() in allowed_sheet_chars])[:31]
+                [c for c in str(row.pop(sheetNameIndex)) if c.upper() in allowed_sheet_chars])[:31].upper()
             try:
                 worksheet = workbook[sheetName]
             except KeyError:
@@ -4752,7 +4752,7 @@ class SpiderFootWebUi:
                 cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="{fname}"'
                 wb = openpyxl.Workbook()
                 ws = wb.active
-                ws.title = "Known Assets"
+                ws.title = "KNOWN ASSETS"
                 ws.append(["Type", "Value", "Source", "Date Added", "Added By", "Notes"])
                 for r in rows:
                     ws.append([r[2], r[3], r[4], r[6], r[7], r[8]])
@@ -7536,10 +7536,10 @@ class SpiderFootWebUi:
                         except Exception as e:
                             self.log.warning(f"Full report: snapshot data fetch failed: {e}")
 
-                        # Sheet 1: Executive Summary (reuse the default active sheet)
-                        self.log.info("Full report: building Executive Summary")
+                        # Sheet 1: EXECUTIVE SUMMARY (reuse the default active sheet)
+                        self.log.info("Full report: building EXECUTIVE SUMMARY")
                         ws_summary = wb.active
-                        ws_summary.title = "Executive Summary"
+                        ws_summary.title = "EXECUTIVE SUMMARY"
                         build_executive_summary(ws_summary, grade_data, scan_info,
                                                 findings_rows=findings_rows,
                                                 correlation_rows=correlation_rows)
@@ -7550,14 +7550,14 @@ class SpiderFootWebUi:
                             ws_snap = wb.create_sheet("SNAPSHOT")
                             build_snapshot_sheet(ws_snap, snapshot_data)
 
-                        # Sheet 3: Findings (black tab, severity colors)
-                        self.log.info(f"Full report: building Findings sheet ({len(findings_rows)} rows)")
-                        ws_findings = wb.create_sheet("Findings")
+                        # Sheet 3: FINDINGS (black tab, severity colors)
+                        self.log.info(f"Full report: building FINDINGS sheet ({len(findings_rows)} rows)")
+                        ws_findings = wb.create_sheet("FINDINGS")
                         build_findings_sheet(ws_findings, findings_rows)
 
-                        # Sheet 3: Correlations (dark gray tab, risk colors)
-                        self.log.info(f"Full report: building Correlations sheet ({len(correlation_rows)} rows)")
-                        ws_corr = wb.create_sheet("Correlations")
+                        # Sheet 4: CORRELATIONS (dark gray tab, risk colors)
+                        self.log.info(f"Full report: building CORRELATIONS sheet ({len(correlation_rows)} rows)")
+                        ws_corr = wb.create_sheet("CORRELATIONS")
                         build_correlations_sheet(ws_corr, correlation_rows)
 
                         # Build category weight ordering for event-type tab sorting
@@ -7567,7 +7567,7 @@ class SpiderFootWebUi:
                             for cat_name, cat_data in cat_results.items()
                         }
 
-                        used_names = {'Executive Summary', 'SNAPSHOT', 'Findings', 'Correlations'}
+                        used_names = {'EXECUTIVE SUMMARY', 'SNAPSHOT', 'FINDINGS', 'CORRELATIONS'}
 
                         # Sheet 4: EXT-VULNS (Nessus) - red tab
                         try:
@@ -7698,7 +7698,7 @@ class SpiderFootWebUi:
                                     build_burp_sheet(ws_burp, burp_rows)
                                     _webapp_vulns_inserted = True
 
-                                safe_name = sanitize_sheet_name(display_type)
+                                safe_name = sanitize_sheet_name(display_type).upper()
                                 original = safe_name
                                 suffix = 2
                                 while safe_name in used_names:
@@ -7730,10 +7730,10 @@ class SpiderFootWebUi:
                         wb = openpyxl.Workbook()
 
                         ws_findings = wb.active
-                        ws_findings.title = "Findings"
+                        ws_findings.title = "FINDINGS"
                         build_findings_sheet(ws_findings, findings_rows)
 
-                        ws_corr = wb.create_sheet("Correlations")
+                        ws_corr = wb.create_sheet("CORRELATIONS")
                         build_correlations_sheet(ws_corr, correlation_rows)
 
                 try:
@@ -7749,12 +7749,12 @@ class SpiderFootWebUi:
                     # Fall back to basic export so the user gets something
                     wb_fallback = openpyxl.Workbook()
                     ws_err = wb_fallback.active
-                    ws_err.title = "Export Error"
+                    ws_err.title = "EXPORT ERROR"
                     ws_err['A1'].value = "Full report save failed during Excel serialization."
                     ws_err['A2'].value = f"Error: {str(e)}"
                     ws_err['A3'].value = "The styled workbook was built but could not be saved. Basic data follows."
 
-                    ws_fb_findings = wb_fallback.create_sheet("Findings")
+                    ws_fb_findings = wb_fallback.create_sheet("FINDINGS")
                     fb_headers = ["Priority", "Category", "Tab", "Item", "Description", "Recommendation"]
                     for col_num, header in enumerate(fb_headers, 1):
                         ws_fb_findings.cell(row=1, column=col_num, value=header)
@@ -7762,7 +7762,7 @@ class SpiderFootWebUi:
                         for col_num, cell_value in enumerate(row_data, 1):
                             ws_fb_findings.cell(row=row_num, column=col_num, value=_safe_str(cell_value))
 
-                    ws_fb_corr = wb_fallback.create_sheet("Correlations")
+                    ws_fb_corr = wb_fallback.create_sheet("CORRELATIONS")
                     fb_corr_headers = ["Correlation", "Rule Name", "Risk", "Description", "Rule Logic", "Event Count", "Event Types"]
                     for col_num, header in enumerate(fb_corr_headers, 1):
                         ws_fb_corr.cell(row=1, column=col_num, value=header)
