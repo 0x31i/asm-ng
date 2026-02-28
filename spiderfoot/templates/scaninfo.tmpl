@@ -3379,10 +3379,10 @@
             }
             knownKebabActiveId = assetId;
 
-            // Position dropdown relative to the button
+            // Position dropdown relative to the button (use getBoundingClientRect
+            // since the dropdown is position:fixed and needs viewport coordinates)
             var $btn = $(btn);
-            var offset = $btn.offset();
-            var btnH = $btn.outerHeight();
+            var rect = btn.getBoundingClientRect();
 
             // Populate affinity toggle label based on current row data
             var $row = $("tr.assets-known-row[data-asset-id='" + assetId + "']");
@@ -3395,15 +3395,20 @@
             knownPopulateKebabTags(currentTag);
 
             $dd.css({
-                top: offset.top + btnH + 4,
-                left: offset.left - 160 + $btn.outerWidth(),
+                top: rect.bottom + 4,
+                left: rect.right - 200,
                 display: 'block'
             });
 
             // Adjust if dropdown goes off-screen right
             var ddWidth = $dd.outerWidth();
-            if (offset.left - 160 + $btn.outerWidth() + ddWidth > $(window).width()) {
-                $dd.css('left', offset.left - ddWidth + $btn.outerWidth());
+            if (rect.right - 200 + ddWidth > $(window).width()) {
+                $dd.css('left', rect.right - ddWidth);
+            }
+            // Adjust if dropdown goes off-screen bottom
+            var ddHeight = $dd.outerHeight();
+            if (rect.bottom + 4 + ddHeight > $(window).height()) {
+                $dd.css('top', rect.top - ddHeight - 4);
             }
         }
 
