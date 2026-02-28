@@ -1058,14 +1058,17 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
     if len(snapshots) >= 2:
         from openpyxl.chart.shapes import GraphicalProperties as ChartGP
         from openpyxl.chart.text import RichText
+        from openpyxl.chart.title import Title as ChartTitle
         from openpyxl.chart.marker import Marker
         from openpyxl.chart.axis import ChartLines
         from openpyxl.drawing.text import (
             Paragraph, ParagraphProperties, CharacterProperties,
-            Font as DrawingFont,
+            RegularTextRun, Font as DrawingFont,
         )
 
-        sr += 2  # leave gap after last section
+        sr += 1  # one spacer row
+        chart_anchor_row = sr  # chart will be placed here visually
+        sr += 1  # another spacer (chart floats over these)
         chart_data_start = sr
 
         # Header row for chart data (invisible text)
@@ -1093,8 +1096,8 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
 
         # ── Build the dark-themed LineChart ────────────────────────────
         chart = LineChart()
-        chart.width = 22   # cm — fits nicely beside the data
-        chart.height = 16  # cm — tall enough for clear reading
+        chart.width = 30.86  # 12.15" — matches full A:J banner width
+        chart.height = 14  # cm — balanced proportion
 
         # Dark chart area background (#111827) with border
         chart_frame = ChartGP()
@@ -1141,14 +1144,18 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
         chart.x_axis.title = None
         chart.x_axis.delete = False
 
-        # ── Title (prominent white text) ──────────────────────────────
+        # ── Title (large, bold, white — built with explicit styled runs) ─
         _title_font = CharacterProperties(
-            latin=DrawingFont(typeface='Calibri'), sz=1400, b=True,
+            latin=DrawingFont(typeface='Calibri'), sz=1800, b=True,
             solidFill='FFFFFF')
-        chart.title = 'SCORE TREND'
-        chart.title.txPr = RichText(
-            p=[Paragraph(pPr=ParagraphProperties(defRPr=_title_font),
-                         endParaRPr=_title_font)])
+        _title_obj = ChartTitle()
+        _title_obj.tx.rich.paragraphs = [
+            Paragraph(
+                pPr=ParagraphProperties(defRPr=_title_font),
+                r=[RegularTextRun(t='SCORE TREND', rPr=_title_font)],
+            )
+        ]
+        chart.title = _title_obj
 
         # ── No legend (single series, self-explanatory) ───────────────
         chart.legend = None
@@ -1189,8 +1196,8 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
             p=[Paragraph(pPr=ParagraphProperties(defRPr=_dlbl_font),
                          endParaRPr=_dlbl_font)])
 
-        # ── Anchor chart to the right of the main content (H1) ────────
-        ws.add_chart(chart, 'H1')
+        # ── Anchor chart below content, full width of A:J ─────────────
+        ws.add_chart(chart, f'A{chart_anchor_row}')
 
     # ── Print setup (landscape, fit to page) ──────────────────────────────
     ws.page_setup.orientation = 'landscape'
