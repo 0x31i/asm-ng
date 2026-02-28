@@ -6271,6 +6271,16 @@ i.glyphicon-white,
 .assets-card-client .assets-card-icon { color: #3b82f6; }
 .assets-card-analyst .assets-card-icon { color: #f59e0b; }
 .assets-card-pending .assets-card-icon { color: #ef4444; }
+
+/* Summary card color accents */
+.assets-card-total { border-left: 4px solid #22c55e; }
+.assets-card-total .assets-card-number { color: #16a34a; }
+.assets-card-client { border-left: 4px solid #3b82f6; }
+.assets-card-client .assets-card-number { color: #2563eb; }
+.assets-card-analyst { border-left: 4px solid #f59e0b; }
+.assets-card-analyst .assets-card-number { color: #d97706; }
+.assets-card-pending { border-left: 4px solid #ef4444; }
+.assets-card-pending .assets-card-number { color: #dc2626; }
 .assets-card-info { display: flex; flex-direction: column; }
 .assets-card-number {
   font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
@@ -6320,6 +6330,29 @@ i.glyphicon-white,
   color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+/* Breakdown card color accents */
+.assets-breakdown-card-ip { border-left: 4px solid #3b82f6; }
+.assets-breakdown-card-ip i { color: #2563eb; }
+.assets-breakdown-card-domain { border-left: 4px solid #8b5cf6; }
+.assets-breakdown-card-domain i { color: #7c3aed; }
+.assets-breakdown-card-email { border-left: 4px solid #06b6d4; }
+.assets-breakdown-card-email i { color: #0891b2; }
+.assets-breakdown-card-human { border-left: 4px solid #f59e0b; }
+.assets-breakdown-card-human i { color: #d97706; }
+.assets-breakdown-card-matches { border-left: 4px solid #ef4444; }
+.assets-breakdown-card-matches i { color: #dc2626; }
+.assets-breakdown-card-direct { border-left: 4px solid #22c55e; }
+.assets-breakdown-card-direct i { color: #16a34a; }
+.assets-breakdown-card-associated { border-left: 4px solid #6366f1; }
+.assets-breakdown-card-associated i { color: #4f46e5; }
+
+/* Balanced breakdown grid rows */
+.assets-breakdown-row-4 { grid-template-columns: repeat(4, 1fr); }
+.assets-breakdown-row-3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 768px) {
+  .assets-breakdown-row-4, .assets-breakdown-row-3 { grid-template-columns: repeat(2, 1fr); }
 }
 
 .assets-callout {
@@ -6542,18 +6575,42 @@ i.glyphicon-white,
   background: #f1f5f9;
   color: #334155;
   border: 1px solid #e2e8f0;
-  border-radius: 4px;
-  padding: 7px 14px;
+  border-radius: 12px;
+  padding: 4px 10px;
   font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
+/* Default hover/active (fallback) */
 .assets-known-filter-btn:hover { color: #16a34a; border-color: rgba(34,197,94,0.3); }
 .assets-known-filter-active { background: rgba(34,197,94,0.1) !important; color: #16a34a !important; border-color: rgba(34,197,94,0.4) !important; }
+
+/* Per-group TYPE (Blue) */
+.assets-known-filter-label-type { color: #2563eb !important; }
+.assets-known-filter-group-type .assets-known-filter-btn:hover { color: #2563eb; border-color: rgba(59,130,246,0.3); }
+.assets-known-filter-active-type { background: rgba(59,130,246,0.1) !important; color: #2563eb !important; border-color: rgba(59,130,246,0.4) !important; }
+
+/* Per-group AFFINITY (Green) */
+.assets-known-filter-label-affinity { color: #16a34a !important; }
+.assets-known-filter-group-affinity .assets-known-filter-btn:hover { color: #16a34a; border-color: rgba(34,197,94,0.3); }
+.assets-known-filter-active-affinity { background: rgba(34,197,94,0.1) !important; color: #16a34a !important; border-color: rgba(34,197,94,0.4) !important; }
+
+/* Per-group SOURCE (Orange) */
+.assets-known-filter-label-source { color: #d97706 !important; }
+.assets-known-filter-group-source .assets-known-filter-btn:hover { color: #d97706; border-color: rgba(245,158,11,0.3); }
+.assets-known-filter-active-source { background: rgba(245,158,11,0.1) !important; color: #d97706 !important; border-color: rgba(245,158,11,0.4) !important; }
+
+/* Per-group TAG (Purple) */
+.assets-known-filter-label-tag { color: #7c3aed !important; }
+.assets-known-filter-group-tag .assets-known-filter-btn:hover { color: #7c3aed; border-color: rgba(139,92,246,0.3); }
+.assets-known-filter-active-tag { background: rgba(139,92,246,0.1) !important; color: #7c3aed !important; border-color: rgba(139,92,246,0.4) !important; }
+
+/* Filter row layout */
+.assets-known-filter-row { display: flex; align-items: center; gap: 12px; width: 100%; flex-wrap: wrap; }
 .assets-known-filter-btn .glyphicon { font-size: 10px; margin-right: 2px; }
 
 .assets-known-remove-sel-btn {
