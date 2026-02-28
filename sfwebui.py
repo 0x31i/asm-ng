@@ -6204,14 +6204,14 @@ class SpiderFootWebUi:
                 target = scan_info[1]  # seed_target
                 scan_count = dbh.scanCountForTarget(target)
 
-                # Get existing snapshots
-                snapshots = dbh.gradeSnapshotsForTarget(target)
+                # Get existing snapshots (include excluded so UI can show them)
+                snapshots = dbh.gradeSnapshotsForTarget(target, include_excluded=True)
 
                 # Lazy backfill if snapshots < completed scan count
                 if len(snapshots) < scan_count:
                     try:
                         self._backfillSnapshots(dbh, target)
-                        snapshots = dbh.gradeSnapshotsForTarget(target)
+                        snapshots = dbh.gradeSnapshotsForTarget(target, include_excluded=True)
                     except Exception as e:
                         self.log.warning(f"Snapshot backfill failed for target={target}: {e}")
 
@@ -6225,7 +6225,7 @@ class SpiderFootWebUi:
                         'trajectory': 'unknown'
                     }
 
-                # Build snapshot response
+                # Build snapshot response (all snapshots, with excluded flag)
                 snap_list = []
                 for s in snapshots:
                     snap_list.append({
@@ -6237,16 +6237,20 @@ class SpiderFootWebUi:
                         'total_findings': s['total_findings'],
                         'unique_findings': s['unique_findings'],
                         'correlations': s['correlation_counts'],
+                        'excluded': s.get('excluded', 0),
                     })
+
+                # Filter to non-excluded snapshots for delta/trajectory calculation
+                active_snaps = [s for s in snap_list if not s.get('excluded')]
 
                 # Calculate deltas
                 deltas = {}
                 trajectory = 'stable'
 
-                if len(snap_list) >= 2:
-                    first = snap_list[0]
-                    latest = snap_list[-1]
-                    previous = snap_list[-2]
+                if len(active_snaps) >= 2:
+                    first = active_snaps[0]
+                    latest = active_snaps[-1]
+                    previous = active_snaps[-2]
 
                     overall_change = latest['overall_score'] - first['overall_score']
                     since_prev_change = latest['overall_score'] - previous['overall_score']
@@ -6330,6 +6334,26 @@ class SpiderFootWebUi:
         except Exception as e:
             self.log.error(f"scantrend failed for id={id}: {e}", exc_info=True)
             return self.jsonify_error('500', f"Failed to load trend data: {e}")
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def snapshotexclude(self: 'SpiderFootWebUi', id: str, excluded: str) -> dict:
+        """Toggle the snapshot_excluded flag for a scan's grade snapshot.
+
+        Args:
+            id (str): scan instance ID
+            excluded (str): '1' to exclude from trend, '0' to include
+
+        Returns:
+            dict: success status
+        """
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                dbh.gradeSnapshotSetExcluded(id, int(excluded))
+                return {'success': True}
+            except Exception as e:
+                self.log.error(f"Error updating snapshot excluded for scan {id}: {e}", exc_info=True)
+                return {'success': False, 'message': str(e)}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()

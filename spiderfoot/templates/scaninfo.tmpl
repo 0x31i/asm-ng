@@ -7689,6 +7689,11 @@
             'Information / Reference': '#6b7280'
         };
 
+        // Resolve CSS variable values for use in D3 SVG attributes (CSS vars don't work in SVG fill/stroke)
+        function cssVar(name) {
+            return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        }
+
         function renderSnapshotChart(trendData, instanceId) {
             var container = document.getElementById('snapshot-chart');
             if (!container || !trendData.snapshots || trendData.snapshots.length < 2) return;
@@ -7729,7 +7734,7 @@
                     .attr('fill', band.color);
                 svg.append('text')
                     .attr('x', width + 5).attr('y', y((band.min + band.max) / 2) + 4)
-                    .style('font-size', '9px').style('fill', 'var(--text-muted)')
+                    .style('font-size', '9px').style('fill', cssVar('--text-muted'))
                     .style('font-family', 'var(--font-mono)').text(band.label);
             });
 
@@ -7738,7 +7743,7 @@
                 svg.append('line')
                     .attr('x1', 0).attr('y1', y(threshold))
                     .attr('x2', width).attr('y2', y(threshold))
-                    .attr('stroke', 'var(--glass-border)').attr('stroke-width', 0.5)
+                    .attr('stroke', cssVar('--glass-border')).attr('stroke-width', 0.5)
                     .attr('stroke-dasharray', '3,3');
             });
 
@@ -7750,21 +7755,24 @@
                 .attr('transform', 'translate(0,' + height + ')')
                 .call(xAxis)
                 .selectAll('text')
-                .style('font-size', '9px').style('fill', 'var(--text-secondary)')
+                .style('font-size', '9px').style('fill', cssVar('--text-secondary'))
                 .style('font-family', 'var(--font-mono)');
 
             // Y axis
             var yAxis = d3.svg.axis().scale(y).orient('left').ticks(5);
             svg.append('g').call(yAxis)
                 .selectAll('text')
-                .style('font-size', '9px').style('fill', 'var(--text-secondary)')
+                .style('font-size', '9px').style('fill', cssVar('--text-secondary'))
                 .style('font-family', 'var(--font-mono)');
 
             // Style axis paths
-            svg.selectAll('.domain').attr('stroke', 'var(--glass-border)');
-            svg.selectAll('.tick line').attr('stroke', 'var(--glass-border)');
+            svg.selectAll('.domain').attr('stroke', cssVar('--glass-border'));
+            svg.selectAll('.tick line').attr('stroke', cssVar('--glass-border'));
 
-            // Overall line with area fill
+            // Split snapshots into active (non-excluded) and all
+            var activeSnaps = snaps.filter(function(d) { return !d.excluded; });
+
+            // Overall line with area fill (only active snapshots)
             var overallLine = d3.svg.line()
                 .x(function(d) { return x(parseDate(d.date)); })
                 .y(function(d) { return y(d.overall_score); })
@@ -7776,26 +7784,34 @@
                 .y1(function(d) { return y(d.overall_score); })
                 .interpolate('monotone');
 
-            var gc = gradeGlowColor(snaps[snaps.length - 1].overall_grade);
+            var latestActive = activeSnaps.length > 0 ? activeSnaps[activeSnaps.length - 1] : snaps[snaps.length - 1];
+            var gc = gradeGlowColor(latestActive.overall_grade);
 
-            svg.append('path')
-                .datum(snaps)
-                .attr('d', overallArea)
-                .attr('fill', gc.text).attr('opacity', 0.1);
+            if (activeSnaps.length > 0) {
+                svg.append('path')
+                    .datum(activeSnaps)
+                    .attr('d', overallArea)
+                    .attr('fill', gc.text).attr('opacity', 0.15);
 
-            svg.append('path')
-                .datum(snaps)
-                .attr('d', overallLine)
-                .attr('fill', 'none').attr('stroke', gc.text)
-                .attr('stroke-width', 3).attr('class', 'snapshot-line-overall');
+                svg.append('path')
+                    .datum(activeSnaps)
+                    .attr('d', overallLine)
+                    .attr('fill', 'none').attr('stroke', gc.text)
+                    .attr('stroke-width', 3).attr('class', 'snapshot-line-overall');
+            }
 
-            // Data points for overall
+            // Data points for overall — active as filled, excluded as hollow
             svg.selectAll('.snapshot-dot-overall')
                 .data(snaps).enter().append('circle')
                 .attr('class', 'snapshot-dot-overall')
                 .attr('cx', function(d) { return x(parseDate(d.date)); })
                 .attr('cy', function(d) { return y(d.overall_score); })
-                .attr('r', 4).attr('fill', gc.text).attr('stroke', '#fff').attr('stroke-width', 1.5)
+                .attr('r', function(d) { return d.excluded ? 3 : 4; })
+                .attr('fill', function(d) { return d.excluded ? 'none' : gc.text; })
+                .attr('stroke', function(d) { return d.excluded ? gc.text : '#fff'; })
+                .attr('stroke-width', function(d) { return d.excluded ? 1 : 1.5; })
+                .attr('stroke-dasharray', function(d) { return d.excluded ? '2,2' : 'none'; })
+                .style('opacity', function(d) { return d.excluded ? 0.4 : 1; })
                 .style('cursor', 'pointer')
                 .on('click', function(d) {
                     window.location.hash = '#id=' + d.scan_id + '&tab=summary';
@@ -7803,7 +7819,8 @@
                 })
                 .append('title').text(function(d) {
                     var dt = new Date(d.date);
-                    return dt.toLocaleDateString() + ' - ' + d.overall_grade + ' (' + d.overall_score.toFixed(1) + ')';
+                    var prefix = d.excluded ? '[EXCLUDED] ' : '';
+                    return prefix + dt.toLocaleDateString() + ' - ' + d.overall_grade + ' (' + d.overall_score.toFixed(1) + ')';
                 });
 
             // Category lines (dashed, toggleable)
@@ -7844,7 +7861,7 @@
 
             // Overall toggle (always visible)
             var overallLegend = document.createElement('span');
-            overallLegend.style.cssText = 'cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid ' + gc.text + ';color:' + gc.text + ';background:rgba(0,0,0,0.2);';
+            overallLegend.style.cssText = 'cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid ' + gc.text + ';color:' + gc.text + ';background:var(--bg-tertiary);';
             overallLegend.innerHTML = '&#9679; Overall';
             overallLegend.setAttribute('data-active', 'true');
             overallLegend.onclick = function() {
@@ -7926,7 +7943,7 @@
                 html += card.value + "</div>";
                 html += "<div style='font-size:9px;color:var(--text-muted);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:1px;margin-top:4px;'>" + card.label + "</div>";
                 if (card.sublabel) {
-                    html += "<div style='font-size:8px;color:var(--text-muted);font-family:var(--font-mono);margin-top:2px;opacity:0.7;'>" + card.sublabel + "</div>";
+                    html += "<div style='font-size:8px;color:var(--text-secondary);font-family:var(--font-mono);margin-top:2px;'>" + card.sublabel + "</div>";
                 }
                 html += "</div>";
             });
@@ -7958,7 +7975,11 @@
                 var dt = new Date(s.date);
                 var dateStr = (dt.getMonth() + 1) + '/' + dt.getDate();
                 var isCurrent = (s.scan_id === instanceId);
-                html += "<th style='text-align:center;padding:6px 8px;color:" + (isCurrent ? 'var(--text-primary)' : 'var(--text-muted)') + ";border-bottom:1px solid var(--glass-border);min-width:50px;font-weight:" + (isCurrent ? '700' : '400') + ";'>" + dateStr + "</th>";
+                var isExcluded = s.excluded ? true : false;
+                var dateStyle = isExcluded ? 'text-decoration:line-through;opacity:0.4;' : '';
+                html += "<th style='text-align:center;padding:6px 8px;color:" + (isCurrent ? 'var(--text-primary)' : 'var(--text-muted)') + ";border-bottom:1px solid var(--glass-border);min-width:50px;font-weight:" + (isCurrent ? '700' : '400') + ";'>";
+                html += "<span style='" + dateStyle + "'>" + dateStr + "</span>";
+                html += "</th>";
             });
             html += "<th style='text-align:center;padding:6px 8px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);min-width:40px;'>TREND</th>";
             html += "</tr></thead><tbody>";
@@ -7967,25 +7988,29 @@
             categories.forEach(function(catName) {
                 var color = snapshotCategoryColors[catName] || '#6b7280';
                 html += "<tr>";
-                html += "<td style='padding:5px 10px;border-bottom:1px solid rgba(255,255,255,0.03);'>";
+                html += "<td style='padding:5px 10px;border-bottom:1px solid var(--glass-border);'>";
                 html += "<span style='display:inline-block;width:3px;height:12px;background:" + color + ";border-radius:1px;margin-right:6px;vertical-align:middle;'></span>";
                 html += "<span style='color:var(--text-secondary);'>" + catName + "</span></td>";
 
                 var firstScore = null, latestScore = null;
                 displaySnaps.forEach(function(s) {
+                    var isExcluded = s.excluded ? true : false;
                     var cats = s.categories || {};
                     var catData = cats[catName];
                     var grade = catData ? catData.grade : '-';
                     var score = catData ? catData.score : 0;
-                    if (firstScore === null && catData) firstScore = score;
-                    if (catData) latestScore = score;
+                    if (!isExcluded) {
+                        if (firstScore === null && catData) firstScore = score;
+                        if (catData) latestScore = score;
+                    }
                     var gc = gradeGlowColor(grade);
-                    html += "<td style='text-align:center;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.03);'>";
-                    html += "<span style='display:inline-block;width:28px;height:22px;line-height:22px;border-radius:3px;font-size:11px;font-weight:600;color:" + gc.text + ";background:rgba(0,0,0,0.2);border:1px solid " + gc.text + ";'>" + grade + "</span>";
+                    var colOpacity = isExcluded ? 'opacity:0.3;' : '';
+                    html += "<td style='text-align:center;padding:5px 8px;border-bottom:1px solid var(--glass-border);" + colOpacity + "'>";
+                    html += "<span style='display:inline-block;width:28px;height:22px;line-height:22px;border-radius:3px;font-size:11px;font-weight:600;color:" + gc.text + ";background:var(--bg-tertiary);border:1px solid " + gc.text + ";'>" + grade + "</span>";
                     html += "</td>";
                 });
 
-                // Trend indicator
+                // Trend indicator (only from non-excluded scans)
                 var change = (firstScore !== null && latestScore !== null) ? latestScore - firstScore : 0;
                 var trendSymbol, trendColor;
                 if (change >= 10) { trendSymbol = '&#x25B2;&#x25B2;'; trendColor = '#22c55e'; }
@@ -7994,7 +8019,7 @@
                 else if (change <= -2) { trendSymbol = '&#x25BC;'; trendColor = '#f59e0b'; }
                 else { trendSymbol = '&#x25C6;'; trendColor = '#6b7280'; }
 
-                html += "<td style='text-align:center;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.03);color:" + trendColor + ";font-size:10px;'>" + trendSymbol + "</td>";
+                html += "<td style='text-align:center;padding:5px 8px;border-bottom:1px solid var(--glass-border);color:" + trendColor + ";font-size:10px;'>" + trendSymbol + "</td>";
                 html += "</tr>";
             });
 
@@ -8003,14 +8028,18 @@
             html += "<td style='padding:6px 10px;font-weight:700;color:var(--text-primary);'>Overall</td>";
             var firstOverall = null, latestOverall = null;
             displaySnaps.forEach(function(s) {
+                var isExcluded = s.excluded ? true : false;
                 var grade = s.overall_grade || '-';
                 var score = s.overall_score || 0;
-                if (firstOverall === null) firstOverall = score;
-                latestOverall = score;
+                if (!isExcluded) {
+                    if (firstOverall === null) firstOverall = score;
+                    latestOverall = score;
+                }
                 var gc = gradeGlowColor(grade);
                 var isCurrent = (s.scan_id === instanceId);
-                html += "<td style='text-align:center;padding:6px 8px;'>";
-                html += "<span style='display:inline-block;width:28px;height:22px;line-height:22px;border-radius:3px;font-size:12px;font-weight:700;color:" + gc.text + ";background:" + (isCurrent ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.2)') + ";border:1px solid " + gc.text + ";box-shadow:" + (isCurrent ? '0 0 8px ' + gc.glow : 'none') + ";'>" + grade + "</span>";
+                var colOpacity = isExcluded ? 'opacity:0.3;' : '';
+                html += "<td style='text-align:center;padding:6px 8px;" + colOpacity + "'>";
+                html += "<span style='display:inline-block;width:28px;height:22px;line-height:22px;border-radius:3px;font-size:12px;font-weight:700;color:" + gc.text + ";background:" + (isCurrent && !isExcluded ? 'var(--bg-elevated)' : 'var(--bg-tertiary)') + ";border:1px solid " + gc.text + ";box-shadow:" + (isCurrent && !isExcluded ? '0 0 8px ' + gc.glow : 'none') + ";'>" + grade + "</span>";
                 html += "</td>";
             });
 
@@ -10998,6 +11027,17 @@
             sf.fetchData('${docroot}/scanopts', {'id': instanceId}, function(data) {
                 var table = "<div id='scansummary-content'>";
 
+                // SNAPSHOT Trend — exclude/include scans from posture trend
+                table += "<div class='manage-section'>";
+                table += "<div class='manage-section-header collapsed' onclick='toggleManageSection(this)'>";
+                table += "<i class='glyphicon glyphicon-chevron-right section-chevron'></i>";
+                table += "<h4><i class='glyphicon glyphicon-stats'></i>&nbsp;SNAPSHOT Trend</h4>";
+                table += "</div>";
+                table += "<div class='manage-section-body' style='display:none'>";
+                table += "<p class='text-muted small' style='margin-bottom:12px;'>Choose which scans contribute to the SNAPSHOT security posture trend for this target. Exclude test scans or partial runs to keep the trend accurate.</p>";
+                table += "<div id='snapshot-exclusion-list'><div style='text-align:center;padding:15px;'><img src=\"${docroot}/static/img/loader.gif\"></div></div>";
+                table += "</div></div>";
+
                 // Meta Information - collapsible, collapsed by default
                 table += "<div class='manage-section'>";
                 table += "<div class='manage-section-header collapsed' onclick='toggleManageSection(this)'>";
@@ -11097,6 +11137,69 @@
 
                 $("#loader").fadeOut(500);
                 $("#mainbody").append(table);
+
+                // Load SNAPSHOT exclusion list
+                loadSnapshotExclusionList(instanceId);
+            });
+        }
+
+        function loadSnapshotExclusionList(instanceId) {
+            var container = document.getElementById('snapshot-exclusion-list');
+            if (!container) return;
+
+            sf.fetchData('${docroot}/scantrend', {id: instanceId}, function(trendData) {
+                if (!trendData || !trendData.snapshots || trendData.snapshots.length === 0) {
+                    container.innerHTML = "<p class='text-muted' style='padding:10px;'>No snapshots available for this target.</p>";
+                    return;
+                }
+
+                var snaps = trendData.snapshots;
+                var html = "<table class='table table-bordered table-striped' style='font-family:var(--font-mono);font-size:12px;margin-bottom:0;'>";
+                html += "<thead><tr><th style='width:40px;'>Include</th><th>Scan Date</th><th>Grade</th><th>Score</th><th style='width:120px;'>Status</th></tr></thead><tbody>";
+
+                snaps.forEach(function(s) {
+                    var isExcluded = s.excluded ? true : false;
+                    var isCurrent = (s.scan_id === instanceId);
+                    var dt = new Date(s.date);
+                    var dateStr = dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                    var gc = gradeGlowColor(s.overall_grade);
+                    var rowStyle = isExcluded ? 'opacity:0.5;' : '';
+                    var currentBadge = isCurrent ? " <span class='label label-info' style='font-size:9px;'>CURRENT</span>" : '';
+
+                    html += "<tr style='" + rowStyle + "'>";
+                    html += "<td style='text-align:center;vertical-align:middle;'>";
+                    html += "<input type='checkbox' class='snapshot-exclude-cb' data-scan-id='" + s.scan_id + "' " + (isExcluded ? '' : 'checked') + " style='cursor:pointer;width:16px;height:16px;'>";
+                    html += "</td>";
+                    html += "<td>" + dateStr + currentBadge + "</td>";
+                    html += "<td style='text-align:center;'><span style='display:inline-block;width:28px;height:22px;line-height:22px;border-radius:3px;font-size:11px;font-weight:700;color:" + gc.text + ";background:var(--bg-tertiary);border:1px solid " + gc.text + ";'>" + s.overall_grade + "</span></td>";
+                    html += "<td style='text-align:center;'>" + s.overall_score.toFixed(1) + "</td>";
+                    html += "<td style='text-align:center;'>" + (isExcluded ? "<span class='text-muted'>Excluded</span>" : "<span style='color:#22c55e;'>Included</span>") + "</td>";
+                    html += "</tr>";
+                });
+
+                html += "</tbody></table>";
+                container.innerHTML = html;
+
+                // Wire up checkbox toggle handlers
+                container.querySelectorAll('.snapshot-exclude-cb').forEach(function(cb) {
+                    cb.addEventListener('change', function() {
+                        var scanId = this.getAttribute('data-scan-id');
+                        var newExcluded = this.checked ? 0 : 1;
+                        var checkbox = this;
+                        checkbox.disabled = true;
+                        sf.fetchData('${docroot}/snapshotexclude', {id: scanId, excluded: newExcluded}, function(resp) {
+                            checkbox.disabled = false;
+                            if (resp && resp.success) {
+                                loadSnapshotExclusionList(instanceId);
+                            } else {
+                                // Revert on failure
+                                checkbox.checked = !checkbox.checked;
+                            }
+                        });
+                    });
+                });
+            }, function() {
+                container.innerHTML = "<p class='text-muted' style='padding:10px;'>Failed to load snapshot data.</p>";
             });
         }
 

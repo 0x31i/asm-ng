@@ -1268,6 +1268,16 @@ class SpiderFootDb:
                 except DatabaseError:
                     pass
 
+            # Migration: Add snapshot_excluded column to tbl_grade_snapshots
+            try:
+                self.dbh.execute("SELECT snapshot_excluded FROM tbl_grade_snapshots LIMIT 1")
+            except DatabaseError:
+                try:
+                    self.dbh.execute("ALTER TABLE tbl_grade_snapshots ADD COLUMN snapshot_excluded INT NOT NULL DEFAULT 0")
+                    self.conn.commit()
+                except DatabaseError:
+                    pass
+
             # Restore normal transaction mode after migrations
             if pg_autocommit:
                 self.conn.autocommit = False
@@ -2941,12 +2951,13 @@ class SpiderFootDb:
 
         return True
 
-    def gradeSnapshotsForTarget(self, target: str, limit: int = 100) -> list:
+    def gradeSnapshotsForTarget(self, target: str, limit: int = 100, include_excluded: bool = False) -> list:
         """Return all grade snapshots for a target, ordered by scan_started ASC.
 
         Args:
             target (str): seed target value
             limit (int): max rows to return
+            include_excluded (bool): if True, return excluded snapshots too (with flag)
 
         Returns:
             list: list of dicts with parsed JSON fields
@@ -2962,10 +2973,15 @@ class SpiderFootDb:
 
         qry = "SELECT scan_instance_id, seed_target, overall_score, overall_grade, " \
               "category_scores, finding_counts, total_findings, unique_findings, " \
-              "correlation_counts, scan_started, scan_ended, created " \
-              "FROM tbl_grade_snapshots WHERE seed_target = ? " \
-              "ORDER BY scan_started ASC LIMIT ?"
-        qvars = [target, limit]
+              "correlation_counts, scan_started, scan_ended, created, snapshot_excluded " \
+              "FROM tbl_grade_snapshots WHERE seed_target = ? "
+        qvars = [target]
+
+        if not include_excluded:
+            qry += "AND snapshot_excluded = 0 "
+
+        qry += "ORDER BY scan_started ASC LIMIT ?"
+        qvars.append(limit)
 
         with self.dbhLock:
             try:
@@ -2989,6 +3005,7 @@ class SpiderFootDb:
                 'scan_started': row[9],
                 'scan_ended': row[10],
                 'created': row[11],
+                'excluded': row[12] if len(row) > 12 else 0,
             }
             try:
                 snap['category_scores'] = _json.loads(row[4]) if row[4] else {}
@@ -3055,6 +3072,36 @@ class SpiderFootDb:
                 self.conn.commit()
             except DatabaseError as e:
                 raise IOError(f"SQL error deleting grade snapshot: {e}") from e
+
+        return True
+
+    def gradeSnapshotSetExcluded(self, scanId: str, excluded: int) -> bool:
+        """Set the snapshot_excluded flag for a scan's grade snapshot.
+
+        Args:
+            scanId (str): scan instance ID
+            excluded (int): 1 to exclude from trend, 0 to include
+
+        Returns:
+            bool: success
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(scanId, str):
+            raise TypeError(f"scanId is {type(scanId)}; expected str()") from None
+
+        excluded = 1 if int(excluded) else 0
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(
+                    "UPDATE tbl_grade_snapshots SET snapshot_excluded = ? WHERE scan_instance_id = ?",
+                    [excluded, scanId])
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError(f"SQL error updating snapshot excluded flag: {e}") from e
 
         return True
 
