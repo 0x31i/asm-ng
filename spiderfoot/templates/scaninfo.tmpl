@@ -11155,7 +11155,7 @@
 
                 var snaps = trendData.snapshots;
                 var html = "<table class='table table-bordered table-striped' style='font-family:var(--font-mono);font-size:12px;margin-bottom:0;'>";
-                html += "<thead><tr><th style='width:40px;'>Include</th><th>Scan Date</th><th>Grade</th><th>Score</th><th style='width:120px;'>Status</th></tr></thead><tbody>";
+                html += "<thead><tr><th style='width:40px;'>Include</th><th>Scan Name</th><th>Date</th><th>Grade</th><th>Score</th><th style='width:100px;'>Scan Status</th><th style='width:100px;'>Trend</th></tr></thead><tbody>";
 
                 snaps.forEach(function(s) {
                     var isExcluded = s.excluded ? true : false;
@@ -11165,14 +11165,19 @@
                     var gc = gradeGlowColor(s.overall_grade);
                     var rowStyle = isExcluded ? 'opacity:0.5;' : '';
                     var currentBadge = isCurrent ? " <span class='label label-info' style='font-size:9px;'>CURRENT</span>" : '';
+                    var scanName = s.scan_name || s.scan_id.substring(0, 8);
+                    var scanStatus = s.scan_status || '';
+                    var statusColor = scanStatus === 'FINISHED' ? '#22c55e' : (scanStatus === 'ABORTED' ? '#f59e0b' : '#ef4444');
 
                     html += "<tr style='" + rowStyle + "'>";
                     html += "<td style='text-align:center;vertical-align:middle;'>";
                     html += "<input type='checkbox' class='snapshot-exclude-cb' data-scan-id='" + s.scan_id + "' " + (isExcluded ? '' : 'checked') + " style='cursor:pointer;width:16px;height:16px;'>";
                     html += "</td>";
-                    html += "<td>" + dateStr + currentBadge + "</td>";
+                    html += "<td>" + scanName + currentBadge + "</td>";
+                    html += "<td>" + dateStr + "</td>";
                     html += "<td style='text-align:center;'><span style='display:inline-block;width:28px;height:22px;line-height:22px;border-radius:3px;font-size:11px;font-weight:700;color:" + gc.text + ";background:var(--bg-tertiary);border:1px solid " + gc.text + ";'>" + s.overall_grade + "</span></td>";
                     html += "<td style='text-align:center;'>" + s.overall_score.toFixed(1) + "</td>";
+                    html += "<td style='text-align:center;'><span style='color:" + statusColor + ";'>" + scanStatus + "</span></td>";
                     html += "<td style='text-align:center;'>" + (isExcluded ? "<span class='text-muted'>Excluded</span>" : "<span style='color:#22c55e;'>Included</span>") + "</td>";
                     html += "</tr>";
                 });

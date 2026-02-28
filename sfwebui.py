@@ -6225,9 +6225,19 @@ class SpiderFootWebUi:
                         'trajectory': 'unknown'
                     }
 
+                # Build scan name/status lookup for enriching snapshot data
+                scan_meta = {}
+                try:
+                    terminal_scans = dbh.scanCompletedForTarget(target, limit=100)
+                    for ts in terminal_scans:
+                        scan_meta[ts[0]] = {'name': ts[1], 'status': ts[6]}
+                except Exception:
+                    pass
+
                 # Build snapshot response (all snapshots, with excluded flag)
                 snap_list = []
                 for s in snapshots:
+                    meta = scan_meta.get(s['scan_id'], {})
                     snap_list.append({
                         'scan_id': s['scan_id'],
                         'date': s['scan_started'],
@@ -6238,6 +6248,8 @@ class SpiderFootWebUi:
                         'unique_findings': s['unique_findings'],
                         'correlations': s['correlation_counts'],
                         'excluded': s.get('excluded', 0),
+                        'scan_name': meta.get('name', ''),
+                        'scan_status': meta.get('status', ''),
                     })
 
                 # Filter to non-excluded snapshots for delta/trajectory calculation

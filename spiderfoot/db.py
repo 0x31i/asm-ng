@@ -2093,13 +2093,16 @@ class SpiderFootDb:
                     "SQL error encountered when retrieving scan instance") from e
 
     def scanCountForTarget(self, target: str) -> int:
-        """Count the number of scans for a given target.
+        """Count the number of terminal scans for a given target.
+
+        Only counts FINISHED, ABORTED, and ERROR-FAILED scans — those
+        that should have grade snapshots.
 
         Args:
             target (str): the target (seed_target value)
 
         Returns:
-            int: number of scans for the target
+            int: number of terminal scans for the target
 
         Raises:
             TypeError: arg type was invalid
@@ -2108,7 +2111,8 @@ class SpiderFootDb:
         if not isinstance(target, str):
             raise TypeError(f"target is {type(target)}; expected str()") from None
 
-        qry = "SELECT COUNT(*) FROM tbl_scan_instance WHERE seed_target = ?"
+        qry = "SELECT COUNT(*) FROM tbl_scan_instance WHERE seed_target = ? " \
+              "AND status IN ('FINISHED', 'ABORTED', 'ERROR-FAILED')"
 
         with self.dbhLock:
             try:
@@ -3140,7 +3144,10 @@ class SpiderFootDb:
         return counts
 
     def scanCompletedForTarget(self, target: str, limit: int = 50) -> list:
-        """Return completed scan instances for a target, ordered by started ASC.
+        """Return terminal scan instances for a target, ordered by started ASC.
+
+        Includes FINISHED, ABORTED, and ERROR-FAILED scans — all terminal
+        states that have collected results worth grading.
 
         Args:
             target (str): seed target value
@@ -3157,7 +3164,8 @@ class SpiderFootDb:
             raise TypeError(f"target is {type(target)}; expected str()") from None
 
         qry = "SELECT guid, name, seed_target, created, started, ended, status " \
-              "FROM tbl_scan_instance WHERE seed_target = ? AND status = 'FINISHED' " \
+              "FROM tbl_scan_instance WHERE seed_target = ? " \
+              "AND status IN ('FINISHED', 'ABORTED', 'ERROR-FAILED') " \
               "ORDER BY started ASC LIMIT ?"
 
         with self.dbhLock:
