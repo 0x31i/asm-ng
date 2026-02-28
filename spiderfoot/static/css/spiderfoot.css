@@ -6925,6 +6925,11 @@ i.glyphicon-white,
   text-align: center; vertical-align: middle;
   cursor: pointer; padding: 0 !important; width: 36px;
 }
+.assets-known-compact.table > tbody > tr > td.assets-cell-select {
+  padding: 0 !important;
+  text-align: center;
+  vertical-align: middle;
+}
 .assets-cell-select input[type="checkbox"] { margin: 0; pointer-events: none; }
 
 /* Expandable cells */
@@ -7032,6 +7037,34 @@ i.glyphicon-white,
   letter-spacing: 0.5px; color: #1e293b;
 }
 .assets-confidence-val { color: #16a34a !important; }
+
+/* Notes card — editable */
+.assets-notes-card { flex: 1; min-width: 200px; cursor: pointer; }
+.assets-notes-card:hover { border-color: #94a3b8; }
+.assets-notes-placeholder { color: #94a3b8; font-style: italic; font-weight: 400; text-transform: none; }
+.assets-notes-textarea {
+  width: 100%; resize: vertical; font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  font-size: 11px; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 3px;
+  background: #fff; color: #1e293b; outline: none; text-transform: none;
+}
+.assets-notes-textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
+.assets-notes-actions { display: flex; gap: 6px; margin-top: 6px; }
+.assets-notes-save-btn, .assets-notes-cancel-btn {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  font-size: 9px; font-weight: 700; letter-spacing: 1px; padding: 3px 10px;
+  border: none; border-radius: 3px; cursor: pointer;
+}
+.assets-notes-save-btn { background: #22c55e; color: #fff; }
+.assets-notes-save-btn:hover { background: #16a34a; }
+.assets-notes-cancel-btn { background: #e2e8f0; color: #475569; }
+.assets-notes-cancel-btn:hover { background: #cbd5e1; }
+
+/* Found-in data-type links */
+.assets-found-in-link {
+  color: #3b82f6; cursor: pointer; text-decoration: none;
+  font-weight: 700; font-size: 10px; letter-spacing: 0.5px;
+}
+.assets-found-in-link:hover { text-decoration: underline; color: #2563eb; }
 
 /* Segment hover highlight */
 .assets-hl-cell { cursor: default; }

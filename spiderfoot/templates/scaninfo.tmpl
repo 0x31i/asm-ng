@@ -3121,7 +3121,22 @@
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>TAG</div><div class='assets-detail-card-value'>" + (a.tag ? tagHtml : '-') + "</div></div>";
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>DATE ADDED</div><div class='assets-detail-card-value'>" + d.toLocaleDateString() + "</div></div>";
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>ADDED BY</div><div class='assets-detail-card-value'>" + (a.added_by || '-') + "</div></div>";
-                        html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>NOTES</div><div class='assets-detail-card-value'>" + (a.notes ? $('<span>').text(a.notes).html() : '-') + "</div></div>";
+
+                        // FOUND IN card — links to DATA tab filtered by element type
+                        var sfTypes = knownAssetTypeToSfTypes(a.asset_type);
+                        var foundInHtml = "";
+                        for (var fi = 0; fi < sfTypes.length; fi++) {
+                            if (fi > 0) foundInHtml += " &nbsp; ";
+                            foundInHtml += "<a class='assets-found-in-link' onclick='dataEventData(\"" + instanceId + "\", \"" + sfTypes[fi][1] + "\", \"" + sfTypes[fi][0] + "\", \"full\")'>" + sfTypes[fi][1].toUpperCase() + "</a>";
+                        }
+                        html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>FOUND IN</div><div class='assets-detail-card-value'>" + (foundInHtml || '-') + "</div></div>";
+
+                        // NOTES card — click to edit inline
+                        html += "<div class='assets-detail-card assets-notes-card' data-asset-id='" + a.id + "' onclick='knownEditNotes(this, " + a.id + ")'>";
+                        html += "<div class='assets-detail-card-label'>NOTES</div>";
+                        html += "<div class='assets-detail-card-value assets-notes-value'>" + (a.notes ? $('<span>').text(a.notes).html() : "<span class='assets-notes-placeholder'>CLICK TO ADD NOTES</span>") + "</div>";
+                        html += "</div>";
+
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>FULL VALUE</div><div class='assets-detail-card-value' style='word-break:break-all;'>" + safeValue + "</div></div>";
                         html += "</div></td></tr>";
                     }
@@ -3449,6 +3464,55 @@
             knownAssetAction(id, 'reset');
         }
 
+        // ---- ASSET TYPE → SF DATA TYPE MAPPING ----
+        function knownAssetTypeToSfTypes(assetType) {
+            var map = {
+                'ip': [['IP_ADDRESS', 'IP Address'], ['IPV6_ADDRESS', 'IPv6 Address']],
+                'domain': [['DOMAIN_NAME', 'Domain Name'], ['INTERNET_NAME', 'Internet Name']],
+                'email': [['EMAILADDR', 'Email Address']],
+                'human_name': [['HUMAN_NAME', 'Human Name']]
+            };
+            return map[assetType] || [];
+        }
+
+        // ---- INLINE NOTES EDITING ----
+        function knownEditNotes(card, assetId) {
+            // Prevent row toggle
+            event.stopPropagation();
+
+            var $card = $(card);
+            // Don't re-enter edit mode if already editing
+            if ($card.find('.assets-notes-textarea').length) return;
+
+            var $val = $card.find('.assets-notes-value');
+            var currentText = $val.find('.assets-notes-placeholder').length ? '' : $val.text().trim();
+
+            var editHtml = "<textarea class='assets-notes-textarea' rows='3' placeholder='Add notes...'>" + $('<span>').text(currentText).html() + "</textarea>";
+            editHtml += "<div class='assets-notes-actions'>";
+            editHtml += "<button class='assets-notes-save-btn' onclick='knownSaveNotes(event, this, " + assetId + ")'>SAVE</button>";
+            editHtml += "<button class='assets-notes-cancel-btn' onclick='knownCancelNotes(event, this)'>CANCEL</button>";
+            editHtml += "</div>";
+
+            // Store original content for cancel
+            $card.data('original-html', $val.html());
+            $val.html(editHtml);
+            $val.find('.assets-notes-textarea').focus();
+        }
+
+        function knownSaveNotes(e, btn, assetId) {
+            e.stopPropagation();
+            var $card = $(btn).closest('.assets-notes-card');
+            var newVal = $card.find('.assets-notes-textarea').val().trim();
+            knownUpdateAssetProperty(assetId, 'notes', newVal);
+        }
+
+        function knownCancelNotes(e, btn) {
+            e.stopPropagation();
+            var $card = $(btn).closest('.assets-notes-card');
+            var $val = $card.find('.assets-notes-value');
+            $val.html($card.data('original-html'));
+        }
+
         function knownUpdateAssetProperty(id, prop, val) {
             var params = {id: id};
             params[prop] = val;
@@ -3480,6 +3544,19 @@
                             $(this).find('.assets-detail-card-value').html("<span class='assets-affinity-badge " + affinityClass + "'>" + affinityLabel + "</span>");
                         }
                     });
+                }
+            } else if (prop === 'notes') {
+                // Update notes card in detail row
+                if ($detailRow.length) {
+                    var $notesCard = $detailRow.find('.assets-notes-card');
+                    if ($notesCard.length) {
+                        var $notesVal = $notesCard.find('.assets-notes-value');
+                        if (val) {
+                            $notesVal.html($('<span>').text(val).html());
+                        } else {
+                            $notesVal.html("<span class='assets-notes-placeholder'>CLICK TO ADD NOTES</span>");
+                        }
+                    }
                 }
             } else if (prop === 'tag') {
                 $row.data('asset-tag', val).attr('data-asset-tag', val);
