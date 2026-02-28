@@ -7698,7 +7698,9 @@
             var container = document.getElementById('snapshot-chart');
             if (!container || !trendData.snapshots || trendData.snapshots.length < 2) return;
 
-            var snaps = trendData.snapshots;
+            // Filter out excluded snapshots entirely — they don't appear on the chart
+            var snaps = trendData.snapshots.filter(function(d) { return !d.excluded; });
+            if (snaps.length < 2) return;
             var margin = {top: 20, right: 20, bottom: 40, left: 45};
             var width = container.offsetWidth - margin.left - margin.right;
             var height = 280 - margin.top - margin.bottom;
@@ -7769,10 +7771,7 @@
             svg.selectAll('.domain').attr('stroke', cssVar('--glass-border'));
             svg.selectAll('.tick line').attr('stroke', cssVar('--glass-border'));
 
-            // Split snapshots into active (non-excluded) and all
-            var activeSnaps = snaps.filter(function(d) { return !d.excluded; });
-
-            // Overall line with area fill (only active snapshots)
+            // Overall line with area fill
             var overallLine = d3.svg.line()
                 .x(function(d) { return x(parseDate(d.date)); })
                 .y(function(d) { return y(d.overall_score); })
@@ -7784,34 +7783,26 @@
                 .y1(function(d) { return y(d.overall_score); })
                 .interpolate('monotone');
 
-            var latestActive = activeSnaps.length > 0 ? activeSnaps[activeSnaps.length - 1] : snaps[snaps.length - 1];
-            var gc = gradeGlowColor(latestActive.overall_grade);
+            var gc = gradeGlowColor(snaps[snaps.length - 1].overall_grade);
 
-            if (activeSnaps.length > 0) {
-                svg.append('path')
-                    .datum(activeSnaps)
-                    .attr('d', overallArea)
-                    .attr('fill', gc.text).attr('opacity', 0.15);
+            svg.append('path')
+                .datum(snaps)
+                .attr('d', overallArea)
+                .attr('fill', gc.text).attr('opacity', 0.15);
 
-                svg.append('path')
-                    .datum(activeSnaps)
-                    .attr('d', overallLine)
-                    .attr('fill', 'none').attr('stroke', gc.text)
-                    .attr('stroke-width', 3).attr('class', 'snapshot-line-overall');
-            }
+            svg.append('path')
+                .datum(snaps)
+                .attr('d', overallLine)
+                .attr('fill', 'none').attr('stroke', gc.text)
+                .attr('stroke-width', 3).attr('class', 'snapshot-line-overall');
 
-            // Data points for overall — active as filled, excluded as hollow
+            // Data points for overall
             svg.selectAll('.snapshot-dot-overall')
                 .data(snaps).enter().append('circle')
                 .attr('class', 'snapshot-dot-overall')
                 .attr('cx', function(d) { return x(parseDate(d.date)); })
                 .attr('cy', function(d) { return y(d.overall_score); })
-                .attr('r', function(d) { return d.excluded ? 3 : 4; })
-                .attr('fill', function(d) { return d.excluded ? 'none' : gc.text; })
-                .attr('stroke', function(d) { return d.excluded ? gc.text : '#fff'; })
-                .attr('stroke-width', function(d) { return d.excluded ? 1 : 1.5; })
-                .attr('stroke-dasharray', function(d) { return d.excluded ? '2,2' : 'none'; })
-                .style('opacity', function(d) { return d.excluded ? 0.4 : 1; })
+                .attr('r', 4).attr('fill', gc.text).attr('stroke', '#fff').attr('stroke-width', 1.5)
                 .style('cursor', 'pointer')
                 .on('click', function(d) {
                     window.location.hash = '#id=' + d.scan_id + '&tab=summary';
@@ -7819,8 +7810,7 @@
                 })
                 .append('title').text(function(d) {
                     var dt = new Date(d.date);
-                    var prefix = d.excluded ? '[EXCLUDED] ' : '';
-                    return prefix + dt.toLocaleDateString() + ' - ' + d.overall_grade + ' (' + d.overall_score.toFixed(1) + ')';
+                    return dt.toLocaleDateString() + ' - ' + d.overall_grade + ' (' + d.overall_score.toFixed(1) + ')';
                 });
 
             // Category lines (dashed, toggleable)
@@ -7963,8 +7953,13 @@
             var container = document.getElementById('snapshot-table-container');
             if (!container || !trendData.snapshots || trendData.snapshots.length < 2) return;
 
-            var snaps = trendData.snapshots;
-            // Show last 8 scans max
+            // Filter out excluded snapshots — they don't appear in the table
+            var snaps = trendData.snapshots.filter(function(d) { return !d.excluded; });
+            if (snaps.length < 2) {
+                container.innerHTML = '';
+                return;
+            }
+            // Show last 8 non-excluded scans max
             var displaySnaps = snaps.slice(-8);
 
             // Collect all categories with weight > 0
@@ -7983,11 +7978,7 @@
                 var dt = new Date(s.date);
                 var dateStr = (dt.getMonth() + 1) + '/' + dt.getDate();
                 var isCurrent = (s.scan_id === instanceId);
-                var isExcluded = s.excluded ? true : false;
-                var dateStyle = isExcluded ? 'text-decoration:line-through;opacity:0.4;' : '';
-                html += "<th style='text-align:center;padding:6px 8px;color:" + (isCurrent ? 'var(--text-primary)' : 'var(--text-muted)') + ";border-bottom:1px solid var(--glass-border);min-width:50px;font-weight:" + (isCurrent ? '700' : '400') + ";'>";
-                html += "<span style='" + dateStyle + "'>" + dateStr + "</span>";
-                html += "</th>";
+                html += "<th style='text-align:center;padding:6px 8px;color:" + (isCurrent ? 'var(--text-primary)' : 'var(--text-muted)') + ";border-bottom:1px solid var(--glass-border);min-width:50px;font-weight:" + (isCurrent ? '700' : '400') + ";'>" + dateStr + "</th>";
             });
             html += "<th style='text-align:center;padding:6px 8px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);min-width:40px;'>TREND</th>";
             html += "</tr></thead><tbody>";
@@ -8002,23 +7993,19 @@
 
                 var firstScore = null, latestScore = null;
                 displaySnaps.forEach(function(s) {
-                    var isExcluded = s.excluded ? true : false;
                     var cats = s.categories || {};
                     var catData = cats[catName];
                     var grade = catData ? catData.grade : '-';
                     var score = catData ? catData.score : 0;
-                    if (!isExcluded) {
-                        if (firstScore === null && catData) firstScore = score;
-                        if (catData) latestScore = score;
-                    }
+                    if (firstScore === null && catData) firstScore = score;
+                    if (catData) latestScore = score;
                     var gc = gradeGlowColor(grade);
-                    var colOpacity = isExcluded ? 'opacity:0.3;' : '';
-                    html += "<td style='text-align:center;padding:5px 8px;border-bottom:1px solid var(--glass-border);" + colOpacity + "'>";
+                    html += "<td style='text-align:center;padding:5px 8px;border-bottom:1px solid var(--glass-border);'>";
                     html += "<span style='display:inline-block;width:28px;height:22px;line-height:22px;border-radius:3px;font-size:11px;font-weight:600;color:" + gc.text + ";background:var(--bg-tertiary);border:1px solid " + gc.text + ";'>" + grade + "</span>";
                     html += "</td>";
                 });
 
-                // Trend indicator (only from non-excluded scans)
+                // Trend indicator
                 var change = (firstScore !== null && latestScore !== null) ? latestScore - firstScore : 0;
                 var trendSymbol, trendColor;
                 if (change >= 10) { trendSymbol = '&#x25B2;&#x25B2;'; trendColor = '#22c55e'; }
@@ -8036,18 +8023,14 @@
             html += "<td style='padding:6px 10px;font-weight:700;color:var(--text-primary);'>Overall</td>";
             var firstOverall = null, latestOverall = null;
             displaySnaps.forEach(function(s) {
-                var isExcluded = s.excluded ? true : false;
                 var grade = s.overall_grade || '-';
                 var score = s.overall_score || 0;
-                if (!isExcluded) {
-                    if (firstOverall === null) firstOverall = score;
-                    latestOverall = score;
-                }
+                if (firstOverall === null) firstOverall = score;
+                latestOverall = score;
                 var gc = gradeGlowColor(grade);
                 var isCurrent = (s.scan_id === instanceId);
-                var colOpacity = isExcluded ? 'opacity:0.3;' : '';
-                html += "<td style='text-align:center;padding:6px 8px;" + colOpacity + "'>";
-                html += "<span style='display:inline-block;width:28px;height:22px;line-height:22px;border-radius:3px;font-size:12px;font-weight:700;color:" + gc.text + ";background:" + (isCurrent && !isExcluded ? 'var(--bg-elevated)' : 'var(--bg-tertiary)') + ";border:1px solid " + gc.text + ";box-shadow:" + (isCurrent && !isExcluded ? '0 0 8px ' + gc.glow : 'none') + ";'>" + grade + "</span>";
+                html += "<td style='text-align:center;padding:6px 8px;'>";
+                html += "<span style='display:inline-block;width:28px;height:22px;line-height:22px;border-radius:3px;font-size:12px;font-weight:700;color:" + gc.text + ";background:" + (isCurrent ? 'var(--bg-elevated)' : 'var(--bg-tertiary)') + ";border:1px solid " + gc.text + ";box-shadow:" + (isCurrent ? '0 0 8px ' + gc.glow : 'none') + ";'>" + grade + "</span>";
                 html += "</td>";
             });
 
