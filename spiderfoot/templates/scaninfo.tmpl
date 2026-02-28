@@ -4317,16 +4317,19 @@
                 html += "<button class='assets-known-filter-btn assets-known-filter-affinity" + (knownActiveFilters.affinity === 'ASSOCIATED' ? " assets-known-filter-active assets-known-filter-active-affinity" : "") + "' onclick='knownFilterAffinity(\"ASSOCIATED\", this)'>";
                 html += "<i class='glyphicon glyphicon-transfer'></i>&nbsp;&nbsp;ASSOCIATED (" + associatedCount + ")</button>";
                 html += "</div>";
-                html += "<div style='flex:1;'></div>";
-                html += "<button class='btn assets-known-remove-sel-btn' onclick='assetsRemoveSelected(\"" + instanceId + "\")' style='display:none;' id='assets-remove-sel-btn'>";
+                html += "</div>";
+
+                // Bulk action buttons (own row, hidden until selection)
+                html += "<div class='assets-known-filter-row assets-known-bulk-row' id='assets-known-bulk-row' style='display:none;'>";
+                html += "<button class='btn assets-known-remove-sel-btn' onclick='assetsRemoveSelected(\"" + instanceId + "\")' id='assets-remove-sel-btn'>";
                 html += "<i class='glyphicon glyphicon-trash'></i>&nbsp;&nbsp;REMOVE SELECTED</button>";
-                html += "<button class='btn assets-known-bulk-fp-btn' onclick='knownBulkAction(\"" + instanceId + "\", \"fp\")' style='display:none;' id='assets-bulk-fp-btn'>";
+                html += "<button class='btn assets-known-bulk-fp-btn' onclick='knownBulkAction(\"" + instanceId + "\", \"fp\")' id='assets-bulk-fp-btn'>";
                 html += "<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;FALSE POSITIVE</button>";
-                html += "<button class='btn assets-known-bulk-pending-btn' onclick='knownBulkAction(\"" + instanceId + "\", \"reset\")' style='display:none;' id='assets-bulk-pending-btn'>";
+                html += "<button class='btn assets-known-bulk-pending-btn' onclick='knownBulkAction(\"" + instanceId + "\", \"reset\")' id='assets-bulk-pending-btn'>";
                 html += "<i class='glyphicon glyphicon-repeat'></i>&nbsp;&nbsp;PENDING</button>";
-                html += "<button class='btn assets-known-bulk-affinity-btn' onclick='knownBulkAffinityPrompt()' style='display:none;' id='assets-bulk-affinity-btn'>";
+                html += "<button class='btn assets-known-bulk-affinity-btn' onclick='knownBulkAffinityPrompt()' id='assets-bulk-affinity-btn'>";
                 html += "<i class='glyphicon glyphicon-transfer'></i>&nbsp;&nbsp;CHANGE AFFINITY</button>";
-                html += "<button class='btn assets-known-bulk-tag-btn' onclick='knownBulkTagPrompt()' style='display:none;' id='assets-bulk-tag-btn'>";
+                html += "<button class='btn assets-known-bulk-tag-btn' onclick='knownBulkTagPrompt()' id='assets-bulk-tag-btn'>";
                 html += "<i class='glyphicon glyphicon-tag'></i>&nbsp;&nbsp;ASSIGN TAG</button>";
                 html += "</div>";
 
@@ -4555,17 +4558,14 @@
         function assetsUpdateSelection() {
             var count = $(".asset-cb:checked").length;
             if (count > 0) {
-                $("#assets-remove-sel-btn").show().html("<i class='glyphicon glyphicon-trash'></i>&nbsp;&nbsp;REMOVE SELECTED (" + count + ")");
-                $("#assets-bulk-fp-btn").show().html("<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;FALSE POSITIVE (" + count + ")");
-                $("#assets-bulk-pending-btn").show().html("<i class='glyphicon glyphicon-repeat'></i>&nbsp;&nbsp;PENDING (" + count + ")");
-                $("#assets-bulk-affinity-btn").show().html("<i class='glyphicon glyphicon-transfer'></i>&nbsp;&nbsp;CHANGE AFFINITY (" + count + ")");
-                $("#assets-bulk-tag-btn").show().html("<i class='glyphicon glyphicon-tag'></i>&nbsp;&nbsp;ASSIGN TAG (" + count + ")");
+                $("#assets-known-bulk-row").show();
+                $("#assets-remove-sel-btn").html("<i class='glyphicon glyphicon-trash'></i>&nbsp;&nbsp;REMOVE SELECTED (" + count + ")");
+                $("#assets-bulk-fp-btn").html("<i class='glyphicon glyphicon-ban-circle'></i>&nbsp;&nbsp;FALSE POSITIVE (" + count + ")");
+                $("#assets-bulk-pending-btn").html("<i class='glyphicon glyphicon-repeat'></i>&nbsp;&nbsp;PENDING (" + count + ")");
+                $("#assets-bulk-affinity-btn").html("<i class='glyphicon glyphicon-transfer'></i>&nbsp;&nbsp;CHANGE AFFINITY (" + count + ")");
+                $("#assets-bulk-tag-btn").html("<i class='glyphicon glyphicon-tag'></i>&nbsp;&nbsp;ASSIGN TAG (" + count + ")");
             } else {
-                $("#assets-remove-sel-btn").hide();
-                $("#assets-bulk-fp-btn").hide();
-                $("#assets-bulk-pending-btn").hide();
-                $("#assets-bulk-affinity-btn").hide();
-                $("#assets-bulk-tag-btn").hide();
+                $("#assets-known-bulk-row").hide();
             }
         }
 
