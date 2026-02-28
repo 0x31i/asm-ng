@@ -7032,13 +7032,81 @@ class SpiderFootWebUi:
                             ) if scan_instance and scan_instance[2] else '',
                         }
 
+                        # Fetch snapshot trend data for Executive Summary
+                        snapshot_data = None
+                        try:
+                            target = scan_info.get('target', '')
+                            if target:
+                                # Get all finished scans for this target
+                                all_scans = dbh.scanInstanceList()
+                                target_scans = [
+                                    s for s in all_scans
+                                    if s[2] == target and s[6] in ('FINISHED', 'ABORTED')
+                                ]
+                                # Sort oldest first (by started timestamp)
+                                target_scans.sort(key=lambda s: s[4] or 0)
+
+                                if len(target_scans) >= 2:
+                                    # Calculate grades for each scan
+                                    snapshots = []
+                                    for ts in target_scans:
+                                        try:
+                                            ts_grade = self._calculateScanGrade(dbh, ts[0])
+                                            snapshots.append({
+                                                'scan_id': ts[0],
+                                                'date': ts[4] or ts[3] or 0,
+                                                'overall_grade': ts_grade.get('overall_grade', '-'),
+                                                'overall_score': ts_grade.get('overall_score', 0),
+                                                'category_scores': {
+                                                    cn: {'score': cd.get('score', 0),
+                                                         'grade': cd.get('grade', '-'),
+                                                         'weight': cd.get('weight', 0)}
+                                                    for cn, cd in ts_grade.get('categories', {}).items()
+                                                },
+                                            })
+                                        except Exception:
+                                            pass
+
+                                    if len(snapshots) >= 2:
+                                        first = snapshots[0]
+                                        latest = snapshots[-1]
+                                        overall_change = round(latest['overall_score'] - first['overall_score'], 1)
+                                        trajectory = 'improving' if overall_change > 2 else (
+                                            'degrading' if overall_change < -2 else 'stable')
+
+                                        # Find worst/best from latest categories
+                                        worst_cat = best_cat = None
+                                        cats = latest.get('category_scores', {})
+                                        for cn, cd in cats.items():
+                                            w = cd.get('weight', 0)
+                                            if w <= 0:
+                                                continue
+                                            sc = cd.get('score', 0)
+                                            gr = cd.get('grade', '-')
+                                            if worst_cat is None or sc < worst_cat['score']:
+                                                worst_cat = {'name': cn, 'score': sc, 'grade': gr}
+                                            if best_cat is None or sc > best_cat['score']:
+                                                best_cat = {'name': cn, 'score': sc, 'grade': gr}
+
+                                        snapshot_data = {
+                                            'snapshots': snapshots,
+                                            'overall_change': overall_change,
+                                            'trajectory': trajectory,
+                                            'worst_category': worst_cat,
+                                            'best_category': best_cat,
+                                            'scan_count': len(snapshots),
+                                        }
+                        except Exception as e:
+                            self.log.warning(f"Full report: snapshot data fetch failed: {e}")
+
                         # Sheet 1: Executive Summary (reuse the default active sheet)
                         self.log.info("Full report: building Executive Summary")
                         ws_summary = wb.active
                         ws_summary.title = "Executive Summary"
                         build_executive_summary(ws_summary, grade_data, scan_info,
                                                 findings_rows=findings_rows,
-                                                correlation_rows=correlation_rows)
+                                                correlation_rows=correlation_rows,
+                                                snapshot_data=snapshot_data)
 
                         # Sheet 2: Findings (black tab, severity colors)
                         self.log.info(f"Full report: building Findings sheet ({len(findings_rows)} rows)")
