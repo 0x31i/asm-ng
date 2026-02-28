@@ -9353,12 +9353,4 @@ a.data-type-btn:hover {
   color: #1f2937 !important;
 }
 
-/* Snapshot chart - white background for light mode */
-#snapshot-chart {
-  background: #ffffff !important;
-  border-radius: 4px;
-}
-#snapshot-chart svg {
-  background: #ffffff !important;
-}
 
