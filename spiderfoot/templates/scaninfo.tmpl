@@ -7698,6 +7698,8 @@
             var container = document.getElementById('snapshot-chart');
             if (!container || !trendData.snapshots || trendData.snapshots.length < 2) return;
 
+            var snaps = trendData.snapshots;
+            var margin = {top: 20, right: 28, bottom: 40, left: 45};
             // Filter out excluded snapshots entirely — they don't appear on the chart
             var snaps = trendData.snapshots.filter(function(d) { return !d.excluded; });
             if (snaps.length < 2) return;
@@ -7705,28 +7707,77 @@
             var width = container.offsetWidth - margin.left - margin.right;
             var height = 280 - margin.top - margin.bottom;
 
-            // Clear any previous chart
+            // Clear any previous chart + tooltip
             d3.select('#snapshot-chart').selectAll('*').remove();
+            d3.select('#snapshot-tooltip').remove();
 
-            var svg = d3.select('#snapshot-chart').append('svg')
+            var rootSvg = d3.select('#snapshot-chart').append('svg')
                 .attr('width', width + margin.left + margin.right)
-                .attr('height', height + margin.top + margin.bottom)
-                .append('g')
+                .attr('height', height + margin.top + margin.bottom);
+
+            // ── SVG defs: gradient + glow filter ──────────────────────────
+            var defs = rootSvg.append('defs');
+
+            var latestActive;
+            var activeSnaps = snaps.filter(function(d) { return !d.excluded; });
+            latestActive = activeSnaps.length > 0 ? activeSnaps[activeSnaps.length - 1] : snaps[snaps.length - 1];
+            var gc = gradeGlowColor(latestActive.overall_grade);
+
+            // Vertical gradient for area fill (line color → transparent)
+            var areaGrad = defs.append('linearGradient')
+                .attr('id', 'snap-area-grad').attr('x1', '0').attr('y1', '0')
+                .attr('x2', '0').attr('y2', '1');
+            areaGrad.append('stop').attr('offset', '0%')
+                .attr('stop-color', gc.text).attr('stop-opacity', 0.25);
+            areaGrad.append('stop').attr('offset', '100%')
+                .attr('stop-color', gc.text).attr('stop-opacity', 0.02);
+
+            // Glow filter for the main line
+            var glowFilter = defs.append('filter')
+                .attr('id', 'snap-line-glow').attr('x', '-20%').attr('y', '-20%')
+                .attr('width', '140%').attr('height', '140%');
+            glowFilter.append('feGaussianBlur').attr('in', 'SourceGraphic')
+                .attr('stdDeviation', '4').attr('result', 'blur');
+            glowFilter.append('feComposite').attr('in', 'SourceGraphic')
+                .attr('in2', 'blur').attr('operator', 'over');
+
+            // Pulse animation for current-scan dot
+            var pulseAnim = defs.append('radialGradient')
+                .attr('id', 'snap-pulse-grad');
+            pulseAnim.append('stop').attr('offset', '0%')
+                .attr('stop-color', gc.text).attr('stop-opacity', 0.6);
+            pulseAnim.append('stop').attr('offset', '100%')
+                .attr('stop-color', gc.text).attr('stop-opacity', 0);
+
+            var svg = rootSvg.append('g')
                 .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
-            // Parse dates and scores
+            // ── Custom tooltip element ────────────────────────────────────
+            var tooltip = d3.select('#snapshot-chart').append('div')
+                .attr('id', 'snapshot-tooltip')
+                .style('position', 'absolute').style('pointer-events', 'none')
+                .style('background', 'var(--bg-elevated, #1f2937)')
+                .style('border', '1px solid var(--glass-border, #374151)')
+                .style('border-radius', '6px').style('padding', '8px 12px')
+                .style('font-family', 'var(--font-mono)').style('font-size', '11px')
+                .style('color', 'var(--text-primary, #f9fafb)')
+                .style('box-shadow', '0 4px 16px rgba(0,0,0,0.4)')
+                .style('opacity', 0).style('z-index', 100)
+                .style('white-space', 'nowrap').style('transition', 'opacity 0.15s ease');
+
+            // ── Scales ────────────────────────────────────────────────────
             var parseDate = function(d) { return new Date(d); };
             var xExtent = d3.extent(snaps, function(d) { return parseDate(d.date); });
             var x = d3.time.scale().domain(xExtent).range([0, width]);
             var y = d3.scale.linear().domain([0, 100]).range([height, 0]);
 
-            // Grade band backgrounds
+            // ── Grade band backgrounds (subtle fills) ─────────────────────
             var gradeBands = [
-                {min: 90, max: 100, color: 'rgba(34, 197, 94, 0.06)', label: 'A'},
-                {min: 80, max: 90, color: 'rgba(59, 130, 246, 0.06)', label: 'B'},
-                {min: 70, max: 80, color: 'rgba(245, 158, 11, 0.06)', label: 'C'},
-                {min: 60, max: 70, color: 'rgba(249, 115, 22, 0.06)', label: 'D'},
-                {min: 0, max: 60, color: 'rgba(239, 68, 68, 0.06)', label: 'F'}
+                {min: 90, max: 100, color: 'rgba(34, 197, 94, 0.05)', label: 'A', textColor: '#22c55e'},
+                {min: 80, max: 90, color: 'rgba(59, 130, 246, 0.05)', label: 'B', textColor: '#3b82f6'},
+                {min: 70, max: 80, color: 'rgba(245, 158, 11, 0.05)', label: 'C', textColor: '#f59e0b'},
+                {min: 60, max: 70, color: 'rgba(249, 115, 22, 0.05)', label: 'D', textColor: '#f97316'},
+                {min: 0, max: 60, color: 'rgba(239, 68, 68, 0.04)', label: 'F', textColor: '#ef4444'}
             ];
 
             gradeBands.forEach(function(band) {
@@ -7735,38 +7786,58 @@
                     .attr('width', width).attr('height', y(band.min) - y(band.max))
                     .attr('fill', band.color);
                 svg.append('text')
-                    .attr('x', width + 5).attr('y', y((band.min + band.max) / 2) + 4)
-                    .style('font-size', '9px').style('fill', cssVar('--text-muted'))
-                    .style('font-family', 'var(--font-mono)').text(band.label);
+                    .attr('x', width + 8).attr('y', y((band.min + band.max) / 2) + 4)
+                    .style('font-size', '9px').style('fill', band.textColor)
+                    .style('font-family', 'var(--font-mono)')
+                    .style('font-weight', '600').style('opacity', 0.5)
+                    .text(band.label);
             });
 
-            // Grade threshold lines
+            // ── Horizontal gridlines at grade thresholds ──────────────────
             [90, 80, 70, 60].forEach(function(threshold) {
                 svg.append('line')
                     .attr('x1', 0).attr('y1', y(threshold))
                     .attr('x2', width).attr('y2', y(threshold))
                     .attr('stroke', cssVar('--glass-border')).attr('stroke-width', 0.5)
-                    .attr('stroke-dasharray', '3,3');
+                    .attr('stroke-dasharray', '2,4').attr('opacity', 0.6);
+            });
+            // Subtle intermediate gridlines (every 20 units)
+            [20, 40].forEach(function(val) {
+                svg.append('line')
+                    .attr('x1', 0).attr('y1', y(val))
+                    .attr('x2', width).attr('y2', y(val))
+                    .attr('stroke', cssVar('--glass-border')).attr('stroke-width', 0.3)
+                    .attr('stroke-dasharray', '1,5').attr('opacity', 0.4);
             });
 
-            // X axis
+            // ── Axes (clean, minimal style) ───────────────────────────────
             var xAxis = d3.svg.axis().scale(x).orient('bottom')
                 .ticks(Math.min(snaps.length, 8))
                 .tickFormat(d3.time.format('%b %d'));
-            svg.append('g')
+            var xAxisG = svg.append('g')
+                .attr('class', 'x-axis')
                 .attr('transform', 'translate(0,' + height + ')')
-                .call(xAxis)
-                .selectAll('text')
+                .call(xAxis);
+            xAxisG.selectAll('text')
                 .style('font-size', '9px').style('fill', cssVar('--text-secondary'))
                 .style('font-family', 'var(--font-mono)');
+            xAxisG.selectAll('.domain').attr('stroke', 'none');
+            xAxisG.selectAll('.tick line').attr('stroke', cssVar('--glass-border'))
+                .attr('opacity', 0.4);
 
-            // Y axis
-            var yAxis = d3.svg.axis().scale(y).orient('left').ticks(5);
-            svg.append('g').call(yAxis)
-                .selectAll('text')
+            var yAxis = d3.svg.axis().scale(y).orient('left').ticks(5)
+                .tickSize(-width);  // extend gridlines across chart width
+            var yAxisG = svg.append('g')
+                .attr('class', 'y-axis')
+                .call(yAxis);
+            yAxisG.selectAll('text')
                 .style('font-size', '9px').style('fill', cssVar('--text-secondary'))
                 .style('font-family', 'var(--font-mono)');
+            yAxisG.selectAll('.domain').attr('stroke', 'none');
+            yAxisG.selectAll('.tick line').attr('stroke', cssVar('--glass-border'))
+                .attr('opacity', 0.15).attr('stroke-dasharray', 'none');
 
+            // ── Line + Area generators ────────────────────────────────────
             // Style axis paths
             svg.selectAll('.domain').attr('stroke', cssVar('--glass-border'));
             svg.selectAll('.tick line').attr('stroke', cssVar('--glass-border'));
@@ -7783,6 +7854,72 @@
                 .y1(function(d) { return y(d.overall_score); })
                 .interpolate('monotone');
 
+            // ── Render overall area + line (active snapshots only) ────────
+            if (activeSnaps.length > 0) {
+                // Gradient area fill
+                svg.append('path')
+                    .datum(activeSnaps)
+                    .attr('d', overallArea)
+                    .attr('fill', 'url(#snap-area-grad)')
+                    .attr('class', 'snapshot-line-overall');
+
+                // Glow line (wider, blurred)
+                svg.append('path')
+                    .datum(activeSnaps)
+                    .attr('d', overallLine)
+                    .attr('fill', 'none').attr('stroke', gc.text)
+                    .attr('stroke-width', 6).attr('opacity', 0.2)
+                    .attr('filter', 'url(#snap-line-glow)')
+                    .attr('class', 'snapshot-line-overall');
+
+                // Main line
+                var mainLine = svg.append('path')
+                    .datum(activeSnaps)
+                    .attr('d', overallLine)
+                    .attr('fill', 'none').attr('stroke', gc.text)
+                    .attr('stroke-width', 2.5)
+                    .attr('stroke-linecap', 'round')
+                    .attr('stroke-linejoin', 'round')
+                    .attr('class', 'snapshot-line-overall');
+
+                // Line draw-in animation
+                try {
+                    var totalLength = mainLine.node().getTotalLength();
+                    mainLine
+                        .attr('stroke-dasharray', totalLength + ' ' + totalLength)
+                        .attr('stroke-dashoffset', totalLength)
+                        .transition().duration(1200).ease('cubic-out')
+                        .attr('stroke-dashoffset', 0);
+                } catch(e) { /* animation non-critical */ }
+            }
+
+            // ── Data points ───────────────────────────────────────────────
+            // Pulse ring on current scan
+            var currentSnap = null;
+            snaps.forEach(function(s) { if (s.scan_id === instanceId) currentSnap = s; });
+            if (currentSnap && !currentSnap.excluded) {
+                svg.append('circle')
+                    .attr('class', 'snapshot-dot-overall')
+                    .attr('cx', x(parseDate(currentSnap.date)))
+                    .attr('cy', y(currentSnap.overall_score))
+                    .attr('r', 12).attr('fill', 'url(#snap-pulse-grad)')
+                    .style('animation', 'snap-pulse 2s ease-in-out infinite');
+            }
+
+            // Outer ring for active dots
+            svg.selectAll('.snapshot-ring-overall')
+                .data(snaps.filter(function(d) { return !d.excluded; }))
+                .enter().append('circle')
+                .attr('class', 'snapshot-dot-overall')
+                .attr('cx', function(d) { return x(parseDate(d.date)); })
+                .attr('cy', function(d) { return y(d.overall_score); })
+                .attr('r', 6)
+                .attr('fill', 'none')
+                .attr('stroke', gc.text).attr('stroke-width', 1)
+                .attr('opacity', 0.3);
+
+            // Main dots
+            svg.selectAll('.snapshot-dot-main')
             var gc = gradeGlowColor(snaps[snaps.length - 1].overall_grade);
 
             svg.append('path')
@@ -7804,6 +7941,31 @@
                 .attr('cy', function(d) { return y(d.overall_score); })
                 .attr('r', 4).attr('fill', gc.text).attr('stroke', '#fff').attr('stroke-width', 1.5)
                 .style('cursor', 'pointer')
+                .on('mouseover', function(d) {
+                    var dt = new Date(d.date);
+                    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                    var prefix = d.excluded ? '<span style="color:#ef4444;">EXCLUDED</span> &middot; ' : '';
+                    var isCurrent = d.scan_id === instanceId;
+                    var gcLocal = gradeGlowColor(d.overall_grade);
+                    tooltip.html(
+                        prefix +
+                        '<span style="color:var(--text-secondary);">' + months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear() + '</span>' +
+                        '<br><span style="font-size:16px;font-weight:700;color:' + gcLocal.text + ';">' + d.overall_grade + '</span>' +
+                        ' <span style="color:var(--text-secondary);">' + d.overall_score.toFixed(1) + '</span>' +
+                        (isCurrent ? ' <span style="font-size:8px;background:var(--glass-border);padding:1px 5px;border-radius:3px;color:var(--text-muted);">CURRENT</span>' : '')
+                    ).style('opacity', 1);
+                    d3.select(this).transition().duration(150).attr('r', d.excluded ? 4 : 6);
+                })
+                .on('mousemove', function() {
+                    var pos = d3.mouse(container);
+                    tooltip
+                        .style('left', (pos[0] + 16) + 'px')
+                        .style('top', (pos[1] - 10) + 'px');
+                })
+                .on('mouseout', function(d) {
+                    tooltip.style('opacity', 0);
+                    d3.select(this).transition().duration(150).attr('r', d.excluded ? 3 : 4);
+                })
                 .on('click', function(d) {
                     window.location.hash = '#id=' + d.scan_id + '&tab=summary';
                     location.reload();
@@ -7813,17 +7975,14 @@
                     return dt.toLocaleDateString() + ' - ' + d.overall_grade + ' (' + d.overall_score.toFixed(1) + ')';
                 });
 
-            // Category lines (dashed, toggleable)
+            // ── Category lines (dashed, toggleable) ──────────────────────
             var categoryNames = [];
             var allCats = snaps[snaps.length - 1].categories || {};
             for (var catName in allCats) {
                 if (allCats[catName].weight > 0) categoryNames.push(catName);
             }
 
-            var catLineVisibility = {};
             categoryNames.forEach(function(catName) {
-                catLineVisibility[catName] = false; // hidden by default
-
                 var catLine = d3.svg.line()
                     .x(function(d) { return x(parseDate(d.date)); })
                     .y(function(d) {
@@ -7839,45 +7998,60 @@
                     .attr('stroke', snapshotCategoryColors[catName] || '#6b7280')
                     .attr('stroke-width', 1.5)
                     .attr('stroke-dasharray', '5,3')
+                    .attr('stroke-linecap', 'round')
                     .attr('class', 'snapshot-cat-line')
                     .attr('data-category', catName)
                     .style('display', 'none');
             });
 
-            // Legend
+            // ── Legend (pill-style toggles) ───────────────────────────────
             var legendEl = document.getElementById('snapshot-legend');
             if (!legendEl) return;
             legendEl.innerHTML = '';
 
-            // Overall toggle (always visible)
-            var overallLegend = document.createElement('span');
-            overallLegend.style.cssText = 'cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid ' + gc.text + ';color:' + gc.text + ';background:var(--bg-tertiary);';
-            overallLegend.innerHTML = '&#9679; Overall';
-            overallLegend.setAttribute('data-active', 'true');
-            overallLegend.onclick = function() {
-                var active = this.getAttribute('data-active') === 'true';
-                this.setAttribute('data-active', active ? 'false' : 'true');
-                this.style.opacity = active ? '0.3' : '1';
-                d3.selectAll('.snapshot-line-overall, .snapshot-dot-overall').style('display', active ? 'none' : null);
-            };
-            legendEl.appendChild(overallLegend);
-
-            categoryNames.forEach(function(catName) {
-                var color = snapshotCategoryColors[catName] || '#6b7280';
+            function makeLegendPill(label, color, isActive, onToggle) {
                 var el = document.createElement('span');
-                el.style.cssText = 'cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid ' + color + ';color:var(--text-muted);opacity:0.5;';
-                el.innerHTML = '&#9679; ' + catName;
-                el.setAttribute('data-active', 'false');
-                el.setAttribute('data-cat', catName);
+                var activeBg = color.replace(')', ', 0.15)').replace('rgb', 'rgba');
+                function applyStyle(active) {
+                    el.style.cssText = 'cursor:pointer;padding:3px 10px;border-radius:12px;font-size:10px;' +
+                        'font-family:var(--font-mono);letter-spacing:0.5px;transition:all 0.2s ease;' +
+                        'border:1px solid ' + color + ';' +
+                        'color:' + (active ? color : 'var(--text-muted)') + ';' +
+                        'background:' + (active ? activeBg : 'transparent') + ';' +
+                        'opacity:' + (active ? '1' : '0.45') + ';';
+                }
+                applyStyle(isActive);
+                el.innerHTML = '<span style="font-size:7px;vertical-align:1px;">&#9679;</span> ' + label;
+                el.setAttribute('data-active', isActive ? 'true' : 'false');
                 el.onclick = function() {
                     var active = this.getAttribute('data-active') === 'true';
                     this.setAttribute('data-active', active ? 'false' : 'true');
-                    this.style.opacity = active ? '0.5' : '1';
-                    this.style.color = active ? 'var(--text-muted)' : color;
-                    d3.selectAll('.snapshot-cat-line[data-category="' + catName + '"]').style('display', active ? 'none' : null);
+                    applyStyle(!active);
+                    onToggle(!active);
                 };
-                legendEl.appendChild(el);
+                return el;
+            }
+
+            // Overall toggle
+            legendEl.appendChild(makeLegendPill('OVERALL', gc.text, true, function(active) {
+                d3.selectAll('.snapshot-line-overall, .snapshot-dot-overall').style('display', active ? null : 'none');
+            }));
+
+            // Category toggles
+            categoryNames.forEach(function(catName) {
+                var color = snapshotCategoryColors[catName] || '#6b7280';
+                legendEl.appendChild(makeLegendPill(catName, color, false, function(active) {
+                    d3.selectAll('.snapshot-cat-line[data-category="' + catName + '"]').style('display', active ? null : 'none');
+                }));
             });
+
+            // ── Inject CSS keyframes for pulse animation ──────────────────
+            if (!document.getElementById('snap-pulse-style')) {
+                var style = document.createElement('style');
+                style.id = 'snap-pulse-style';
+                style.textContent = '@keyframes snap-pulse { 0%,100% { opacity:0.4; transform-origin:center; } 50% { opacity:0.15; } }';
+                document.head.appendChild(style);
+            }
         }
 
         function renderSnapshotMetrics(trendData) {
@@ -7891,13 +8065,13 @@
             var oc = d.overall_change || 0;
             var ocColor = oc > 0 ? '#22c55e' : (oc < 0 ? '#ef4444' : '#6b7280');
             var ocArrow = oc > 0 ? '&#x25B2;' : (oc < 0 ? '&#x25BC;' : '&#x25C6;');
-            cards.push({label: 'CHANGE', value: (oc > 0 ? '+' : '') + oc.toFixed(1), color: ocColor, icon: ocArrow});
+            cards.push({label: 'CHANGE', value: (oc > 0 ? '+' : '') + oc.toFixed(1), color: ocColor, icon: ocArrow, sublabel: 'vs first scan'});
 
             // 2. Trajectory
             var tj = d.trajectory || 'stable';
             var tjColor = tj === 'improving' ? '#22c55e' : (tj === 'degrading' ? '#ef4444' : '#6b7280');
             var tjArrow = tj === 'improving' ? '&#x25B2;' : (tj === 'degrading' ? '&#x25BC;' : '&#x25C6;');
-            cards.push({label: 'TREND', value: tj.toUpperCase(), color: tjColor, icon: tjArrow});
+            cards.push({label: 'TREND', value: tj.toUpperCase(), color: tjColor, icon: tjArrow, sublabel: 'overall trajectory'});
 
             // 3. Worst Category
             var wc = d.worst_category;
@@ -7920,25 +8094,36 @@
             // 5. Timeframe
             var snaps = trendData.snapshots || [];
             var tfVal = '-';
+            var tfSublabel = '';
             if (snaps.length >= 2) {
                 var firstDate = snaps[0].date || 0;
                 var lastDate = snaps[snaps.length - 1].date || 0;
                 if (firstDate && lastDate) {
                     var days = Math.max(1, Math.round((lastDate - firstDate) / 86400000));
-                    tfVal = days + 'd';
+                    tfVal = days + ' days';
+                    var d1 = new Date(firstDate);
+                    var d2 = new Date(lastDate);
+                    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                    tfSublabel = months[d1.getMonth()] + ' ' + d1.getDate() + ' \u2013 ' + months[d2.getMonth()] + ' ' + d2.getDate();
                 }
             }
-            cards.push({label: 'TIMEFRAME', value: tfVal, color: '#8b5cf6', icon: ''});
+            cards.push({label: 'TIMEFRAME', value: tfVal, color: '#8b5cf6', icon: '', sublabel: tfSublabel || '-'});
 
             // 6. Scan Count
-            cards.push({label: 'SCANS', value: trendData.scan_count || snaps.length, color: '#06b6d4', icon: ''});
+            cards.push({label: 'SCANS', value: trendData.scan_count || snaps.length, color: '#06b6d4', icon: '', sublabel: 'data points'});
 
             var html = '';
             cards.forEach(function(card) {
-                html += "<div style='background:var(--bg-tertiary);border:1px solid var(--glass-border);border-radius:6px;padding:10px 8px;text-align:center;min-width:0;overflow:hidden;'>";
-                html += "<div style='font-size:22px;font-weight:700;color:" + card.color + ";font-family:var(--font-mono);line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>";
-                if (card.icon) html += "<span style='font-size:12px;'>" + card.icon + "</span> ";
-                html += card.value + "</div>";
+                // Adaptive font size based on value length for visual balance
+                var valStr = String(card.value);
+                var vLen = valStr.length;
+                var fontSize = vLen <= 2 ? '22px' : (vLen <= 4 ? '18px' : (vLen <= 7 ? '15px' : '12px'));
+                var iconSize = vLen <= 2 ? '12px' : (vLen <= 4 ? '10px' : '9px');
+
+                html += "<div style='background:var(--bg-tertiary);border:1px solid var(--glass-border);border-left:3px solid " + card.color + ";border-radius:6px;padding:10px 8px;text-align:center;min-width:0;overflow:hidden;display:flex;flex-direction:column;justify-content:center;'>";
+                html += "<div style='font-size:" + fontSize + ";font-weight:700;color:" + card.color + ";font-family:var(--font-mono);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>";
+                if (card.icon) html += "<span style='font-size:" + iconSize + ";vertical-align:middle;'>" + card.icon + "</span> ";
+                html += valStr + "</div>";
                 html += "<div style='font-size:9px;color:var(--text-muted);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:1px;margin-top:4px;'>" + card.label + "</div>";
                 if (card.sublabel) {
                     html += "<div style='font-size:8px;color:var(--text-secondary);font-family:var(--font-mono);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" + card.sublabel + "</div>";

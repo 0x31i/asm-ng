@@ -56,6 +56,7 @@ from spiderfoot.grade_config import (
 )
 from spiderfoot.excel_styles import (
     build_executive_summary,
+    build_snapshot_sheet,
     build_findings_sheet,
     build_correlations_sheet,
     build_nessus_sheet,
@@ -7510,7 +7511,13 @@ class SpiderFootWebUi:
                                             'date': s['scan_started'] / 1000,  # ms -> seconds
                                             'overall_grade': s['overall_grade'],
                                             'overall_score': s['overall_score'],
+                                            'category_scores': s.get('category_scores', {}),
+                                            'total_findings': s.get('total_findings', 0),
+                                            'unique_findings': s.get('unique_findings', 0),
                                         })
+
+                                    first_ts = active[0]['scan_started'] / 1000
+                                    last_ts = active[-1]['scan_started'] / 1000
 
                                     snapshot_data = {
                                         'snapshots': snap_list,
@@ -7519,6 +7526,10 @@ class SpiderFootWebUi:
                                         'worst_category': worst_cat,
                                         'best_category': best_cat,
                                         'scan_count': len(snap_list),
+                                        'timeframe_days': max(1, int((last_ts - first_ts) / 86400)),
+                                        'first_date': first_ts,
+                                        'last_date': last_ts,
+                                        'target': target,
                                     }
                                     self.log.info(f"Full report: snapshot panel OK — "
                                                   f"{len(snap_list)} scans, change={overall_change}")
@@ -7531,10 +7542,15 @@ class SpiderFootWebUi:
                         ws_summary.title = "Executive Summary"
                         build_executive_summary(ws_summary, grade_data, scan_info,
                                                 findings_rows=findings_rows,
-                                                correlation_rows=correlation_rows,
-                                                snapshot_data=snapshot_data)
+                                                correlation_rows=correlation_rows)
 
-                        # Sheet 2: Findings (black tab, severity colors)
+                        # Sheet 2: SNAPSHOT (purple tab, dedicated trend analysis)
+                        if snapshot_data and isinstance(snapshot_data, dict):
+                            self.log.info("Full report: building SNAPSHOT sheet")
+                            ws_snap = wb.create_sheet("SNAPSHOT")
+                            build_snapshot_sheet(ws_snap, snapshot_data)
+
+                        # Sheet 3: Findings (black tab, severity colors)
                         self.log.info(f"Full report: building Findings sheet ({len(findings_rows)} rows)")
                         ws_findings = wb.create_sheet("Findings")
                         build_findings_sheet(ws_findings, findings_rows)
@@ -7551,7 +7567,7 @@ class SpiderFootWebUi:
                             for cat_name, cat_data in cat_results.items()
                         }
 
-                        used_names = {'Executive Summary', 'Findings', 'Correlations'}
+                        used_names = {'Executive Summary', 'SNAPSHOT', 'Findings', 'Correlations'}
 
                         # Sheet 4: EXT-VULNS (Nessus) - red tab
                         try:

@@ -211,8 +211,7 @@ def add_data_table(ws, header_row: int, num_data_rows: int, num_columns: int):
 
 def build_executive_summary(ws, grade_data: dict, scan_info: dict,
                             findings_rows: list = None,
-                            correlation_rows: list = None,
-                            snapshot_data: dict = None):
+                            correlation_rows: list = None):
     """Build the Executive Summary worksheet with grade visualization.
 
     Args:
@@ -223,7 +222,6 @@ def build_executive_summary(ws, grade_data: dict, scan_info: dict,
         scan_info: dict with keys 'name', 'target', 'date'
         findings_rows: list of finding rows for summary statistics
         correlation_rows: list of correlation rows for summary statistics
-        snapshot_data: dict with trend data for the SNAPSHOT panel (optional)
     """
     findings_rows = findings_rows or []
     correlation_rows = correlation_rows or []
@@ -573,245 +571,482 @@ def build_executive_summary(ws, grade_data: dict, scan_info: dict,
     ws.column_dimensions['F'].width = 12
     ws.column_dimensions['G'].width = 14
 
-    # ── SNAPSHOT PANEL (right side, columns I-N) ─────────────────────────
-    if snapshot_data and isinstance(snapshot_data, dict):
-        _build_snapshot_panel(ws, snapshot_data, dark_fill, label_font, value_font, subtle_border)
-
 
 # ============================================================================
-# SNAPSHOT PANEL BUILDER (right side of Executive Summary)
+# SNAPSHOT SHEET BUILDER (dedicated tab)
 # ============================================================================
 
-def _build_snapshot_panel(ws, snapshot_data, dark_fill, label_font, value_font, subtle_border):
-    """Render the SNAPSHOT trend panel on the right side of the Executive Summary.
+def build_snapshot_sheet(ws, snapshot_data: dict):
+    """Build the SNAPSHOT worksheet — a dedicated security posture trend tab.
 
-    Occupies columns I-N (9-14), with column H (8) as a spacer.
+    Args:
+        ws: openpyxl Worksheet
+        snapshot_data: dict with keys 'snapshots', 'overall_change', 'trajectory',
+                       'worst_category', 'best_category', 'scan_count',
+                       'timeframe_days', 'first_date', 'last_date', and
+                       per-snapshot 'category_scores', 'total_findings', 'unique_findings'
     """
     import time as _time
 
-    # Column widths for right side
-    ws.column_dimensions['H'].width = 2   # spacer
-    ws.column_dimensions['I'].width = 16
-    ws.column_dimensions['J'].width = 12
-    ws.column_dimensions['K'].width = 12
-    ws.column_dimensions['L'].width = 16
-    ws.column_dimensions['M'].width = 12
-    ws.column_dimensions['N'].width = 12
+    set_tab_color(ws, '8b5cf6')  # purple tab
 
-    banner_fill = PatternFill(start_color='FF111827', end_color='FF111827', fill_type='solid')
-    banner_font = Font(name='Calibri', size=12, bold=True, color='FFFFFFFF')
+    # ── Style constants ────────────────────────────────────────────────────
+    dark_fill = PatternFill(start_color='FF111827', end_color='FF111827', fill_type='solid')
+    subtitle_fill = PatternFill(start_color='FF1F2937', end_color='FF1F2937', fill_type='solid')
+    sub_banner_fill = PatternFill(start_color='FF374151', end_color='FF374151', fill_type='solid')
+    alt_row_fill = PatternFill(start_color='FFF9FAFB', end_color='FFF9FAFB', fill_type='solid')
     card_label_font = Font(name='Calibri', size=9, bold=True, color='FF9CA3AF')
-    card_value_font = Font(name='Calibri', size=14, bold=True)
+    card_sublabel_font = Font(name='Calibri', size=8, italic=True, color='FF9CA3AF')
+    subtle_border = Border(bottom=Side(style='thin', color='FFD1D5DB'))
     section_border = Border(bottom=Side(style='medium', color='FF9CA3AF'))
 
     def _grade_color(grade_letter):
         return GRADE_METRIC_COLORS.get(grade_letter, '#6b7280')
 
-    def _fill_banner(row, col_start=9, col_end=14):
+    def _fill_row(row, col_start, col_end, fill):
         for c in range(col_start, col_end + 1):
-            ws.cell(row=row, column=c).fill = banner_fill
+            ws.cell(row=row, column=c).fill = fill
 
-    def _merge_card(row, col_start, col_end):
-        ws.merge_cells(
-            start_row=row, start_column=col_start,
-            end_row=row, end_column=col_end,
-        )
+    # ── Column widths ──────────────────────────────────────────────────────
+    widths = {'A': 24, 'B': 14, 'C': 14, 'D': 14, 'E': 14, 'F': 14,
+              'G': 14, 'H': 14, 'I': 14, 'J': 10}
+    for col_letter, w in widths.items():
+        ws.column_dimensions[col_letter].width = w
 
-    # ── Row 1: SECURITY POSTURE TREND banner ─────────────────────────────
-    _merge_card(1, 9, 14)
-    banner_cell = ws.cell(row=1, column=9, value='SECURITY POSTURE TREND')
-    banner_cell.font = banner_font
-    banner_cell.fill = banner_fill
-    banner_cell.alignment = Alignment(horizontal='left', vertical='center')
-    _fill_banner(1)
-
-    # Row 2: spacer
-    # (already exists from left side)
-
-    # ── Rows 3-4: CHANGE + TREND cards ───────────────────────────────────
+    # ── Extract data ───────────────────────────────────────────────────────
+    snapshots = snapshot_data.get('snapshots', [])
     overall_change = snapshot_data.get('overall_change', 0)
     trajectory = snapshot_data.get('trajectory', 'stable')
+    worst = snapshot_data.get('worst_category') or {}
+    best = snapshot_data.get('best_category') or {}
+    scan_count = snapshot_data.get('scan_count', len(snapshots))
+    timeframe_days = snapshot_data.get('timeframe_days', 0)
+    first_date = snapshot_data.get('first_date', 0)
+    last_date = snapshot_data.get('last_date', 0)
 
-    # CHANGE card (I-K)
-    _merge_card(3, 9, 11)
-    ws.cell(row=3, column=9, value='CHANGE').font = card_label_font
-    ws.cell(row=3, column=9).alignment = Alignment(horizontal='left')
+    # Format date range string
+    date_range_str = ''
+    if first_date and last_date:
+        try:
+            d1 = _time.strftime('%b %d', _time.localtime(first_date))
+            d2 = _time.strftime('%b %d', _time.localtime(last_date))
+            date_range_str = f"{d1} \u2013 {d2}"
+        except (OSError, ValueError):
+            date_range_str = ''
 
-    _merge_card(4, 9, 11)
+    # Target name from scan info embedded in snapshot_data
+    target_name = snapshot_data.get('target', '')
+
+    # ── ROW 1: Title banner ────────────────────────────────────────────────
+    ws.merge_cells('A1:J1')
+    title_cell = ws['A1']
+    title_cell.value = 'SECURITY POSTURE SNAPSHOT'
+    title_cell.font = Font(name='Calibri', size=18, bold=True, color='FFFFFFFF')
+    title_cell.fill = dark_fill
+    title_cell.alignment = Alignment(horizontal='left', vertical='center')
+    _fill_row(1, 2, 10, dark_fill)
+    ws.row_dimensions[1].height = 40
+
+    # ── ROW 2: Subtitle bar ───────────────────────────────────────────────
+    ws.merge_cells('A2:J2')
+    subtitle_parts = []
+    if target_name:
+        subtitle_parts.append(f"Target: {target_name}")
+    if date_range_str:
+        subtitle_parts.append(date_range_str)
+    subtitle_parts.append(f"{scan_count} scans analyzed")
+    subtitle_cell = ws['A2']
+    subtitle_cell.value = ' | '.join(subtitle_parts)
+    subtitle_cell.font = Font(name='Calibri', size=10, color='FF9CA3AF')
+    subtitle_cell.fill = subtitle_fill
+    subtitle_cell.alignment = Alignment(horizontal='left', vertical='center')
+    _fill_row(2, 2, 10, subtitle_fill)
+    ws.row_dimensions[2].height = 22
+
+    # ── ROW 3: spacer ─────────────────────────────────────────────────────
+    ws.row_dimensions[3].height = 8
+
+    # ── ROW 4: KEY METRICS section label ───────────────────────────────────
+    ws.merge_cells('A4:J4')
+    ws.cell(row=4, column=1, value='KEY METRICS').font = Font(
+        name='Calibri', size=11, bold=True, color='FF1F2937')
+    for c in range(1, 11):
+        ws.cell(row=4, column=c).border = Border(
+            bottom=Side(style='medium', color='FFD1D5DB'))
+    ws.row_dimensions[4].height = 18
+
+    # ── ROWS 5-10: 6 metric cards (3×2 grid) ──────────────────────────────
+    # Card definitions: (label, value, sublabel, accent_color)
     change_str = f"+{overall_change}" if overall_change > 0 else str(overall_change)
     change_color = '#22c55e' if overall_change > 0 else ('#ef4444' if overall_change < 0 else '#6b7280')
-    change_cell = ws.cell(row=4, column=9, value=change_str)
-    change_cell.font = Font(name='Calibri', size=14, bold=True, color=hex_to_argb(change_color))
-    change_cell.alignment = Alignment(horizontal='left')
-    change_cell.border = Border(left=Side(style='thick', color=hex_to_argb(change_color)))
 
-    # TREND card (L-N)
-    _merge_card(3, 12, 14)
-    ws.cell(row=3, column=12, value='TREND').font = card_label_font
-    ws.cell(row=3, column=12).alignment = Alignment(horizontal='left')
-
-    _merge_card(4, 12, 14)
     trend_map = {
         'improving': ('#22c55e', 'IMPROVING'),
         'degrading': ('#ef4444', 'DEGRADING'),
         'stable': ('#6b7280', 'STABLE'),
     }
     trend_color, trend_label = trend_map.get(trajectory, ('#6b7280', 'STABLE'))
-    trend_cell = ws.cell(row=4, column=12, value=trend_label)
-    trend_cell.font = Font(name='Calibri', size=14, bold=True, color=hex_to_argb(trend_color))
-    trend_cell.alignment = Alignment(horizontal='left')
-    trend_cell.border = Border(left=Side(style='thick', color=hex_to_argb(trend_color)))
 
-    # Row 5: spacer
-    ws.row_dimensions[5].height = max(ws.row_dimensions[5].height or 8, 8)
+    worst_grade = worst.get('grade', '-')
+    worst_name = worst.get('name', '-')
+    worst_color = _grade_color(worst_grade)
 
-    # ── Rows 6-7: WORST + BEST cards ─────────────────────────────────────
-    worst = snapshot_data.get('worst_category') or {}
-    best = snapshot_data.get('best_category') or {}
+    best_grade = best.get('grade', '-')
+    best_name = best.get('name', '-')
+    best_color = _grade_color(best_grade)
 
-    # WORST card (I-K)
-    _merge_card(6, 9, 11)
-    ws.cell(row=6, column=9, value='WORST').font = card_label_font
-    ws.cell(row=6, column=9).alignment = Alignment(horizontal='left')
+    tf_val = f"{timeframe_days} days" if timeframe_days else '-'
 
-    _merge_card(7, 9, 11)
-    if worst:
-        w_grade = worst.get('grade', '-')
-        w_name = worst.get('name', '')
-        w_color = _grade_color(w_grade)
-        worst_cell = ws.cell(row=7, column=9, value=f"{w_grade} \u2014 {w_name}")
-        worst_cell.font = Font(name='Calibri', size=11, bold=True, color=hex_to_argb(w_color))
-        worst_cell.border = Border(left=Side(style='thick', color=hex_to_argb(w_color)))
-    else:
-        ws.cell(row=7, column=9, value='-').font = Font(name='Calibri', size=11, color='FF9CA3AF')
-
-    # BEST card (L-N)
-    _merge_card(6, 12, 14)
-    ws.cell(row=6, column=12, value='BEST').font = card_label_font
-    ws.cell(row=6, column=12).alignment = Alignment(horizontal='left')
-
-    _merge_card(7, 12, 14)
-    if best:
-        b_grade = best.get('grade', '-')
-        b_name = best.get('name', '')
-        b_color = _grade_color(b_grade)
-        best_cell = ws.cell(row=7, column=12, value=f"{b_grade} \u2014 {b_name}")
-        best_cell.font = Font(name='Calibri', size=11, bold=True, color=hex_to_argb(b_color))
-        best_cell.border = Border(left=Side(style='thick', color=hex_to_argb(b_color)))
-    else:
-        ws.cell(row=7, column=12, value='-').font = Font(name='Calibri', size=11, color='FF9CA3AF')
-
-    # Row 8: spacer
-    ws.row_dimensions[8].height = max(ws.row_dimensions[8].height or 8, 8)
-
-    # ── Rows 9-10: TIMEFRAME + SCANS cards ───────────────────────────────
-    snapshots = snapshot_data.get('snapshots', [])
-    scan_count = snapshot_data.get('scan_count', len(snapshots))
     purple = '#8b5cf6'
     cyan = '#06b6d4'
 
-    # TIMEFRAME card (I-K)
-    _merge_card(9, 9, 11)
-    ws.cell(row=9, column=9, value='TIMEFRAME').font = card_label_font
-    ws.cell(row=9, column=9).alignment = Alignment(horizontal='left')
+    # Row 1 of cards: CHANGE, TREND, WORST (columns A:B, C:D, E:F)
+    card_row1 = [
+        ('CHANGE', change_str, 'vs first scan', change_color),
+        ('TREND', trend_label, 'overall trajectory', trend_color),
+        ('WORST', worst_grade, worst_name, worst_color),
+    ]
+    # Row 2 of cards: BEST, TIMEFRAME, SCANS
+    card_row2 = [
+        ('BEST', best_grade, best_name, best_color),
+        ('TIMEFRAME', tf_val, date_range_str or '-', purple),
+        ('SCANS', str(scan_count), 'data points', cyan),
+    ]
 
-    _merge_card(10, 9, 11)
-    if len(snapshots) >= 2:
-        first_ts = snapshots[0].get('date', 0)
-        last_ts = snapshots[-1].get('date', 0)
-        if first_ts and last_ts:
-            days = max(1, int((last_ts - first_ts) / 86400))
-            tf_val = f"{days} days"
-        else:
-            tf_val = '-'
-    else:
-        tf_val = '-'
-    tf_cell = ws.cell(row=10, column=9, value=tf_val)
-    tf_cell.font = Font(name='Calibri', size=14, bold=True, color=hex_to_argb(purple))
-    tf_cell.alignment = Alignment(horizontal='left')
-    tf_cell.border = Border(left=Side(style='thick', color=hex_to_argb(purple)))
+    def _render_card_row(label_row, value_row, sublabel_row, cards_def):
+        for i, (label, value, sublabel, accent) in enumerate(cards_def):
+            col_start = 1 + i * 2  # A=1, C=3, E=5
+            col_end = col_start + 1
 
-    # SCANS card (L-N)
-    _merge_card(9, 12, 14)
-    ws.cell(row=9, column=12, value='SCANS').font = card_label_font
-    ws.cell(row=9, column=12).alignment = Alignment(horizontal='left')
+            # Label row
+            ws.merge_cells(start_row=label_row, start_column=col_start,
+                           end_row=label_row, end_column=col_end)
+            lbl = ws.cell(row=label_row, column=col_start, value=label)
+            lbl.font = card_label_font
+            lbl.alignment = Alignment(horizontal='left')
 
-    _merge_card(10, 12, 14)
-    scans_cell = ws.cell(row=10, column=12, value=scan_count)
-    scans_cell.font = Font(name='Calibri', size=14, bold=True, color=hex_to_argb(cyan))
-    scans_cell.alignment = Alignment(horizontal='left')
-    scans_cell.border = Border(left=Side(style='thick', color=hex_to_argb(cyan)))
+            # Value row
+            ws.merge_cells(start_row=value_row, start_column=col_start,
+                           end_row=value_row, end_column=col_end)
+            val = ws.cell(row=value_row, column=col_start, value=value)
+            val.font = Font(name='Calibri', size=16, bold=True, color=hex_to_argb(accent))
+            val.alignment = Alignment(horizontal='left')
+            val.border = Border(left=Side(style='thick', color=hex_to_argb(accent)))
 
-    # ── Row 11: divider ──────────────────────────────────────────────────
-    for c in range(9, 15):
+            # Sublabel row
+            ws.merge_cells(start_row=sublabel_row, start_column=col_start,
+                           end_row=sublabel_row, end_column=col_end)
+            sub = ws.cell(row=sublabel_row, column=col_start, value=sublabel)
+            sub.font = card_sublabel_font
+            sub.alignment = Alignment(horizontal='left')
+
+    _render_card_row(5, 6, 7, card_row1)
+    _render_card_row(8, 9, 10, card_row2)
+    ws.row_dimensions[5].height = 14
+    ws.row_dimensions[6].height = 28
+    ws.row_dimensions[7].height = 14
+    ws.row_dimensions[8].height = 14
+    ws.row_dimensions[9].height = 28
+    ws.row_dimensions[10].height = 14
+
+    # ── ROW 11: spacer + divider ──────────────────────────────────────────
+    ws.row_dimensions[11].height = 8
+    for c in range(1, 11):
         ws.cell(row=11, column=c).border = section_border
 
-    # ── Row 12: SCAN HISTORY sub-banner ──────────────────────────────────
-    _merge_card(12, 9, 14)
-    hist_banner = ws.cell(row=12, column=9, value='SCAN HISTORY')
+    # ── ROW 12: SCAN HISTORY sub-banner ───────────────────────────────────
+    ws.merge_cells('A12:J12')
+    hist_banner = ws.cell(row=12, column=1, value='SCAN HISTORY')
     hist_banner.font = Font(name='Calibri', size=11, bold=True, color='FFFFFFFF')
-    hist_banner.fill = banner_fill
+    hist_banner.fill = dark_fill
     hist_banner.alignment = Alignment(horizontal='left', vertical='center')
-    _fill_banner(12)
-    ws.row_dimensions[12].height = 24
+    _fill_row(12, 2, 10, dark_fill)
+    ws.row_dimensions[12].height = 26
 
-    # ── Row 13: headers ──────────────────────────────────────────────────
+    # ── ROW 13: table headers ─────────────────────────────────────────────
+    hist_headers = ['DATE', 'GRADE', 'SCORE', 'FINDINGS', 'UNIQUE', 'CHANGE']
     header_font = Font(name='Calibri', size=9, bold=True, color='FF6B7280')
     header_border = Border(bottom=Side(style='thin', color='FFD1D5DB'))
+    for ci, hdr in enumerate(hist_headers):
+        cell = ws.cell(row=13, column=ci + 1, value=hdr)
+        cell.font = header_font
+        cell.border = header_border
+        cell.alignment = Alignment(horizontal='center' if ci > 0 else 'left')
+    ws.row_dimensions[13].height = 18
 
-    ws.cell(row=13, column=9, value='DATE').font = header_font
-    ws.cell(row=13, column=9).border = header_border
-    _merge_card(13, 10, 11)
-    ws.cell(row=13, column=10, value='GRADE').font = header_font
-    ws.cell(row=13, column=10).border = header_border
-    ws.cell(row=13, column=11).border = header_border
-    _merge_card(13, 12, 14)
-    ws.cell(row=13, column=12, value='SCORE').font = header_font
-    ws.cell(row=13, column=12).border = header_border
-    for c in range(13, 15):
-        ws.cell(row=13, column=c).border = header_border
-
-    # ── Rows 14+: scan history data (most recent first, up to 15) ────────
+    # ── ROWS 14+: scan data (most recent first, up to 15) ────────────────
     display_snapshots = list(reversed(snapshots))[:15]
     sr = 14
+    prev_score = None
     for snap in display_snapshots:
         # Date
         snap_date = snap.get('date', 0)
         if snap_date:
             try:
-                date_str = _time.strftime('%b %d, %Y', _time.localtime(snap_date))
+                date_str = _time.strftime('%b %d', _time.localtime(snap_date))
             except (OSError, ValueError):
                 date_str = str(snap_date)
         else:
             date_str = '-'
-        ws.cell(row=sr, column=9, value=date_str).font = Font(
-            name='Calibri', size=9, color='FF374151')
-        ws.cell(row=sr, column=9).border = Border(
-            bottom=Side(style='thin', color='FFE5E7EB'))
 
-        # Grade badge
         snap_grade = snap.get('overall_grade', '-')
+        snap_score = snap.get('overall_score', 0)
+        total_findings = snap.get('total_findings', 0)
+        unique_findings = snap.get('unique_findings', 0)
+
+        # Delta from the next-most-recent scan (prev in reversed order = later in time)
+        if prev_score is not None:
+            delta = round(snap_score - prev_score, 1)
+            delta_str = f"+{delta}" if delta > 0 else str(delta)
+            delta_color = '#22c55e' if delta > 0 else ('#ef4444' if delta < 0 else '#6b7280')
+        else:
+            delta_str = '-'
+            delta_color = '#6b7280'
+        prev_score = snap_score
+
+        # Alternating row fill
+        row_fill = alt_row_fill if (sr - 14) % 2 == 1 else None
+
+        # Date
+        d_cell = ws.cell(row=sr, column=1, value=date_str)
+        d_cell.font = Font(name='Calibri', size=9, color='FF374151')
+        d_cell.border = subtle_border
+        if row_fill:
+            d_cell.fill = row_fill
+
+        # Grade
         g_color = _grade_color(snap_grade)
-        _merge_card(sr, 10, 11)
-        g_cell = ws.cell(row=sr, column=10, value=snap_grade)
+        g_cell = ws.cell(row=sr, column=2, value=snap_grade)
         g_cell.font = Font(name='Calibri', size=10, bold=True, color=hex_to_argb(g_color))
         g_cell.alignment = Alignment(horizontal='center')
-        g_cell.border = Border(bottom=Side(style='thin', color='FFE5E7EB'))
-        ws.cell(row=sr, column=11).border = Border(
-            bottom=Side(style='thin', color='FFE5E7EB'))
+        g_cell.border = subtle_border
+        if row_fill:
+            g_cell.fill = row_fill
 
         # Score
-        snap_score = snap.get('overall_score', 0)
-        _merge_card(sr, 12, 14)
-        s_cell = ws.cell(row=sr, column=12, value=snap_score)
+        s_cell = ws.cell(row=sr, column=3, value=snap_score)
         s_cell.font = Font(name='Calibri', size=10, bold=True, color='FF374151')
         s_cell.number_format = '0.0'
-        s_cell.border = Border(bottom=Side(style='thin', color='FFE5E7EB'))
-        for c in range(13, 15):
-            ws.cell(row=sr, column=c).border = Border(
-                bottom=Side(style='thin', color='FFE5E7EB'))
+        s_cell.alignment = Alignment(horizontal='center')
+        s_cell.border = subtle_border
+        if row_fill:
+            s_cell.fill = row_fill
+
+        # Findings
+        f_cell = ws.cell(row=sr, column=4, value=total_findings)
+        f_cell.font = Font(name='Calibri', size=9, color='FF374151')
+        f_cell.alignment = Alignment(horizontal='center')
+        f_cell.border = subtle_border
+        if row_fill:
+            f_cell.fill = row_fill
+
+        # Unique
+        u_cell = ws.cell(row=sr, column=5, value=unique_findings)
+        u_cell.font = Font(name='Calibri', size=9, color='FF374151')
+        u_cell.alignment = Alignment(horizontal='center')
+        u_cell.border = subtle_border
+        if row_fill:
+            u_cell.fill = row_fill
+
+        # Change
+        ch_cell = ws.cell(row=sr, column=6, value=delta_str)
+        ch_cell.font = Font(name='Calibri', size=9, bold=True, color=hex_to_argb(delta_color))
+        ch_cell.alignment = Alignment(horizontal='center')
+        ch_cell.border = subtle_border
+        if row_fill:
+            ch_cell.fill = row_fill
 
         sr += 1
+
+    # ── Spacer + section divider after history ────────────────────────────
+    ws.row_dimensions[sr].height = 8
+    for c in range(1, 11):
+        ws.cell(row=sr, column=c).border = section_border
+    sr += 1
+
+    # ── CATEGORY COMPARISON sub-banner ────────────────────────────────────
+    ws.merge_cells(start_row=sr, start_column=1, end_row=sr, end_column=10)
+    cat_banner = ws.cell(row=sr, column=1, value='CATEGORY COMPARISON')
+    cat_banner.font = Font(name='Calibri', size=11, bold=True, color='FFFFFFFF')
+    cat_banner.fill = sub_banner_fill
+    cat_banner.alignment = Alignment(horizontal='left', vertical='center')
+    _fill_row(sr, 2, 10, sub_banner_fill)
+    ws.row_dimensions[sr].height = 26
+    sr += 1
+
+    # Build category comparison from per-snapshot category_scores
+    # Use up to 8 most recent scans
+    display_snaps = snapshots[-8:] if len(snapshots) > 8 else snapshots
+
+    # Collect all category names across all snapshots
+    all_cats = {}
+    for snap in display_snaps:
+        cats = snap.get('category_scores', {})
+        for cn, cd in cats.items():
+            if cd.get('weight', 0) > 0:
+                all_cats[cn] = cd.get('weight', 0)
+
+    if all_cats and len(display_snaps) >= 2:
+        # Sort categories by weight descending
+        sorted_cat_names = sorted(all_cats.keys(), key=lambda x: (-all_cats[x], x))
+
+        # Header row: CATEGORY, then date columns, then TREND
+        cat_header_font = Font(name='Calibri', size=9, bold=True, color='FF6B7280')
+        cat_header_border = Border(bottom=Side(style='thin', color='FFD1D5DB'))
+
+        ws.cell(row=sr, column=1, value='CATEGORY').font = cat_header_font
+        ws.cell(row=sr, column=1).border = cat_header_border
+
+        for si, snap in enumerate(display_snaps):
+            col = si + 2
+            snap_date = snap.get('date', 0)
+            if snap_date:
+                try:
+                    hdr_date = _time.strftime('%m/%d', _time.localtime(snap_date))
+                except (OSError, ValueError):
+                    hdr_date = '-'
+            else:
+                hdr_date = '-'
+            hdr_cell = ws.cell(row=sr, column=col, value=hdr_date)
+            hdr_cell.font = cat_header_font
+            hdr_cell.alignment = Alignment(horizontal='center')
+            hdr_cell.border = cat_header_border
+
+        trend_col = len(display_snaps) + 2
+        ws.cell(row=sr, column=trend_col, value='TREND').font = cat_header_font
+        ws.cell(row=sr, column=trend_col).border = cat_header_border
+        ws.cell(row=sr, column=trend_col).alignment = Alignment(horizontal='center')
+        ws.row_dimensions[sr].height = 18
+        sr += 1
+
+        # Category rows
+        for cat_name in sorted_cat_names:
+            cat_tab_color = CATEGORY_TAB_COLORS.get(cat_name, '#6b7280')
+
+            # Category name with thick left border
+            name_cell = ws.cell(row=sr, column=1, value=cat_name)
+            name_cell.font = Font(name='Calibri', size=9, bold=True,
+                                  color=hex_to_argb(cat_tab_color))
+            name_cell.border = Border(
+                left=Side(style='thick', color=hex_to_argb(cat_tab_color)),
+                bottom=Side(style='thin', color='FFE5E7EB'),
+            )
+
+            # Grade cells per scan
+            first_score = None
+            last_score = None
+            for si, snap in enumerate(display_snaps):
+                col = si + 2
+                cats = snap.get('category_scores', {})
+                cd = cats.get(cat_name, {})
+                grade = cd.get('grade', '-')
+                score = cd.get('score', None)
+
+                if score is not None and first_score is None:
+                    first_score = score
+                if score is not None:
+                    last_score = score
+
+                gc = _grade_color(grade)
+                g_cell = ws.cell(row=sr, column=col, value=grade)
+                g_cell.font = Font(name='Calibri', size=10, bold=True,
+                                   color=hex_to_argb(gc))
+                g_cell.alignment = Alignment(horizontal='center')
+                g_cell.border = Border(bottom=Side(style='thin', color='FFE5E7EB'))
+
+            # Trend arrow
+            if first_score is not None and last_score is not None:
+                diff = last_score - first_score
+                if diff > 10:
+                    arrow, arrow_color = '\u25b2\u25b2', '#22c55e'
+                elif diff > 2:
+                    arrow, arrow_color = '\u25b2', '#22c55e'
+                elif diff < -10:
+                    arrow, arrow_color = '\u25bc\u25bc', '#ef4444'
+                elif diff < -2:
+                    arrow, arrow_color = '\u25bc', '#ef4444'
+                else:
+                    arrow, arrow_color = '\u25c6', '#6b7280'
+            else:
+                arrow, arrow_color = '\u25c6', '#6b7280'
+
+            t_cell = ws.cell(row=sr, column=trend_col, value=arrow)
+            t_cell.font = Font(name='Calibri', size=10, bold=True,
+                               color=hex_to_argb(arrow_color))
+            t_cell.alignment = Alignment(horizontal='center')
+            t_cell.border = Border(bottom=Side(style='thin', color='FFE5E7EB'))
+
+            sr += 1
+
+        # Overall row
+        overall_border_top = Border(
+            top=Side(style='thick', color='FF374151'),
+            bottom=Side(style='thin', color='FFE5E7EB'),
+        )
+        ov_cell = ws.cell(row=sr, column=1, value='Overall')
+        ov_cell.font = Font(name='Calibri', size=10, bold=True, color='FF1F2937')
+        ov_cell.border = Border(
+            left=Side(style='thick', color='FF374151'),
+            top=Side(style='thick', color='FF374151'),
+            bottom=Side(style='thin', color='FFE5E7EB'),
+        )
+
+        first_ov_score = None
+        last_ov_score = None
+        for si, snap in enumerate(display_snaps):
+            col = si + 2
+            grade = snap.get('overall_grade', '-')
+            score = snap.get('overall_score', 0)
+
+            if first_ov_score is None:
+                first_ov_score = score
+            last_ov_score = score
+
+            gc = _grade_color(grade)
+            g_cell = ws.cell(row=sr, column=col, value=grade)
+            g_cell.font = Font(name='Calibri', size=10, bold=True,
+                               color=hex_to_argb(gc))
+            g_cell.alignment = Alignment(horizontal='center')
+            g_cell.border = overall_border_top
+
+            # Highlight the most recent scan's overall grade
+            if si == len(display_snaps) - 1:
+                grade_bg = GRADE_METRIC_COLORS.get(grade, '#6b7280')
+                # Use a lighter version for the fill
+                g_cell.fill = PatternFill(
+                    start_color=hex_to_argb(grade_bg),
+                    end_color=hex_to_argb(grade_bg),
+                    fill_type='solid',
+                )
+                g_cell.font = Font(name='Calibri', size=10, bold=True, color='FFFFFFFF')
+
+        # Overall trend
+        if first_ov_score is not None and last_ov_score is not None:
+            ov_diff = last_ov_score - first_ov_score
+            if ov_diff > 10:
+                ov_arrow, ov_color = '\u25b2\u25b2', '#22c55e'
+            elif ov_diff > 2:
+                ov_arrow, ov_color = '\u25b2', '#22c55e'
+            elif ov_diff < -10:
+                ov_arrow, ov_color = '\u25bc\u25bc', '#ef4444'
+            elif ov_diff < -2:
+                ov_arrow, ov_color = '\u25bc', '#ef4444'
+            else:
+                ov_arrow, ov_color = '\u25c6', '#6b7280'
+        else:
+            ov_arrow, ov_color = '\u25c6', '#6b7280'
+
+        ov_t = ws.cell(row=sr, column=trend_col, value=ov_arrow)
+        ov_t.font = Font(name='Calibri', size=10, bold=True,
+                         color=hex_to_argb(ov_color))
+        ov_t.alignment = Alignment(horizontal='center')
+        ov_t.border = overall_border_top
+
+    # ── Print setup (landscape, fit to page) ──────────────────────────────
+    ws.page_setup.orientation = 'landscape'
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 1
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
 
 
 # ============================================================================
