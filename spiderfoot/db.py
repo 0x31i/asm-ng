@@ -328,6 +328,7 @@ class SpiderFootDb:
             date_added      INT NOT NULL, \
             added_by        VARCHAR, \
             notes           VARCHAR, \
+            raw_value       VARCHAR, \
             UNIQUE(target, asset_type, asset_value) \
         )",
         "CREATE INDEX idx_known_assets_target ON tbl_known_assets (target)",
@@ -1241,6 +1242,33 @@ class SpiderFootDb:
                     self.conn.commit()
                 except DatabaseError:
                     pass
+
+            # Migration: Add raw_value column to tbl_known_assets
+            try:
+                self.dbh.execute("SELECT raw_value FROM tbl_known_assets LIMIT 0")
+            except DatabaseError:
+                try:
+                    self.dbh.execute("ALTER TABLE tbl_known_assets ADD COLUMN raw_value VARCHAR")
+                    self.conn.commit()
+                except DatabaseError:
+                    pass
+
+            # Migration: Clean existing dirty asset_values containing SFURL tags
+            try:
+                self.dbh.execute("SELECT id, asset_value FROM tbl_known_assets WHERE raw_value IS NULL AND asset_value LIKE '%<SFURL>%'")
+                dirty_rows = self.dbh.fetchall()
+                if dirty_rows:
+                    for row_id, raw_val in dirty_rows:
+                        # Extract URL from SFURL tags
+                        import re as _re
+                        sfurl_match = _re.search(r'<SFURL>(.*?)</SFURL>', raw_val, _re.IGNORECASE)
+                        clean_val = sfurl_match.group(1).strip() if sfurl_match else raw_val
+                        self.dbh.execute("UPDATE tbl_known_assets SET asset_value = ?, raw_value = ? WHERE id = ?",
+                                         (clean_val, raw_val, row_id))
+                    self.conn.commit()
+                    _log.info(f"Cleaned {len(dirty_rows)} dirty known asset values")
+            except DatabaseError:
+                pass
 
             # Migration: Create tbl_asset_tags table
             try:
@@ -3753,7 +3781,7 @@ class SpiderFootDb:
 
         Args:
             target (str): scan target this asset belongs to
-            items (list): list of (assetType, assetValue) tuples
+            items (list): list of (assetType, assetValue) or (assetType, assetValue, rawValue) tuples
             source (str): 'CLIENT_PROVIDED' or 'ANALYST_CONFIRMED'
             addedBy (str): username who added this
 
@@ -3764,10 +3792,14 @@ class SpiderFootDb:
             return True
 
         qry = self._insert_or_ignore("INSERT OR IGNORE INTO tbl_known_assets \
-            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag) \
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, raw_value) \
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         now = int(time.time() * 1000)
-        params_list = [(target, at, av, source, None, now, addedBy, None, 'DIRECT', None) for (at, av) in items]
+        params_list = []
+        for item in items:
+            at, av = item[0], item[1]
+            rv = item[2] if len(item) > 2 else None
+            params_list.append((target, at, av, source, None, now, addedBy, None, 'DIRECT', None, rv))
 
         with self.dbhLock:
             try:
@@ -3900,19 +3932,21 @@ class SpiderFootDb:
     def knownAssetAdd(self, target: str, assetType: str, assetValue: str,
                       source: str = 'CLIENT_PROVIDED', importBatch: str = None,
                       addedBy: str = None, notes: str = None,
-                      affinity: str = 'DIRECT', tag: str = None) -> bool:
+                      affinity: str = 'DIRECT', tag: str = None,
+                      rawValue: str = None) -> bool:
         """Add a known asset entry.
 
         Args:
             target: scan target this asset belongs to
             assetType: 'ip', 'domain', 'email', or 'human_name'
-            assetValue: the asset value
+            assetValue: the asset value (clean)
             source: 'CLIENT_PROVIDED' or 'ANALYST_CONFIRMED'
             importBatch: optional batch identifier for bulk imports
             addedBy: username who added this
             notes: optional notes
             affinity: 'DIRECT' or 'ASSOCIATED'
             tag: optional tag name
+            rawValue: original raw event_data before cleaning (if different from assetValue)
 
         Returns:
             bool: True on success
@@ -3921,14 +3955,14 @@ class SpiderFootDb:
             IOError: database I/O failed
         """
         qry = self._insert_or_ignore("INSERT OR IGNORE INTO tbl_known_assets \
-            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag) \
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, raw_value) \
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, (target, assetType, assetValue, source,
                                        importBatch, int(time.time() * 1000), addedBy, notes,
-                                       affinity, tag))
+                                       affinity, tag, rawValue))
                 self.conn.commit()
                 _log.info(f"Known asset add: target={target} type={assetType} value={assetValue}")
             except DatabaseError as e:
@@ -4053,16 +4087,16 @@ class SpiderFootDb:
         """Get known assets for a target, optionally filtered by type.
 
         Returns:
-            list: list of asset rows [id, target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag]
+            list: list of asset rows [id, target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, raw_value]
         """
         if assetType:
             qry = "SELECT id, target, asset_type, asset_value, source, import_batch, \
-                date_added/1000 as date_added, added_by, notes, affinity, tag \
+                date_added/1000 as date_added, added_by, notes, affinity, tag, raw_value \
                 FROM tbl_known_assets WHERE target = ? AND asset_type = ? ORDER BY date_added DESC"
             qvars = [target, assetType]
         else:
             qry = "SELECT id, target, asset_type, asset_value, source, import_batch, \
-                date_added/1000 as date_added, added_by, notes, affinity, tag \
+                date_added/1000 as date_added, added_by, notes, affinity, tag, raw_value \
                 FROM tbl_known_assets WHERE target = ? ORDER BY asset_type, date_added DESC"
             qvars = [target]
 

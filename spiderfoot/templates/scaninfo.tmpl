@@ -4382,8 +4382,15 @@
                         var d = new Date(a.date_added * 1000);
                         var sourceClass = a.source === 'CLIENT_PROVIDED' ? 'assets-source-client' : 'assets-source-analyst';
                         var sourceLabel = a.source === 'CLIENT_PROVIDED' ? 'CLIENT' : 'ANALYST';
-                        var safeValue = $('<span>').text(a.asset_value).html();
-                        var valueWrapped = assetsRenderWrappable(a.asset_value);
+                        // Compute display value: platform+username for human_name, clean value for others
+                        var displayVal = a.asset_value;
+                        if (a.display && a.display.platform && a.display.username) {
+                            displayVal = a.display.platform + ': ' + a.display.username;
+                        } else if (a.display && a.display.clean_value) {
+                            displayVal = a.display.clean_value;
+                        }
+                        var safeValue = $('<span>').text(displayVal).html();
+                        var valueWrapped = assetsRenderWrappable(displayVal);
 
                         // Check filters
                         var typeMatch = (knownActiveFilters.type === 'all' || knownActiveFilters.type === a.asset_type);
@@ -4435,7 +4442,8 @@
                         html += "<div class='assets-detail-card-value assets-notes-value'>" + (a.notes ? $('<span>').text(a.notes).html() : "<span class='assets-notes-placeholder'>CLICK TO ADD NOTES</span>") + "</div>";
                         html += "</div>";
 
-                        html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>FULL VALUE</div><div class='assets-detail-card-value' style='word-break:break-all;'>" + safeValue + "</div></div>";
+                        var fullVal = a.raw_value || a.asset_value;
+                        html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>FULL VALUE</div><div class='assets-detail-card-value' style='word-break:break-all;'>" + $('<span>').text(fullVal).html() + "</div></div>";
                         html += "</div></td></tr>";
                     }
                     html += "</tbody></table>";
