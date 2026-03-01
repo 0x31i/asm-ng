@@ -51,3 +51,8 @@ openai
 psycopg2-binary>=2.9.0,<3.0.0
 alembic>=1.13.0,<2.0.0
 telethon
+ddgs>=7.0
+py-tlsh>=4.7.2
+ppdeep>=20200505
+imagehash>=4.3.1
+mmh3>=4.0
