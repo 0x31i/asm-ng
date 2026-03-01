@@ -6405,6 +6405,8 @@ i.glyphicon-white,
 .assets-breakdown-card-email i { color: #0891b2; }
 .assets-breakdown-card-human { border-left: 4px solid #f59e0b; }
 .assets-breakdown-card-human i { color: #d97706; }
+.assets-breakdown-card-username { border-left: 4px solid #10b981; }
+.assets-breakdown-card-username i { color: #059669; }
 .assets-breakdown-card-matches { border-left: 4px solid #ef4444; }
 .assets-breakdown-card-matches i { color: #dc2626; }
 .assets-breakdown-card-direct { border-left: 4px solid #22c55e; }
@@ -6413,10 +6415,11 @@ i.glyphicon-white,
 .assets-breakdown-card-associated i { color: #4f46e5; }
 
 /* Balanced breakdown grid rows */
+.assets-breakdown-row-5 { grid-template-columns: repeat(5, 1fr); }
 .assets-breakdown-row-4 { grid-template-columns: repeat(4, 1fr); }
 .assets-breakdown-row-3 { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 768px) {
-  .assets-breakdown-row-4, .assets-breakdown-row-3 { grid-template-columns: repeat(2, 1fr); }
+  .assets-breakdown-row-5, .assets-breakdown-row-4, .assets-breakdown-row-3 { grid-template-columns: repeat(2, 1fr); }
 }
 
 .assets-callout {
@@ -6505,6 +6508,7 @@ i.glyphicon-white,
 .assets-type-domain { background: rgba(139,92,246,0.1); color: #7c3aed; border: 1px solid rgba(139,92,246,0.2); }
 .assets-type-email { background: rgba(236,72,153,0.1); color: #db2777; border: 1px solid rgba(236,72,153,0.2); }
 .assets-type-human_name { background: rgba(245,158,11,0.1); color: #d97706; border: 1px solid rgba(245,158,11,0.2); }
+.assets-type-username { background: rgba(16,185,129,0.1); color: #059669; border: 1px solid rgba(16,185,129,0.2); }
 
 .assets-source-badge {
   display: inline-block;
@@ -7158,6 +7162,23 @@ i.glyphicon-white,
   letter-spacing: 0.5px; color: #1e293b;
 }
 .assets-confidence-val { color: #16a34a !important; }
+.assets-type-select {
+  background: #fff;
+  color: #1e293b;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 3px 6px;
+  cursor: pointer;
+}
+.assets-type-select:focus {
+  outline: 1px solid #2563eb;
+  border-color: #2563eb;
+}
 
 /* Notes card — editable */
 .assets-notes-card { flex: 1; min-width: 200px; cursor: pointer; }

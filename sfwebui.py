@@ -4270,8 +4270,10 @@ class SpiderFootWebUi:
                                 ka_type = 'ip'
                             elif eventType in ('EMAILADDR', 'AFFILIATE_EMAILADDR'):
                                 ka_type = 'email'
-                            elif eventType in ('HUMAN_NAME', 'USERNAME', 'SOCIAL_MEDIA'):
+                            elif eventType == 'HUMAN_NAME':
                                 ka_type = 'human_name'
+                            elif eventType in ('USERNAME', 'SOCIAL_MEDIA'):
+                                ka_type = 'username'
                             clean_val = cleanAssetValue(evData)
                             raw_val = evData if clean_val != evData else None
                             ka_adds.append((ka_type, clean_val, raw_val))
@@ -4555,7 +4557,7 @@ class SpiderFootWebUi:
         if not target or not asset_type or not asset_value:
             return json.dumps(["ERROR", "target, asset_type, and asset_value are required."]).encode('utf-8')
 
-        if asset_type not in ('ip', 'domain', 'email', 'human_name'):
+        if asset_type not in ('ip', 'domain', 'email', 'human_name', 'username'):
             return json.dumps(["ERROR", "asset_type must be ip, domain, email, or human_name."]).encode('utf-8')
 
         if source not in ('CLIENT_PROVIDED', 'ANALYST_CONFIRMED'):
@@ -4604,8 +4606,9 @@ class SpiderFootWebUi:
     @cherrypy.expose
     def knownassetupdate(self: 'SpiderFootWebUi', id: str = None,
                          notes: str = None, source: str = None,
-                         affinity: str = None, tag: str = None) -> str:
-        """Update a known asset's notes, source, affinity, or tag.
+                         affinity: str = None, tag: str = None,
+                         asset_type: str = None) -> str:
+        """Update a known asset's metadata including type reassignment.
 
         Returns:
             str: JSON status
@@ -4615,13 +4618,20 @@ class SpiderFootWebUi:
         if not id:
             return json.dumps(["ERROR", "id is required."]).encode('utf-8')
 
+        if asset_type and asset_type not in ('ip', 'domain', 'email', 'human_name', 'username'):
+            return json.dumps(["ERROR", f"Invalid asset type: {asset_type}"]).encode('utf-8')
+
         with SpiderFootDb(self.config) as dbh:
             try:
                 dbh.knownAssetUpdate(int(id), notes=notes, source=source,
-                                     affinity=affinity, tag=tag)
+                                     affinity=affinity, tag=tag,
+                                     assetType=asset_type)
                 return json.dumps(["SUCCESS", ""]).encode('utf-8')
             except Exception as e:
-                return json.dumps(["ERROR", str(e)]).encode('utf-8')
+                msg = str(e)
+                if 'unique' in msg.lower() or 'duplicate' in msg.lower():
+                    return json.dumps(["ERROR", "An asset with that type and value already exists."]).encode('utf-8')
+                return json.dumps(["ERROR", msg]).encode('utf-8')
 
     @cherrypy.expose
     def knownassetimport(self: 'SpiderFootWebUi', target: str = None,
@@ -4642,7 +4652,7 @@ class SpiderFootWebUi:
         if not target or not asset_type or not importfile:
             return json.dumps(["ERROR", "target, asset_type, and importfile are required."]).encode('utf-8')
 
-        if asset_type not in ('ip', 'domain', 'email', 'human_name'):
+        if asset_type not in ('ip', 'domain', 'email', 'human_name', 'username'):
             return json.dumps(["ERROR", "asset_type must be ip, domain, email, or human_name."]).encode('utf-8')
 
         current_user = cherrypy.session.get('user', 'anonymous')
@@ -4680,7 +4690,8 @@ class SpiderFootWebUi:
                         cell = row[0].strip().lower()
                         if cell in ('ip', 'ip address', 'ip_address', 'domain', 'hostname',
                                     'subdomain', 'name', 'employee', 'email', 'value',
-                                    'asset', 'host', 'address', 'fqdn'):
+                                    'asset', 'host', 'address', 'fqdn', 'username',
+                                    'social media', 'handle', 'screen name'):
                             continue
                     # Take the first column
                     val = row[0].strip()
@@ -4834,11 +4845,12 @@ class SpiderFootWebUi:
     def knownassetexportzip(self: 'SpiderFootWebUi', target: str = None) -> bytes:
         """Export known assets as a ZIP containing separate CSVs per asset type.
 
-        Creates four CSV files bundled in a zip:
+        Creates CSV files bundled in a zip:
         - IPs.csv
         - DOMAINS.csv
         - EMAILS.csv
         - HUMAN_NAMES.csv
+        - USERNAMES.csv
 
         Args:
             target (str): the scan target
@@ -4860,6 +4872,7 @@ class SpiderFootWebUi:
                 'domain': [],
                 'email': [],
                 'human_name': [],
+                'username': [],
             }
             for r in rows:
                 asset_type = r[2]
@@ -4873,6 +4886,7 @@ class SpiderFootWebUi:
                 'domain': 'DOMAINS.csv',
                 'email': 'EMAILS.csv',
                 'human_name': 'HUMAN_NAMES.csv',
+                'username': 'USERNAMES.csv',
             }
 
             zip_buf = BytesIO()
@@ -4958,7 +4972,8 @@ class SpiderFootWebUi:
                 domain_types = {'DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
                                 'CO_HOSTED_SITE', 'SIMILARDOMAIN', 'INTERNET_NAME_UNRESOLVED'}
                 email_types = {'EMAILADDR', 'AFFILIATE_EMAILADDR'}
-                human_name_types = {'HUMAN_NAME', 'USERNAME', 'SOCIAL_MEDIA'}
+                human_name_types = {'HUMAN_NAME'}
+                username_types = {'USERNAME', 'SOCIAL_MEDIA'}
 
                 for ev in events:
                     fp_flag = ev[13]  # false_positive column
@@ -4979,6 +4994,8 @@ class SpiderFootWebUi:
                         asset_type = 'email'
                     elif event_type in human_name_types:
                         asset_type = 'human_name'
+                    elif event_type in username_types:
+                        asset_type = 'username'
 
                     if asset_type:
                         try:
@@ -5005,6 +5022,8 @@ class SpiderFootWebUi:
                             asset_type = 'email'
                         elif evt in human_name_types:
                             asset_type = 'human_name'
+                        elif evt in username_types:
+                            asset_type = 'username'
                         if asset_type:
                             try:
                                 clean_val = cleanAssetValue(evd)
@@ -5180,8 +5199,10 @@ class SpiderFootWebUi:
                                 asset_type = 'ip'
                             elif event_type in ('EMAILADDR', 'AFFILIATE_EMAILADDR'):
                                 asset_type = 'email'
-                            elif event_type in ('HUMAN_NAME', 'USERNAME', 'SOCIAL_MEDIA'):
+                            elif event_type == 'HUMAN_NAME':
                                 asset_type = 'human_name'
+                            elif event_type in ('USERNAME', 'SOCIAL_MEDIA'):
+                                asset_type = 'username'
                             clean_val = cleanAssetValue(event_data)
                             dbh.knownAssetAdd(target, asset_type, clean_val,
                                               source='ANALYST_CONFIRMED', addedBy=current_user,
@@ -5233,10 +5254,13 @@ class SpiderFootWebUi:
                                 asset_type = 'ip'
                             elif event_type in ('EMAILADDR', 'AFFILIATE_EMAILADDR'):
                                 asset_type = 'email'
-                            elif event_type in ('HUMAN_NAME', 'USERNAME', 'SOCIAL_MEDIA'):
+                            elif event_type == 'HUMAN_NAME':
                                 asset_type = 'human_name'
+                            elif event_type in ('USERNAME', 'SOCIAL_MEDIA'):
+                                asset_type = 'username'
                             clean_val = cleanAssetValue(event_data)
-                            dbh.knownAssetRemove(target=target, assetType=asset_type, assetValue=clean_val)
+                            dbh.knownAssetRemove(target=target, assetType=asset_type,
+                                                 assetValue=clean_val, source='ANALYST_CONFIRMED')
 
                     return json.dumps(["SUCCESS", f"Reset {len(hashes)} items to pending."]).encode('utf-8')
 
@@ -8748,7 +8772,8 @@ class SpiderFootWebUi:
             domain_match_types = {'DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
                                   'CO_HOSTED_SITE', 'SIMILARDOMAIN', 'INTERNET_NAME_UNRESOLVED'}
             email_match_types = {'EMAILADDR', 'AFFILIATE_EMAILADDR'}
-            human_name_match_types = {'HUMAN_NAME', 'USERNAME', 'SOCIAL_MEDIA'}
+            human_name_match_types = {'HUMAN_NAME'}
+            username_match_types = {'USERNAME', 'SOCIAL_MEDIA'}
             hasKnownAssets = any(knownAssets.values())
 
             for row in data:
@@ -8795,6 +8820,26 @@ class SpiderFootWebUi:
                         cleanLower = cleanAssetValue(eventDataRaw).lower().strip()
                         for kh in knownAssets.get('human_name', set()):
                             if kh in cleanLower or cleanLower in kh:
+                                isKnownAsset = 1
+                                break
+                    elif eventTypeRaw in username_match_types:
+                        cleanLower = cleanAssetValue(eventDataRaw).lower().strip()
+                        for ku in knownAssets.get('username', set()):
+                            if ku in cleanLower or cleanLower in ku:
+                                isKnownAsset = 1
+                                break
+                    # Cross-match: USERNAME/SOCIAL_MEDIA against human_name assets
+                    if not isKnownAsset and eventTypeRaw in username_match_types:
+                        cleanLower = cleanAssetValue(eventDataRaw).lower().strip()
+                        for kh in knownAssets.get('human_name', set()):
+                            if kh in cleanLower or cleanLower in kh:
+                                isKnownAsset = 1
+                                break
+                    # Cross-match: HUMAN_NAME against username assets
+                    if not isKnownAsset and eventTypeRaw in human_name_match_types:
+                        cleanLower = cleanAssetValue(eventDataRaw).lower().strip()
+                        for ku in knownAssets.get('username', set()):
+                            if ku in cleanLower or cleanLower in ku:
                                 isKnownAsset = 1
                                 break
 

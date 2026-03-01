@@ -3809,8 +3809,15 @@ class SpiderFootDb:
         return count
 
     def knownAssetRemove(self, assetId: int = None, target: str = None,
-                         assetType: str = None, assetValue: str = None) -> bool:
+                         assetType: str = None, assetValue: str = None,
+                         source: str = None) -> bool:
         """Remove a known asset by ID or by (target, type, value).
+
+        Args:
+            assetId: delete by primary key
+            target/assetType/assetValue: delete by composite key
+            source: optional source filter (e.g. 'ANALYST_CONFIRMED') to
+                    avoid removing CLIENT_PROVIDED entries
 
         Returns:
             bool: True on success
@@ -3818,11 +3825,21 @@ class SpiderFootDb:
         with self.dbhLock:
             try:
                 if assetId is not None:
-                    self.dbh.execute("DELETE FROM tbl_known_assets WHERE id = ?", (assetId,))
+                    if source:
+                        self.dbh.execute(
+                            "DELETE FROM tbl_known_assets WHERE id = ? AND source = ?",
+                            (assetId, source))
+                    else:
+                        self.dbh.execute("DELETE FROM tbl_known_assets WHERE id = ?", (assetId,))
                 elif target and assetType and assetValue:
-                    self.dbh.execute(
-                        "DELETE FROM tbl_known_assets WHERE target = ? AND asset_type = ? AND asset_value = ?",
-                        (target, assetType, assetValue))
+                    if source:
+                        self.dbh.execute(
+                            "DELETE FROM tbl_known_assets WHERE target = ? AND asset_type = ? AND asset_value = ? AND source = ?",
+                            (target, assetType, assetValue, source))
+                    else:
+                        self.dbh.execute(
+                            "DELETE FROM tbl_known_assets WHERE target = ? AND asset_type = ? AND asset_value = ?",
+                            (target, assetType, assetValue))
                 else:
                     return False
                 self.conn.commit()
@@ -3848,14 +3865,26 @@ class SpiderFootDb:
         return count
 
     def knownAssetUpdate(self, assetId: int, notes: str = None, source: str = None,
-                         affinity: str = None, tag: str = None) -> bool:
-        """Update a known asset's notes, source, affinity, or tag.
+                         affinity: str = None, tag: str = None,
+                         assetType: str = None) -> bool:
+        """Update a known asset's metadata.
+
+        Args:
+            assetId: primary key
+            notes: optional new notes
+            source: optional new source
+            affinity: optional new affinity
+            tag: optional new tag
+            assetType: optional new asset type (may fail on unique constraint)
 
         Returns:
             bool: True on success
         """
         updates = []
         vals = []
+        if assetType is not None:
+            updates.append("asset_type = ?")
+            vals.append(assetType)
         if notes is not None:
             updates.append("notes = ?")
             vals.append(notes)
@@ -3910,11 +3939,11 @@ class SpiderFootDb:
         """Get all known asset values for a target grouped by type for fast lookups.
 
         Returns:
-            dict: {'ip': set(), 'domain': set(), 'email': set(), 'human_name': set()}
+            dict: {'ip': set(), 'domain': set(), 'email': set(), 'human_name': set(), 'username': set()}
         """
         qry = "SELECT asset_type, asset_value FROM tbl_known_assets WHERE target = ?"
 
-        result = {'ip': set(), 'domain': set(), 'email': set(), 'human_name': set()}
+        result = {'ip': set(), 'domain': set(), 'email': set(), 'human_name': set(), 'username': set()}
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, (target,))
@@ -3936,7 +3965,7 @@ class SpiderFootDb:
 
         result = {'total': 0, 'client_provided': 0, 'analyst_confirmed': 0,
                   'direct': 0, 'associated': 0,
-                  'by_type': {'ip': 0, 'domain': 0, 'email': 0, 'human_name': 0}}
+                  'by_type': {'ip': 0, 'domain': 0, 'email': 0, 'human_name': 0, 'username': 0}}
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, (target,))
@@ -3964,7 +3993,8 @@ class SpiderFootDb:
         - IP assets: exact match against IP_ADDRESS, IPV6_ADDRESS, AFFILIATE_IPADDR
         - Domain assets: exact or subdomain match against DOMAIN_NAME, INTERNET_NAME, etc.
         - Email assets: exact or prefix match against EMAILADDR, AFFILIATE_EMAILADDR
-        - Human name assets: partial match against HUMAN_NAME, USERNAME, SOCIAL_MEDIA
+        - Human name assets: partial match against HUMAN_NAME
+        - Username assets: partial match against USERNAME, SOCIAL_MEDIA
 
         Returns:
             list: matching scan result rows with match info
@@ -3977,9 +4007,10 @@ class SpiderFootDb:
         ip_types = "('IP_ADDRESS','IPV6_ADDRESS','AFFILIATE_IPADDR')"
         domain_types = "('DOMAIN_NAME','INTERNET_NAME','AFFILIATE_INTERNET_NAME','CO_HOSTED_SITE','SIMILARDOMAIN','INTERNET_NAME_UNRESOLVED')"
         email_types = "('EMAILADDR','AFFILIATE_EMAILADDR')"
-        human_name_types = "('HUMAN_NAME','USERNAME','SOCIAL_MEDIA')"
+        human_name_types = "('HUMAN_NAME')"
+        username_types = "('USERNAME','SOCIAL_MEDIA')"
 
-        all_types = f"{ip_types[1:-1]},{domain_types[1:-1]},{email_types[1:-1]},{human_name_types[1:-1]}"
+        all_types = f"{ip_types[1:-1]},{domain_types[1:-1]},{email_types[1:-1]},{human_name_types[1:-1]},{username_types[1:-1]}"
         qry = f"SELECT scan_instance_id, hash, type, generated, confidence, visibility, risk, \
             module, data, false_positive, source_event_hash, imported_from_scan \
             FROM tbl_scan_results WHERE scan_instance_id = ? AND type IN ({all_types})"
@@ -3996,7 +4027,8 @@ class SpiderFootDb:
         domain_types_set = {'DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
                             'CO_HOSTED_SITE', 'SIMILARDOMAIN', 'INTERNET_NAME_UNRESOLVED'}
         email_types_set = {'EMAILADDR', 'AFFILIATE_EMAILADDR'}
-        human_name_types_set = {'HUMAN_NAME', 'USERNAME', 'SOCIAL_MEDIA'}
+        human_name_types_set = {'HUMAN_NAME'}
+        username_types_set = {'USERNAME', 'SOCIAL_MEDIA'}
 
         for row in rows:
             event_type = row[2]
@@ -4042,6 +4074,29 @@ class SpiderFootDb:
                     if known_name in data_lower:
                         matched_asset = known_name
                         match_type = 'human_name_partial'
+                        break
+
+            elif event_type in username_types_set and assets['username']:
+                for known_username in assets['username']:
+                    if known_username in data_lower:
+                        matched_asset = known_username
+                        match_type = 'username_partial'
+                        break
+
+            # USERNAME/SOCIAL_MEDIA events can also match human_name assets (cross-match)
+            if not matched_asset and event_type in username_types_set and assets['human_name']:
+                for known_name in assets['human_name']:
+                    if known_name in data_lower:
+                        matched_asset = known_name
+                        match_type = 'human_name_partial'
+                        break
+
+            # HUMAN_NAME events can also match username assets (cross-match)
+            if not matched_asset and event_type in human_name_types_set and assets['username']:
+                for known_username in assets['username']:
+                    if known_username in data_lower:
+                        matched_asset = known_username
+                        match_type = 'username_partial'
                         break
 
             if matched_asset:

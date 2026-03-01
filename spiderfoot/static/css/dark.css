@@ -6605,6 +6605,8 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
 .assets-breakdown-card-email i { color: #06b6d4; }
 .assets-breakdown-card-human { border-left: 4px solid #f59e0b; }
 .assets-breakdown-card-human i { color: #f59e0b; }
+.assets-breakdown-card-username { border-left: 4px solid #10b981; }
+.assets-breakdown-card-username i { color: #10b981; }
 .assets-breakdown-card-matches { border-left: 4px solid #ef4444; }
 .assets-breakdown-card-matches i { color: #ef4444; }
 .assets-breakdown-card-direct { border-left: 4px solid #22c55e; }
@@ -6613,10 +6615,11 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
 .assets-breakdown-card-associated i { color: #6366f1; }
 
 /* Balanced breakdown grid rows */
+.assets-breakdown-row-5 { grid-template-columns: repeat(5, 1fr); }
 .assets-breakdown-row-4 { grid-template-columns: repeat(4, 1fr); }
 .assets-breakdown-row-3 { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 768px) {
-  .assets-breakdown-row-4, .assets-breakdown-row-3 { grid-template-columns: repeat(2, 1fr); }
+  .assets-breakdown-row-5, .assets-breakdown-row-4, .assets-breakdown-row-3 { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* Callout banner */
@@ -6741,11 +6744,25 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   text-shadow: 0 0 6px rgba(139, 92, 246, 0.4);
 }
 
-.assets-type-employee {
+.assets-type-email {
+  background: rgba(236, 72, 153, 0.15);
+  color: #f472b6;
+  border: 1px solid rgba(236, 72, 153, 0.3);
+  text-shadow: 0 0 6px rgba(236, 72, 153, 0.4);
+}
+
+.assets-type-human_name {
   background: rgba(245, 158, 11, 0.15);
   color: #fbbf24;
   border: 1px solid rgba(245, 158, 11, 0.3);
   text-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
+}
+
+.assets-type-username {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  text-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
 }
 
 /* Source badges */
@@ -7285,6 +7302,24 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   letter-spacing: 0.5px;
   color: var(--text-primary, #e2e8f0);
   text-shadow: 0 0 6px rgba(255,255,255,0.2);
+}
+
+.assets-type-select {
+  background: rgba(0,0,0,0.3);
+  color: var(--text-primary, #e2e8f0);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 3px 6px;
+  cursor: pointer;
+}
+.assets-type-select:focus {
+  outline: 1px solid var(--accent-blue, #60a5fa);
+  border-color: var(--accent-blue, #60a5fa);
 }
 
 .assets-confidence-val {
