@@ -327,7 +327,7 @@ class SpiderFootWebUi:
         })
 
         # Kill orphaned multiprocessing workers from a previous run.
-        # These can hold open SQLite connections that lock the database,
+        # These can hold open database connections that lock the database,
         # preventing startup cleanup from succeeding.
         try:
             import subprocess
@@ -564,11 +564,11 @@ class SpiderFootWebUi:
         return killed
 
     def _force_scan_status(self: 'SpiderFootWebUi', scan_id: str, status: str) -> bool:
-        """Force-set a scan status using a fresh direct SQLite connection.
+        """Force-set a scan status using a fresh direct database connection.
 
         Bypasses the shared SpiderFootDb connection and its class-level lock.
         Used as a last resort when the normal path fails due to a locked
-        database.
+        connection.
 
         Args:
             scan_id (str): scan instance ID
@@ -5608,7 +5608,7 @@ class SpiderFootWebUi:
         Allows an administrator to manually set a scan's status, for example
         to mark a stuck scan as FINISHED so its results are preserved.
         If the scan is in an active state, the scan process is killed first.
-        Falls back to a direct SQLite connection if the database is locked.
+        Falls back to a direct database connection if the connection is busy.
 
         Args:
             id (str): scan instance ID
@@ -5715,8 +5715,8 @@ class SpiderFootWebUi:
     def dbbackup(self):
         """Create a backup of the database.
 
-        Creates a hot backup using SQLite's built-in backup API.
-        The backup is stored in the same directory as the database
+        Creates a hot backup using pg_dump.
+        The backup is stored in the configured backup directory
         with a timestamped filename.
 
         Returns:

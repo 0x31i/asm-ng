@@ -1187,7 +1187,7 @@ class SpiderFootCli(cmd.Cmd):
             ["correlations", "Show correlation results from a scan."],
             ["summary", "Scan result summary."],
             ["find", "Search for data within scan results."],
-            ["query", "Run SQL against the ASM-NG SQLite database."],
+            ["query", "Run SQL against the ASM-NG database."],
             ["logs", "View/watch logs from a scan."]
         ]
 

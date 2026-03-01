@@ -33,7 +33,7 @@ class SpiderFootDbLogHandler(logging.Handler):
             self.batch_size = 5
         self.shutdown_hook = False
         self.log_file = os.path.join(
-            SpiderFootHelpers.logPath(), "spiderfoot.sqlite.log")
+            SpiderFootHelpers.logPath(), "spiderfoot.db.log")
         self.backup_count = 30
         self.rotate_logs()
         self.log_queue = Queue()
@@ -259,6 +259,3 @@ def stop_listener(listener: 'logging.handlers.QueueListener') -> None:
     with suppress(BaseException):
         listener.stop()
 
-
-# Backwards-compatible alias (tests import the old name; will be removed in Step 2).
-SpiderFootSqliteLogHandler = SpiderFootDbLogHandler

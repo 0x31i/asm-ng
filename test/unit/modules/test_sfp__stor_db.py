@@ -78,8 +78,8 @@ class TestModuleStor_db(SpiderFootTestBase):
         module = sfp__stor_db()
         self.assertIsInstance(module.producedEvents(), list)
 
-    def test_sqlite_storage(self):
-        """Test SQLite storage functionality."""
+    def test_db_storage(self):
+        """Test database storage functionality."""
         module = sfp__stor_db()
         module.setup(self.sf_instance, {'_store': True})
 
@@ -94,8 +94,8 @@ class TestModuleStor_db(SpiderFootTestBase):
         # Verify that scanEventStore was called
         self.mock_dbh.scanEventStore.assert_called()
 
-    def test_sqlite_storage_with_size_limit(self):
-        """Test SQLite storage with size limits."""
+    def test_db_storage_with_size_limit(self):
+        """Test database storage with size limits."""
         module = sfp__stor_db()
         module.setup(self.sf_instance, {
             '_store': True,
@@ -164,7 +164,7 @@ class TestModuleStor_db(SpiderFootTestBase):
             events_per_second = float('inf')
         else:
             events_per_second = events_count / total_time
-        # Verify reasonable performance (at least 100 events/sec for SQLite)
+        # Verify reasonable performance (at least 100 events/sec)
         self.assertGreater(events_per_second, 100,
                           f"Performance should be at least 100 events/sec, got {events_per_second:.1f}")
 
