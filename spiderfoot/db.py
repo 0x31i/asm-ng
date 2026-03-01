@@ -648,9 +648,8 @@ class SpiderFootDb:
         Uses PostgreSQL backend exclusively.
 
         Args:
-            opts (dict): must specify the database file path in the '__database' key
+            opts (dict): must include a non-empty '__database' key (data directory path)
             init (bool): initialise the database schema.
-                         if the database file does not exist this option will be ignored.
 
         Raises:
             TypeError: arg type was invalid

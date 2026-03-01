@@ -5733,7 +5733,7 @@ class SpiderFootWebUi:
                 if not backup_dir:
                     backup_dir = '.'
                 timestamp = time.strftime("%Y%m%d_%H%M%S")
-                backup_filename = f"spiderfoot_backup_{timestamp}.db"
+                backup_filename = f"asmng_backup_{timestamp}.sql"
                 backup_path = os.path.join(backup_dir, backup_filename)
 
                 result_path = dbh.backupDB(backup_path)

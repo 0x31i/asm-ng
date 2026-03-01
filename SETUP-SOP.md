@@ -145,7 +145,7 @@ After first launch, check the logs for:
 PostgreSQL is now available after auto-setup. Using PostgreSQL backend.
 ```
 
-If you see `PostgreSQL not available. Using SQLite backend.` instead, check:
+If PostgreSQL is not available, ASM-NG will exit with an error. Check:
 
 ```bash
 sudo systemctl status postgresql
@@ -173,14 +173,6 @@ To prevent auto-setup from running (e.g., in CI or container environments):
 
 ```bash
 export ASMNG_PG_AUTO_SETUP=0
-```
-
-#### Forcing SQLite
-
-To explicitly use SQLite regardless of PostgreSQL availability:
-
-```bash
-export ASMNG_DB_TYPE=sqlite
 ```
 
 #### Troubleshooting Auto-Setup
@@ -919,10 +911,3 @@ Make sure you click **Save** at the bottom of the Settings page after making
 changes. The IMPORT API KEYS function loads values into the form but you still
 need to click Save to persist them.
 
-### Database locked (SQLite)
-
-Only one instance of ASM-NG should run at a time when using SQLite. Check for
-duplicate processes:
-```bash
-ps aux | grep sf.py
-```

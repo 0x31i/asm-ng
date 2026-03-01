@@ -42,7 +42,7 @@ ASM-NG consists of the following main components:
 - **Modules:** Each module is responsible for gathering a specific type of data or integrating with a particular source. Modules can be enabled, disabled, or configured individually.
 - **Web UI:** Provides a user-friendly interface for configuring scans, viewing results, managing workspaces, and visualizing relationships between entities. The UI supports advanced filtering, search, and export features.
 - **API:** Enables programmatic access to ASM-NG's capabilities for integration and automation. The API is fully documented and supports authentication, scan management, and data retrieval.
-- **Database:** Stores scan results, configuration, and workspace data. ASM-NG supports dual backends: SQLite for development and PostgreSQL for production, with automatic setup, connection pooling, and bidirectional migration tooling.
+- **Database:** Stores scan results, configuration, and workspace data. ASM-NG uses PostgreSQL as its database backend, with automatic setup, connection pooling, and 64 concurrent connections.
 - **Scheduler:** Allows for automated, recurring scans to ensure continuous monitoring of assets and threats.
 
 ---

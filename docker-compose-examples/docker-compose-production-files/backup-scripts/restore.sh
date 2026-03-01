@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# ASM-NG SQLite Database Restore Script
+# ASM-NG PostgreSQL Database Restore Script
 # Usage: ./restore.sh <backup_file>
 
 set -e
@@ -8,12 +8,12 @@ set -e
 if [[ $# -eq 0 ]]; then
     echo "Usage: $0 <backup_file>"
     echo "Available backups:"
-    ls -la /backups/spiderfoot_backup_*.db.gz 2>/dev/null || echo "No backups found"
+    ls -la /backups/asmng_backup_*.sql.gz 2>/dev/null || echo "No backups found"
     exit 1
 fi
 
 BACKUP_FILE="$1"
-DB_PATH="${SF_DB_PATH:-/home/spiderfoot/.spiderfoot/spiderfoot.db}"
+PG_DSN="${ASMNG_DATABASE_URL:-postgresql://admin:admin@localhost:5432/asmng}"
 
 # Check if backup file exists
 if [[ ! -f "$BACKUP_FILE" ]]; then
@@ -22,8 +22,8 @@ if [[ ! -f "$BACKUP_FILE" ]]; then
 fi
 
 echo "Starting database restore from: $BACKUP_FILE"
-echo "Target database: $DB_PATH"
-echo "WARNING: This will replace the current database"
+echo "Target database: $PG_DSN"
+echo "WARNING: This will replace the current database contents"
 read -p "Are you sure you want to continue? (y/N): " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -35,27 +35,26 @@ fi
 echo "Note: Stop ASM-NG before restoring for best results."
 
 # Create backup of current database before overwriting
-if [[ -f "$DB_PATH" ]]; then
-    CURRENT_BACKUP="${DB_PATH}.pre-restore.$(date +%Y%m%d_%H%M%S)"
-    cp "$DB_PATH" "$CURRENT_BACKUP"
-    echo "Current database backed up to: $CURRENT_BACKUP"
-fi
+echo "Creating pre-restore backup..."
+PRE_RESTORE_BACKUP="/backups/asmng_pre_restore_$(date +%Y%m%d_%H%M%S).sql.gz"
+pg_dump "$PG_DSN" | gzip > "$PRE_RESTORE_BACKUP"
+echo "Current database backed up to: $PRE_RESTORE_BACKUP"
 
 # Restore from backup
 if [[ "$BACKUP_FILE" == *.gz ]]; then
     echo "Decompressing and restoring backup..."
-    gunzip -c "$BACKUP_FILE" > "$DB_PATH"
+    gunzip -c "$BACKUP_FILE" | psql "$PG_DSN"
 else
     echo "Restoring backup..."
-    cp "$BACKUP_FILE" "$DB_PATH"
+    psql "$PG_DSN" < "$BACKUP_FILE"
 fi
 
 # Verify the restored database
-if sqlite3 "$DB_PATH" "PRAGMA quick_check;" | grep -q "ok"; then
+if psql "$PG_DSN" -c "SELECT 1;" &>/dev/null; then
     echo "Database restore completed successfully!"
-    echo "Database integrity check: PASSED"
+    echo "Database connectivity check: PASSED"
 else
-    echo "WARNING: Database integrity check failed after restore."
+    echo "WARNING: Database connectivity check failed after restore."
     echo "Consider restoring from a different backup."
 fi
 

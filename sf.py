@@ -41,6 +41,47 @@ from spiderfoot import __version__
 scanId = None
 dbh = None
 
+
+def _handle_db_error(err: Exception) -> None:
+    """Print a user-friendly error and exit if PostgreSQL is unavailable."""
+    # Check the entire cause chain (SpiderFootDb wraps psycopg2 errors in IOError)
+    cause = err
+    while cause is not None:
+        try:
+            import psycopg2
+            if isinstance(cause, (psycopg2.OperationalError, psycopg2.InterfaceError)):
+                _print_pg_fatal(cause)
+        except ImportError:
+            pass
+        cause = getattr(cause, '__cause__', None)
+
+    # Fallback: check the error message string for known PG connection keywords
+    err_str = str(err).lower()
+    if any(kw in err_str for kw in ('connection refused', 'could not connect',
+                                     'no postgresql', 'password authentication failed',
+                                     'does not exist', 'pg_hba.conf')):
+        _print_pg_fatal(err)
+
+    # Not a DB connection error — re-raise for the caller to handle
+    raise err
+
+
+def _print_pg_fatal(err: Exception) -> None:
+    """Print PostgreSQL fatal message and exit."""
+    print("")
+    print("=" * 65)
+    print(" FATAL: PostgreSQL is required but not available.")
+    print("=" * 65)
+    print("")
+    print(f"  Error: {err}")
+    print("")
+    print("  To fix:")
+    print("    1. Install PostgreSQL:  sudo ./setup-postgresql.sh")
+    print("    2. Or set ASMNG_DATABASE_URL to your PostgreSQL DSN")
+    print("    3. Or check:  sudo systemctl status postgresql")
+    print("")
+    sys.exit(-1)
+
 # 'Global' configuration options
 # These can be overriden on a per-module basis, and some will
 # be overridden from saved configuration settings stored in the DB.
@@ -56,7 +97,7 @@ sfConfig = {
     '_internettlds': 'https://publicsuffix.org/list/effective_tld_names.dat',
     '_internettlds_cache': 72,
     '_genericusers': '',  # Will be set after SpiderFootHelpers is available
-    '__database': '',  # Legacy; will be set after SpiderFootHelpers is available
+    '__database': '',  # Data directory path; set after SpiderFootHelpers is available
     '__dbtype': '',  # Always 'postgresql'
     '__pg_host': 'localhost',
     '__pg_port': '5432',
@@ -241,26 +282,15 @@ def main():
         try:
             from spiderfoot import SpiderFootHelpers
             sfConfig['_genericusers'] = ",".join(SpiderFootHelpers.usernamesFromWordlists(['generic-usernames']))
-            sfConfig['__database'] = f"{SpiderFootHelpers.dataPath()}/spiderfoot.db"
+            sfConfig['__database'] = SpiderFootHelpers.dataPath()
         except Exception as e:
             log.error(f"Failed to initialize SpiderFootHelpers configuration: {e}")
             # Use fallback values
             sfConfig['_genericusers'] = ""
-            # Use a default database path as fallback
+            # Use a default data path as fallback
             default_data_path = Path.home() / '.spiderfoot'
             default_data_path.mkdir(exist_ok=True)
-            sfConfig['__database'] = str(default_data_path / 'spiderfoot.db')
-
-        # Check for legacy database files
-        if os.path.exists('spiderfoot.db'):
-            print(
-                f"ERROR: spiderfoot.db file exists in {os.path.dirname(__file__)}")
-            print("SpiderFoot no longer supports loading the spiderfoot.db database from the application directory.")
-            print(
-                f"The database is now loaded from your home directory: {Path.home()}/.spiderfoot/spiderfoot.db")
-            print(
-                f"This message will go away once you move or remove spiderfoot.db from {os.path.dirname(__file__)}")
-            sys.exit(-1)
+            sfConfig['__database'] = str(default_data_path)
 
         # Check for legacy passwd files
         if os.path.exists('passwd'):
@@ -539,7 +569,10 @@ def main():
                 from spiderfoot.correlation.rule_executor import RuleExecutor
                 from spiderfoot.correlation.event_enricher import EventEnricher
                 from spiderfoot.correlation.result_aggregator import ResultAggregator
-                dbh = SpiderFootDb(sfConfig, init=True)
+                try:
+                    dbh = SpiderFootDb(sfConfig, init=True)
+                except Exception as e:
+                    _handle_db_error(e)
                 rules = sfConfig.get('__correlationrules__', [])
                 scan_id = args.correlate
                 # Execute rules
@@ -569,7 +602,10 @@ def main():
 
             if args.types:
                 # List event types
-                dbh = SpiderFootDb(sfConfig, init=True)
+                try:
+                    dbh = SpiderFootDb(sfConfig, init=True)
+                except Exception as e:
+                    _handle_db_error(e)
                 etypes = dbh.eventTypes()
                 if etypes:
                     print(f"Total event types: {len(etypes)}")
@@ -639,7 +675,10 @@ def start_scan(sfConfig: dict, sfModules: dict, args, loggingQueue) -> None:
         global dbh
         global scanId
 
-        dbh = SpiderFootDb(sfConfig, init=True)
+        try:
+            dbh = SpiderFootDb(sfConfig, init=True)
+        except Exception as e:
+            _handle_db_error(e)
         sf = SpiderFoot(sfConfig)
 
         validate_arguments(args, log)
@@ -1292,6 +1331,12 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
         try:
             web_ui = SpiderFootWebUi(sfWebUiConfig, sfConfig, loggingQueue)
         except Exception as init_err:
+            # Check for PostgreSQL connection errors first
+            try:
+                _handle_db_error(init_err)
+            except Exception:
+                pass
+            # If _handle_db_error didn't exit, it's a different error
             msg = f"Failed to initialize web UI: {init_err}"
             log.critical(msg, exc_info=True)
             print(f"\nERROR: {msg}", file=sys.stderr)

@@ -64,7 +64,7 @@ class Config:
             '__webaddr': '127.0.0.1',
             '__webport': '5001',
             '__webaddr_apikey': None,
-            '__database': f"{SpiderFootHelpers.dataPath()}/spiderfoot.db",
+            '__database': SpiderFootHelpers.dataPath(),
             '__loglevel': 'INFO',
             '__logfile': '',
             '__version__': __version__

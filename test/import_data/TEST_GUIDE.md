@@ -64,10 +64,11 @@ python3 tools/import_legacy_csv.py \
 
 ## Test 4: Verify Database Tables
 
-Connect to the SQLite database and verify the data:
+Connect to the PostgreSQL database and verify the data:
 
 ```bash
-sqlite3 ~/.spiderfoot/spiderfoot.db
+psql "$ASMNG_DATABASE_URL"
+# Or: psql -U admin -d asmng
 ```
 
 **Check scan results:**
@@ -140,12 +141,12 @@ To remove test data after testing:
 
 ```bash
 # Remove test scans from database (use scan IDs from import output)
-sqlite3 ~/.spiderfoot/spiderfoot.db "DELETE FROM tbl_scan_results WHERE scan_instance_id IN (SELECT guid FROM tbl_scan_instance WHERE name LIKE 'Test Import%');"
-sqlite3 ~/.spiderfoot/spiderfoot.db "DELETE FROM tbl_scan_instance WHERE name LIKE 'Test Import%';"
+psql "$ASMNG_DATABASE_URL" -c "DELETE FROM tbl_scan_results WHERE scan_instance_id IN (SELECT guid FROM tbl_scan_instance WHERE name LIKE 'Test Import%');"
+psql "$ASMNG_DATABASE_URL" -c "DELETE FROM tbl_scan_instance WHERE name LIKE 'Test Import%';"
 
 # Remove test target-level entries
-sqlite3 ~/.spiderfoot/spiderfoot.db "DELETE FROM tbl_target_false_positives WHERE target IN ('example.com', 'testcorp.com');"
-sqlite3 ~/.spiderfoot/spiderfoot.db "DELETE FROM tbl_target_validated WHERE target IN ('example.com', 'testcorp.com');"
+psql "$ASMNG_DATABASE_URL" -c "DELETE FROM tbl_target_false_positives WHERE target IN ('example.com', 'testcorp.com');"
+psql "$ASMNG_DATABASE_URL" -c "DELETE FROM tbl_target_validated WHERE target IN ('example.com', 'testcorp.com');"
 ```
 
 ## Status Value Reference
