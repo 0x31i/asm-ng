@@ -9449,6 +9449,11 @@ a.data-type-btn:hover {
   border: 1px solid var(--glass-border);
   border-radius: 4px;
   max-width: 280px;
+  transition: max-width 0.2s ease;
+}
+
+.dp-inline-node.dp-node-expanded {
+  max-width: 100%;
 }
 
 .dp-inline-type {
@@ -9467,6 +9472,20 @@ a.data-type-btn:hover {
   color: #059669;
   word-break: break-all;
   line-height: 1.3;
+}
+
+.dp-inline-data.dp-truncated {
+  cursor: pointer;
+  border-bottom: 1px dashed rgba(5, 150, 105, 0.3);
+}
+
+.dp-inline-data.dp-truncated:hover {
+  color: #047857;
+  border-bottom-color: rgba(5, 150, 105, 0.6);
+}
+
+.dp-inline-data.dp-expanded {
+  white-space: pre-wrap;
 }
 
 .dp-inline-module {

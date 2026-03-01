@@ -12,6 +12,7 @@
 # -------------------------------------------------------------------------------
 
 import json
+import re
 import time
 import urllib.parse
 
@@ -83,6 +84,10 @@ class sfp_huggingface(SpiderFootPlugin):
     def _isTargetAssociated(self, author):
         """Check if a Hugging Face author/owner matches the scan target.
 
+        Uses word-boundary matching to avoid false positives from substring
+        collisions (e.g. domain keyword "sims" should NOT match ML project
+        names like "SimSiam" or "SimCLR").
+
         Args:
             author: The HF resource author or organization name.
 
@@ -95,11 +100,26 @@ class sfp_huggingface(SpiderFootPlugin):
         target_value = self.getTarget().targetValue.lower()
         author_lower = author.lower()
 
+        # Exact match on domain keyword (e.g. "sims" == "sims")
         keyword = self.sf.domainKeyword(target_value, self.opts.get('_internettlds', {}))
-        if keyword and author_lower == keyword:
+        if keyword and keyword == author_lower:
             return True
 
-        if target_value in author_lower or author_lower in target_value:
+        # Exact match on full target value
+        if target_value == author_lower:
+            return True
+
+        # Word-boundary match: split on common separators and check for
+        # whole-token overlap (e.g. "0x31i" in "0x31i-research" but NOT
+        # "sims" in "SimSiam")
+        author_tokens = set(re.split(r'[-_.\s]+', author_lower))
+        target_tokens = set(re.split(r'[-_.\s@]+', target_value))
+        if keyword:
+            target_tokens.add(keyword)
+
+        # Require at least one meaningful token overlap (3+ chars)
+        overlap = author_tokens & target_tokens
+        if any(len(t) >= 3 for t in overlap):
             return True
 
         return False
@@ -298,18 +318,18 @@ class sfp_huggingface(SpiderFootPlugin):
             self._searchAllTypes(eventData, event, needs_validation=True)
 
         elif eventName == "HUMAN_NAME":
-            # Search for models/spaces by that author
-            self._searchAllTypes(eventData, event)
+            # Search for models/spaces by that author (validate ownership)
+            self._searchAllTypes(eventData, event, needs_validation=True)
 
         elif eventName == "USERNAME":
-            # Search for models/spaces by that author/organization
-            self._searchAllTypes(eventData, event)
+            # Search for models/spaces by that author/organization (validate ownership)
+            self._searchAllTypes(eventData, event, needs_validation=True)
 
         elif eventName == "EMAILADDR":
-            # Extract the username part of the email and search
+            # Extract the username part of the email and search (validate ownership)
             username = eventData.split('@')[0]
             if username:
-                self._searchAllTypes(username, event)
+                self._searchAllTypes(username, event, needs_validation=True)
 
 
 # End of sfp_huggingface class
