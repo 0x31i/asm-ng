@@ -58,7 +58,8 @@ class sfp_gleif(SpiderFootPlugin):
         return ["COMPANY_NAME", "LEI"]
 
     def producedEvents(self):
-        return ["COMPANY_NAME", "LEI", "PHYSICAL_ADDRESS", "RAW_RIR_DATA"]
+        return ["COMPANY_NAME", "AFFILIATE_DOMAIN_NAME", "LEI",
+                "PHYSICAL_ADDRESS", "RAW_RIR_DATA"]
 
     def searchLegalName(self, qry):
         """Fuzzy search for legal entity by name.
@@ -182,6 +183,97 @@ class sfp_gleif(SpiderFootPlugin):
             return None
 
         return data
+
+    def _check_relationships(self, lei, event):
+        """Check GLEIF parent/subsidiary relationships for a LEI.
+
+        Queries the direct-parent and ultimate-parent endpoints to
+        discover related entities and emit COMPANY_NAME and
+        AFFILIATE_DOMAIN_NAME events.
+        """
+        for rel_type in ('direct-parent', 'ultimate-parent'):
+            url = (f"https://api.gleif.org/api/v1"
+                   f"/lei-records/{lei}/{rel_type}")
+
+            headers = {
+                'Accept': 'application/vnd.api+json'
+            }
+
+            res = self.sf.fetchUrl(
+                url,
+                timeout=self.opts.get('_fetchtimeout', 15),
+                headers=headers,
+                useragent=self.opts['_useragent']
+            )
+
+            if not res or not res.get('content'):
+                continue
+
+            if res.get('code') in ('404', '429'):
+                continue
+
+            try:
+                result = json.loads(res['content'])
+            except (json.JSONDecodeError, ValueError):
+                continue
+
+            data = result.get('data')
+            if not data:
+                continue
+
+            attributes = data.get('attributes', {})
+            if not attributes:
+                # data might be a relationship pointer with an 'id'
+                rel_lei = data.get('id', '')
+                if rel_lei and rel_lei != lei:
+                    dedup = f"rel:{rel_lei}"
+                    if dedup not in self.results:
+                        self.results[dedup] = True
+                        # Fetch the related entity's record
+                        rel_record = self.retrieveRecord(rel_lei)
+                        if rel_record:
+                            self._emit_entity(rel_record, event)
+                continue
+
+            entity = attributes.get('entity', {})
+            if entity:
+                self._emit_entity_from_attrs(entity, event)
+
+    def _emit_entity_from_attrs(self, entity, event):
+        """Emit COMPANY_NAME from GLEIF entity attributes."""
+        legal_name = entity.get('legalName', {})
+        name = legal_name.get('value', '')
+        if name:
+            dedup = f"name:{name.lower()}"
+            if dedup not in self.results:
+                self.results[dedup] = True
+                e = SpiderFootEvent(
+                    "COMPANY_NAME", name, self.__name__, event)
+                self.notifyListeners(e)
+
+    def _emit_entity(self, record_data, event):
+        """Emit COMPANY_NAME and AFFILIATE_DOMAIN_NAME from a LEI record."""
+        attributes = record_data.get('attributes', {})
+        if not attributes:
+            return
+
+        entity = attributes.get('entity', {})
+        if not entity:
+            return
+
+        # Emit company name
+        legal_name = entity.get('legalName', {})
+        name = legal_name.get('value', '')
+        if name:
+            dedup = f"name:{name.lower()}"
+            if dedup not in self.results:
+                self.results[dedup] = True
+                e = SpiderFootEvent(
+                    "COMPANY_NAME", name, self.__name__, event)
+                self.notifyListeners(e)
+
+        # Check for registered URL in otherAddresses or entity URLs
+        # GLEIF v1 doesn't have a website field, but v2 may in future
 
     def handleEvent(self, event):
         eventName = event.eventType
@@ -311,5 +403,8 @@ class sfp_gleif(SpiderFootPlugin):
                 e = SpiderFootEvent("PHYSICAL_ADDRESS",
                                     address, self.__name__, event)
                 self.notifyListeners(e)
+
+            # Check parent/subsidiary relationships for this LEI
+            self._check_relationships(lei, event)
 
 # End of sfp_gleif class

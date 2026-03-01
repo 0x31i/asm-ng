@@ -42,14 +42,23 @@ class sfp_tool_dnstwist(SpiderFootPlugin):
     opts = {
         'pythonpath': "python3",
         'dnstwistpath': "",
-        'skipwildcards': True
+        'skipwildcards': True,
+        'enable_lsh': True,
+        'enable_whois': True,
+        'enable_mxcheck': True,
     }
 
     # Option descriptions
     optdescs = {
         'pythonpath': "Path to Python interpreter to use for DNSTwist. If just 'python' then it must be in your PATH.",
         'dnstwistpath': "Path to the where the dnstwist.py file lives. Optional.",
-        'skipwildcards': "Skip TLDs and sub-TLDs that have wildcard DNS."
+        'skipwildcards': "Skip TLDs and sub-TLDs that have wildcard DNS.",
+        'enable_lsh': "Enable fuzzy hash comparison (--lsh) to detect "
+                      "content similarity between target and lookalike.",
+        'enable_whois': "Enable WHOIS lookup (--whois) to check domain "
+                        "creation dates for lookalikes.",
+        'enable_mxcheck': "Enable MX mail acceptance check (--mxcheck) "
+                          "to detect phishing-ready lookalikes.",
     }
 
     results = None
@@ -134,8 +143,17 @@ class sfp_tool_dnstwist(SpiderFootPlugin):
 
             cmd = [self.opts['pythonpath'], exe]
 
+        # Build flags
+        extra_flags = []
+        if self.opts.get('enable_lsh'):
+            extra_flags.append("--lsh")
+        if self.opts.get('enable_whois'):
+            extra_flags.append("--whois")
+        if self.opts.get('enable_mxcheck'):
+            extra_flags.append("--mxcheck")
+
         try:
-            p = Popen(cmd + ["-f", "json", "-r", eventData],
+            p = Popen(cmd + ["-f", "json", "-r"] + extra_flags + [eventData],
                       stdout=PIPE, stderr=PIPE)
             stdout, stderr = p.communicate(input=None, timeout=300)
             if p.returncode == 0:
@@ -156,7 +174,23 @@ class sfp_tool_dnstwist(SpiderFootPlugin):
                     if self.getTarget().matches(domain, includeParents=True):
                         continue
 
-                    evt = SpiderFootEvent("SIMILARDOMAIN", domain,
+                    # Build enriched event data with available fields
+                    enrichment = []
+                    ssdeep_val = r.get('ssdeep')
+                    if ssdeep_val:
+                        enrichment.append(f"ssdeep:{ssdeep_val}")
+                    whois_created = r.get('whois-created')
+                    if whois_created:
+                        enrichment.append(f"created:{whois_created}")
+                    mx_val = r.get('mx')
+                    if mx_val:
+                        enrichment.append(f"mx:{mx_val}")
+
+                    evt_data = domain
+                    if enrichment:
+                        evt_data = domain + " [" + ", ".join(enrichment) + "]"
+
+                    evt = SpiderFootEvent("SIMILARDOMAIN", evt_data,
                                           self.__name__, event)
                     self.notifyListeners(evt)
             except Exception as e:

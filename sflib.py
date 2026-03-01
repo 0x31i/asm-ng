@@ -1732,6 +1732,59 @@ class SpiderFoot:
 
         return None
 
+    def ddgsIterate(self, searchString: str, opts: dict = None) -> dict:
+        """Request search results from ddgs (zero-key multi-engine search).
+
+        Uses the ddgs library to search across 9 backends (Google, Bing,
+        Brave, DuckDuckGo, Mojeek, Yandex, Yahoo, etc.) without any API
+        keys. Returns results in the same format as googleIterate() and
+        bingIterate() for interchangeability.
+
+        Options accepted:
+            max_results: Maximum number of results (default 20)
+
+        Args:
+            searchString (str): Search query (supports operators like
+                site:, filetype:, inurl:, etc.)
+            opts (dict): Options dict
+
+        Returns:
+            dict: Search results as {"webSearchUrl": "URL", "urls": [results]}
+        """
+        if not searchString:
+            return None
+
+        if opts is None:
+            opts = {}
+
+        max_results = opts.get('max_results', 20)
+
+        try:
+            from ddgs import DDGS
+        except ImportError:
+            self.error("ddgs library not installed. "
+                       "Install with: pip install ddgs")
+            return None
+
+        try:
+            results = DDGS().text(searchString, max_results=max_results)
+        except Exception as e:
+            self.error(f"ddgs search failed: {e}")
+            return None
+
+        if not results:
+            return None
+
+        urls = [r['href'] for r in results if r.get('href')]
+        if not urls:
+            return None
+
+        search_string = searchString.replace(" ", "+")
+        return {
+            "urls": urls,
+            "webSearchUrl": f"https://duckduckgo.com/?q={search_string}"
+        }
+
     def loadModules(self):
         """Load SpiderFoot modules from the modules directory."""
         # Get the modules directory path

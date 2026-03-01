@@ -155,6 +155,11 @@ EVENT_TYPE_LEGACY_MAPPING = {
     'AI_HISTORICAL_EVIDENCE': 'SOFTWARE_USED',
     'AI_COMPLIANCE_GAP': 'VULNERABILITY_DISCLOSURE',
     'AI_GOVERNANCE_FINDING': 'VULNERABILITY_DISCLOSURE',
+
+    # =========================================================================
+    # BRAND PROTECTION TYPES
+    # =========================================================================
+    'BRAND_IMPERSONATION_DETECTED': 'SIMILARDOMAIN',
 }
 
 # Legacy types that are valid SpiderFoot event types

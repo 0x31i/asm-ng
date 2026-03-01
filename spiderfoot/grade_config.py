@@ -383,6 +383,10 @@ DEFAULT_EVENT_TYPE_GRADING = {
         'category': 'Information / Reference', 'rank': 5, 'points': 0,
         'logic': 'informational',
     },
+    'BRAND_IMPERSONATION_DETECTED': {
+        'category': 'General Health', 'rank': 2, 'points': -5,
+        'logic': 'unverified_exists',
+    },
     'ETHEREUM_ADDRESS': {
         'category': 'Information / Reference', 'rank': 5, 'points': 0,
         'logic': 'informational',
