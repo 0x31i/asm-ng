@@ -880,12 +880,22 @@ class SpiderFootScanner():
             # Persist a progress snapshot so the UI can read it
             modules_idle = sum(1 for empty in queues_empty if empty) - len(modules_errored)
             modules_total = len(self.__moduleInstances)
+            running_set = set(modules_running)
+            errored_set = set(modules_errored)
             snapshot = json.dumps({
                 "totalQueued": total_queued,
                 "modulesRunning": len(modules_running),
                 "modulesIdle": max(0, modules_idle),
                 "modulesErrored": len(modules_errored),
                 "modulesTotal": modules_total,
+                "modules": {
+                    mod: {
+                        "q": qsize,
+                        "r": mod in running_set,
+                        "e": mod in errored_set,
+                    }
+                    for mod, qsize in modules_waiting
+                }
             })
             with suppress(Exception):
                 self.__dbh.scanLogEvent(
