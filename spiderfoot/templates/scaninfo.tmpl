@@ -648,8 +648,14 @@
 
                 html += "<div class='" + nodeClass + "'>";
                 html += "<span class='dp-inline-type'>" + sf.escapeHtml(node.typeDescr || node.type) + "</span>";
-                var displayData = (node.data || '').length > 80 ? node.data.substring(0, 77) + '...' : (node.data || '');
-                html += "<span class='dp-inline-data' title='" + sf.escapeHtml(node.data) + "'>" + sf.escapeHtml(displayData) + "</span>";
+                var fullData = node.data || '';
+                var isTruncated = fullData.length > 80;
+                var displayData = isTruncated ? fullData.substring(0, 77) + '...' : fullData;
+                if (isTruncated) {
+                    html += "<span class='dp-inline-data dp-truncated' onclick='event.stopPropagation(); toggleDpData(this)' data-full='" + sf.escapeHtml(fullData).replace(/'/g, '&#39;') + "' data-short='" + sf.escapeHtml(displayData).replace(/'/g, '&#39;') + "'>" + sf.escapeHtml(displayData) + "</span>";
+                } else {
+                    html += "<span class='dp-inline-data'>" + sf.escapeHtml(displayData) + "</span>";
+                }
                 if (node.module && !node.isRoot) {
                     html += "<span class='dp-inline-module'>" + sf.escapeHtml(node.module) + "</span>";
                 }
@@ -658,6 +664,20 @@
             }
             html += "</div>";
             container.innerHTML = html;
+        }
+
+        // Toggle discovery path data between truncated and full
+        function toggleDpData(el) {
+            var node = el.closest('.dp-inline-node');
+            if (el.classList.contains('dp-expanded')) {
+                el.textContent = el.getAttribute('data-short');
+                el.classList.remove('dp-expanded');
+                if (node) node.classList.remove('dp-node-expanded');
+            } else {
+                el.textContent = el.getAttribute('data-full');
+                el.classList.add('dp-expanded');
+                if (node) node.classList.add('dp-node-expanded');
+            }
         }
 
         // Load all results (removes pagination limit)
