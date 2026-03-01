@@ -572,12 +572,21 @@
             }
         }
 
-        // Build data detail HTML for expanded row (analyst note only)
+        // Discovery path cache (hash -> pathData array)
+        var dpPathCache = {};
+
+        // Build data detail HTML for expanded row
         function buildDataDetailHtml(d) {
             var noteVal = (d[16] != null && d[16] !== undefined) ? d[16] : '';
             var eventHash = d[7] || '';
             var rowIdx = d._idx !== undefined ? d._idx : '';
-            var html = "<div class='detail-analyst-note'>";
+            // Discovery Path section (lazy-loaded on expand)
+            var html = "<div class='detail-discovery-path' id='dp-container-" + sf.escapeHtml(eventHash) + "'>";
+            html += "<div class='finding-detail-label dp-label'>Discovery Path</div>";
+            html += "<div class='dp-path-content' id='dp-content-" + sf.escapeHtml(eventHash) + "'></div>";
+            html += "</div>";
+            // Analyst Note section
+            html += "<div class='detail-analyst-note'>";
             html += "<div class='finding-detail-label'>Analyst Note</div>";
             html += "<div class='analyst-note-container'>";
             html += "<textarea id='analyst-row-note-" + sf.escapeHtml(eventHash) + "' class='analyst-note-textarea' placeholder='Add a note for this result...' rows='2' onclick='event.stopPropagation()'>" + sf.escapeHtml(noteVal) + "</textarea>";
@@ -600,7 +609,55 @@
                 row.addClass('finding-expanded');
                 detail.show();
                 detail.find('.finding-detail').slideDown(150);
+                // Lazy-load discovery path on first expand
+                var d = currentViewData ? currentViewData[idx] : null;
+                if (d && d[7] && !dpPathCache[d[7]]) {
+                    loadDiscoveryPath(d[7]);
+                }
             }
+        }
+
+        // Load discovery path for a given element hash
+        function loadDiscoveryPath(eventHash) {
+            if (dpPathCache[eventHash]) return;
+            dpPathCache[eventHash] = 'loading';
+            var container = document.getElementById('dp-content-' + eventHash);
+            if (container) container.innerHTML = "<span class='dp-loading'>Loading...</span>";
+
+            sf.fetchData('${docroot}/scanelementpath', {id: '${id}', resultHash: eventHash}, function(pathData) {
+                dpPathCache[eventHash] = pathData;
+                renderDiscoveryPath(eventHash, pathData);
+            });
+        }
+
+        // Render discovery path as inline badge trail
+        function renderDiscoveryPath(eventHash, pathData) {
+            var container = document.getElementById('dp-content-' + eventHash);
+            if (!container) return;
+            if (!pathData || !pathData.length) {
+                container.innerHTML = "<span class='dp-no-path'>No discovery path available</span>";
+                return;
+            }
+            var html = "<div class='dp-inline-trail'>";
+            for (var i = 0; i < pathData.length; i++) {
+                var node = pathData[i];
+                var isLast = (i === pathData.length - 1);
+                var nodeClass = 'dp-inline-node';
+                if (isLast) nodeClass += ' dp-inline-current';
+                if (node.isRoot) nodeClass += ' dp-inline-root';
+
+                html += "<div class='" + nodeClass + "'>";
+                html += "<span class='dp-inline-type'>" + sf.escapeHtml(node.typeDescr || node.type) + "</span>";
+                var displayData = (node.data || '').length > 80 ? node.data.substring(0, 77) + '...' : (node.data || '');
+                html += "<span class='dp-inline-data' title='" + sf.escapeHtml(node.data) + "'>" + sf.escapeHtml(displayData) + "</span>";
+                if (node.module && !node.isRoot) {
+                    html += "<span class='dp-inline-module'>" + sf.escapeHtml(node.module) + "</span>";
+                }
+                html += "</div>";
+                if (!isLast) html += "<span class='dp-inline-arrow'>\u2192</span>";
+            }
+            html += "</div>";
+            container.innerHTML = html;
         }
 
         // Load all results (removes pagination limit)

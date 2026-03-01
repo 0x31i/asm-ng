@@ -4796,6 +4796,79 @@ class SpiderFootDb:
                 raise IOError(
                     "SQL error encountered when getting source element IDs") from e
 
+    def scanElementPath(self, instanceId: str, elementHash: str) -> list:
+        """Trace the discovery path for a single element back to ROOT.
+
+        Args:
+            instanceId (str): scan instance ID
+            elementHash (str): hash of the element to trace
+
+        Returns:
+            list: ordered list from ROOT to leaf, each entry is a dict with
+                  data, type, typeDescr, module, hash, isRoot
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+
+        if not isinstance(instanceId, str):
+            raise TypeError(
+                f"instanceId is {type(instanceId)}; expected str()") from None
+
+        if not isinstance(elementHash, str):
+            raise TypeError(
+                f"elementHash is {type(elementHash)}; expected str()") from None
+
+        if not elementHash or not elementHash.isalnum():
+            return []
+
+        qry = "SELECT r.data, r.type, r.module, r.hash, r.source_event_hash, \
+            t.event_descr \
+            FROM tbl_scan_results r, tbl_event_types t \
+            WHERE r.scan_instance_id = ? AND r.hash = ? AND t.event = r.type"
+
+        path = []
+        visited = set()
+        currentHash = elementHash
+        maxDepth = 20
+
+        with self.dbhLock:
+            try:
+                for _ in range(maxDepth):
+                    if currentHash in visited:
+                        break
+                    visited.add(currentHash)
+
+                    self.dbh.execute(qry, [instanceId, currentHash])
+                    row = self.dbh.fetchone()
+                    if not row:
+                        break
+
+                    data, etype, module, rhash, sourceHash, typeDescr = row
+                    isRoot = (sourceHash == 'ROOT')
+
+                    path.append({
+                        'data': data,
+                        'type': etype,
+                        'typeDescr': typeDescr,
+                        'module': module,
+                        'hash': rhash,
+                        'isRoot': isRoot
+                    })
+
+                    if isRoot:
+                        break
+
+                    currentHash = sourceHash
+
+            except DatabaseError as e:
+                raise IOError(
+                    "SQL error encountered when tracing element path") from e
+
+        path.reverse()
+        return path
+
     def scanElementChildrenDirect(self, instanceId: str, elementIdList: list) -> list:
         """Get the child IDs, types and data for a set of IDs.
 
