@@ -16,20 +16,18 @@
 <h2>${name}&nbsp;<span id='scanstatusbadge' class='badge ${statusy}'>${status}</span><span id='latestbadge' class='badge' style='display: none; background-color: #3b82f6; color: white; margin-left: 5px;'>LATEST</span><span id='syncbadge' class='badge' style='display: none; background-color: #10b981; color: white; margin-left: 5px; cursor: pointer;' onclick='resyncScanEntries()' title='Click to sync entries from previous scans'>SYNC</span><span id='importedbadge' class='badge' style='display: none; background-color: #8b5cf6; color: white; margin-left: 5px;'></span>&nbsp;<img id="loader" src="${docroot}/static/img/loader.gif"></h2>
   <div id="scan-progress-container" style="display: none; margin-bottom: 10px;">
     <div style="display: flex; align-items: center; gap: 10px;">
-      <div class="progress" style="flex: 1; height: 18px; margin-bottom: 0;">
+      <div class="progress" style="flex: 1; height: 8px; margin-bottom: 0; border-radius: 4px;">
         <div id="scan-progress-bar" class="progress-bar progress-bar-striped active" role="progressbar"
-             aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%; min-width: 2em; text-align: center; line-height: 18px; font-size: 11px;">
-          0%
+             aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%; border-radius: 4px;">
         </div>
       </div>
-      <small id="scan-progress-pct" style="white-space: nowrap; font-weight: bold; min-width: 30px;"></small>
+      <small id="scan-progress-pct" style="white-space: nowrap; font-weight: bold; min-width: 30px; font-family: var(--font-mono, monospace); font-size: 12px;"></small>
     </div>
-    <div id="scan-progress-details" style="margin-top: 4px; font-size: 11px; color: #888; display: flex; gap: 15px; flex-wrap: wrap;">
-      <span id="sp-modules" title="Modules that have reported results / total modules"></span>
-      <span id="sp-running" title="Modules actively processing events"></span>
-      <span id="sp-queued" title="Events waiting to be processed by modules"></span>
-      <span id="sp-events" title="Total events produced so far"></span>
-      <span id="sp-rate" title="Events produced per second (recent)"></span>
+    <div class="monitor-stat-row" id="scaninfo-monitor-stats" style="margin-top: 8px;"></div>
+    <div class="monitor-columns" id="scaninfo-monitor-columns" style="margin-top: 4px;">
+      <div class="monitor-col" id="scaninfo-col-modules"></div>
+      <div class="monitor-col" id="scaninfo-col-events"></div>
+      <div class="monitor-col" id="scaninfo-col-recent"></div>
     </div>
   </div>
   <div class="btn-toolbar" role="toolbar" style='padding-bottom: 10px'>
@@ -7451,9 +7449,10 @@
             // Progress bar inside Scan Status panel
             dataloaders.push(
                 function() {
-                    sf.fetchData('${docroot}/scanprogress', {'id': instanceId}, function(data) {
+                    sf.fetchData('${docroot}/scanmonitor', {'id': instanceId}, function(resp) {
                         var container = $('#summary-progress-container');
                         var bar = $('#summary-progress-bar');
+                        var data = resp.progress || {};
                         var status = data.status;
 
                         if (status == 'FINISHED' || status == 'ABORTED' || status == 'ERROR-FAILED') {
@@ -7470,9 +7469,9 @@
                             var details = '';
                             details += '<span style="font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;text-shadow:0 0 6px rgba(255,255,255,0.3);"><i class="glyphicon glyphicon-th-list"></i> ' + data.modulesWithResults + '/' + data.modulesTotal + ' MODULES</span>';
                             details += '<span style="font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;text-shadow:0 0 6px rgba(255,255,255,0.3);"><i class="glyphicon glyphicon-play"></i> ' + data.modulesRunning + ' RUNNING</span>';
-                            var ql = data.eventsQueued; if (ql > 999) ql = (ql/1000).toFixed(1) + 'k';
+                            var ql = sfMonitor.formatNum(data.eventsQueued);
                             details += '<span style="font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;text-shadow:0 0 6px rgba(255,255,255,0.3);"><i class="glyphicon glyphicon-inbox"></i> ' + ql + ' QUEUED</span>';
-                            var tl = data.totalEvents; if (tl > 999) tl = (tl/1000).toFixed(1) + 'k';
+                            var tl = sfMonitor.formatNum(data.totalEvents);
                             details += '<span style="font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;text-shadow:0 0 6px rgba(255,255,255,0.3);"><i class="glyphicon glyphicon-signal"></i> ' + tl + ' EVENTS</span>';
                             details += '<span style="font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;text-shadow:0 0 6px rgba(255,255,255,0.3);"><i class="glyphicon glyphicon-dashboard"></i> ' + data.eventsPerSecond + '/SEC</span>';
                             $('#summary-progress-details').html(details);
@@ -11601,13 +11600,14 @@
         var progressInterval;
 
         function updateScanProgress() {
-            sf.fetchData('${docroot}/scanprogress', {'id': '${id}'}, function(data) {
+            sf.fetchData('${docroot}/scanmonitor', {'id': '${id}'}, function(resp) {
                 var container = $('#scan-progress-container');
                 var bar = $('#scan-progress-bar');
+                var data = resp.progress || {};
                 var status = data.status;
 
                 if (status == 'FINISHED' || status == 'ABORTED' || status == 'ERROR-FAILED') {
-                    bar.css('width', '100%').attr('aria-valuenow', 100).text('100%');
+                    bar.css('width', '100%').attr('aria-valuenow', 100);
                     bar.removeClass('active progress-bar-striped');
                     if (status == 'FINISHED') {
                         bar.addClass('progress-bar-success');
@@ -11617,33 +11617,27 @@
                         bar.addClass('progress-bar-danger');
                     }
                     $('#scan-progress-pct').text('Done');
-                    $('#scan-progress-details').html('<span>' + status + '</span>');
+                    // Show final state in dashboard
+                    sfMonitor.renderStatCards('#scaninfo-monitor-stats', data);
+                    sfMonitor.renderModulePipeline('#scaninfo-col-modules', resp.modules || {});
+                    sfMonitor.renderEventTypeGrid('#scaninfo-col-events', resp.eventTypes || []);
+                    sfMonitor.renderRecentDiscoveries('#scaninfo-col-recent', resp.recentEvents || []);
                     clearInterval(progressInterval);
-                    setTimeout(function() { container.fadeOut(1000); }, 3000);
+                    setTimeout(function() { container.fadeOut(1000); }, 5000);
                     return;
                 }
 
                 if (status == 'CREATED' || status == 'INITIALIZING' || status == 'STARTING' || status == 'STARTED' || status == 'RUNNING') {
                     container.show();
                     var pct = data.progressPercent || 0;
-                    bar.css('width', pct + '%').attr('aria-valuenow', pct).text(pct + '%');
+                    bar.css('width', pct + '%').attr('aria-valuenow', pct);
                     $('#scan-progress-pct').text('~' + pct + '%');
 
-                    // Detail metrics
-                    $('#sp-modules').html('<i class="glyphicon glyphicon-th-list"></i> ' +
-                        data.modulesWithResults + '/' + data.modulesTotal + ' modules reported');
-                    $('#sp-running').html('<i class="glyphicon glyphicon-play"></i> ' +
-                        data.modulesRunning + ' running');
-                    var queuedLabel = data.eventsQueued;
-                    if (queuedLabel > 999) queuedLabel = (queuedLabel / 1000).toFixed(1) + 'k';
-                    $('#sp-queued').html('<i class="glyphicon glyphicon-inbox"></i> ' +
-                        queuedLabel + ' queued');
-                    var totalLabel = data.totalEvents;
-                    if (totalLabel > 999) totalLabel = (totalLabel / 1000).toFixed(1) + 'k';
-                    $('#sp-events').html('<i class="glyphicon glyphicon-signal"></i> ' +
-                        totalLabel + ' events');
-                    $('#sp-rate').html('<i class="glyphicon glyphicon-dashboard"></i> ' +
-                        data.eventsPerSecond + '/sec');
+                    // Stat cards + 3-column dashboard via shared renderers
+                    sfMonitor.renderStatCards('#scaninfo-monitor-stats', data);
+                    sfMonitor.renderModulePipeline('#scaninfo-col-modules', resp.modules || {});
+                    sfMonitor.renderEventTypeGrid('#scaninfo-col-events', resp.eventTypes || []);
+                    sfMonitor.renderRecentDiscoveries('#scaninfo-col-recent', resp.recentEvents || []);
                 } else {
                     container.hide();
                 }

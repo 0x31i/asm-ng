@@ -13,6 +13,7 @@
 from pathlib import Path
 import hashlib
 import logging
+import math
 import os
 import random
 import re
@@ -37,6 +38,11 @@ from spiderfoot.db_backend import (
 
 if HAS_PSYCOPG2:
     import psycopg2
+
+# In-memory high-water mark for monotonic progress tracking.
+# Survives across poll cycles; resets on server restart (catches up quickly
+# since module_report_pct reflects DB state).
+_progress_highwater: dict = {}
 
 
 class _PgPoolLock:
@@ -2209,6 +2215,54 @@ class SpiderFootDb:
                 raise IOError(
                     "SQL error encountered when fetching result summary") from e
 
+    def scanRecentEvents(self, instanceId: str, limit: int = 20) -> list:
+        """Fetch the most recent scan events for the live monitoring feed.
+
+        Args:
+            instanceId (str): scan instance ID
+            limit (int): max events to return (default 20)
+
+        Returns:
+            list: recent events as dicts with time, type, descr, preview, module
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(
+                f"instanceId is {type(instanceId)}; expected str()") from None
+
+        qry = """
+            SELECT r.generated, r.type, t.event_descr,
+                   SUBSTR(r.data, 1, 120) AS data_preview, r.module
+            FROM tbl_scan_results r
+            JOIN tbl_event_types t ON t.event = r.type
+            WHERE r.scan_instance_id = ? AND r.type != 'ROOT'
+            ORDER BY r.generated DESC LIMIT ?
+        """
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [instanceId, limit])
+                rows = self.dbh.fetchall()
+                result = []
+                for row in rows:
+                    ts = row[0]
+                    if ts and ts > 1000000000000:
+                        ts = ts / 1000  # Convert ms to seconds
+                    result.append({
+                        'time': time.strftime("%H:%M:%S", time.localtime(ts)) if ts else '',
+                        'type': row[1] or '',
+                        'descr': row[2] or '',
+                        'preview': (row[3] or '').strip()[:120],
+                        'module': row[4] or '',
+                    })
+                return result
+            except DatabaseError as e:
+                raise IOError(
+                    "SQL error encountered when fetching recent events") from e
+
     def scanProgress(self, instanceId: str) -> dict:
         """Estimate scan progress using multiple signals: module completion,
         live queue state from the scanner, and event production rate.
@@ -2257,6 +2311,7 @@ class SpiderFootDb:
 
                 # Terminal states -> 100%
                 if row[0] in ('FINISHED', 'ABORTED', 'ERROR-FAILED'):
+                    _progress_highwater.pop(instanceId, None)
                     self.dbh.execute(
                         "SELECT val FROM tbl_scan_config WHERE scan_instance_id = ? "
                         "AND component = 'GLOBAL' AND opt = '_modulesenabled'",
@@ -2328,6 +2383,7 @@ class SpiderFootDb:
                     "ORDER BY generated DESC LIMIT 1",
                     [instanceId])
                 logrow = self.dbh.fetchone()
+                snap = {}
                 if logrow and logrow[0]:
                     try:
                         snap = _json.loads(logrow[0])
@@ -2338,24 +2394,32 @@ class SpiderFootDb:
                     except (ValueError, KeyError):
                         pass
 
-                # --- Composite progress estimate ---
-                # Weight multiple signals:
-                #   40% - module reporting ratio (modules with results / total)
-                #   40% - module idle ratio (idle modules / total)
-                #   20% - queue drain (inverse of queued events, diminishing)
-                module_report_pct = (modules_with_results / modules_total) * 100
-                idle_pct = (result['modulesIdle'] / modules_total) * 100
-                # Queue drain: 100% when 0 queued, dropping as queue grows
-                queued = result['eventsQueued']
-                queue_drain_pct = max(0, 100 - min(queued, 100))
+                # Expose per-module snapshot for monitoring dashboard
+                result['_snapshot_modules'] = snap.get('modules', {})
 
-                pct = int(
-                    module_report_pct * 0.4
-                    + idle_pct * 0.4
-                    + queue_drain_pct * 0.2
+                # --- Composite progress estimate ---
+                # 50% module reporting (most stable, monotonically increasing)
+                module_report_pct = (modules_with_results / modules_total) * 100
+                # 30% module idle ratio
+                idle_pct = (result['modulesIdle'] / modules_total) * 100
+                # 20% logarithmic queue drain (handles 0 to 100k+ gracefully)
+                queued = result['eventsQueued']
+                if queued <= 0:
+                    queue_drain_pct = 100
+                else:
+                    queue_drain_pct = max(0, 100 - 20 * math.log10(queued + 1))
+
+                raw_pct = int(
+                    module_report_pct * 0.50
+                    + idle_pct * 0.30
+                    + queue_drain_pct * 0.20
                 )
+
+                # High-water mark: never go below previous value (monotonic)
+                pct = max(_progress_highwater.get(instanceId, 0), raw_pct)
                 # Clamp to [0, 95] while still running
                 pct = max(0, min(95, pct))
+                _progress_highwater[instanceId] = pct
                 result['progressPercent'] = pct
 
                 return result

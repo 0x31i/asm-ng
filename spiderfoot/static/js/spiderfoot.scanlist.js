@@ -317,6 +317,9 @@ function fallbackCopyTextToClipboard(text) {
     document.body.removeChild(textArea);
 }
 
+// Track active monitor polling intervals per scan
+window._monitorIntervals = window._monitorIntervals || {};
+
 function updateScanListProgress() {
     $('.scanlist-progress').each(function() {
         var el = $(this);
@@ -330,13 +333,15 @@ function updateScanListProgress() {
 
             if (status == 'FINISHED' || status == 'ABORTED' || status == 'ERROR-FAILED') {
                 el.fadeOut(500);
+                // Stop any monitor polling for this scan
+                stopMonitorPolling(scanId);
                 return;
             }
 
             var pct = data.progressPercent || 0;
             bar.css('width', pct + '%').text(pct + '%');
-            var ql = data.eventsQueued; if (ql > 999) ql = (ql/1000).toFixed(1) + 'k';
-            var tl = data.totalEvents; if (tl > 999) tl = (tl/1000).toFixed(1) + 'k';
+            var ql = sfMonitor.formatNum(data.eventsQueued);
+            var tl = sfMonitor.formatNum(data.totalEvents);
             info.html(data.modulesRunning + ' running &middot; ' + ql + ' queued &middot; ' + tl + ' events &middot; ' + data.eventsPerSecond + '/s');
         });
     });
@@ -345,6 +350,103 @@ function updateScanListProgress() {
     if ($('.scanlist-progress:visible').length === 0 && window._scanlistProgressInterval) {
         clearInterval(window._scanlistProgressInterval);
     }
+}
+
+function toggleMonitorPanel(scanId) {
+    var panelRow = $('#monitor-panel-' + scanId);
+    if (panelRow.length > 0) {
+        // Panel exists, toggle visibility
+        if (panelRow.is(':visible')) {
+            panelRow.hide();
+            stopMonitorPolling(scanId);
+            $('#monitor-toggle-' + scanId).text('MONITOR');
+        } else {
+            panelRow.show();
+            startMonitorPolling(scanId);
+            $('#monitor-toggle-' + scanId).text('CLOSE');
+        }
+        return;
+    }
+
+    // Create the panel row after the scan's table row
+    var scanRow = $('#monitor-toggle-' + scanId).closest('tr');
+    var panelHtml = '<tr id="monitor-panel-' + scanId + '" class="scanlist-monitor-panel tablesorter-childRow">';
+    panelHtml += '<td colspan="10" style="padding: 0 !important;">';
+    panelHtml += '<div style="padding: 10px;">';
+    panelHtml += '<div class="monitor-progress-thin"><div class="progress-bar progress-bar-striped active" id="monitor-bar-' + scanId + '" style="width: 0%;"></div></div>';
+    panelHtml += '<div class="monitor-summary-line" id="monitor-summary-' + scanId + '"></div>';
+    panelHtml += '<div class="monitor-columns">';
+    panelHtml += '<div class="monitor-col" id="monitor-col-modules-' + scanId + '"></div>';
+    panelHtml += '<div class="monitor-col" id="monitor-col-events-' + scanId + '"></div>';
+    panelHtml += '<div class="monitor-col" id="monitor-col-recent-' + scanId + '"></div>';
+    panelHtml += '</div>';
+    panelHtml += '</div>';
+    panelHtml += '</td></tr>';
+
+    scanRow.after(panelHtml);
+    $('#monitor-toggle-' + scanId).text('CLOSE');
+    startMonitorPolling(scanId);
+}
+
+function startMonitorPolling(scanId) {
+    // Clear any existing interval
+    stopMonitorPolling(scanId);
+
+    // Fetch immediately
+    fetchMonitorData(scanId);
+
+    // Then poll every 5 seconds
+    window._monitorIntervals[scanId] = setInterval(function() {
+        fetchMonitorData(scanId);
+    }, 5000);
+}
+
+function stopMonitorPolling(scanId) {
+    if (window._monitorIntervals[scanId]) {
+        clearInterval(window._monitorIntervals[scanId]);
+        delete window._monitorIntervals[scanId];
+    }
+}
+
+function fetchMonitorData(scanId) {
+    sf.fetchData(docroot + '/scanmonitor', {'id': scanId}, function(resp) {
+        var progress = resp.progress || {};
+        var status = progress.status;
+
+        // Update the thin progress bar
+        var pct = progress.progressPercent || 0;
+        $('#monitor-bar-' + scanId).css('width', pct + '%');
+
+        // Summary line
+        var running = progress.modulesRunning || 0;
+        var idle = progress.modulesIdle || 0;
+        var errors = progress.modulesErrored || 0;
+        var queued = sfMonitor.formatNum(progress.eventsQueued);
+        var total = sfMonitor.formatNum(progress.totalEvents);
+        var rate = progress.eventsPerSecond || 0;
+        var summary = running + ' running / ' + idle + ' idle / ' + errors + ' errors';
+        summary += ' | ' + queued + ' queued | ' + total + ' events | ' + rate + '/s';
+        $('#monitor-summary-' + scanId).text(pct + '% — ' + summary);
+
+        // 3-column dashboard
+        sfMonitor.renderModulePipeline('#monitor-col-modules-' + scanId, resp.modules || {});
+        sfMonitor.renderEventTypeGrid('#monitor-col-events-' + scanId, resp.eventTypes || []);
+        sfMonitor.renderRecentDiscoveries('#monitor-col-recent-' + scanId, resp.recentEvents || []);
+
+        // Handle terminal states
+        if (status == 'FINISHED' || status == 'ABORTED' || status == 'ERROR-FAILED') {
+            $('#monitor-bar-' + scanId).css('width', '100%').removeClass('active progress-bar-striped');
+            if (status == 'FINISHED') {
+                $('#monitor-bar-' + scanId).addClass('progress-bar-success');
+            } else if (status == 'ABORTED') {
+                $('#monitor-bar-' + scanId).addClass('progress-bar-warning');
+            } else {
+                $('#monitor-bar-' + scanId).addClass('progress-bar-danger');
+            }
+            $('#monitor-summary-' + scanId).text(status);
+            stopMonitorPolling(scanId);
+        }
+    });
 }
 
 function showlisttable(types, filter, data) {
@@ -454,6 +556,7 @@ function showlisttable(types, filter, data) {
                 table += "<div class='progress-bar progress-bar-striped active' role='progressbar' style='width: 0%; font-size: 9px; line-height: 10px;'>0%</div>";
                 table += "</div>";
                 table += "<div class='scanlist-progress-info' style='font-size: 9px; color: #888; margin-top: 2px; white-space: nowrap;'></div>";
+                table += "<a class='scanlist-monitor-toggle' id='monitor-toggle-" + data[i][0] + "' onclick='event.stopPropagation(); toggleMonitorPanel(\"" + data[i][0] + "\"); return false;'>MONITOR</a>";
                 table += "</div>";
             }
             table += "</td>";

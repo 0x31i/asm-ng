@@ -5955,7 +5955,9 @@ class SpiderFootWebUi:
         """
         with SpiderFootDb(self.config) as dbh:
             try:
-                return dbh.scanProgress(id)
+                result = dbh.scanProgress(id)
+                result.pop('_snapshot_modules', None)
+                return result
             except Exception:
                 return {
                     'status': 'UNKNOWN',
@@ -5967,6 +5969,77 @@ class SpiderFootWebUi:
                     'eventsPerSecond': 0.0,
                     'progressPercent': 0,
                 }
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scanmonitor(self: 'SpiderFootWebUi', id: str) -> dict:
+        """Comprehensive scan monitoring data for the live dashboard.
+
+        Returns progress, per-module status, event type summary, and recent
+        events in a single combined response to minimize HTTP round-trips.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: combined monitoring data
+        """
+        result = {
+            'progress': {},
+            'modules': {},
+            'eventTypes': [],
+            'recentEvents': [],
+        }
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                # 1. Progress data (includes per-module snapshot)
+                progress = dbh.scanProgress(id)
+                # Extract per-module detail before sending to client
+                snapshot_modules = progress.pop('_snapshot_modules', {})
+                result['progress'] = progress
+                result['modules'] = snapshot_modules
+
+                # 2. Event type summary with grading colors (top 30)
+                if progress.get('totalEvents', 0) > 0:
+                    try:
+                        scandata = _cached_scan_summary(dbh, id, 'type')
+                        config_overrides = _cached_grade_config(self.config)
+                        overrides = config_overrides.get('event_overrides')
+                        evt_list = []
+                        for row in scandata:
+                            if row[0] == 'ROOT':
+                                continue
+                            try:
+                                grading = get_event_grading(row[0], overrides)
+                                cat_meta = DEFAULT_GRADE_CATEGORIES.get(
+                                    grading.get('category', ''), {})
+                                color = cat_meta.get('color', '#6b7280')
+                            except Exception:
+                                color = '#6b7280'
+                            evt_list.append({
+                                'type': row[0],
+                                'descr': row[1],
+                                'count': row[3],
+                                'unique': row[4],
+                                'color': color,
+                            })
+                        # Sort by count descending, take top 30
+                        evt_list.sort(key=lambda x: x['count'], reverse=True)
+                        result['eventTypes'] = evt_list[:30]
+                    except Exception:
+                        pass
+
+                # 3. Recent events feed
+                try:
+                    result['recentEvents'] = dbh.scanRecentEvents(id, 20)
+                except Exception:
+                    pass
+
+            except Exception:
+                pass
+
+        return result
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
