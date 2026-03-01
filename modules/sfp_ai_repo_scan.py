@@ -484,6 +484,87 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
                 self.__class__.__name__, event)
             self.notifyListeners(evt)
 
+    def _check_repo_coauthors(self, owner, repo, event):
+        """Check recent commits for AI co-author trailers.
+
+        Claude and other AI tools appear as Co-Authored-By trailers in
+        commit messages rather than as GitHub contributors. This method
+        fetches recent commits and parses their messages for these
+        trailers, matching against known AI tool name/email patterns.
+        """
+        url = (f"https://api.github.com/repos/{owner}/{repo}"
+               f"/commits?per_page=30")
+
+        res = self.sf.fetchUrl(
+            url,
+            timeout=15,
+            useragent=self.opts.get('_useragent', 'ASM-NG')
+        )
+
+        if not res or not res.get('content'):
+            self.debug(f"No commits data for {owner}/{repo}.")
+            return
+
+        try:
+            commits = json.loads(res['content'])
+        except (json.JSONDecodeError, ValueError):
+            self.debug(f"Failed to parse commits for {owner}/{repo}.")
+            return
+
+        if not isinstance(commits, list):
+            return
+
+        # Patterns matching AI tool names/emails in co-author trailers
+        ai_coauthor_patterns = {
+            'claude': 'Claude / Anthropic',
+            'anthropic': 'Claude / Anthropic',
+            'copilot': 'GitHub Copilot',
+            'devin': 'Devin AI',
+            'coderabbit': 'CodeRabbit',
+            'sweep': 'Sweep AI',
+            'aider': 'Aider',
+            'cursor': 'Cursor IDE',
+        }
+
+        coauthor_re = re.compile(
+            r'Co-Authored-By:\s*(.+?)\s*<([^>]+)>',
+            re.IGNORECASE
+        )
+
+        # Track matches: {label: count}
+        found = {}
+        for commit_obj in commits:
+            if self.checkForStop():
+                return
+
+            message = (commit_obj.get('commit', {})
+                       .get('message', ''))
+            if not message:
+                continue
+
+            for match in coauthor_re.finditer(message):
+                name = match.group(1).lower()
+                email = match.group(2).lower()
+                combined = f"{name} {email}"
+
+                for pattern, label in ai_coauthor_patterns.items():
+                    if pattern in combined:
+                        found[label] = found.get(label, 0) + 1
+                        break
+
+        if found:
+            parts = [f"{label} ({count} commits)"
+                     for label, count in found.items()]
+            detail = (f"AI co-author trailers in "
+                      f"github.com/{owner}/{repo}: "
+                      f"{', '.join(parts)}")
+
+            evt = SpiderFootEvent(
+                "AI_INFRASTRUCTURE_DETECTED",
+                detail,
+                self.__class__.__name__, event)
+            self.notifyListeners(evt)
+
     def _check_repo_branches(self, owner, repo, event):
         """Check repository branch names for AI tool naming patterns."""
         url = (f"https://api.github.com/repos/{owner}/{repo}"
@@ -793,6 +874,10 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
 
         if self.checkForStop():
             return
+        self._check_repo_coauthors(owner, repo, event)
+
+        if self.checkForStop():
+            return
         self._check_repo_branches(owner, repo, event)
 
     def handleEvent(self, event):
@@ -819,6 +904,19 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
                 self._discover_github_repos(eventData, event)
             return
 
+        # PUBLIC_CODE_REPO → extract URL from event data, then scan
+        if eventName == "PUBLIC_CODE_REPO":
+            try:
+                url = eventData.split("\n")[1].replace("URL: ", "")
+            except (IndexError, AttributeError):
+                self.debug(f"Could not parse URL from PUBLIC_CODE_REPO: "
+                           f"{eventData[:100]}")
+                return
+            owner, repo = self._extract_github_repo(url)
+            if owner and repo:
+                self._scan_repo(owner, repo, event)
+            return
+
         # For LINKED_URL_EXTERNAL, only process GitHub/GitLab URLs
         if eventName == "LINKED_URL_EXTERNAL":
             if 'github.com' not in eventData and 'gitlab.com' not in eventData:
@@ -826,11 +924,31 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
 
         # Extract owner/repo from the URL
         owner, repo = self._extract_github_repo(eventData)
-        if not owner or not repo:
-            self.debug(f"Could not extract owner/repo from: {eventData}")
+        if owner and repo:
+            self._scan_repo(owner, repo, event)
             return
 
-        self._scan_repo(owner, repo, event)
+        # Fallback: profile-only URL like github.com/{username}
+        if 'github.com' in eventData:
+            match = re.search(
+                r'(?:https?://)?(?:www\.)?github\.com/([A-Za-z0-9_.-]+)/?$',
+                eventData
+            )
+            if match:
+                username = match.group(1)
+                if username.lower() not in (
+                    'features', 'marketplace', 'explore', 'topics',
+                    'trending', 'collections', 'sponsors', 'settings',
+                    'notifications', 'login', 'signup', 'about',
+                    'pricing', 'enterprise', 'team', 'security',
+                    'customer-stories', 'readme', 'events', 'apps',
+                ):
+                    self.info(f"Profile-only GitHub URL, "
+                              f"discovering repos for: {username}")
+                    self._discover_github_repos(username, event)
+                    return
+
+        self.debug(f"Could not extract owner/repo from: {eventData}")
 
 
 # End of sfp_ai_repo_scan class

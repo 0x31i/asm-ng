@@ -17,10 +17,10 @@ from spiderfoot import SpiderFootEvent, SpiderFootPlugin
 regexps = dict({
     "LinkedIn (Individual)": list(['.*linkedin.com/in/([a-zA-Z0-9_]+$)']),
     "LinkedIn (Company)": list(['.*linkedin.com/company/([a-zA-Z0-9_]+$)']),
-    "Github": list([r'.*github.com/([a-zA-Z0-9_]+)\/']),
+    "Github": list([r'.*github\.com/([a-zA-Z0-9_-]+)(?:/|$)']),
     "Google+": list(['.*plus.google.com/([0-9]+$)']),
-    "Bitbucket": list([r'.*bitbucket.org/([a-zA-Z0-9_]+)\/']),
-    "Gitlab": list([r'.*gitlab.com/([a-zA-Z0-9_]+)\/']),
+    "Bitbucket": list([r'.*bitbucket\.org/([a-zA-Z0-9_-]+)(?:/|$)']),
+    "Gitlab": list([r'.*gitlab\.com/([a-zA-Z0-9_-]+)(?:/|$)']),
     "Facebook": list(['.*facebook.com/([a-zA-Z0-9_]+$)']),
     "MySpace": list([r'https?://myspace.com/([a-zA-Z0-9_\.]+$)']),
     "YouTube": list(['.*youtube.com/([a-zA-Z0-9_]+$)']),
