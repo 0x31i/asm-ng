@@ -8930,6 +8930,27 @@ class SpiderFootWebUi:
             return retdata
 
     @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scanelementpath(self: 'SpiderFootWebUi', id: str = None, resultHash: str = None) -> list:
+        """Trace discovery path for a single element back to ROOT.
+
+        Args:
+            id: scan instance ID
+            resultHash: hash of the element to trace
+
+        Returns:
+            list: ordered path from ROOT to leaf element
+        """
+        if not id or not resultHash or not resultHash.isalnum():
+            return []
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                return dbh.scanElementPath(id, resultHash)
+            except Exception:
+                return []
+
+    @cherrypy.expose
     def active_maintenance_status(self: 'SpiderFootWebUi') -> str:
         """Display the active maintenance status of the project.
 
