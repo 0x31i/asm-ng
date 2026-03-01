@@ -17,9 +17,8 @@ All notable changes to this project will be documented in this file.
   - Thread-safe connection pooling with semaphore-gated access (64 concurrent connections default)
   - Transparent SQL translation via `PgCursorWrapper` (no code changes needed for existing queries)
   - Automatic INT-to-BIGINT conversion for millisecond timestamp compatibility
-  - Bidirectional migration tool (`python -m spiderfoot.db_migrate`) between SQLite and PostgreSQL
   - Configurable via environment variables: `ASMNG_DATABASE_URL`, `ASMNG_DB_TYPE`, `ASMNG_PG_AUTO_SETUP`
-  - Auto-detection priority: explicit DSN → env var → localhost probe → auto-setup → SQLite fallback
+  - Auto-detection priority: explicit DSN → env var → localhost probe → auto-setup
 - Automated changelog generation enabled in CI.
 
 ## [5.2.5] - 2025-06-24

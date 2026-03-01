@@ -171,7 +171,7 @@ def import_csv(csv_path: str, scan_name: str = None, target: str = None, dry_run
 
     # Initialize database
     config = {
-        '__database': f"{SpiderFootHelpers.dataPath()}/spiderfoot.db",
+        '__database': SpiderFootHelpers.dataPath(),
     }
 
     try:

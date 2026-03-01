@@ -116,7 +116,7 @@ def default_options(request):
             '_internettlds': 'https://publicsuffix.org/list/effective_tld_names.dat',
             '_internettlds_cache': 72,
             '_genericusers': ",".join(SpiderFootHelpers.usernamesFromWordlists(['generic-usernames'])),
-            '__database': f"{SpiderFootHelpers.dataPath()}/spiderfoot.test.db",
+            '__database': os.environ.get('ASMNG_TEST_DATABASE_URL', f"{SpiderFootHelpers.dataPath()}/spiderfoot.test.db"),
             '__modules__': None,
             '__correlationrules__': None,
             '_socks1type': '',

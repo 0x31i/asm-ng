@@ -18,26 +18,22 @@ import os
 import random
 import re
 import secrets
-import sqlite3
 import threading
 import time
+
+import psycopg2
 
 from spiderfoot.db_backend import (
     DatabaseError,
     OperationalError,
-    HAS_PSYCOPG2,
     create_connection,
     create_pg_connection,
-    create_sqlite_connection,
     get_pg_schema_queries,
     get_raw_connection,
     raw_execute,
     return_pg_connection,
     return_pg_connection_fast,
 )
-
-if HAS_PSYCOPG2:
-    import psycopg2
 
 # In-memory high-water mark for monotonic progress tracking.
 # Survives across poll cycles; resets on server restart (catches up quickly
@@ -114,22 +110,19 @@ _log = logging.getLogger("spiderfoot.db")
 
 
 class SpiderFootDb:
-    """SpiderFoot database.
-
-    Supports both SQLite and PostgreSQL backends.  The backend is selected
-    automatically at init time (see ``db_backend.detect_db_type``).
+    """SpiderFoot database (PostgreSQL backend).
 
     Attributes:
-        conn: database connection (sqlite3 or psycopg2)
-        dbh: database cursor (or PgCursorWrapper for PostgreSQL)
-        db_type (str): ``'sqlite'`` or ``'postgresql'``
-        dbhLock (_thread.RLock): thread lock (active for SQLite, no-op for PG)
+        conn: database connection (psycopg2)
+        dbh: database cursor (PgCursorWrapper)
+        db_type (str): ``'postgresql'``
+        dbhLock: ``_PgPoolLock`` (set in ``__init__`` after migrations)
     """
 
     dbh = None
     conn = None
 
-    # Prevent multithread access to database (SQLite only; PG handles this natively)
+    # Initial lock; replaced by _PgPoolLock after init completes.
     dbhLock = threading.RLock()
 
     # Track whether schema migrations have already been applied this process
@@ -652,14 +645,11 @@ class SpiderFootDb:
     def __init__(self, opts: dict, init: bool = False) -> None:
         """Initialize database and create handle to the database.
 
-        Supports both SQLite and PostgreSQL backends.  The backend is
-        auto-detected (see ``db_backend.detect_db_type``) or can be
-        forced via the ``__dbtype`` config key or ``ASMNG_DB_TYPE`` env var.
+        Uses PostgreSQL backend exclusively.
 
         Args:
-            opts (dict): must specify the database file path in the '__database' key
+            opts (dict): must include a non-empty '__database' key (data directory path)
             init (bool): initialise the database schema.
-                         if the database file does not exist this option will be ignored.
 
         Raises:
             TypeError: arg type was invalid
@@ -707,9 +697,7 @@ class SpiderFootDb:
             # PostgreSQL enters InFailedSqlTransaction after any query error,
             # blocking subsequent queries until rollback.  Enable autocommit
             # during setup/migrations so each statement is independent.
-            pg_autocommit = (self.db_type == 'postgresql')
-            if pg_autocommit:
-                self.conn.autocommit = True
+            self.conn.autocommit = True
 
             try:
                 self.dbh.execute('SELECT COUNT(*) FROM tbl_scan_config')
@@ -722,27 +710,25 @@ class SpiderFootDb:
                         "Tried to set up the SpiderFoot database schema, but failed") from e
 
             # Migration: Convert PostgreSQL INT columns to BIGINT.
-            # SQLite's INT is variable-length (up to 8 bytes), but PostgreSQL's
-            # INT is strictly 32-bit (max ~2.1B).  Millisecond timestamps like
-            # int(time.time()*1000) ≈ 1.77 trillion overflow this.  Convert all
-            # existing integer columns to BIGINT so timestamps store correctly.
-            if self.db_type == 'postgresql':
-                try:
-                    self.dbh.execute(
-                        "SELECT table_name, column_name "
-                        "FROM information_schema.columns "
-                        "WHERE table_schema = 'public' "
-                        "AND data_type = 'integer'"
-                    )
-                    for row in self.dbh.fetchall():
-                        try:
-                            self.dbh.execute(
-                                f'ALTER TABLE "{row[0]}" ALTER COLUMN "{row[1]}" TYPE BIGINT'
-                            )
-                        except Exception:
-                            pass
-                except DatabaseError:
-                    pass
+            # PostgreSQL's INT is strictly 32-bit (max ~2.1B).  Millisecond
+            # timestamps like int(time.time()*1000) ≈ 1.77 trillion overflow
+            # this.  Convert all existing integer columns to BIGINT.
+            try:
+                self.dbh.execute(
+                    "SELECT table_name, column_name "
+                    "FROM information_schema.columns "
+                    "WHERE table_schema = 'public' "
+                    "AND data_type = 'integer'"
+                )
+                for row in self.dbh.fetchall():
+                    try:
+                        self.dbh.execute(
+                            f'ALTER TABLE "{row[0]}" ALTER COLUMN "{row[1]}" TYPE BIGINT'
+                        )
+                    except Exception:
+                        pass
+            except DatabaseError:
+                pass
 
             # Migration: Ensure tbl_scan_results exists with scan_instance_id.
             # If a previous create() call failed partway through (autocommit
@@ -763,10 +749,7 @@ class SpiderFootDb:
 
                     if not table_exists:
                         # Table doesn't exist at all — create it fresh.
-                        if self.db_type == 'postgresql':
-                            schema = get_pg_schema_queries(self.createSchemaQueries)
-                        else:
-                            schema = self.createSchemaQueries
+                        schema = get_pg_schema_queries(self.createSchemaQueries)
                         for qry in schema:
                             if 'tbl_scan_results' in qry and (
                                     'CREATE TABLE' in qry.upper()
@@ -843,42 +826,6 @@ class SpiderFootDb:
                     self.conn.commit()
                 except DatabaseError:
                     pass  # Table creation failed, but this is not critical
-
-            # Migration: Add source_data column and update UNIQUE constraint
-            # SQLite doesn't support modifying constraints, so we need to recreate the table
-            # This migration is SQLite-only; PostgreSQL schemas are created with the correct structure.
-            if self.db_type == 'sqlite':
-                try:
-                    self.dbh.execute("SELECT source_data FROM tbl_target_false_positives LIMIT 1")
-                    # Column exists, but check if we need to fix the UNIQUE constraint
-                    self.dbh.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='tbl_target_false_positives'")
-                    table_sql = self.dbh.fetchone()
-                    if table_sql and 'source_data' not in str(table_sql[0]).split('UNIQUE')[1] if 'UNIQUE' in str(table_sql[0]) else True:
-                        raise Exception("Need to update UNIQUE constraint")
-                except DatabaseError:
-                    try:
-                        self.dbh.execute("CREATE TABLE IF NOT EXISTS tbl_target_false_positives_new ( \
-                            id INTEGER PRIMARY KEY AUTOINCREMENT, \
-                            target VARCHAR NOT NULL, \
-                            event_type VARCHAR NOT NULL, \
-                            event_data VARCHAR NOT NULL, \
-                            source_data VARCHAR, \
-                            date_added INT NOT NULL, \
-                            notes VARCHAR, \
-                            UNIQUE(target, event_type, event_data, source_data) \
-                        )")
-                        self.dbh.execute("INSERT OR IGNORE INTO tbl_target_false_positives_new \
-                            (id, target, event_type, event_data, source_data, date_added, notes) \
-                            SELECT id, target, event_type, event_data, \
-                            CASE WHEN source_data IS NULL THEN NULL ELSE source_data END, \
-                            date_added, notes FROM tbl_target_false_positives")
-                        self.dbh.execute("DROP TABLE tbl_target_false_positives")
-                        self.dbh.execute("ALTER TABLE tbl_target_false_positives_new RENAME TO tbl_target_false_positives")
-                        self.dbh.execute("CREATE INDEX IF NOT EXISTS idx_target_fp_target ON tbl_target_false_positives (target)")
-                        self.dbh.execute("CREATE INDEX IF NOT EXISTS idx_target_fp_lookup ON tbl_target_false_positives (target, event_type, event_data, source_data)")
-                        self.conn.commit()
-                    except DatabaseError:
-                        pass  # Migration failed, but continue
 
             # Add target validated table if it doesn't exist (migration for validated status feature)
             try:
@@ -1079,39 +1026,6 @@ class SpiderFootDb:
                 except DatabaseError as e:
                     _log.warning(f"Migration failed: could not add tracking column to tbl_scan_results: {e}")
 
-            # Migration: Fix invalid FK in tbl_scan_correlation_results_events
-            # The REFERENCES tbl_scan_results(hash) is invalid because hash is
-            # not a PRIMARY KEY or UNIQUE column, causing foreign key mismatch
-            # errors when PRAGMA foreign_keys=ON
-            # This migration is SQLite-only; PostgreSQL schemas are created with the correct structure.
-            if self.db_type == 'sqlite':
-                try:
-                    self.dbh.execute(
-                        "SELECT sql FROM sqlite_master WHERE type='table' "
-                        "AND name='tbl_scan_correlation_results_events'")
-                    table_sql = self.dbh.fetchone()
-                    if table_sql and 'REFERENCES tbl_scan_results' in str(table_sql[0]):
-                        self.dbh.execute(
-                            "CREATE TABLE IF NOT EXISTS tbl_scan_correlation_results_events_new ( "
-                            "correlation_id VARCHAR NOT NULL REFERENCES tbl_scan_correlation_results(id), "
-                            "event_hash VARCHAR NOT NULL)")
-                        self.dbh.execute(
-                            "INSERT OR IGNORE INTO tbl_scan_correlation_results_events_new "
-                            "SELECT correlation_id, event_hash FROM tbl_scan_correlation_results_events")
-                        self.dbh.execute("DROP TABLE tbl_scan_correlation_results_events")
-                        self.dbh.execute(
-                            "ALTER TABLE tbl_scan_correlation_results_events_new "
-                            "RENAME TO tbl_scan_correlation_results_events")
-                        self.dbh.execute(
-                            "CREATE INDEX IF NOT EXISTS idx_scan_correlation_events "
-                            "ON tbl_scan_correlation_results_events (correlation_id)")
-                        self.dbh.execute(
-                            "CREATE INDEX IF NOT EXISTS idx_scan_correlation_events_hash "
-                            "ON tbl_scan_correlation_results_events (event_hash)")
-                        self.conn.commit()
-                except DatabaseError:
-                    pass
-
             # Migration: Add pid column to tbl_scan_instance for process tracking
             try:
                 self.dbh.execute("SELECT pid FROM tbl_scan_instance LIMIT 1")
@@ -1124,65 +1038,12 @@ class SpiderFootDb:
                 except DatabaseError:
                     pass
 
-            # Migration: Add explicit id column to tbl_scan_log (replaces rowid dependency)
-            if self.db_type == 'sqlite':
-                try:
-                    self.dbh.execute("SELECT id FROM tbl_scan_log LIMIT 1")
-                except DatabaseError:
-                    try:
-                        self.dbh.execute(
-                            "CREATE TABLE IF NOT EXISTS tbl_scan_log_new ( "
-                            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                            "scan_instance_id VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), "
-                            "generated INT NOT NULL, "
-                            "component VARCHAR, "
-                            "type VARCHAR NOT NULL, "
-                            "message VARCHAR)")
-                        self.dbh.execute(
-                            "INSERT INTO tbl_scan_log_new "
-                            "(scan_instance_id, generated, component, type, message) "
-                            "SELECT scan_instance_id, generated, component, type, message "
-                            "FROM tbl_scan_log")
-                        self.dbh.execute("DROP TABLE tbl_scan_log")
-                        self.dbh.execute(
-                            "ALTER TABLE tbl_scan_log_new RENAME TO tbl_scan_log")
-                        self.conn.commit()
-                    except DatabaseError:
-                        pass
-
-            # Migration: Add UNIQUE constraint to tbl_scan_config for upsert support
-            if self.db_type == 'sqlite':
-                try:
-                    # Check if UNIQUE constraint exists by inspecting schema
-                    self.dbh.execute(
-                        "SELECT sql FROM sqlite_master WHERE type='table' "
-                        "AND name='tbl_scan_config'")
-                    table_sql = self.dbh.fetchone()
-                    if table_sql and 'UNIQUE' not in str(table_sql[0]):
-                        self.dbh.execute(
-                            "CREATE TABLE IF NOT EXISTS tbl_scan_config_new ( "
-                            "scan_instance_id VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), "
-                            "component VARCHAR NOT NULL, "
-                            "opt VARCHAR NOT NULL, "
-                            "val VARCHAR NOT NULL, "
-                            "UNIQUE(scan_instance_id, component, opt))")
-                        self.dbh.execute(
-                            "INSERT OR IGNORE INTO tbl_scan_config_new "
-                            "SELECT scan_instance_id, component, opt, val "
-                            "FROM tbl_scan_config")
-                        self.dbh.execute("DROP TABLE tbl_scan_config")
-                        self.dbh.execute(
-                            "ALTER TABLE tbl_scan_config_new RENAME TO tbl_scan_config")
-                        self.conn.commit()
-                except DatabaseError:
-                    pass
-
             # Migration: Create analyst type comments table
             try:
                 self.dbh.execute("SELECT COUNT(*) FROM tbl_analyst_type_comments")
             except DatabaseError:
                 try:
-                    schema = get_pg_schema_queries(self.createSchemaQueries) if self.db_type == 'postgresql' else self.createSchemaQueries
+                    schema = get_pg_schema_queries(self.createSchemaQueries)
                     for qry in schema:
                         if "tbl_analyst_type_comments" in qry:
                             self.dbh.execute(qry)
@@ -1195,7 +1056,7 @@ class SpiderFootDb:
                 self.dbh.execute("SELECT COUNT(*) FROM tbl_analyst_row_notes")
             except DatabaseError:
                 try:
-                    schema = get_pg_schema_queries(self.createSchemaQueries) if self.db_type == 'postgresql' else self.createSchemaQueries
+                    schema = get_pg_schema_queries(self.createSchemaQueries)
                     for qry in schema:
                         if "tbl_analyst_row_notes" in qry:
                             self.dbh.execute(qry)
@@ -1281,7 +1142,7 @@ class SpiderFootDb:
                 self.dbh.execute("SELECT COUNT(*) FROM tbl_asset_tags")
             except DatabaseError:
                 try:
-                    schema = get_pg_schema_queries(self.createSchemaQueries) if self.db_type == 'postgresql' else self.createSchemaQueries
+                    schema = get_pg_schema_queries(self.createSchemaQueries)
                     for qry in schema:
                         if "tbl_asset_tags" in qry:
                             self.dbh.execute(qry)
@@ -1294,7 +1155,7 @@ class SpiderFootDb:
                 self.dbh.execute("SELECT COUNT(*) FROM tbl_grade_snapshots")
             except DatabaseError:
                 try:
-                    schema = get_pg_schema_queries(self.createSchemaQueries) if self.db_type == 'postgresql' else self.createSchemaQueries
+                    schema = get_pg_schema_queries(self.createSchemaQueries)
                     for qry in schema:
                         if "tbl_grade_snapshots" in qry:
                             self.dbh.execute(qry)
@@ -1313,8 +1174,7 @@ class SpiderFootDb:
                     pass
 
             # Restore normal transaction mode after migrations
-            if pg_autocommit:
-                self.conn.autocommit = False
+            self.conn.autocommit = False
 
             # Mark migrations as complete so subsequent connections skip this block
             SpiderFootDb._migrations_done = True
@@ -1345,40 +1205,30 @@ class SpiderFootDb:
     #
 
     def _insert_or_ignore(self, query: str) -> str:
-        """Convert ``INSERT OR IGNORE INTO`` to the backend-appropriate syntax.
+        """Convert ``INSERT OR IGNORE INTO`` to PostgreSQL syntax.
 
-        SQLite: ``INSERT OR IGNORE INTO ...``
-        PostgreSQL: ``INSERT INTO ... ON CONFLICT DO NOTHING``
+        ``INSERT INTO ... ON CONFLICT DO NOTHING``
         """
-        if self.db_type != 'postgresql':
-            return query
-        # Replace "INSERT OR IGNORE INTO" with "INSERT INTO ... ON CONFLICT DO NOTHING"
         q = query.replace('INSERT OR IGNORE INTO', 'INSERT INTO')
-        # Append ON CONFLICT DO NOTHING before any trailing whitespace
         q = q.rstrip()
         if not q.endswith('ON CONFLICT DO NOTHING'):
             q += ' ON CONFLICT DO NOTHING'
         return q
 
     def _replace_into(self, table: str, columns: list, conflict_columns: list) -> str:
-        """Generate an upsert query appropriate for the current backend.
+        """Generate a PostgreSQL upsert query.
 
-        SQLite: ``REPLACE INTO table (cols) VALUES (?, ...)``
-        PostgreSQL: ``INSERT INTO table (cols) VALUES (%s, ...) ON CONFLICT (conflict_cols) DO UPDATE SET ...``
+        ``INSERT INTO table (cols) VALUES (%s, ...) ON CONFLICT (conflict_cols) DO UPDATE SET ...``
         """
         placeholders = ', '.join(['?'] * len(columns))
         col_list = ', '.join(columns)
-
-        if self.db_type == 'postgresql':
-            conflict_list = ', '.join(conflict_columns)
-            update_cols = [c for c in columns if c not in conflict_columns]
-            set_clause = ', '.join([f"{c} = EXCLUDED.{c}" for c in update_cols])
-            return (
-                f"INSERT INTO {table} ({col_list}) VALUES ({placeholders}) "
-                f"ON CONFLICT ({conflict_list}) DO UPDATE SET {set_clause}"
-            )
-
-        return f"REPLACE INTO {table} ({col_list}) VALUES ({placeholders})"
+        conflict_list = ', '.join(conflict_columns)
+        update_cols = [c for c in columns if c not in conflict_columns]
+        set_clause = ', '.join([f"{c} = EXCLUDED.{c}" for c in update_cols])
+        return (
+            f"INSERT INTO {table} ({col_list}) VALUES ({placeholders}) "
+            f"ON CONFLICT ({conflict_list}) DO UPDATE SET {set_clause}"
+        )
 
     def create(self) -> None:
         """Create the database schema.
@@ -1389,9 +1239,7 @@ class SpiderFootDb:
 
         with self.dbhLock:
             try:
-                schema = self.createSchemaQueries
-                if self.db_type == 'postgresql':
-                    schema = get_pg_schema_queries(schema)
+                schema = get_pg_schema_queries(self.createSchemaQueries)
 
                 for qry in schema:
                     # Add IF NOT EXISTS so create() is idempotent and
@@ -1427,8 +1275,6 @@ class SpiderFootDb:
         for milliseconds instead of the module's entire lifetime) and
         ensures the web server always has connections available.
         """
-        if self.db_type != 'postgresql':
-            return
         # Return the connection that __init__ acquired for setup.
         if self.conn is not None:
             return_pg_connection(self.conn)
@@ -1457,12 +1303,9 @@ class SpiderFootDb:
     def close(self) -> None:
         """Close the database handle and connection.
 
-        In per-operation pool mode (PostgreSQL with ``_PgPoolLock``),
-        connections are transient — checked out and returned within each
+        In per-operation pool mode (``_PgPoolLock``), connections are
+        transient — checked out and returned within each
         ``with self.dbhLock:`` block.  There is nothing to close.
-
-        For SQLite (or PostgreSQL still in init mode), closes the cursor
-        and connection normally.
         """
         if isinstance(self.dbhLock, _PgPoolLock):
             return
@@ -1472,14 +1315,11 @@ class SpiderFootDb:
                 self.dbh.close()
                 self.dbh = None
             if self.conn:
-                if self.db_type == 'postgresql':
-                    return_pg_connection(self.conn)
-                else:
-                    self.conn.close()
+                return_pg_connection(self.conn)
                 self.conn = None
 
     def vacuumDB(self) -> None:
-        """Vacuum the database. Clears unused database file pages.
+        """Vacuum the database.
 
         Returns:
             bool: success
@@ -1489,15 +1329,11 @@ class SpiderFootDb:
         """
         with self.dbhLock:
             try:
-                if self.db_type == 'postgresql':
-                    # PostgreSQL VACUUM requires autocommit mode
-                    old_autocommit = self.conn.autocommit
-                    self.conn.autocommit = True
-                    self.dbh.execute("VACUUM ANALYZE")
-                    self.conn.autocommit = old_autocommit
-                else:
-                    self.dbh.execute("VACUUM")
-                    self.conn.commit()
+                # PostgreSQL VACUUM requires autocommit mode
+                old_autocommit = self.conn.autocommit
+                self.conn.autocommit = True
+                self.dbh.execute("VACUUM ANALYZE")
+                self.conn.autocommit = old_autocommit
                 return True
             except DatabaseError as e:
                 raise IOError(
@@ -1517,45 +1353,18 @@ class SpiderFootDb:
         }
 
         with self.dbhLock:
-            if self.db_type == 'postgresql':
-                # PostgreSQL doesn't have PRAGMA-style checks;
-                # verify connectivity and basic table access.
-                try:
-                    self.dbh.execute("SELECT 1")
-                    result['integrity_check'].append('ok')
-                    result['status'] = 'healthy'
-                except DatabaseError as e:
-                    result['ok'] = False
-                    result['integrity_check'].append(str(e))
-            else:
-                try:
-                    self.dbh.execute("PRAGMA integrity_check")
-                    rows = self.dbh.fetchall()
-                    for row in rows:
-                        result['integrity_check'].append(row[0])
-                        if row[0] != 'ok':
-                            result['ok'] = False
-                except DatabaseError as e:
-                    result['ok'] = False
-                    result['integrity_check'].append(str(e))
-
-                try:
-                    self.dbh.execute("PRAGMA foreign_key_check")
-                    rows = self.dbh.fetchall()
-                    for row in rows:
-                        result['foreign_key_check'].append(str(row))
-                        result['ok'] = False
-                except DatabaseError as e:
-                    result['ok'] = False
-                    result['foreign_key_check'].append(str(e))
+            try:
+                self.dbh.execute("SELECT 1")
+                result['integrity_check'].append('ok')
+                result['status'] = 'healthy'
+            except DatabaseError as e:
+                result['ok'] = False
+                result['integrity_check'].append(str(e))
 
         return result
 
     def backupDB(self, destination_path: str) -> str:
-        """Create a hot backup of the database.
-
-        For SQLite, uses the built-in backup API.
-        For PostgreSQL, uses pg_dump.
+        """Create a hot backup of the database using pg_dump.
 
         Args:
             destination_path (str): path for the backup file
@@ -1576,28 +1385,20 @@ class SpiderFootDb:
 
         with self.dbhLock:
             try:
-                if self.db_type == 'postgresql':
-                    from spiderfoot.db_backend import _build_pg_dsn
-                    dsn = _build_pg_dsn(self._opts) if hasattr(self, '_opts') else 'postgresql://admin:admin@localhost:5432/asmng'
-                    result = subprocess.run(
-                        ['pg_dump', dsn, '-f', destination_path],
-                        capture_output=True, text=True, timeout=300
-                    )
-                    if result.returncode != 0:
-                        raise IOError(f"pg_dump failed: {result.stderr}")
-                else:
-                    backup_conn = sqlite3.connect(destination_path)
-                    self.conn.backup(backup_conn)
-                    backup_conn.close()
+                from spiderfoot.db_backend import _build_pg_dsn
+                dsn = _build_pg_dsn(self._opts) if hasattr(self, '_opts') else 'postgresql://admin:admin@localhost:5432/asmng'
+                result = subprocess.run(
+                    ['pg_dump', dsn, '-f', destination_path],
+                    capture_output=True, text=True, timeout=300
+                )
+                if result.returncode != 0:
+                    raise IOError(f"pg_dump failed: {result.stderr}")
                 return destination_path
             except DatabaseError as e:
                 raise IOError(f"Database backup failed: {e}") from e
 
     def _execute_with_retry(self, query: str, params=None, max_retries: int = 3) -> None:
-        """Execute a query with retry logic for transient SQLite errors.
-
-        Retries on 'database is locked' and 'database is busy' errors
-        with exponential backoff.
+        """Execute a query with basic retry logic for transient errors.
 
         Args:
             query (str): SQL query to execute
@@ -1607,36 +1408,18 @@ class SpiderFootDb:
         Raises:
             DatabaseError: if the query fails after all retries
         """
-        import time
-
-        last_error = None
-        for attempt in range(max_retries + 1):
-            try:
-                if params:
-                    self.dbh.execute(query, params)
-                else:
-                    self.dbh.execute(query)
-                return
-            except OperationalError as e:
-                error_msg = str(e).lower()
-                if 'locked' in error_msg or 'busy' in error_msg:
-                    last_error = e
-                    if attempt < max_retries:
-                        time.sleep(0.1 * (2 ** attempt))  # 0.1s, 0.2s, 0.4s
-                        continue
-                raise
-
-        raise last_error
+        if params:
+            self.dbh.execute(query, params)
+        else:
+            self.dbh.execute(query)
 
     def dbHealth(self) -> dict:
         """Get database health status information.
 
         Returns:
-            dict: health information including file size, page counts,
-                  integrity status, and WAL/backend info
+            dict: health information including database size,
+                  integrity status, and backend info
         """
-        import os
-
         health = {
             'status': 'unknown',
             'file_size': 0,
@@ -1645,65 +1428,21 @@ class SpiderFootDb:
             'page_size': 0,
             'wal_file_size': 0,
             'integrity': 'unknown',
-            'journal_mode': 'unknown',
-            'db_path': '',
+            'journal_mode': 'wal (native)',
+            'db_path': 'postgresql',
             'db_type': self.db_type
         }
 
         with self.dbhLock:
             try:
-                if self.db_type == 'postgresql':
-                    # PostgreSQL health checks
-                    self.dbh.execute("SELECT pg_database_size(current_database())")
-                    row = self.dbh.fetchone()
-                    if row:
-                        health['file_size'] = row[0]
+                self.dbh.execute("SELECT pg_database_size(current_database())")
+                row = self.dbh.fetchone()
+                if row:
+                    health['file_size'] = row[0]
 
-                    self.dbh.execute("SELECT 1")
-                    health['integrity'] = 'ok'
-                    health['status'] = 'healthy'
-                    health['journal_mode'] = 'wal (native)'
-                    health['db_path'] = 'postgresql'
-                else:
-                    # SQLite health checks
-                    self.dbh.execute("PRAGMA database_list")
-                    db_info = self.dbh.fetchone()
-                    if db_info:
-                        health['db_path'] = db_info[2] if len(db_info) > 2 else ''
-                        if health['db_path'] and os.path.exists(health['db_path']):
-                            health['file_size'] = os.path.getsize(health['db_path'])
-                            wal_path = health['db_path'] + '-wal'
-                            if os.path.exists(wal_path):
-                                health['wal_file_size'] = os.path.getsize(wal_path)
-
-                    self.dbh.execute("PRAGMA page_count")
-                    row = self.dbh.fetchone()
-                    if row:
-                        health['page_count'] = row[0]
-
-                    self.dbh.execute("PRAGMA freelist_count")
-                    row = self.dbh.fetchone()
-                    if row:
-                        health['free_pages'] = row[0]
-
-                    self.dbh.execute("PRAGMA page_size")
-                    row = self.dbh.fetchone()
-                    if row:
-                        health['page_size'] = row[0]
-
-                    self.dbh.execute("PRAGMA journal_mode")
-                    row = self.dbh.fetchone()
-                    if row:
-                        health['journal_mode'] = row[0]
-
-                    self.dbh.execute("PRAGMA quick_check")
-                    row = self.dbh.fetchone()
-                    if row and row[0] == 'ok':
-                        health['integrity'] = 'ok'
-                        health['status'] = 'healthy'
-                    else:
-                        health['integrity'] = row[0] if row else 'failed'
-                        health['status'] = 'degraded'
+                self.dbh.execute("SELECT 1")
+                health['integrity'] = 'ok'
+                health['status'] = 'healthy'
 
             except DatabaseError as e:
                 health['status'] = 'error'
@@ -1785,10 +1524,7 @@ class SpiderFootDb:
             qvars.append(criteria['value'])
 
         if criteria.get('regex') is not None:
-            if self.db_type == 'postgresql':
-                qry += " AND (c.data ~* ? OR s.data ~* ?) "
-            else:
-                qry += " AND (c.data REGEXP ? OR s.data REGEXP ?) "
+            qry += " AND (c.data ~* ? OR s.data ~* ?) "
             qvars.append(criteria['regex'])
             qvars.append(criteria['regex'])
 
@@ -1938,12 +1674,11 @@ class SpiderFootDb:
                 ))
                 self.conn.commit()
             except DatabaseError as e:
-                if "locked" not in e.args[0] and "thread" not in e.args[0]:
+                err_msg = str(e.args[0]) if e.args else str(e)
+                if "locked" not in err_msg and "thread" not in err_msg:
                     raise IOError(
                         "Unable to log scan event in database") from e
-                # print("[warning] Couldn't log due to SQLite limitations. You can probably ignore this.")
-                # log.critical(f"Unable to log event in DB due to lock: {e.args[0]}")
-                pass
+                _log.debug(f"scanLogEvent: DB lock contention ({err_msg}), skipping")
 
     def scanInstanceCreate(self, instanceId: str, scanName: str, scanTarget: str) -> None:
         """Store a scan instance in the database.
@@ -3009,7 +2744,7 @@ class SpiderFootDb:
 
         now = int(time.time() * 1000)
 
-        # Use INSERT OR REPLACE for SQLite, or equivalent upsert
+        # Upsert (PgCursorWrapper handles INSERT OR REPLACE conversion)
         qry = "INSERT OR REPLACE INTO tbl_grade_snapshots " \
               "(scan_instance_id, seed_target, overall_score, overall_grade, " \
               "category_scores, finding_counts, total_findings, unique_findings, " \
@@ -3293,7 +3028,7 @@ class SpiderFootDb:
 
         with self.dbhLock:
             # Batch update using WHERE hash IN (...) instead of per-hash loop.
-            # Chunk into groups of 500 to stay within SQLite's 999-variable limit.
+            # Chunk into groups of 500 for manageable query sizes.
             chunk_size = 500
             for i in range(0, len(resultHashes), chunk_size):
                 chunk = resultHashes[i:i + chunk_size]

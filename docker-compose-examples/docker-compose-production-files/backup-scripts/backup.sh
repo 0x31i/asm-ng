@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# ASM-NG SQLite Database Backup Script
-# This script creates compressed backups of the SQLite database
+# ASM-NG PostgreSQL Database Backup Script
+# This script creates compressed backups of the PostgreSQL database
 
 set -e
 
 # Configuration
 BACKUP_DIR="/backups"
-DB_PATH="${SF_DB_PATH:-/home/spiderfoot/.spiderfoot/spiderfoot.db}"
+PG_DSN="${ASMNG_DATABASE_URL:-postgresql://admin:admin@localhost:5432/asmng}"
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
 
 # Create backup directory if it doesn't exist
@@ -15,21 +15,14 @@ mkdir -p "$BACKUP_DIR"
 
 # Generate timestamp for backup file
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-BACKUP_FILE="spiderfoot_backup_${TIMESTAMP}.db"
+BACKUP_FILE="asmng_backup_${TIMESTAMP}.sql"
 BACKUP_PATH="$BACKUP_DIR/$BACKUP_FILE"
 
 echo "Starting database backup at $(date)"
-echo "Source database: $DB_PATH"
 echo "Backup file: $BACKUP_PATH"
 
-# Check if source database exists
-if [[ ! -f "$DB_PATH" ]]; then
-    echo "ERROR: Database file '$DB_PATH' not found!"
-    exit 1
-fi
-
-# Create the backup using SQLite's .backup command (hot backup, safe while db is in use)
-sqlite3 "$DB_PATH" ".backup '$BACKUP_PATH'"
+# Create the backup using pg_dump
+pg_dump "$PG_DSN" > "$BACKUP_PATH"
 
 # Compress the backup
 gzip "$BACKUP_PATH"
@@ -47,11 +40,11 @@ fi
 
 # Clean up old backups (keep only last N days)
 echo "Cleaning up backups older than $RETENTION_DAYS days..."
-find "$BACKUP_DIR" -name "spiderfoot_backup_*.db.gz" -type f -mtime +$RETENTION_DAYS -delete
+find "$BACKUP_DIR" -name "asmng_backup_*.sql.gz" -type f -mtime +$RETENTION_DAYS -delete
 
 # List current backups
 echo "Current backups:"
-ls -lh "$BACKUP_DIR"/spiderfoot_backup_*.db.gz 2>/dev/null | tail -10
+ls -lh "$BACKUP_DIR"/asmng_backup_*.sql.gz 2>/dev/null | tail -10
 
 # Optional: Upload to S3 if configured
 if [[ "${S3_BACKUP_ENABLED}" == "true" ]]; then

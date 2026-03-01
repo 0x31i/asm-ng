@@ -336,7 +336,7 @@ $(document).ready(function() {
 <div id='optsect_dbmanage' class="tab-pane" style="display: none">
 <h4>Database Management</h4>
 <p style="color: var(--text-secondary); margin-bottom: 15px;">
-Monitor database health, create backups, and perform maintenance on the SQLite database.
+Monitor database health, create backups, and perform maintenance on the PostgreSQL database.
 </p>
 
 <!-- Health Status -->
@@ -345,13 +345,8 @@ Monitor database health, create backups, and perform maintenance on the SQLite d
 <table class='table table-bordered table-striped' id="db-health-table">
 <tbody>
 <tr><td style="width:200px">Status</td><td><span id="db-health-status" class="label label-default">Not checked</span></td></tr>
-<tr><td>Database File</td><td id="db-health-path">-</td></tr>
-<tr><td>File Size</td><td id="db-health-filesize">-</td></tr>
-<tr><td>Page Count</td><td id="db-health-pages">-</td></tr>
-<tr><td>Free Pages</td><td id="db-health-freepages">-</td></tr>
-<tr><td>Page Size</td><td id="db-health-pagesize">-</td></tr>
-<tr><td>WAL File Size</td><td id="db-health-walsize">-</td></tr>
-<tr><td>Journal Mode</td><td id="db-health-journal">-</td></tr>
+<tr><td>Backend</td><td id="db-health-path">-</td></tr>
+<tr><td>Database Size</td><td id="db-health-filesize">-</td></tr>
 <tr><td>Integrity</td><td id="db-health-integrity">-</td></tr>
 </tbody>
 </table>
@@ -377,8 +372,7 @@ Run a full integrity check including foreign key validation. This may take a mom
 <!-- Backup -->
 <h5><i class="glyphicon glyphicon-save"></i> Database Backup</h5>
 <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">
-Create a hot backup of the database. The backup is created using SQLite's built-in backup API
-and is safe to run while scans are in progress.
+Create a hot backup of the database using pg_dump. Safe to run while scans are in progress.
 </p>
 <div id="db-backup-result" style="display:none; margin-bottom: 10px;"></div>
 <button type="button" class="btn btn-success" id="btn-db-backup" onclick="dbBackup()">
@@ -390,7 +384,7 @@ and is safe to run while scans are in progress.
 <!-- Vacuum -->
 <h5><i class="glyphicon glyphicon-compressed"></i> Vacuum Database</h5>
 <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">
-Reclaim unused space from deleted records. This rebuilds the database file, removing fragmentation and reducing file size.
+Reclaim unused space from deleted records and reduce table bloat.
 This operation may take a while on large databases.
 </p>
 <div id="db-vacuum-result" style="display:none; margin-bottom: 10px;"></div>
@@ -421,13 +415,8 @@ function dbHealthCheck() {
                 statusEl.textContent = data.status || 'Error';
             }
 
-            document.getElementById('db-health-path').textContent = data.db_path || '-';
+            document.getElementById('db-health-path').textContent = data.db_type || data.db_path || 'PostgreSQL';
             document.getElementById('db-health-filesize').textContent = data.file_size_human || formatBytes(data.file_size || 0);
-            document.getElementById('db-health-pages').textContent = (data.page_count || 0).toLocaleString();
-            document.getElementById('db-health-freepages').textContent = (data.free_pages || 0).toLocaleString();
-            document.getElementById('db-health-pagesize').textContent = formatBytes(data.page_size || 0);
-            document.getElementById('db-health-walsize').textContent = data.wal_file_size_human || formatBytes(data.wal_file_size || 0);
-            document.getElementById('db-health-journal').textContent = data.journal_mode || '-';
             document.getElementById('db-health-integrity').textContent = data.integrity || '-';
         },
         error: function(xhr) {
@@ -597,12 +586,10 @@ Controls database tuning, scan concurrency, and web server threads.
   <table class='table table-bordered table-striped' style="margin-top: 25px;" id="tune-details-table">
     <thead><tr><th>Parameter</th><th>Current</th><th>New Value</th></tr></thead>
     <tbody>
-      <tr class="tune-sqlite-row"><td>SQLite Cache</td><td id="tune-cur-cache">—</td><td id="tune-new-cache">—</td></tr>
-      <tr class="tune-sqlite-row"><td>SQLite Memory-Mapped I/O</td><td id="tune-cur-mmap">—</td><td id="tune-new-mmap">—</td></tr>
-      <tr class="tune-pg-row" style="display:none;"><td>Work Memory</td><td id="tune-cur-pg-workmem">—</td><td id="tune-new-pg-workmem">—</td></tr>
-      <tr class="tune-pg-row" style="display:none;"><td>Effective Cache Size</td><td id="tune-cur-pg-cache">—</td><td id="tune-new-pg-cache">—</td></tr>
-      <tr class="tune-pg-row" style="display:none;"><td>Maintenance Work Memory</td><td id="tune-cur-pg-maint">—</td><td id="tune-new-pg-maint">—</td></tr>
-      <tr class="tune-pg-row" style="display:none;"><td>Connection Pool</td><td id="tune-cur-pg-pool">—</td><td id="tune-new-pg-pool">—</td></tr>
+      <tr><td>Work Memory</td><td id="tune-cur-pg-workmem">—</td><td id="tune-new-pg-workmem">—</td></tr>
+      <tr><td>Effective Cache Size</td><td id="tune-cur-pg-cache">—</td><td id="tune-new-pg-cache">—</td></tr>
+      <tr><td>Maintenance Work Memory</td><td id="tune-cur-pg-maint">—</td><td id="tune-new-pg-maint">—</td></tr>
+      <tr><td>Connection Pool</td><td id="tune-cur-pg-pool">—</td><td id="tune-new-pg-pool">—</td></tr>
       <tr><td>Module Concurrency</td><td id="tune-cur-threads">—</td><td id="tune-new-threads">—</td></tr>
       <tr><td>Web Server Threads</td><td id="tune-cur-pool">—</td><td id="tune-new-pool">—</td></tr>
     </tbody>
@@ -619,24 +606,18 @@ Controls database tuning, scan concurrency, and web server threads.
 <script>
 (function() {
     var TIERS = [
-        { name: 'light',  label: 'LIGHT',  cache: '~32 MB',  mmap: '128 MB', threads: 2, pool: 10,
+        { name: 'light',  label: 'LIGHT',  threads: 2, pool: 10,
           pg_workmem: '64 MB', pg_cache: '3 GB', pg_maint: '256 MB', pg_pool: 20 },
-        { name: 'medium', label: 'MEDIUM', cache: '~128 MB', mmap: '512 MB', threads: 3, pool: 15,
+        { name: 'medium', label: 'MEDIUM', threads: 3, pool: 15,
           pg_workmem: '128 MB', pg_cache: '10 GB', pg_maint: '512 MB', pg_pool: 40 },
-        { name: 'heavy',  label: 'HEAVY',  cache: '~256 MB', mmap: '1 GB',   threads: 5, pool: 20,
+        { name: 'heavy',  label: 'HEAVY',  threads: 5, pool: 20,
           pg_workmem: '256 MB', pg_cache: '22 GB', pg_maint: '1 GB', pg_pool: 80 }
     ];
     var NAME_TO_IDX = { 'light': 0, 'medium': 1, 'heavy': 2 };
     var savedIdx = 1; // default medium
-    var dbType = 'sqlite'; // detected from backend
 
     function updateDisplay(newIdx) {
         var cur = TIERS[savedIdx], nw = TIERS[newIdx];
-        // SQLite fields
-        $('#tune-cur-cache').text(cur.cache);
-        $('#tune-new-cache').text(nw.cache);
-        $('#tune-cur-mmap').text(cur.mmap);
-        $('#tune-new-mmap').text(nw.mmap);
         // PostgreSQL fields
         $('#tune-cur-pg-workmem').text(cur.pg_workmem);
         $('#tune-new-pg-workmem').text(nw.pg_workmem);
@@ -652,7 +633,7 @@ Controls database tuning, scan concurrency, and web server threads.
         $('#tune-cur-pool').text(cur.pool);
         $('#tune-new-pool').text(nw.pool);
         // Highlight changed values
-        $('#tune-details-table tbody tr:visible').each(function() {
+        $('#tune-details-table tbody tr').each(function() {
             var curVal = $(this).find('td:eq(1)').text();
             var newVal = $(this).find('td:eq(2)').text();
             var $cell = $(this).find('td:eq(2)');
@@ -665,21 +646,12 @@ Controls database tuning, scan concurrency, and web server threads.
     }
 
     $(document).ready(function() {
-        // Load current tier and db type
+        // Load current tier
         $.getJSON(docroot + '/getresourcetier', function(data) {
             if (data.success) {
                 var idx = NAME_TO_IDX[data.tier];
                 if (idx === undefined) idx = 1;
                 savedIdx = idx;
-                dbType = data.db_type || 'sqlite';
-                // Toggle rows based on database backend
-                if (dbType === 'postgresql') {
-                    $('.tune-sqlite-row').hide();
-                    $('.tune-pg-row').show();
-                } else {
-                    $('.tune-sqlite-row').show();
-                    $('.tune-pg-row').hide();
-                }
                 $('#tune-resource-slider').val(idx);
                 $('#tune-current-label').text(TIERS[idx].label);
                 updateDisplay(idx);
@@ -713,11 +685,7 @@ Controls database tuning, scan concurrency, and web server threads.
                         $('#tune-current-label').text(tier.label);
                         updateDisplay(idx);
                         var msg = '<strong>Applied!</strong> Resource tier set to <strong>' + tier.label + '</strong>.';
-                        if (dbType === 'postgresql') {
-                            msg += '<br><small>PostgreSQL tuning applies to new database connections. Module concurrency applies to new scans.</small>';
-                        } else {
-                            msg += '<br><small>SQLite tuning applies to new database connections. Module concurrency applies to new scans.</small>';
-                        }
+                        msg += '<br><small>PostgreSQL tuning applies to new database connections. Module concurrency applies to new scans.</small>';
                         if (data.restart_required) {
                             msg += '<br><i class="glyphicon glyphicon-warning-sign"></i> <strong>Restart required</strong> for web server thread pool change to take effect.';
                             $el.attr('class', 'alert alert-warning');

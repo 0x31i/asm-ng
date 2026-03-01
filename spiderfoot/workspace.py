@@ -73,11 +73,8 @@ class SpiderFootWorkspace:
                 # Check if we need to add missing columns for existing tables
                 self.db.dbh.execute(
                     "SELECT column_name FROM information_schema.columns WHERE table_name = 'tbl_workspaces'"
-                    if self.db.db_type == 'postgresql' else
-                    "PRAGMA table_info(tbl_workspaces)"
                 )
-                columns = [col[0] if self.db.db_type == 'postgresql' else col[1]
-                                 for col in self.db.dbh.fetchall()]
+                columns = [col[0] for col in self.db.dbh.fetchall()]
                 
                 if 'correlations' not in columns:
                     self.db.dbh.execute("ALTER TABLE tbl_workspaces ADD COLUMN correlations TEXT")
@@ -130,12 +127,9 @@ class SpiderFootWorkspace:
                     
                     # Check if we need to add missing columns for existing tables
                     self.db.dbh.execute(
-                    "SELECT column_name FROM information_schema.columns WHERE table_name = 'tbl_workspaces'"
-                    if self.db.db_type == 'postgresql' else
-                    "PRAGMA table_info(tbl_workspaces)"
-                )
-                    columns = [col[0] if self.db.db_type == 'postgresql' else col[1]
-                                 for col in self.db.dbh.fetchall()]
+                        "SELECT column_name FROM information_schema.columns WHERE table_name = 'tbl_workspaces'"
+                    )
+                    columns = [col[0] for col in self.db.dbh.fetchall()]
                     
                     if 'correlations' not in columns:
                         self.db.dbh.execute("ALTER TABLE tbl_workspaces ADD COLUMN correlations TEXT")
@@ -458,11 +452,8 @@ class SpiderFootWorkspace:
                 # Check if we need to add missing columns for existing tables
                 db.dbh.execute(
                     "SELECT column_name FROM information_schema.columns WHERE table_name = 'tbl_workspaces'"
-                    if db.db_type == 'postgresql' else
-                    "PRAGMA table_info(tbl_workspaces)"
                 )
-                columns = [col[0] if db.db_type == 'postgresql' else col[1]
-                           for col in db.dbh.fetchall()]
+                columns = [col[0] for col in db.dbh.fetchall()]
                 
                 if 'correlations' not in columns:
                     db.dbh.execute("ALTER TABLE tbl_workspaces ADD COLUMN correlations TEXT")

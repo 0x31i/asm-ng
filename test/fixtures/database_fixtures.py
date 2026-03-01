@@ -4,51 +4,47 @@
 import pytest
 import tempfile
 import os
-import sqlite3
+import psycopg2
 from unittest.mock import Mock, MagicMock, patch
 from spiderfoot import SpiderFootDb
 from spiderfoot.event import SpiderFootEvent
 from spiderfoot.db_backend import DatabaseError, OperationalError
 
 
+# PostgreSQL test database DSN — set this env var to enable DB tests.
+PG_TEST_DSN = os.environ.get('ASMNG_TEST_DATABASE_URL', '')
+
+requires_pg = pytest.mark.skipif(
+    not PG_TEST_DSN,
+    reason="ASMNG_TEST_DATABASE_URL not set — PostgreSQL not available for testing"
+)
+
+
 @pytest.fixture
-def temp_db_path():
-    """Create a temporary database file path."""
-    fd, path = tempfile.mkstemp(suffix='.db')
-    os.close(fd)
-    yield path
-    # Allow time for connections to close on Windows
-    import time
-    time.sleep(0.1)
-    try:
-        if os.path.exists(path):
-            os.unlink(path)
-    except PermissionError:
-        # On Windows, try again after a short delay
-        time.sleep(0.5)
-        try:
-            if os.path.exists(path):
-                os.unlink(path)
-        except PermissionError:
-            # If still failing, just skip cleanup (file will be removed by OS)
-            pass
+def pg_test_dsn():
+    """Return the PostgreSQL test database DSN, or skip if not available."""
+    if not PG_TEST_DSN:
+        pytest.skip("ASMNG_TEST_DATABASE_URL not set")
+    return PG_TEST_DSN
+
+
+@pytest.fixture
+def temp_db_path(pg_test_dsn):
+    """Provide PostgreSQL test database DSN.
+
+    This fixture replaces the old SQLite temp file approach.
+    Tests that used to pass a file path as ``__database`` now
+    receive the PostgreSQL DSN string instead.
+    """
+    return pg_test_dsn
 
 
 @pytest.fixture
 def mock_db_config():
     """Mock database configuration."""
     return {
-        '__database': ':memory:',
-        '__dbtype': 'sqlite',
+        '__database': PG_TEST_DSN or 'postgresql://localhost:5432/asmng_test',
     }
-
-
-@pytest.fixture
-def in_memory_db():
-    """Create an in-memory SQLite database for testing."""
-    conn = sqlite3.connect(':memory:')
-    yield conn
-    conn.close()
 
 
 @pytest.fixture
@@ -119,20 +115,20 @@ def mock_db_connection():
     """Mock database connection with common methods."""
     mock_conn = Mock()
     mock_cursor = Mock()
-    
+
     # Mock cursor methods
     mock_cursor.execute = Mock()
     mock_cursor.fetchone = Mock()
     mock_cursor.fetchall = Mock()
     mock_cursor.fetchmany = Mock()
     mock_cursor.rowcount = 0
-    
+
     # Mock connection methods
     mock_conn.cursor = Mock(return_value=mock_cursor)
     mock_conn.commit = Mock()
     mock_conn.rollback = Mock()
     mock_conn.close = Mock()
-    
+
     return mock_conn, mock_cursor
 
 
@@ -171,7 +167,7 @@ def sample_scan_log():
             'message': 'Starting DNS resolution'
         },
         {
-            'scan_instance_id': 'test-scan-123', 
+            'scan_instance_id': 'test-scan-123',
             'generated': 1640995260,
             'component': 'sfp_dnsresolve',
             'type': 'ERROR',
@@ -184,11 +180,11 @@ def sample_scan_log():
 def database_error_scenarios():
     """Common database error scenarios for testing."""
     return {
-        'connection_error': sqlite3.OperationalError("database is locked"),
-        'syntax_error': sqlite3.OperationalError("near 'FROM': syntax error"),
-        'integrity_error': sqlite3.IntegrityError("UNIQUE constraint failed"),
-        'data_error': sqlite3.DataError("Invalid data type"),
-        'database_error': sqlite3.DatabaseError("Database corrupted")
+        'connection_error': psycopg2.OperationalError("connection refused"),
+        'syntax_error': psycopg2.errors.SyntaxError("syntax error at or near \"FROM\""),
+        'integrity_error': psycopg2.IntegrityError("duplicate key value violates unique constraint"),
+        'data_error': psycopg2.DataError("invalid input syntax"),
+        'database_error': psycopg2.DatabaseError("database error")
     }
 
 
@@ -198,7 +194,7 @@ class MockSpiderFootDb:
     def __init__(self, config=None):
         self.config = config or {}
         self.dbh = Mock()
-        self.db_type = 'sqlite'
+        self.db_type = 'postgresql'
         self.connection_error = False
 
     def configGet(self, opt, default=None):
@@ -206,22 +202,22 @@ class MockSpiderFootDb:
 
     def scanInstanceCreate(self, scanId, scanName, scanTarget):
         if self.connection_error:
-            raise sqlite3.OperationalError("Connection failed")
+            raise psycopg2.OperationalError("Connection failed")
         return True
 
     def scanEventStore(self, scanId, sfEvent):
         if self.connection_error:
-            raise sqlite3.OperationalError("Connection failed")
+            raise psycopg2.OperationalError("Connection failed")
         return True
 
     def scanResultEvent(self, instanceId, eventType=None, filterFp=None):
         if self.connection_error:
-            raise sqlite3.OperationalError("Connection failed")
+            raise psycopg2.OperationalError("Connection failed")
         return []
 
     def scanInstanceGet(self, instanceId):
         if self.connection_error:
-            raise sqlite3.OperationalError("Connection failed")
+            raise psycopg2.OperationalError("Connection failed")
         return None
 
 

@@ -6,7 +6,7 @@
 [![Last Commit](https://img.shields.io/github/last-commit/0x31i/asm-ng)](https://github.com/0x31i/asm-ng/commits/master)
 ![Active Development](https://img.shields.io/badge/Maintenance%20Level-Actively%20Developed-brightgreen.svg)
 
-**ASM-NG** is a production-ready attack surface management and OSINT platform. Built on a battle-tested scanning engine with 200+ modules, it extends far beyond traditional OSINT with **workspace management**, **security grading**, **AI/ML infrastructure discovery**, **false positive tracking**, **known asset management**, **external vulnerability tool integration** (Burp Suite Pro, Nessus Pro, Nuclei), **dual-backend database** (SQLite + PostgreSQL), and **multi-layered cross-scan correlation** — making intelligence data truly navigable and actionable.
+**ASM-NG** is a production-ready attack surface management and OSINT platform. Built on a battle-tested scanning engine with 200+ modules, it extends far beyond traditional OSINT with **workspace management**, **security grading**, **AI/ML infrastructure discovery**, **false positive tracking**, **known asset management**, **external vulnerability tool integration** (Burp Suite Pro, Nessus Pro, Nuclei), **PostgreSQL database backend**, and **multi-layered cross-scan correlation** — making intelligence data truly navigable and actionable.
 
 ASM-NG features an embedded web server with a clean, modern interface and can also be used entirely via the command line. Written in **Python 3** and **MIT-licensed**.
 
@@ -32,7 +32,7 @@ ASM-NG is a ground-up transformation of SpiderFoot into a full attack surface ma
 | **Correlation Engine** | Basic YAML rules | YAML rules + single-scan IOC correlation + cross-scan historical correlation + CTI report generation |
 | **Data Import** | None | Legacy CSV, Scan Backup, Nessus XML, Burp XML/HTML, Excel findings |
 | **Export** | CSV/JSON | CSV/JSON/XLSX/GEXF with multi-scan export, vulnerability export, asset export |
-| **Database** | SQLite only | Dual-backend: SQLite (dev) + PostgreSQL (production) with auto-setup, connection pooling, and bidirectional migration |
+| **Database** | SQLite only | PostgreSQL with auto-setup, connection pooling, and 64 concurrent connections |
 | **AI/ML Discovery** | None | 3 modules for external AI infrastructure fingerprinting, AI subdomain discovery, and embedded AI detection |
 | **Modules** | ~200 | 277 modules including AI recon, security hardening, and threat intel modules |
 | **Correlation Rules** | 37 YAML rules | 51 YAML rules + automated single-scan and cross-scan correlation |
@@ -355,34 +355,23 @@ Multi-format, multi-scan export capabilities for professional reporting workflow
 
 ### Database Architecture
 
-ASM-NG supports two database backends: **SQLite** for development and single-user deployments, and **PostgreSQL** for production multi-user environments. Both backends share the same schema, queries, and features — switching is transparent.
+ASM-NG uses **PostgreSQL** as its database backend, providing production-grade performance, concurrency, and reliability.
 
-**Dual-Backend Support:**
-
-| | SQLite | PostgreSQL |
-|---|---|---|
-| **Best for** | Development, single-user | Production, multi-user, concurrent scans |
-| **Setup** | Zero-config, file-based | Auto-setup on first launch or manual |
-| **Storage** | `~/.spiderfoot/spiderfoot.db` | `asmng` database on localhost:5432 |
-| **Concurrency** | Single-writer | 64 pooled connections (configurable) |
-| **Monitoring** | `/dbhealth`, `/dbbackup` endpoints | Standard PostgreSQL tooling |
-
-**PostgreSQL Features:**
+**Key Features:**
 - **Auto-setup** — on first launch, ASM-NG automatically installs and configures PostgreSQL on Debian/Kali/Ubuntu, macOS (Homebrew), and RHEL/Fedora
 - **Connection pooling** — semaphore-gated thread pool with 64 concurrent connections (prevents thundering herd from 100+ modules)
 - **Autocommit mode** — pool connections stay in autocommit mode, eliminating 2 network round-trips per operation
-- **Transparent SQL translation** — `PgCursorWrapper` automatically converts SQLite parameter markers and conflict syntax to PostgreSQL equivalents
-- **Automatic INT-to-BIGINT conversion** — handles millisecond timestamp overflow (SQLite INT is variable-length, PostgreSQL INT is 32-bit)
-- **Bidirectional migration** — `python -m spiderfoot.db_migrate` migrates data in either direction between SQLite and PostgreSQL
+- **Transparent SQL translation** — `PgCursorWrapper` automatically converts parameter markers and conflict syntax to PostgreSQL equivalents
+- **Automatic INT-to-BIGINT conversion** — handles millisecond timestamp overflow (PostgreSQL INT is 32-bit)
+- **Health monitoring** — `/dbhealth` and `/dbbackup` endpoints for database integrity and backup
 
-**Backend Detection Priority:**
+**Connection Priority:**
 1. `ASMNG_DATABASE_URL` environment variable (explicit PostgreSQL DSN)
-2. `ASMNG_DB_TYPE` environment variable (`postgresql` or `sqlite`)
+2. `ASMNG_DB_TYPE` environment variable
 3. Auto-probe localhost:5432 for running PostgreSQL
 4. Auto-setup attempt (first launch only, creates sentinel file)
-5. Fallback to SQLite
 
-**New tables beyond SpiderFoot v4.0 (17 total across both backends):**
+**New tables beyond SpiderFoot v4.0 (17 total):**
 
 | Table | Purpose |
 |---|---|
@@ -399,7 +388,7 @@ ASM-NG supports two database backends: **SQLite** for development and single-use
 Plus enhancements to existing tables:
 - `tbl_scan_results` — new `imported_from_scan` column for provenance tracking
 - Comprehensive indexing on all new tables (25+ indexes) for query performance
-- Incremental auto-migration handles schema upgrades seamlessly on both backends
+- Incremental auto-migration handles schema upgrades seamlessly
 
 ---
 
@@ -410,7 +399,7 @@ graph TD;
     A[User] -->|Web UI| B[ASM-NG Core Engine];
     A -->|CLI| B;
     B --> C[277 Modules];
-    B --> D[Database - SQLite / PostgreSQL];
+    B --> D[Database - PostgreSQL];
     B --> E[REST API];
     B --> F[Workspace Manager];
     B --> G[Grading Engine];
@@ -499,16 +488,7 @@ Or install via `pip install .` / `setup.py` which registers both legacy (`spider
 
 ## Database Configuration
 
-### SQLite (Default for Development)
-
-Works out of the box with zero configuration. Database stored at `~/.spiderfoot/spiderfoot.db`.
-
-```bash
-# Force SQLite even if PostgreSQL is available
-export ASMNG_DB_TYPE=sqlite
-```
-
-### PostgreSQL (Recommended for Production)
+### PostgreSQL (Required)
 
 On first launch, ASM-NG automatically installs and configures PostgreSQL if running on a supported platform (Debian/Kali/Ubuntu, macOS, RHEL/Fedora). Default credentials: `admin:admin`.
 
@@ -537,19 +517,11 @@ export ASMNG_PG_POOL_TIMEOUT=120
 sudo ./setup-postgresql.sh
 ```
 
-**Migrate existing data from SQLite to PostgreSQL:**
-```bash
-python -m spiderfoot.db_migrate \
-    --direction sqlite-to-pg \
-    --sqlite ~/.spiderfoot/spiderfoot.db \
-    --pg-dsn postgresql://admin:admin@localhost:5432/asmng
-```
-
 ### Database Health & Backup
 
 ASM-NG provides built-in database health monitoring and backup capabilities via the web UI:
-- `/dbhealth` — check database integrity, file size, page counts, and WAL status
-- `/dbbackup` — create a hot backup of the database while it's in use (SQLite)
+- `/dbhealth` — check database integrity, connection pool status, and table statistics
+- `/dbbackup` — create a database backup via `pg_dump`
 
 ---
 

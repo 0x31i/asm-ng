@@ -261,7 +261,7 @@ else
         echo ""
     else
         warn "PostgreSQL setup completed but connection test failed."
-        warn "ASM-NG will fall back to SQLite until the connection is fixed."
+        warn "ASM-NG requires PostgreSQL. Fix the connection before starting."
         echo "  Debug: PGPASSWORD=${PG_PASSWORD} psql -U ${PG_USER} -d ${PG_DATABASE} -h localhost"
     fi
 fi

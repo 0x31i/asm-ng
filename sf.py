@@ -12,7 +12,6 @@
 # -------------------------------------------------------------------------------
 
 import argparse
-import atexit
 import logging
 import multiprocessing as mp
 import os
@@ -20,7 +19,6 @@ import os.path
 import random
 import signal
 import socket
-import sqlite3
 import sys
 import time
 import threading
@@ -43,6 +41,47 @@ from spiderfoot import __version__
 scanId = None
 dbh = None
 
+
+def _handle_db_error(err: Exception) -> None:
+    """Print a user-friendly error and exit if PostgreSQL is unavailable."""
+    # Check the entire cause chain (SpiderFootDb wraps psycopg2 errors in IOError)
+    cause = err
+    while cause is not None:
+        try:
+            import psycopg2
+            if isinstance(cause, (psycopg2.OperationalError, psycopg2.InterfaceError)):
+                _print_pg_fatal(cause)
+        except ImportError:
+            pass
+        cause = getattr(cause, '__cause__', None)
+
+    # Fallback: check the error message string for known PG connection keywords
+    err_str = str(err).lower()
+    if any(kw in err_str for kw in ('connection refused', 'could not connect',
+                                     'no postgresql', 'password authentication failed',
+                                     'does not exist', 'pg_hba.conf')):
+        _print_pg_fatal(err)
+
+    # Not a DB connection error — re-raise for the caller to handle
+    raise err
+
+
+def _print_pg_fatal(err: Exception) -> None:
+    """Print PostgreSQL fatal message and exit."""
+    print("")
+    print("=" * 65)
+    print(" FATAL: PostgreSQL is required but not available.")
+    print("=" * 65)
+    print("")
+    print(f"  Error: {err}")
+    print("")
+    print("  To fix:")
+    print("    1. Install PostgreSQL:  sudo ./setup-postgresql.sh")
+    print("    2. Or set ASMNG_DATABASE_URL to your PostgreSQL DSN")
+    print("    3. Or check:  sudo systemctl status postgresql")
+    print("")
+    sys.exit(-1)
+
 # 'Global' configuration options
 # These can be overriden on a per-module basis, and some will
 # be overridden from saved configuration settings stored in the DB.
@@ -58,8 +97,8 @@ sfConfig = {
     '_internettlds': 'https://publicsuffix.org/list/effective_tld_names.dat',
     '_internettlds_cache': 72,
     '_genericusers': '',  # Will be set after SpiderFootHelpers is available
-    '__database': '',  # Will be set after SpiderFootHelpers is available (SQLite path)
-    '__dbtype': '',  # Auto-detected: 'postgresql' or 'sqlite'
+    '__database': '',  # Data directory path; set after SpiderFootHelpers is available
+    '__dbtype': '',  # Always 'postgresql'
     '__pg_host': 'localhost',
     '__pg_port': '5432',
     '__pg_database': 'asmng',
@@ -102,7 +141,7 @@ sfOptdescs = {
     '_grade_category_weights': "JSON to override default category weights. Example: {\"Network Security\": {\"weight\": 0.9}}. Leave empty for defaults.",
     '_grade_event_overrides': "JSON to override scoring for specific event types. Example: {\"TCP_PORT_OPEN\": {\"category\": \"Network Security\", \"points\": -15, \"logic\": \"unverified_exists\"}}. Leave empty for defaults.",
     '_grade_thresholds': "JSON to override grade letter thresholds. Example: [{\"min\": 90, \"grade\": \"A\"}, {\"min\": 80, \"grade\": \"B\"}, ...]. Leave empty for defaults.",
-    '_resource_tier': "Resource tuning tier. Controls SQLite cache/mmap sizes, module concurrency, and web server threads. Options: light, medium, heavy.",
+    '_resource_tier': "Resource tuning tier. Controls PostgreSQL session settings, module concurrency, and web server threads. Options: light, medium, heavy.",
 }
 
 
@@ -243,26 +282,15 @@ def main():
         try:
             from spiderfoot import SpiderFootHelpers
             sfConfig['_genericusers'] = ",".join(SpiderFootHelpers.usernamesFromWordlists(['generic-usernames']))
-            sfConfig['__database'] = f"{SpiderFootHelpers.dataPath()}/spiderfoot.db"
+            sfConfig['__database'] = SpiderFootHelpers.dataPath()
         except Exception as e:
             log.error(f"Failed to initialize SpiderFootHelpers configuration: {e}")
             # Use fallback values
             sfConfig['_genericusers'] = ""
-            # Use a default database path as fallback
+            # Use a default data path as fallback
             default_data_path = Path.home() / '.spiderfoot'
             default_data_path.mkdir(exist_ok=True)
-            sfConfig['__database'] = str(default_data_path / 'spiderfoot.db')
-
-        # Check for legacy database files
-        if os.path.exists('spiderfoot.db'):
-            print(
-                f"ERROR: spiderfoot.db file exists in {os.path.dirname(__file__)}")
-            print("SpiderFoot no longer supports loading the spiderfoot.db database from the application directory.")
-            print(
-                f"The database is now loaded from your home directory: {Path.home()}/.spiderfoot/spiderfoot.db")
-            print(
-                f"This message will go away once you move or remove spiderfoot.db from {os.path.dirname(__file__)}")
-            sys.exit(-1)
+            sfConfig['__database'] = str(default_data_path)
 
         # Check for legacy passwd files
         if os.path.exists('passwd'):
@@ -541,7 +569,10 @@ def main():
                 from spiderfoot.correlation.rule_executor import RuleExecutor
                 from spiderfoot.correlation.event_enricher import EventEnricher
                 from spiderfoot.correlation.result_aggregator import ResultAggregator
-                dbh = SpiderFootDb(sfConfig, init=True)
+                try:
+                    dbh = SpiderFootDb(sfConfig, init=True)
+                except Exception as e:
+                    _handle_db_error(e)
                 rules = sfConfig.get('__correlationrules__', [])
                 scan_id = args.correlate
                 # Execute rules
@@ -571,7 +602,10 @@ def main():
 
             if args.types:
                 # List event types
-                dbh = SpiderFootDb(sfConfig, init=True)
+                try:
+                    dbh = SpiderFootDb(sfConfig, init=True)
+                except Exception as e:
+                    _handle_db_error(e)
                 etypes = dbh.eventTypes()
                 if etypes:
                     print(f"Total event types: {len(etypes)}")
@@ -641,7 +675,10 @@ def start_scan(sfConfig: dict, sfModules: dict, args, loggingQueue) -> None:
         global dbh
         global scanId
 
-        dbh = SpiderFootDb(sfConfig, init=True)
+        try:
+            dbh = SpiderFootDb(sfConfig, init=True)
+        except Exception as e:
+            _handle_db_error(e)
         sf = SpiderFoot(sfConfig)
 
         validate_arguments(args, log)
@@ -1286,35 +1323,6 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
             'cors.preflight.origins': cors_origins
         })
 
-        # Subscribe a CherryPy engine plugin that flushes the SQLite WAL
-        # on graceful shutdown (SIGTERM, cherrypy.engine.exit(), etc.).
-        # Only relevant for SQLite backend.
-        from spiderfoot.db_backend import detect_db_type
-        _db_type = detect_db_type(sfConfig)
-
-        if _db_type == 'sqlite':
-            from cherrypy.process.plugins import SimplePlugin
-
-            class _DatabaseCleanupPlugin(SimplePlugin):
-                """Checkpoint and truncate the SQLite WAL on server stop."""
-
-                def __init__(self, bus, db_path):
-                    super().__init__(bus)
-                    self._db_path = db_path
-
-                def stop(self):
-                    try:
-                        if self._db_path and os.path.exists(self._db_path):
-                            conn = sqlite3.connect(self._db_path, timeout=5)
-                            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                            conn.close()
-                    except Exception:
-                        pass
-
-            _DatabaseCleanupPlugin(
-                cherrypy.engine, sfConfig.get('__database')
-            ).subscribe()
-
         # Disable auto-reloading of content
         cherrypy.engine.autoreload.unsubscribe()
 
@@ -1323,6 +1331,12 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
         try:
             web_ui = SpiderFootWebUi(sfWebUiConfig, sfConfig, loggingQueue)
         except Exception as init_err:
+            # Check for PostgreSQL connection errors first
+            try:
+                _handle_db_error(init_err)
+            except Exception:
+                pass
+            # If _handle_db_error didn't exit, it's a different error
             msg = f"Failed to initialize web UI: {init_err}"
             log.critical(msg, exc_info=True)
             print(f"\nERROR: {msg}", file=sys.stderr)
@@ -1341,23 +1355,6 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
             _verify_server_listening(web_host, int(web_port), url, log)
 
         cherrypy.engine.subscribe('started', _on_server_ready)
-
-        # Register an atexit handler to flush the WAL and release SQLite
-        # locks on exit.  This prevents stale -wal/-shm files from
-        # blocking the next startup after a crash or SIGKILL.
-        # Only relevant for SQLite backend.
-        if _db_type == 'sqlite':
-            def _atexit_wal_checkpoint():
-                try:
-                    _db_path = sfConfig.get('__database')
-                    if _db_path and os.path.exists(_db_path):
-                        _conn = sqlite3.connect(_db_path, timeout=5)
-                        _conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                        _conn.close()
-                except Exception:
-                    pass
-
-            atexit.register(_atexit_wal_checkpoint)
 
         cherrypy.quickstart(web_ui, script_name=web_root, config=conf)
 

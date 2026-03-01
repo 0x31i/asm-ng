@@ -6,7 +6,7 @@ Storage Features Integration Test Suite
 This comprehensive test suite validates storage features
 implemented in SpiderFoot's storage modules:
 
-- SQLite storage with data integrity
+- Database storage with data integrity
 - Error handling and recovery
 - Performance optimization
 - Security features
@@ -67,9 +67,9 @@ class TestStorageFeatures(unittest.TestCase):
         event.risk = 0
         return event
 
-    def test_sqlite_storage_features(self):
-        """Test SQLite storage features."""
-        print("\n=== Testing SQLite Storage Features ===")
+    def test_db_storage_features(self):
+        """Test database storage features."""
+        print("\n=== Testing Database Storage Features ===")
 
         module = sfp__stor_db()
         module.setup(self.sf, {'_store': True})
@@ -83,7 +83,7 @@ class TestStorageFeatures(unittest.TestCase):
         module.handleEvent(test_event)
         self.mock_dbh.scanEventStore.assert_called()
 
-        print("  SQLite storage working")
+        print("  Database storage working")
 
     def test_elasticsearch_advanced_features(self):
         """Test Elasticsearch storage advanced features."""
@@ -164,15 +164,15 @@ class TestStorageFeatures(unittest.TestCase):
 
         start_time = time.time()
 
-        sqlite_module = sfp__stor_db()
-        sqlite_module.setup(self.sf, {'_store': True})
-        sqlite_module.getScanId = MagicMock(return_value=self.test_scan_id)
+        db_module = sfp__stor_db()
+        db_module.setup(self.sf, {'_store': True})
+        db_module.getScanId = MagicMock(return_value=self.test_scan_id)
 
         for i in range(1000):
             event = self.create_test_event("IP_ADDRESS", f"192.168.{i//256}.{i%256}")
-            sqlite_module.handleEvent(event)
+            db_module.handleEvent(event)
 
-        sqlite_time = time.time() - start_time
+        db_time = time.time() - start_time
 
         with patch('modules.sfp__stor_elasticsearch.Elasticsearch') as mock_es_class, \
              patch('elasticsearch.helpers.bulk') as mock_bulk:
@@ -202,7 +202,7 @@ class TestStorageFeatures(unittest.TestCase):
 
             self.assertLess(mock_es.bulk.call_count, 15)
 
-        print(f"  SQLite processing time: {sqlite_time:.3f}s")
+        print(f"  DB processing time: {db_time:.3f}s")
         print(f"  Elasticsearch bulk processing: {es_time:.3f}s")
         print("  Performance optimization validated")
 
@@ -231,16 +231,16 @@ class TestStorageFeatures(unittest.TestCase):
         """Test data integrity and validation features."""
         print("\n=== Testing Data Integrity and Validation ===")
 
-        sqlite_module = sfp__stor_db()
-        sqlite_module.setup(self.sf, {
+        db_module = sfp__stor_db()
+        db_module.setup(self.sf, {
             '_store': True,
             'maxstorage': 100
         })
-        sqlite_module.getScanId = MagicMock(return_value=self.test_scan_id)
+        db_module.getScanId = MagicMock(return_value=self.test_scan_id)
 
         large_data = "x" * 1000
         large_event = self.create_test_event("LARGE_DATA", large_data)
-        sqlite_module.handleEvent(large_event)
+        db_module.handleEvent(large_event)
 
         call_args = self.mock_dbh.scanEventStore.call_args
         self.assertEqual(call_args[0][2], 100)
@@ -249,7 +249,7 @@ class TestStorageFeatures(unittest.TestCase):
         special_event = self.create_test_event("SPECIAL_DATA", special_data)
 
         try:
-            sqlite_module.handleEvent(special_event)
+            db_module.handleEvent(special_event)
         except Exception as e:
             self.fail(f"Should handle special characters: {e}")
 
@@ -257,7 +257,7 @@ class TestStorageFeatures(unittest.TestCase):
         unicode_event = self.create_test_event("UNICODE_DATA", unicode_data)
 
         try:
-            sqlite_module.handleEvent(unicode_event)
+            db_module.handleEvent(unicode_event)
         except Exception as e:
             self.fail(f"Should handle Unicode: {e}")
 
@@ -324,9 +324,9 @@ class TestStorageFeatures(unittest.TestCase):
         """Test coordination between multiple storage backends."""
         print("\n=== Testing Multi-Storage Coordination ===")
 
-        sqlite_module = sfp__stor_db()
-        sqlite_module.setup(self.sf, {'_store': True})
-        sqlite_module.getScanId = MagicMock(return_value=self.test_scan_id)
+        db_module = sfp__stor_db()
+        db_module.setup(self.sf, {'_store': True})
+        db_module.getScanId = MagicMock(return_value=self.test_scan_id)
 
         with patch('modules.sfp__stor_elasticsearch.Elasticsearch') as mock_es_class, \
              patch('elasticsearch.helpers.bulk') as mock_bulk:
@@ -355,7 +355,7 @@ class TestStorageFeatures(unittest.TestCase):
                 event = self.create_test_event("COORDINATION_TEST", f"data_{i}")
                 test_events.append(event)
 
-                sqlite_module.handleEvent(event)
+                db_module.handleEvent(event)
                 es_module.handleEvent(event)
                 with patch('sys.stdout'):
                     stdout_module.handleEvent(event)
@@ -376,7 +376,7 @@ class TestStorageFeatures(unittest.TestCase):
         print("="*60)
 
         test_methods = [
-            self.test_sqlite_storage_features,
+            self.test_db_storage_features,
             self.test_elasticsearch_advanced_features,
             self.test_storage_performance_optimization,
             self.test_error_handling_resilience,

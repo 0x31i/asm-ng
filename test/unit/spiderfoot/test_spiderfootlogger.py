@@ -4,16 +4,16 @@ import tempfile
 import os
 from queue import Queue
 from spiderfoot.logger import (
-    SpiderFootSqliteLogHandler,
+    SpiderFootDbLogHandler,
     logListenerSetup,
     logWorkerSetup,
     stop_listener
 )
 
 class TestLoggerIntegration(unittest.TestCase):
-    def test_sqlite_log_handler_emit_and_batch(self):
+    def test_db_log_handler_emit_and_batch(self):
         opts = {'_debug': True}
-        handler = SpiderFootSqliteLogHandler(opts)
+        handler = SpiderFootDbLogHandler(opts)
         logger = logging.getLogger("test_logger_emit")
         logger.setLevel(logging.DEBUG)
         logger.addHandler(handler)
@@ -35,7 +35,7 @@ class TestLoggerIntegration(unittest.TestCase):
 
     def test_rotate_logs(self):
         opts = {'_debug': True}
-        handler = SpiderFootSqliteLogHandler(opts)
+        handler = SpiderFootDbLogHandler(opts)
         # Create a fake log file
         with tempfile.NamedTemporaryFile(delete=False) as tmp:
             log_path = tmp.name

@@ -1,6 +1,6 @@
 # Production Docker Compose Configuration for ASM-NG
 # Includes: Elasticsearch, Nginx, Redis, and monitoring
-# Database: SQLite (embedded, stored in asm-ng-data volume)
+# Database: PostgreSQL
 # Written by poppopjmp
 
 version: "3.9"
