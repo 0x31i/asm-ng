@@ -632,6 +632,9 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
         actual_login = user_data['login']
         self.info(f"Found GitHub user: {actual_login} — fetching repos")
 
+        # Scan user profile bio and profile README for AI keywords
+        self._check_github_profile(actual_login, user_data, event)
+
         # Fetch repos (up to 100 — respects max_repos in _scan_repo)
         repos_url = (f"https://api.github.com/users/{actual_login}"
                      f"/repos?per_page=100&sort=updated")
@@ -663,6 +666,97 @@ class sfp_ai_repo_scan(SpiderFootPlugin):
                 continue
 
             self._scan_repo(owner, repo_name, event)
+
+    def _check_github_profile(self, login, user_data, event):
+        """Check a GitHub user's profile bio and profile README for AI keywords.
+
+        The GitHub API user response includes 'bio' and 'blog' fields.
+        The special repo '{login}/{login}' contains a profile README that
+        is displayed on the user's GitHub page. Both are checked for AI
+        framework keywords.
+        """
+        dedup_key = f"ghprofile:{login.lower()}"
+        if dedup_key in self.results:
+            return
+        self.results[dedup_key] = True
+
+        found_keywords = []
+        sources = []
+
+        # 1. Check profile bio
+        bio = (user_data.get('bio') or '').lower()
+        if bio:
+            for keyword in self.AI_FRAMEWORK_KEYWORDS:
+                if keyword in bio:
+                    found_keywords.append(keyword)
+            if found_keywords:
+                sources.append('bio')
+
+        # 2. Check blog/website URL for AI service domains
+        blog = (user_data.get('blog') or '').lower()
+        ai_domains = [
+            'anthropic', 'openai', 'huggingface', 'replicate',
+            'claude', 'chatgpt', 'ollama', 'langchain',
+        ]
+        for domain in ai_domains:
+            if domain in blog and domain not in found_keywords:
+                found_keywords.append(domain)
+                if 'blog URL' not in sources:
+                    sources.append('blog URL')
+
+        # 3. Check profile README (special repo: {login}/{login})
+        readme_url = (f"https://api.github.com/repos/{login}/{login}"
+                      f"/readme")
+        res = self.sf.fetchUrl(
+            readme_url,
+            timeout=15,
+            useragent=self.opts.get('_useragent', 'ASM-NG'),
+            headers={
+                'Accept': 'application/vnd.github.raw'
+            }
+        )
+
+        if res and res.get('content'):
+            content = res['content'].lower()
+            for keyword in self.AI_FRAMEWORK_KEYWORDS:
+                if keyword in content and keyword not in found_keywords:
+                    found_keywords.append(keyword)
+            if 'profile README' not in sources and any(
+                kw in content for kw in self.AI_FRAMEWORK_KEYWORDS
+            ):
+                sources.append('profile README')
+
+        # 4. Check .github/{login} special org profile README
+        org_readme_url = (f"https://api.github.com/repos/{login}"
+                          f"/.github/readme")
+        res = self.sf.fetchUrl(
+            org_readme_url,
+            timeout=15,
+            useragent=self.opts.get('_useragent', 'ASM-NG'),
+            headers={
+                'Accept': 'application/vnd.github.raw'
+            }
+        )
+
+        if res and res.get('content'):
+            content = res['content'].lower()
+            for keyword in self.AI_FRAMEWORK_KEYWORDS:
+                if keyword in content and keyword not in found_keywords:
+                    found_keywords.append(keyword)
+            if '.github profile README' not in sources and any(
+                kw in content for kw in self.AI_FRAMEWORK_KEYWORDS
+            ):
+                sources.append('.github profile README')
+
+        if found_keywords:
+            detail = (f"AI references found in GitHub profile "
+                      f"github.com/{login} ({', '.join(sources)}): "
+                      f"{', '.join(found_keywords)}")
+            evt = SpiderFootEvent(
+                "AI_INFRASTRUCTURE_DETECTED",
+                detail,
+                self.__class__.__name__, event)
+            self.notifyListeners(evt)
 
     def _scan_repo(self, owner, repo, event):
         """Run all AI checks on a single repo (with dedup and limit)."""
