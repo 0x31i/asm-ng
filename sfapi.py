@@ -18,7 +18,6 @@ import openpyxl
 import os
 import random
 import re
-import sqlite3
 import string
 import sys
 import time

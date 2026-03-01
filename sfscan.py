@@ -897,9 +897,11 @@ class SpiderFootScanner():
                     for mod, qsize in modules_waiting
                 }
             })
-            with suppress(Exception):
+            try:
                 self.__dbh.scanLogEvent(
                     self.__scanId, "PROGRESS", snapshot, "SpiderFoot")
+            except Exception as e:
+                self.__sf.debug(f"Failed to persist PROGRESS snapshot: {e}")
 
         if all(queues_empty) and not modules_running:
             return True

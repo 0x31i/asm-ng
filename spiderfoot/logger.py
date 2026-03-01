@@ -1,7 +1,6 @@
 import atexit
 import logging
 import os
-import sqlite3
 import sys
 import time
 from contextlib import suppress
@@ -12,15 +11,15 @@ from threading import Thread
 from spiderfoot import SpiderFootDb, SpiderFootHelpers
 
 
-class SpiderFootSqliteLogHandler(logging.Handler):
-    """Handler for logging to SQLite database.
+class SpiderFootDbLogHandler(logging.Handler):
+    """Handler for logging to the database.
 
-    This ensure all sqlite logging is done from a single process and a
+    Ensures all database logging is done from a single process and a
     single database handle.
     """
 
     def __init__(self, opts: dict) -> None:
-        """Initialize the SQLite log handler.
+        """Initialize the database log handler.
 
         Args:
             opts (dict): Configuration options
@@ -110,7 +109,7 @@ class SpiderFootSqliteLogHandler(logging.Handler):
             self.dbh = None
 
     def rotate_logs(self) -> None:
-        """Rotate and archive SQLite logs."""
+        """Rotate and archive database logs."""
         if os.path.exists(self.log_file):
             if os.path.getsize(self.log_file) > 10 * 1024 * 1024:  # 10 MB
                 for i in range(self.backup_count - 1, 0, -1):
@@ -217,10 +216,10 @@ def logListenerSetup(loggingQueue, opts: dict = None) -> 'logging.handlers.Queue
         handlers = []
 
     if doLogging and opts is not None:
-        sqlite_handler = SpiderFootSqliteLogHandler(opts)
-        sqlite_handler.setLevel(logLevel)
-        sqlite_handler.setFormatter(log_format)
-        handlers.append(sqlite_handler)
+        db_handler = SpiderFootDbLogHandler(opts)
+        db_handler.setLevel(logLevel)
+        db_handler.setFormatter(log_format)
+        handlers.append(db_handler)
     spiderFootLogListener = QueueListener(loggingQueue, *handlers)
     spiderFootLogListener.start()
     atexit.register(stop_listener, spiderFootLogListener)
@@ -259,3 +258,7 @@ def stop_listener(listener: 'logging.handlers.QueueListener') -> None:
     """
     with suppress(BaseException):
         listener.stop()
+
+
+# Backwards-compatible alias (tests import the old name; will be removed in Step 2).
+SpiderFootSqliteLogHandler = SpiderFootDbLogHandler
