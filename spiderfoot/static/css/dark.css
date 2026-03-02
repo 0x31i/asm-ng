@@ -10867,6 +10867,15 @@ mark {
   background: rgba(167, 139, 250, 0.15) !important;
   opacity: 1;
 }
+.search-goto-cell.search-goto-disabled {
+  cursor: not-allowed !important;
+  color: #ef4444;
+  opacity: 0.45;
+}
+.search-goto-cell.search-goto-disabled:hover {
+  background: rgba(239, 68, 68, 0.12) !important;
+  opacity: 0.7;
+}
 
 /* ============================================
    Search Row Highlight Glow (Dark)
