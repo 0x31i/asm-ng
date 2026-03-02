@@ -4065,19 +4065,23 @@
             refresh = function() { searchResults(instanceId, query, typeName); }
             sf.search(instanceId, query, typeName, function(response) {
                             // Handle both new dict format and legacy array format
-                            var data, total, respQuery, operators, respScope;
+                            var data, total, respQuery, operators, respScope, truncated, searchLimit;
                             if (response && response.results) {
                                 data = response.results;
                                 total = response.total;
                                 respQuery = response.query || query;
                                 operators = response.operators || {};
                                 respScope = response.scope || searchScope;
+                                truncated = response.truncated || false;
+                                searchLimit = response.limit || 1000;
                             } else {
                                 data = response || [];
                                 total = data.length;
                                 respQuery = query;
                                 operators = {};
                                 respScope = searchScope;
+                                truncated = false;
+                                searchLimit = 1000;
                             }
 
                             lastSearchType = typeName;
@@ -4107,7 +4111,12 @@
 
                                 // Search results info bar with export button
                                 var infoBar = "<div class='search-results-info'>";
-                                infoBar += "<span class='search-results-text'>" + total + " results for &quot;" + sf.escapeHtml(respQuery) + "&quot;" + sf.escapeHtml(opStr) + " in " + scopeLabel + "</span>";
+                                var totalLabel = truncated ? searchLimit + "+" : String(total);
+                                infoBar += "<span class='search-results-text'>" + totalLabel + " results for &quot;" + sf.escapeHtml(respQuery) + "&quot;" + sf.escapeHtml(opStr) + " in " + scopeLabel;
+                                if (truncated) {
+                                    infoBar += " <span style='color:#f59e0b;font-size:11px;'>(showing first " + searchLimit + " — refine your search for more specific results)</span>";
+                                }
+                                infoBar += "</span>";
                                 infoBar += "<button class='btn btn-default btn-xs search-export-btn' onclick='exportSearchCSV()' title='Export to CSV'><i class='glyphicon glyphicon-download-alt'></i> Export CSV</button>";
                                 infoBar += "</div>";
 
