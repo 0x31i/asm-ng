@@ -770,6 +770,8 @@ class SpiderFootWebUi:
         retdata = []
         parsed_operators = {}
 
+        logging.info("searchBase called: id=%s eventType=%s value=%r scope=%s", id, eventType, value, scope)
+
         if not id and not eventType and not value:
             return {'results': retdata, 'total': 0, 'query': '', 'operators': {}, 'scope': scope}
 
@@ -832,9 +834,11 @@ class SpiderFootWebUi:
             search_limit = 1000
             try:
                 data = dbh.search(criteria, limit=search_limit)
-            except Exception:
+            except Exception as e:
+                logging.error("Search failed for criteria %s: %s", criteria, e, exc_info=True)
                 return {'results': retdata, 'total': 0, 'query': original_query,
-                        'operators': parsed_operators, 'scope': scope}
+                        'operators': parsed_operators, 'scope': scope,
+                        'error': str(e)}
 
             truncated = len(data) >= search_limit
 
@@ -9187,8 +9191,10 @@ class SpiderFootWebUi:
         """
         try:
             return self.searchBase(id, eventType, value, scope)
-        except Exception:
-            return {'results': [], 'total': 0, 'query': value or '', 'operators': {}, 'scope': scope}
+        except Exception as e:
+            logging.error("search() outer handler caught: %s", e, exc_info=True)
+            return {'results': [], 'total': 0, 'query': value or '', 'operators': {}, 'scope': scope,
+                    'error': str(e)}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
