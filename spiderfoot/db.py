@@ -1457,6 +1457,7 @@ class SpiderFootDb:
             IOError: if the backup fails
         """
         import os
+        import shutil
         import subprocess
 
         # Ensure destination directory exists
@@ -1464,18 +1465,35 @@ class SpiderFootDb:
         if dest_dir and not os.path.exists(dest_dir):
             os.makedirs(dest_dir, exist_ok=True)
 
+        # Find pg_dump — check PATH first, then common Homebrew/system locations
+        pg_dump = shutil.which('pg_dump')
+        if not pg_dump:
+            for candidate in [
+                '/opt/homebrew/opt/postgresql@16/bin/pg_dump',
+                '/opt/homebrew/opt/postgresql@17/bin/pg_dump',
+                '/opt/homebrew/opt/postgresql@15/bin/pg_dump',
+                '/opt/homebrew/bin/pg_dump',
+                '/usr/local/bin/pg_dump',
+                '/usr/bin/pg_dump',
+            ]:
+                if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                    pg_dump = candidate
+                    break
+        if not pg_dump:
+            raise IOError("pg_dump not found on PATH or in common install locations")
+
         with self.dbhLock:
             try:
                 from spiderfoot.db_backend import _build_pg_dsn
                 dsn = _build_pg_dsn(self._opts) if hasattr(self, '_opts') else 'postgresql://admin:admin@localhost:5432/asmng'
                 result = subprocess.run(
-                    ['pg_dump', dsn, '-f', destination_path],
+                    [pg_dump, dsn, '-f', destination_path],
                     capture_output=True, text=True, timeout=300
                 )
                 if result.returncode != 0:
                     raise IOError(f"pg_dump failed: {result.stderr}")
                 return destination_path
-            except DatabaseError as e:
+            except (DatabaseError, FileNotFoundError, subprocess.TimeoutExpired) as e:
                 raise IOError(f"Database backup failed: {e}") from e
 
     def _execute_with_retry(self, query: str, params=None, max_retries: int = 3) -> None:
