@@ -839,7 +839,15 @@
             } else {
                 row.addClass('finding-expanded');
                 detail.show();
-                detail.find('.finding-detail').slideDown(150);
+                detail.find('.finding-detail').slideDown(150, function() {
+                    // Auto-size analyst note textareas to fit content
+                    $(this).find('.analyst-note-textarea').each(function() {
+                        if (this.value) {
+                            this.style.height = 'auto';
+                            this.style.height = this.scrollHeight + 'px';
+                        }
+                    });
+                });
                 // Lazy-load discovery path on first expand
                 var d = currentViewData ? currentViewData[idx] : null;
                 if (d && d[7] && !dpPathCache[d[7]]) {
