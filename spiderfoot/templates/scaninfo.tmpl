@@ -3803,6 +3803,7 @@
         function searchResults(instanceId, query, typeName) {
             // Remove pre-existing tables if they exist
             $("#scansummary-content").remove();
+            $("#load-all-bar").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
             $("#ai-correlation-table-cross").remove();
@@ -3867,6 +3868,7 @@
 
         function viewVulnerabilities(instanceId) {
             $("#scansummary-content").remove();
+            $("#load-all-bar").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
             $("#ai-correlation-table-cross").remove();
@@ -3920,6 +3922,7 @@
 
         function viewAssets(instanceId) {
             $("#scansummary-content").remove();
+            $("#load-all-bar").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
             $("#ai-correlation-table-cross").remove();
@@ -6813,6 +6816,7 @@
 
         function viewFindings(instanceId) {
             $("#scansummary-content").remove();
+            $("#load-all-bar").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
             $("#ai-correlation-table-cross").remove();
@@ -7882,6 +7886,7 @@
             // Cancel globe animation before removing content
             if (globeAnimationId) { cancelAnimationFrame(globeAnimationId); globeAnimationId = null; }
             $("#scansummary-content").remove();
+            $("#load-all-bar").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
             $("#ai-correlation-table-cross").remove();
@@ -10196,6 +10201,7 @@
         // Original correlation data fetching (kept for reference by AI correlation refresh)
         function dataCorrelationsLegacy(instanceId) {
             $("#scansummary-content").remove();
+            $("#load-all-bar").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
             $("#ai-correlation-table-cross").remove();
@@ -10569,6 +10575,7 @@
         // Logs for the scan
         function viewScanLog(instanceId) {
             $("#scansummary-content").remove();
+            $("#load-all-bar").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
             $("#ai-correlation-table-cross").remove();
@@ -10761,6 +10768,7 @@
 
             // Remove pre-existing tables if they exist
             $("#scansummary-content").remove();
+            $("#load-all-bar").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
             $("#ai-correlation-table-cross").remove();
@@ -10855,6 +10863,7 @@
                 filterImportedEntries = false;  // Default: show imported entries
             }
             $("#scansummary-content").remove();
+            $("#load-all-bar").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
             $("#ai-correlation-table-cross").remove();
@@ -11751,6 +11760,7 @@
         // View the configuration that was used for this scan
         function viewScanConfig(instanceId) {
             $("#scansummary-content").remove();
+            $("#load-all-bar").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
             $("#ai-correlation-table-cross").remove();
