@@ -7852,7 +7852,7 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
 }
 
 .assets-known-col-select { width: 36px; text-align: center; vertical-align: middle; }
-.assets-known-col-type { width: 90px; }
+.assets-known-col-type { width: 120px; }
 .assets-known-col-source { width: 100px; }
 .assets-known-col-actions { width: 70px; text-align: center; }
 
@@ -8081,6 +8081,34 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-top: 8px;
+}
+
+.assets-modal-btn-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  padding: 8px 0;
+}
+.assets-modal-choice-btn {
+  display: inline-block;
+  padding: 8px 18px;
+  background: var(--bg-tertiary, #1e293b);
+  color: var(--text-primary, #e2e8f0);
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.12));
+  border-radius: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.assets-modal-choice-btn:hover {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: #22c55e;
+  color: #22c55e;
 }
 
 .assets-modal-footer {

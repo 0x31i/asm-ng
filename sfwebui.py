@@ -4328,7 +4328,7 @@ class SpiderFootWebUi:
                                 ka_type = 'uncategorized'
                             clean_val = cleanAssetValue(evData)
                             raw_val = evData if clean_val != evData else None
-                                ka_adds.append((ka_type, clean_val, raw_val))
+                            ka_adds.append((ka_type, clean_val, raw_val))
                         else:
                             fp_removes.append((eventType, evData, sourceData))
                             val_removes.append((eventType, evData, sourceData))
@@ -5256,7 +5256,7 @@ class SpiderFootWebUi:
                     if etype in email_types: return 'email'
                     if etype in human_name_types: return 'human_name'
                     if etype in username_types: return 'username'
-                    return 'uncategorized'
+                    return None
 
                 # Collect all items for batch insert
                 batch_items = []
