@@ -328,6 +328,8 @@ class SpiderFootDb:
             added_by        VARCHAR, \
             notes           VARCHAR, \
             raw_value       VARCHAR, \
+            status          VARCHAR NOT NULL DEFAULT 'CONFIRMED', \
+            entry_method    VARCHAR DEFAULT 'MANUAL', \
             UNIQUE(target, asset_type, asset_value) \
         )",
         "CREATE INDEX idx_known_assets_target ON tbl_known_assets (target)",
@@ -1134,6 +1136,47 @@ class SpiderFootDb:
                                          (clean_val, raw_val, row_id))
                     self.conn.commit()
                     _log.info(f"Cleaned {len(dirty_rows)} dirty known asset values")
+            except DatabaseError:
+                pass
+
+            # Migration: Add status column to tbl_known_assets
+            try:
+                self.dbh.execute("SELECT status FROM tbl_known_assets LIMIT 0")
+            except DatabaseError:
+                try:
+                    self.dbh.execute("ALTER TABLE tbl_known_assets ADD COLUMN status VARCHAR NOT NULL DEFAULT 'CONFIRMED'")
+                    self.conn.commit()
+                except DatabaseError:
+                    pass
+
+            # Migration: Add entry_method column to tbl_known_assets
+            try:
+                self.dbh.execute("SELECT entry_method FROM tbl_known_assets LIMIT 0")
+            except DatabaseError:
+                try:
+                    self.dbh.execute("ALTER TABLE tbl_known_assets ADD COLUMN entry_method VARCHAR DEFAULT 'MANUAL'")
+                    self.conn.commit()
+                except DatabaseError:
+                    pass
+
+            # Migration: Add composite index on (target, status) for filtered asset queries
+            try:
+                self.dbh.execute("CREATE INDEX idx_known_assets_target_status ON tbl_known_assets (target, status)")
+                self.conn.commit()
+            except DatabaseError:
+                pass
+
+            # Migration: Add index on tbl_target_validated(target) for sync/match lookups
+            try:
+                self.dbh.execute("CREATE INDEX idx_target_validated_target ON tbl_target_validated (target)")
+                self.conn.commit()
+            except DatabaseError:
+                pass
+
+            # Migration: Add index on tbl_target_false_positives(target) for match lookups
+            try:
+                self.dbh.execute("CREATE INDEX idx_target_fp_target ON tbl_target_false_positives (target)")
+                self.conn.commit()
             except DatabaseError:
                 pass
 
@@ -3575,7 +3618,9 @@ class SpiderFootDb:
         _log.info(f"Target validated remove batch: target={target} count={len(items)}")
         return True
 
-    def knownAssetAddBatch(self, target: str, items: list, source: str = 'ANALYST_CONFIRMED', addedBy: str = None) -> bool:
+    def knownAssetAddBatch(self, target: str, items: list, source: str = 'ANALYST_CONFIRMED',
+                           addedBy: str = None, status: str = 'CONFIRMED',
+                           entryMethod: str = 'MANUAL') -> bool:
         """Add multiple known asset entries in one transaction.
 
         Args:
@@ -3583,6 +3628,8 @@ class SpiderFootDb:
             items (list): list of (assetType, assetValue) or (assetType, assetValue, rawValue) tuples
             source (str): 'CLIENT_PROVIDED' or 'ANALYST_CONFIRMED'
             addedBy (str): username who added this
+            status (str): 'CONFIRMED' or 'PENDING'
+            entryMethod (str): how the asset was added ('MANUAL', 'IMPORT', 'SYNC_VERIFIED', 'VERIFY_MATCH')
 
         Returns:
             bool: success
@@ -3590,15 +3637,18 @@ class SpiderFootDb:
         if not items:
             return True
 
+        if status not in ('CONFIRMED', 'PENDING'):
+            status = 'CONFIRMED'
+
         qry = self._insert_or_ignore("INSERT OR IGNORE INTO tbl_known_assets \
-            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, raw_value) \
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, raw_value, status, entry_method) \
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         now = int(time.time() * 1000)
         params_list = []
         for item in items:
             at, av = item[0], item[1]
             rv = item[2] if len(item) > 2 else None
-            params_list.append((target, at, av, source, None, now, addedBy, None, 'DIRECT', None, rv))
+            params_list.append((target, at, av, source, None, now, addedBy, None, 'DIRECT', None, rv, status, entryMethod))
 
         with self.dbhLock:
             try:
@@ -3732,7 +3782,8 @@ class SpiderFootDb:
                       source: str = 'CLIENT_PROVIDED', importBatch: str = None,
                       addedBy: str = None, notes: str = None,
                       affinity: str = 'DIRECT', tag: str = None,
-                      rawValue: str = None) -> bool:
+                      rawValue: str = None, status: str = 'CONFIRMED',
+                      entryMethod: str = 'MANUAL') -> bool:
         """Add a known asset entry.
 
         Args:
@@ -3746,6 +3797,8 @@ class SpiderFootDb:
             affinity: 'DIRECT' or 'ASSOCIATED'
             tag: optional tag name
             rawValue: original raw event_data before cleaning (if different from assetValue)
+            status: 'CONFIRMED' or 'PENDING'
+            entryMethod: how the asset was added ('MANUAL', 'IMPORT', 'SYNC_VERIFIED', 'VERIFY_MATCH')
 
         Returns:
             bool: True on success
@@ -3753,25 +3806,30 @@ class SpiderFootDb:
         Raises:
             IOError: database I/O failed
         """
+        if status not in ('CONFIRMED', 'PENDING'):
+            status = 'CONFIRMED'
+
         qry = self._insert_or_ignore("INSERT OR IGNORE INTO tbl_known_assets \
-            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, raw_value) \
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, raw_value, status, entry_method) \
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, (target, assetType, assetValue, source,
                                        importBatch, int(time.time() * 1000), addedBy, notes,
-                                       affinity, tag, rawValue))
+                                       affinity, tag, rawValue, status, entryMethod))
+                inserted = self.dbh.rowcount > 0
                 self.conn.commit()
-                _log.info(f"Known asset add: target={target} type={assetType} value={assetValue}")
+                _log.info(f"Known asset add: target={target} type={assetType} value={assetValue} status={status} inserted={inserted}")
             except DatabaseError as e:
                 raise IOError("SQL error encountered when adding known asset") from e
-        return True
+        return inserted
 
     def knownAssetAddBulk(self, target: str, assetType: str, assets: list,
                           source: str = 'CLIENT_PROVIDED', importBatch: str = None,
                           addedBy: str = None, affinity: str = 'DIRECT',
-                          tag: str = None) -> int:
+                          tag: str = None, status: str = 'CONFIRMED',
+                          entryMethod: str = 'MANUAL') -> int:
         """Add multiple known assets in bulk.
 
         Args:
@@ -3783,13 +3841,18 @@ class SpiderFootDb:
             addedBy: username
             affinity: 'DIRECT' or 'ASSOCIATED'
             tag: optional tag name
+            status: 'CONFIRMED' or 'PENDING'
+            entryMethod: how the asset was added ('MANUAL', 'IMPORT', 'SYNC_VERIFIED', 'VERIFY_MATCH')
 
         Returns:
             int: number of assets actually inserted
         """
+        if status not in ('CONFIRMED', 'PENDING'):
+            status = 'CONFIRMED'
+
         qry = self._insert_or_ignore("INSERT OR IGNORE INTO tbl_known_assets \
-            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag) \
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, status, entry_method) \
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 
         now = int(time.time() * 1000)
         count = 0
@@ -3801,7 +3864,7 @@ class SpiderFootDb:
                         continue
                     self.dbh.execute(qry, (target, assetType, val, source,
                                            importBatch, now, addedBy, None,
-                                           affinity, tag))
+                                           affinity, tag, status, entryMethod))
                     count += self.dbh.rowcount if self.dbh.rowcount > 0 else 0
                 self.conn.commit()
             except DatabaseError as e:
@@ -3853,12 +3916,14 @@ class SpiderFootDb:
         Returns:
             int: number removed
         """
-        count = 0
+        if not assetIds:
+            return 0
+        placeholders = ','.join(['?' for _ in assetIds])
+        qry = f"DELETE FROM tbl_known_assets WHERE id IN ({placeholders})"
         with self.dbhLock:
             try:
-                for aid in assetIds:
-                    self.dbh.execute("DELETE FROM tbl_known_assets WHERE id = ?", (int(aid),))
-                    count += self.dbh.rowcount if self.dbh.rowcount > 0 else 0
+                self.dbh.execute(qry, [int(aid) for aid in assetIds])
+                count = self.dbh.rowcount if self.dbh.rowcount > 0 else 0
                 self.conn.commit()
             except DatabaseError as e:
                 raise IOError("SQL error encountered when bulk removing known assets") from e
@@ -3866,7 +3931,7 @@ class SpiderFootDb:
 
     def knownAssetUpdate(self, assetId: int, notes: str = None, source: str = None,
                          affinity: str = None, tag: str = None,
-                         assetType: str = None) -> bool:
+                         assetType: str = None, status: str = None) -> bool:
         """Update a known asset's metadata.
 
         Args:
@@ -3876,6 +3941,7 @@ class SpiderFootDb:
             affinity: optional new affinity
             tag: optional new tag
             assetType: optional new asset type (may fail on unique constraint)
+            status: optional new status ('CONFIRMED' or 'PENDING')
 
         Returns:
             bool: True on success
@@ -3897,6 +3963,9 @@ class SpiderFootDb:
         if tag is not None:
             updates.append("tag = ?")
             vals.append(tag if tag != '' else None)
+        if status is not None and status in ('CONFIRMED', 'PENDING'):
+            updates.append("status = ?")
+            vals.append(status)
         if not updates:
             return False
 
@@ -3911,22 +3980,240 @@ class SpiderFootDb:
                 raise IOError("SQL error encountered when updating known asset") from e
         return True
 
-    def knownAssetList(self, target: str, assetType: str = None) -> list:
-        """Get known assets for a target, optionally filtered by type.
+    def knownAssetGet(self, assetId: int) -> tuple:
+        """Get a single known asset by ID.
+
+        Args:
+            assetId: primary key
 
         Returns:
-            list: list of asset rows [id, target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, raw_value]
+            tuple: (id, target, asset_type, asset_value, source, import_batch,
+                    date_added, added_by, notes, affinity, tag, raw_value, status, entry_method)
+                   or None if not found
         """
-        if assetType:
-            qry = "SELECT id, target, asset_type, asset_value, source, import_batch, \
-                date_added/1000 as date_added, added_by, notes, affinity, tag, raw_value \
-                FROM tbl_known_assets WHERE target = ? AND asset_type = ? ORDER BY date_added DESC"
-            qvars = [target, assetType]
+        qry = "SELECT id, target, asset_type, asset_value, source, import_batch, \
+            date_added, added_by, notes, affinity, tag, raw_value, status, \
+            COALESCE(entry_method, 'MANUAL') as entry_method \
+            FROM tbl_known_assets WHERE id = ?"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (int(assetId),))
+                return self.dbh.fetchone()
+            except DatabaseError as e:
+                raise IOError("SQL error encountered when fetching known asset") from e
+
+    def knownAssetFindConflict(self, target: str, assetType: str, assetValue: str,
+                               excludeId: int = None) -> tuple:
+        """Find a known asset that would conflict on UNIQUE(target, asset_type, asset_value).
+
+        Args:
+            target: scan target
+            assetType: asset type
+            assetValue: asset value
+            excludeId: ID to exclude from the search (the source row being changed)
+
+        Returns:
+            tuple: (id, target, asset_type, asset_value, source, ...) or None
+        """
+        qry = "SELECT id, target, asset_type, asset_value, source, import_batch, \
+            date_added, added_by, notes, affinity, tag, raw_value, status, \
+            COALESCE(entry_method, 'MANUAL') as entry_method \
+            FROM tbl_known_assets WHERE target = ? AND asset_type = ? AND asset_value = ?"
+        params = [target, assetType, assetValue]
+        if excludeId is not None:
+            qry += " AND id != ?"
+            params.append(int(excludeId))
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, tuple(params))
+                return self.dbh.fetchone()
+            except DatabaseError as e:
+                raise IOError("SQL error encountered when finding conflicting known asset") from e
+
+    def knownAssetMerge(self, sourceId: int, targetId: int) -> bool:
+        """Merge two known asset rows. Keeps the target row, deletes the source row.
+
+        Merge rules:
+        - date_added: keeps the older (smaller) value
+        - notes: combines with newline separator
+        - source: keeps the richer one (ANALYST_CONFIRMED > CLIENT_PROVIDED)
+        - affinity: keeps the richer one (DIRECT > ASSOCIATED)
+        - entry_method: keeps the source row's method if more specific than MANUAL
+
+        Args:
+            sourceId: the row being merged away (will be deleted)
+            targetId: the row that survives
+
+        Returns:
+            bool: True on success
+        """
+        source_row = self.knownAssetGet(sourceId)
+        target_row = self.knownAssetGet(targetId)
+        if not source_row or not target_row:
+            return False
+
+        # Indices: 4=source, 6=date_added, 8=notes, 9=affinity, 13=entry_method
+        # Pick the older date_added
+        merged_date = min(source_row[6], target_row[6])
+
+        # Combine notes
+        s_notes = source_row[8] or ''
+        t_notes = target_row[8] or ''
+        if s_notes and t_notes:
+            merged_notes = t_notes + '\n' + s_notes
         else:
-            qry = "SELECT id, target, asset_type, asset_value, source, import_batch, \
-                date_added/1000 as date_added, added_by, notes, affinity, tag, raw_value \
-                FROM tbl_known_assets WHERE target = ? ORDER BY asset_type, date_added DESC"
-            qvars = [target]
+            merged_notes = t_notes or s_notes or None
+
+        # Keep the richer source
+        source_priority = {'ANALYST_CONFIRMED': 2, 'CLIENT_PROVIDED': 1}
+        merged_source = source_row[4] if source_priority.get(source_row[4], 0) > source_priority.get(target_row[4], 0) else target_row[4]
+
+        # Keep the richer affinity
+        affinity_priority = {'DIRECT': 2, 'ASSOCIATED': 1}
+        merged_affinity = source_row[9] if affinity_priority.get(source_row[9], 0) > affinity_priority.get(target_row[9], 0) else target_row[9]
+
+        # Keep the more specific entry_method
+        method_priority = {'VERIFY_MATCH': 4, 'SYNC_VERIFIED': 3, 'IMPORT': 2, 'MANUAL': 1}
+        s_method = source_row[13] or 'MANUAL'
+        t_method = target_row[13] or 'MANUAL'
+        merged_method = s_method if method_priority.get(s_method, 0) > method_priority.get(t_method, 0) else t_method
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(
+                    "UPDATE tbl_known_assets SET date_added = ?, notes = ?, source = ?, affinity = ?, entry_method = ? WHERE id = ?",
+                    (merged_date, merged_notes, merged_source, merged_affinity, merged_method, int(targetId))
+                )
+                self.dbh.execute("DELETE FROM tbl_known_assets WHERE id = ?", (int(sourceId),))
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error encountered when merging known assets") from e
+        _log.info(f"Known asset merge: source={sourceId} -> target={targetId}")
+        return True
+
+    def knownAssetSetStatus(self, assetId: int, status: str) -> bool:
+        """Set the status of a single known asset.
+
+        Args:
+            assetId: primary key
+            status: 'CONFIRMED' or 'PENDING'
+
+        Returns:
+            bool: True on success
+        """
+        if status not in ('CONFIRMED', 'PENDING'):
+            return False
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute("UPDATE tbl_known_assets SET status = ? WHERE id = ?",
+                                 (status, int(assetId)))
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error encountered when setting known asset status") from e
+        return True
+
+    def knownAssetSetStatusBulk(self, assetIds: list, status: str) -> int:
+        """Set the status of multiple known assets.
+
+        Args:
+            assetIds: list of asset IDs
+            status: 'CONFIRMED' or 'PENDING'
+
+        Returns:
+            int: number of rows updated
+        """
+        if status not in ('CONFIRMED', 'PENDING'):
+            return 0
+
+        if not assetIds:
+            return 0
+
+        placeholders = ','.join(['?' for _ in assetIds])
+        qry = f"UPDATE tbl_known_assets SET status = ? WHERE id IN ({placeholders})"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [status] + [int(aid) for aid in assetIds])
+                count = self.dbh.rowcount if self.dbh.rowcount > 0 else 0
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error encountered when bulk setting known asset status") from e
+        return count
+
+    def knownAssetBulkUpdate(self, assetIds: list, affinity: str = None,
+                             tag: str = None, assetType: str = None) -> int:
+        """Update a property on multiple known assets at once.
+
+        Args:
+            assetIds: list of asset IDs
+            affinity: optional new affinity for all
+            tag: optional new tag for all (empty string to remove)
+            assetType: optional new asset type for all
+
+        Returns:
+            int: number of rows updated
+        """
+        if not assetIds:
+            return 0
+
+        updates = []
+        vals = []
+        if affinity is not None:
+            updates.append("affinity = ?")
+            vals.append(affinity)
+        if tag is not None:
+            updates.append("tag = ?")
+            vals.append(tag if tag != '' else None)
+        if assetType is not None:
+            updates.append("asset_type = ?")
+            vals.append(assetType)
+        if not updates:
+            return 0
+
+        placeholders = ','.join(['?' for _ in assetIds])
+        qry = f"UPDATE tbl_known_assets SET {', '.join(updates)} WHERE id IN ({placeholders})"
+        vals.extend([int(aid) for aid in assetIds])
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, vals)
+                count = self.dbh.rowcount if self.dbh.rowcount > 0 else 0
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error encountered when bulk updating known assets") from e
+        return count
+
+    def knownAssetList(self, target: str, assetType: str = None, status: str = None,
+                       limit: int = 0, offset: int = 0) -> list:
+        """Get known assets for a target, optionally filtered by type and/or status.
+
+        Args:
+            target: scan target
+            assetType: optional type filter
+            status: optional status filter ('CONFIRMED' or 'PENDING')
+            limit: max rows to return (0 = unlimited)
+            offset: number of rows to skip
+
+        Returns:
+            list: list of asset rows [id, target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, raw_value, status, entry_method]
+        """
+        conditions = ["target = ?"]
+        qvars = [target]
+        if assetType:
+            conditions.append("asset_type = ?")
+            qvars.append(assetType)
+        if status and status in ('CONFIRMED', 'PENDING'):
+            conditions.append("status = ?")
+            qvars.append(status)
+
+        where = " AND ".join(conditions)
+        order = "date_added DESC" if assetType else "asset_type, date_added DESC"
+        qry = f"SELECT id, target, asset_type, asset_value, source, import_batch, \
+            date_added/1000 as date_added, added_by, notes, affinity, tag, raw_value, status, \
+            COALESCE(entry_method, 'MANUAL') as entry_method \
+            FROM tbl_known_assets WHERE {where} ORDER BY {order}"
+        if limit > 0:
+            qry += f" LIMIT {int(limit)} OFFSET {int(offset)}"
 
         with self.dbhLock:
             try:
@@ -3934,6 +4221,33 @@ class SpiderFootDb:
                 return self.dbh.fetchall()
             except DatabaseError as e:
                 raise IOError("SQL error encountered when listing known assets") from e
+
+    def knownAssetTotal(self, target: str, status: str = None) -> int:
+        """Get total count of known assets for a target.
+
+        Args:
+            target: scan target
+            status: optional status filter
+
+        Returns:
+            int: total count
+        """
+        conditions = ["target = ?"]
+        qvars = [target]
+        if status and status in ('CONFIRMED', 'PENDING'):
+            conditions.append("status = ?")
+            qvars.append(status)
+
+        where = " AND ".join(conditions)
+        qry = f"SELECT COUNT(*) FROM tbl_known_assets WHERE {where}"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, qvars)
+                row = self.dbh.fetchone()
+                return row[0] if row else 0
+            except DatabaseError as e:
+                raise IOError("SQL error encountered when counting known assets") from e
 
     def knownAssetValues(self, target: str) -> dict:
         """Get all known asset values for a target grouped by type for fast lookups.
@@ -3956,21 +4270,22 @@ class SpiderFootDb:
                 raise IOError("SQL error encountered when fetching known asset values") from e
 
     def knownAssetCount(self, target: str) -> dict:
-        """Get counts of known assets by type and source.
+        """Get counts of known assets by type, source, and status.
 
         Returns:
-            dict: counts breakdown
+            dict: counts breakdown including confirmed/pending
         """
-        qry = "SELECT asset_type, source, affinity, COUNT(*) FROM tbl_known_assets WHERE target = ? GROUP BY asset_type, source, affinity"
+        qry = "SELECT asset_type, source, affinity, status, COUNT(*) FROM tbl_known_assets WHERE target = ? GROUP BY asset_type, source, affinity, status"
 
-        result = {'total': 0, 'client_provided': 0, 'analyst_confirmed': 0,
+        result = {'total': 0, 'confirmed': 0, 'pending': 0,
+                  'client_provided': 0, 'analyst_confirmed': 0,
                   'direct': 0, 'associated': 0,
                   'by_type': {'ip': 0, 'domain': 0, 'email': 0, 'human_name': 0, 'username': 0}}
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, (target,))
                 for row in self.dbh.fetchall():
-                    cnt = row[3]
+                    cnt = row[4]
                     result['total'] += cnt
                     if row[0] in result['by_type']:
                         result['by_type'][row[0]] += cnt
@@ -3982,6 +4297,10 @@ class SpiderFootDb:
                         result['associated'] += cnt
                     else:
                         result['direct'] += cnt
+                    if row[3] == 'PENDING':
+                        result['pending'] += cnt
+                    else:
+                        result['confirmed'] += cnt
                 return result
             except DatabaseError as e:
                 raise IOError("SQL error encountered when counting known assets") from e
@@ -3989,12 +4308,8 @@ class SpiderFootDb:
     def knownAssetMatchScanResults(self, scanId: str, target: str) -> list:
         """Find scan results that match known assets.
 
-        Performs matching:
-        - IP assets: exact match against IP_ADDRESS, IPV6_ADDRESS, AFFILIATE_IPADDR
-        - Domain assets: exact or subdomain match against DOMAIN_NAME, INTERNET_NAME, etc.
-        - Email assets: exact or prefix match against EMAILADDR, AFFILIATE_EMAILADDR
-        - Human name assets: partial match against HUMAN_NAME
-        - Username assets: partial match against USERNAME, SOCIAL_MEDIA
+        Uses targeted SQL queries per match type to minimize rows fetched,
+        with pre-built lookup structures for fast Python-side matching.
 
         Returns:
             list: matching scan result rows with match info
@@ -4003,118 +4318,139 @@ class SpiderFootDb:
         if not any(assets.values()):
             return []
 
-        # Fetch all relevant scan results
-        ip_types = "('IP_ADDRESS','IPV6_ADDRESS','AFFILIATE_IPADDR')"
-        domain_types = "('DOMAIN_NAME','INTERNET_NAME','AFFILIATE_INTERNET_NAME','CO_HOSTED_SITE','SIMILARDOMAIN','INTERNET_NAME_UNRESOLVED')"
-        email_types = "('EMAILADDR','AFFILIATE_EMAILADDR')"
-        human_name_types = "('HUMAN_NAME')"
-        username_types = "('USERNAME','SOCIAL_MEDIA')"
-
-        all_types = f"{ip_types[1:-1]},{domain_types[1:-1]},{email_types[1:-1]},{human_name_types[1:-1]},{username_types[1:-1]}"
-        qry = f"SELECT scan_instance_id, hash, type, generated, confidence, visibility, risk, \
-            module, data, false_positive, source_event_hash, imported_from_scan \
-            FROM tbl_scan_results WHERE scan_instance_id = ? AND type IN ({all_types})"
-
+        columns = "scan_instance_id, hash, type, generated, confidence, visibility, risk, " \
+                  "module, data, false_positive, source_event_hash, imported_from_scan"
         matches = []
+
+        # Pre-build email prefix lookup: prefix -> original email
+        email_prefix_map = {}
+        for em in assets['email']:
+            prefix = em.split('@')[0] if '@' in em else em
+            email_prefix_map[prefix] = em
+
+        # Pre-build domain suffix set for O(1) subdomain matching
+        domain_suffixes = {'.' + d for d in assets['domain']}
+
         with self.dbhLock:
             try:
-                self.dbh.execute(qry, (scanId,))
-                rows = self.dbh.fetchall()
+                # 1. Exact IP matches — SQL-level filtering
+                if assets['ip']:
+                    ph = ','.join(['?'] * len(assets['ip']))
+                    qry = f"SELECT {columns} FROM tbl_scan_results " \
+                          f"WHERE scan_instance_id = ? AND type IN ('IP_ADDRESS','IPV6_ADDRESS','AFFILIATE_IPADDR') " \
+                          f"AND LOWER(data) IN ({ph})"
+                    self.dbh.execute(qry, [scanId] + list(assets['ip']))
+                    for row in self.dbh.fetchall():
+                        matches.append(self._matchRow(row, row[8], 'ip_exact'))
+
+                # 2. Domain matches — fetch domain-type rows, match in Python
+                if assets['domain']:
+                    qry = f"SELECT {columns} FROM tbl_scan_results " \
+                          f"WHERE scan_instance_id = ? AND type IN " \
+                          f"('DOMAIN_NAME','INTERNET_NAME','AFFILIATE_INTERNET_NAME'," \
+                          f"'CO_HOSTED_SITE','SIMILARDOMAIN','INTERNET_NAME_UNRESOLVED')"
+                    self.dbh.execute(qry, [scanId])
+                    for row in self.dbh.fetchall():
+                        data_lower = (row[8] or '').lower().strip()
+                        if data_lower in assets['domain']:
+                            matches.append(self._matchRow(row, row[8], 'domain_exact'))
+                        else:
+                            for sfx in domain_suffixes:
+                                if data_lower.endswith(sfx):
+                                    matches.append(self._matchRow(row, sfx[1:], 'domain_subdomain'))
+                                    break
+
+                # 3. Email matches — SQL exact + Python prefix
+                if assets['email']:
+                    ph = ','.join(['?'] * len(assets['email']))
+                    # Exact matches via SQL
+                    qry = f"SELECT {columns} FROM tbl_scan_results " \
+                          f"WHERE scan_instance_id = ? AND type IN ('EMAILADDR','AFFILIATE_EMAILADDR') " \
+                          f"AND LOWER(data) IN ({ph})"
+                    self.dbh.execute(qry, [scanId] + list(assets['email']))
+                    exact_hashes = set()
+                    for row in self.dbh.fetchall():
+                        exact_hashes.add(row[1])
+                        matches.append(self._matchRow(row, row[8], 'email_exact'))
+
+                    # Prefix matches — fetch remaining email rows
+                    if email_prefix_map:
+                        qry = f"SELECT {columns} FROM tbl_scan_results " \
+                              f"WHERE scan_instance_id = ? AND type IN ('EMAILADDR','AFFILIATE_EMAILADDR')"
+                        self.dbh.execute(qry, [scanId])
+                        for row in self.dbh.fetchall():
+                            if row[1] in exact_hashes:
+                                continue
+                            data_lower = (row[8] or '').lower().strip()
+                            if '@' in data_lower:
+                                prefix = data_lower.split('@')[0]
+                                if prefix in email_prefix_map:
+                                    matches.append(self._matchRow(row, email_prefix_map[prefix], 'email_prefix'))
+
+                # 4. Human name + username partial matches
+                partial_types = "('HUMAN_NAME','USERNAME','SOCIAL_MEDIA')"
+                if assets['human_name'] or assets['username']:
+                    qry = f"SELECT {columns} FROM tbl_scan_results " \
+                          f"WHERE scan_instance_id = ? AND type IN {partial_types}"
+                    self.dbh.execute(qry, [scanId])
+                    hn_types = {'HUMAN_NAME'}
+                    un_types = {'USERNAME', 'SOCIAL_MEDIA'}
+                    for row in self.dbh.fetchall():
+                        event_type = row[2]
+                        data_lower = (row[8] or '').lower().strip()
+                        matched_asset = None
+                        match_type = None
+
+                        # Primary match by type
+                        if event_type in hn_types and assets['human_name']:
+                            for name in assets['human_name']:
+                                if name in data_lower:
+                                    matched_asset, match_type = name, 'human_name_partial'
+                                    break
+                        elif event_type in un_types and assets['username']:
+                            for uname in assets['username']:
+                                if uname in data_lower:
+                                    matched_asset, match_type = uname, 'username_partial'
+                                    break
+
+                        # Cross-match: username events vs human_name assets
+                        if not matched_asset and event_type in un_types and assets['human_name']:
+                            for name in assets['human_name']:
+                                if name in data_lower:
+                                    matched_asset, match_type = name, 'human_name_partial'
+                                    break
+
+                        # Cross-match: human_name events vs username assets
+                        if not matched_asset and event_type in hn_types and assets['username']:
+                            for uname in assets['username']:
+                                if uname in data_lower:
+                                    matched_asset, match_type = uname, 'username_partial'
+                                    break
+
+                        if matched_asset:
+                            matches.append(self._matchRow(row, matched_asset, match_type))
+
             except DatabaseError as e:
                 raise IOError("SQL error encountered when matching known assets") from e
 
-        ip_types_set = {'IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'}
-        domain_types_set = {'DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
-                            'CO_HOSTED_SITE', 'SIMILARDOMAIN', 'INTERNET_NAME_UNRESOLVED'}
-        email_types_set = {'EMAILADDR', 'AFFILIATE_EMAILADDR'}
-        human_name_types_set = {'HUMAN_NAME'}
-        username_types_set = {'USERNAME', 'SOCIAL_MEDIA'}
-
-        for row in rows:
-            event_type = row[2]
-            data_val = row[8] if row[8] else ''
-            data_lower = data_val.lower().strip()
-            matched_asset = None
-            match_type = None
-
-            if event_type in ip_types_set and assets['ip']:
-                if data_lower in assets['ip']:
-                    matched_asset = data_val
-                    match_type = 'ip_exact'
-
-            elif event_type in domain_types_set and assets['domain']:
-                if data_lower in assets['domain']:
-                    matched_asset = data_val
-                    match_type = 'domain_exact'
-                else:
-                    # Subdomain match: check if data ends with .known_domain
-                    for known_domain in assets['domain']:
-                        if data_lower.endswith('.' + known_domain):
-                            matched_asset = known_domain
-                            match_type = 'domain_subdomain'
-                            break
-
-            elif event_type in email_types_set and assets['email']:
-                if data_lower in assets['email']:
-                    matched_asset = data_val
-                    match_type = 'email_exact'
-                else:
-                    # Check email prefix against known emails
-                    if '@' in data_lower:
-                        prefix = data_lower.split('@')[0]
-                        for known_email in assets['email']:
-                            known_prefix = known_email.split('@')[0] if '@' in known_email else known_email
-                            if prefix == known_prefix:
-                                matched_asset = known_email
-                                match_type = 'email_prefix'
-                                break
-
-            elif event_type in human_name_types_set and assets['human_name']:
-                for known_name in assets['human_name']:
-                    if known_name in data_lower:
-                        matched_asset = known_name
-                        match_type = 'human_name_partial'
-                        break
-
-            elif event_type in username_types_set and assets['username']:
-                for known_username in assets['username']:
-                    if known_username in data_lower:
-                        matched_asset = known_username
-                        match_type = 'username_partial'
-                        break
-
-            # USERNAME/SOCIAL_MEDIA events can also match human_name assets (cross-match)
-            if not matched_asset and event_type in username_types_set and assets['human_name']:
-                for known_name in assets['human_name']:
-                    if known_name in data_lower:
-                        matched_asset = known_name
-                        match_type = 'human_name_partial'
-                        break
-
-            # HUMAN_NAME events can also match username assets (cross-match)
-            if not matched_asset and event_type in human_name_types_set and assets['username']:
-                for known_username in assets['username']:
-                    if known_username in data_lower:
-                        matched_asset = known_username
-                        match_type = 'username_partial'
-                        break
-
-            if matched_asset:
-                matches.append({
-                    'hash': row[1],
-                    'type': event_type,
-                    'data': data_val,
-                    'module': row[7],
-                    'generated': row[3],
-                    'false_positive': row[9],
-                    'imported': row[11],
-                    'matched_asset': matched_asset,
-                    'match_type': match_type,
-                    'confidence': row[4],
-                    'risk': row[6],
-                })
-
         return matches
+
+    @staticmethod
+    def _matchRow(row: tuple, matched_asset: str, match_type: str) -> dict:
+        """Build a match result dict from a scan result row."""
+        return {
+            'hash': row[1],
+            'type': row[2],
+            'data': row[8],
+            'module': row[7],
+            'generated': row[3],
+            'false_positive': row[9],
+            'imported': row[11],
+            'matched_asset': matched_asset,
+            'match_type': match_type,
+            'confidence': row[4],
+            'risk': row[6],
+        }
 
     def assetTagList(self, target: str) -> list:
         """Get all asset tags for a target.
