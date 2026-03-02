@@ -132,22 +132,14 @@
               </li>
             </ul>
         </div>
-    <div class='btn-group search-group search-group-enhanced'>
-        <div id='btn-search' class='input-group' style='position:relative;'>
+    <div class='btn-group search-group'>
+        <div id='btn-search' class='input-group'>
           <input class='form-control' id='searchvalue' type='text' placeholder='Search "admin"...' autocomplete='off'>
             <div class='input-group-btn' style='width: 0px'> <!-- Chrome fix -->
               <button class='btn btn-primary' id='searchbutton' type='button' onClick="searchDirector('${id}')">
                 <i class='glyphicon glyphicon-search glyphicon glyphicon-white'></i>
               </button>
-              <button class='btn btn-default' id='searchsavebutton' type='button' onClick="saveCurrentSearch()" title='Save this search'>
-                <i class='glyphicon glyphicon-star'></i>
-              </button>
             </div>
-          <div class='search-scope-toggle'>
-            <span class='search-scope-btn active' data-scope='scan' onclick='setSearchScope("scan")'>This Scan</span>
-            <span class='search-scope-btn' data-scope='all' onclick='setSearchScope("all")'>All Scans</span>
-          </div>
-          <div id='search-hint-badge' class='search-hint-badge' style='display:none;'></div>
           <div id='search-history-dropdown' class='search-history' style='display:none;'></div>
         </div>
     </div>
@@ -406,6 +398,31 @@
             searchScope = scope;
             $('.search-scope-btn').removeClass('active');
             $('.search-scope-btn[data-scope="' + scope + '"]').addClass('active');
+            // Auto-resubmit search when scope changes and there's a current query
+            if ($('#searchvalue').val()) {
+                searchDirector(_instanceId);
+            }
+        }
+
+        // Navigate from search result to DATA view row
+        function navigateToDataRow(instanceId, eventType, eventTypeLabel, hash) {
+            _pendingScrollToHash = hash;
+            dataEventData(instanceId, eventTypeLabel, eventType, 'full');
+        }
+
+        // Scroll to a row and highlight it with a blue glow
+        function scrollAndHighlight(row) {
+            var el = row[0] || row;
+            el.scrollIntoView({behavior: 'smooth', block: 'center'});
+            $(el).addClass('search-highlight-glow');
+            // Auto-expand the detail row
+            var idx = $(el).data('event-idx');
+            if (idx !== undefined) {
+                toggleDataDetail(idx);
+            }
+            setTimeout(function() {
+                $(el).removeClass('search-highlight-glow');
+            }, 3500);
         }
 
         // Rotating placeholder hints
@@ -453,6 +470,7 @@
             var dropdown = $('#search-history-dropdown');
             var history = getSearchHistory();
             var saved = [];
+            var inputVal = $('#searchvalue').val() || '';
             // Load saved searches
             $.ajax({
                 url: docroot + '/savedsearchlist',
@@ -460,8 +478,24 @@
                 async: false,
                 success: function(data) { saved = data || []; }
             });
-            if (history.length === 0 && saved.length === 0) { dropdown.hide(); return; }
             var html = '';
+            // Show tips when input is empty or very short
+            if (inputVal.length < 2) {
+                var tips = [
+                    {text: 'type:EMAIL_ADDRESS', desc: 'Filter by data type'},
+                    {text: 'risk:high', desc: 'Filter by risk level'},
+                    {text: 'module:sfp_hunter', desc: 'Filter by source module'},
+                    {text: '/regex/pattern/', desc: 'Search with regex'},
+                    {text: 'after:2026-01-01', desc: 'Results after date'}
+                ];
+                html += '<div class="search-history-section">Tips</div>';
+                for (var t = 0; t < tips.length; t++) {
+                    html += '<div class="search-history-item search-tips-item" data-query="' + tips[t].text + '">';
+                    html += '<code style="font-size:11px;margin-right:8px;">' + tips[t].text + '</code>';
+                    html += '<span style="color:var(--text-muted);font-size:11px;">' + tips[t].desc + '</span>';
+                    html += '</div>';
+                }
+            }
             if (saved.length > 0) {
                 html += '<div class="search-history-section">Saved</div>';
                 for (var i = 0; i < saved.length; i++) {
@@ -480,6 +514,7 @@
                     html += sf.escapeHtml(history[j]) + '</div>';
                 }
             }
+            if (html === '') { dropdown.hide(); return; }
             dropdown.html(html).show();
         }
 
@@ -530,8 +565,8 @@
                 dataType: 'json',
                 success: function(resp) {
                     if (resp && resp.success) {
-                        $('#searchsavebutton .glyphicon').css('color', '#f59e0b');
-                        setTimeout(function() { $('#searchsavebutton .glyphicon').css('color', ''); }, 2000);
+                        $('.search-save-btn .glyphicon').css('color', '#f59e0b');
+                        setTimeout(function() { $('.search-save-btn .glyphicon').css('color', ''); }, 2000);
                     }
                 }
             });
@@ -604,6 +639,7 @@
         var paginatedInstanceId = null;
         var paginatedEventType = null;
         var PAGE_SIZE = 500;
+        var _pendingScrollToHash = null;
 
         // Client-side filter state - persists while on the page
         var clientFilterState = {
@@ -902,7 +938,7 @@
                     if (isImported) rowClasses.push("imported-row");
                     if (isKnownAsset) rowClasses.push("known-asset-row");
 
-                    var row = "<tr class='" + rowClasses.join(" ") + "' data-event-idx='" + i + "' onclick='toggleDataDetail(" + i + ")'>";
+                    var row = "<tr class='" + rowClasses.join(" ") + "' data-event-idx='" + i + "' data-event-hash='" + allData[i][7] + "' onclick='toggleDataDetail(" + i + ")'>";
                     row += "<td class='text-center' onclick='event.stopPropagation()'><input type='checkbox' id='cb_" + allData[i][7] + "'></td>";
                     row += "<td class='text-center validation-status'>";
                     var importedClass = isImported ? " status-imported-glow" : "";
@@ -950,6 +986,15 @@
                     }
                     lastChecked = this;
                 });
+
+                // Check for pending scroll-to-hash after load-all
+                if (_pendingScrollToHash) {
+                    var targetRow = $('tr[data-event-hash="' + _pendingScrollToHash + '"]');
+                    if (targetRow.length) {
+                        setTimeout(function() { scrollAndHighlight(targetRow); }, 200);
+                    }
+                    _pendingScrollToHash = null;
+                }
             });
         }
 
@@ -3995,9 +4040,11 @@
         }
 
         function searchResults(instanceId, query, typeName) {
-            // Remove pre-existing tables if they exist
+            // Remove pre-existing search results and related elements
             $("#scansummary-content").remove();
+            $(".search-results-info").remove();
             $("#search-chips-bar").remove();
+            $("#search-scope-bar").remove();
             $("#load-all-bar").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
@@ -4036,6 +4083,18 @@
                             lastSearchType = typeName;
                             lastSearchQuery = query;
 
+                            // Build scope toggle + action bar (always shown)
+                            var scopeBar = "<div id='search-scope-bar' class='search-scope-bar'>";
+                            scopeBar += "<div class='search-scope-toggle'>";
+                            scopeBar += "<span class='search-scope-btn" + (searchScope === 'scan' ? ' active' : '') + "' data-scope='scan' onclick='setSearchScope(\"scan\")'>This Scan</span>";
+                            scopeBar += "<span class='search-scope-btn" + (searchScope === 'all' ? ' active' : '') + "' data-scope='all' onclick='setSearchScope(\"all\")'>All Scans</span>";
+                            scopeBar += "</div>";
+                            scopeBar += "<div class='search-scope-actions'>";
+                            scopeBar += "<button class='btn btn-default btn-xs search-save-btn' onclick='saveCurrentSearch()' title='Save this search'><i class='glyphicon glyphicon-star'></i> Save</button>";
+                            scopeBar += "</div>";
+                            scopeBar += "<div id='search-hint-badge' class='search-hint-badge'></div>";
+                            scopeBar += "</div>";
+
                             if (data.length == 0) {
                                 var table = "<div id='scansummary-content'>&nbsp;&nbsp;No results found. Try broadening your search criteria or use plain text for substring matching.</div>";
                             } else {
@@ -4048,8 +4107,8 @@
 
                                 // Search results info bar with export button
                                 var infoBar = "<div class='search-results-info'>";
-                                infoBar += "SEARCH RESULTS &mdash; " + total + " results for &quot;" + sf.escapeHtml(respQuery) + "&quot;" + sf.escapeHtml(opStr) + " in " + scopeLabel;
-                                infoBar += " <button class='btn btn-default btn-xs search-export-btn' onclick='exportSearchCSV()' title='Export to CSV'><i class='glyphicon glyphicon-download-alt'></i> Export CSV</button>";
+                                infoBar += "<span class='search-results-text'>" + total + " results for &quot;" + sf.escapeHtml(respQuery) + "&quot;" + sf.escapeHtml(opStr) + " in " + scopeLabel + "</span>";
+                                infoBar += "<button class='btn btn-default btn-xs search-export-btn' onclick='exportSearchCSV()' title='Export to CSV'><i class='glyphicon glyphicon-download-alt'></i> Export CSV</button>";
                                 infoBar += "</div>";
 
                                 // Build filter chips from result data
@@ -4081,7 +4140,11 @@
                                 if (typeName == null) {
                                     table += "<th class='sorter-false'>Data Element Type</th>";
                                 }
-                                table += "<th>Data Element</th><th>Source Data Element</th><th>Source Module</th><th>Identified</th></tr></thead><tbody>";
+                                table += "<th>Data Element</th><th>Source Data Element</th><th>Source Module</th><th>Identified</th>";
+                                if (respScope !== 'all') {
+                                    table += "<th class='sorter-false' style='width:30px;'></th>";
+                                }
+                                table += "</tr></thead><tbody>";
                                 for (var i = 0; i < data.length; i++) {
                                     var rowRisk = String(data[i][6] || '0');
                                     var rowRiskLabel = riskLabels[rowRisk] || rowRisk;
@@ -4099,6 +4162,14 @@
                                     table += "<td><pre class='table-border-bg-inherit'>" + data[i][3];
                                     table += "</pre></td><td><pre class='table-border-bg-inherit'>" + data[i][0];
                                     table += "</pre></td>";
+                                    if (respScope !== 'all') {
+                                        var navEventType = data[i][10] || data[i][9] || '';
+                                        var navEventLabel = data[i][8] || data[i][9] || '';
+                                        var navHash = data[i][7] || '';
+                                        table += "<td class='text-center' onclick='event.stopPropagation()'>";
+                                        table += "<span class='search-goto-link' title='Go to this row in DATA view' onclick='navigateToDataRow(\"" + _instanceId + "\", \"" + sf.escapeHtml(navEventType) + "\", \"" + sf.escapeHtml(navEventLabel) + "\", \"" + sf.escapeHtml(navHash) + "\")'>";
+                                        table += "<i class='glyphicon glyphicon-arrow-right'></i></span></td>";
+                                    }
                                     table += "</tr>";
                                     // Hidden detail row
                                     var conf = data[i][4] || ''; var vis = data[i][5] || ''; var risk = data[i][6] || '';
@@ -4120,7 +4191,7 @@
                                 table = infoBar + chipsBar + table;
                             }
                             $("#loader").fadeOut(500);
-                            $("#mainbody").append(table);
+                            $("#mainbody").append(scopeBar + table);
                             $("#scansummary-content").tablesorter();
                             initExpandableCells();
 
@@ -11330,7 +11401,7 @@
                                 var rowClasses = ['data-event-row'];
                                 if (isImported) rowClasses.push("imported-row");
                                 if (isKnownAsset) rowClasses.push("known-asset-row");
-                                table += "<tr class='" + rowClasses.join(" ") + "' data-event-idx='" + i + "' onclick='toggleDataDetail(" + i + ")'>";
+                                table += "<tr class='" + rowClasses.join(" ") + "' data-event-idx='" + i + "' data-event-hash='" + data[i][7] + "' onclick='toggleDataDetail(" + i + ")'>";
                                 // Checkbox column (simple checkbox only, no persistence indicators)
                                 table += "<td class='text-center' onclick='event.stopPropagation()'><input type='checkbox' id='cb_" + data[i][7] + "'></td>";
 
@@ -11451,6 +11522,20 @@
                             $("#checkall").change(function() {
                                 updateSelectionToolbar();
                             });
+
+                            // Check for pending scroll-to-hash from search navigate
+                            if (_pendingScrollToHash) {
+                                var targetRow = $('tr[data-event-hash="' + _pendingScrollToHash + '"]');
+                                if (targetRow.length) {
+                                    setTimeout(function() { scrollAndHighlight(targetRow); }, 200);
+                                    _pendingScrollToHash = null;
+                                } else if (isPaginated) {
+                                    // Row is beyond first page — load all results, hash stays set
+                                    loadAllResults();
+                                } else {
+                                    _pendingScrollToHash = null;
+                                }
+                            }
 
                 });
             }

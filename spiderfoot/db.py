@@ -1626,11 +1626,20 @@ class SpiderFootDb:
 
         if criteria.get('after') is not None:
             qry += " AND c.generated >= ? "
-            qvars.append(criteria['after'])
+            try:
+                after_epoch = int(time.mktime(time.strptime(criteria['after'], '%Y-%m-%d')))
+            except (ValueError, OverflowError):
+                after_epoch = 0
+            qvars.append(after_epoch)
 
         if criteria.get('before') is not None:
             qry += " AND c.generated <= ? "
-            qvars.append(criteria['before'])
+            try:
+                # End of day for the before date
+                before_epoch = int(time.mktime(time.strptime(criteria['before'], '%Y-%m-%d'))) + 86399
+            except (ValueError, OverflowError):
+                before_epoch = int(time.time())
+            qvars.append(before_epoch)
 
         qry += " ORDER BY c.data"
 

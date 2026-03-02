@@ -2403,7 +2403,7 @@ pre.table-border-bg-inherit {
   margin-left: auto;
   flex-shrink: 1;
   min-width: 150px;
-  max-width: 200px;
+  max-width: 350px;
 }
 
 /* Container for the nav tabs - sharp modern style like main menu */
@@ -2935,7 +2935,7 @@ tr.active td {
   background: transparent !important;
   border: none !important;
   border-radius: 0 !important;
-  width: 120px;
+  width: 280px;
   font-family: var(--font-mono);
   font-size: 11px;
   text-transform: uppercase;
@@ -8376,22 +8376,6 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
-/* Search results info bar */
-.search-results-info {
-  padding: 12px 16px;
-  margin-bottom: 15px;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: rgba(255, 255, 255, 0.6);
-  background: linear-gradient(180deg, #1e1e1e 0%, #141414 100%);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
 /* Discovery path - dark mode is the primary theme, styles are in spiderfoot.css */
 
 /* Dark mode: expandable pre cells in data tables */
@@ -10645,6 +10629,46 @@ a.data-type-btn:hover {
    SEARCH OVERHAUL — Enhanced Search Styles (Dark Theme)
    ===================================================================== */
 
+/* Scope bar */
+.search-scope-bar {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Scope toggle */
+.search-scope-toggle {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.search-scope-btn {
+  background: #1e1e1e;
+  color: rgba(255, 255, 255, 0.6);
+}
+.search-scope-btn:hover {
+  background: #2a2a2a;
+}
+.search-scope-btn.active {
+  background: #2563eb;
+  color: white;
+}
+
+/* Save button */
+.search-save-btn {
+  color: rgba(255, 255, 255, 0.6);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Hint badge */
+.search-hint-badge {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Search results info bar */
+.search-results-info {
+  color: rgba(255, 255, 255, 0.6);
+  background: linear-gradient(180deg, #1e1e1e 0%, #141414 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
 /* Search chips */
 .search-chip {
   background: #2a2a2a;
@@ -10674,27 +10698,6 @@ mark {
   color: #fef08a;
   padding: 0 2px;
   border-radius: 2px;
-}
-
-/* Scope toggle */
-.search-scope-toggle {
-  border: 1px solid rgba(255, 255, 255, 0.15);
-}
-.search-scope-btn {
-  background: #1e1e1e;
-  color: rgba(255, 255, 255, 0.6);
-}
-.search-scope-btn:hover {
-  background: #2a2a2a;
-}
-.search-scope-btn.active {
-  background: #2563eb;
-  color: white;
-}
-
-/* Search hint badge */
-.search-hint-badge {
-  color: rgba(255, 255, 255, 0.4);
 }
 
 /* Search history dropdown */
@@ -10738,4 +10741,47 @@ mark {
 }
 .tablesorter-headerDesc .tablesorter-header-inner::after {
   color: rgba(255, 255, 255, 0.5);
+}
+
+/* ============================================
+   Search Tips Items (Dark)
+   ============================================ */
+.search-tips-item {
+  border-left: 3px solid #a78bfa !important;
+  padding-left: 10px !important;
+}
+.search-tips-item:hover {
+  background: rgba(167, 139, 250, 0.12) !important;
+}
+.search-tips-item code {
+  background: rgba(167, 139, 250, 0.15);
+  padding: 1px 5px;
+  border-radius: 2px;
+  color: #c4b5fd;
+}
+
+/* ============================================
+   Search Navigate Link (Dark)
+   ============================================ */
+.search-goto-link {
+  color: #a78bfa;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  font-size: 14px;
+}
+.search-goto-link:hover {
+  opacity: 1;
+}
+
+/* ============================================
+   Search Row Highlight Glow (Dark)
+   ============================================ */
+@keyframes searchRowGlow {
+  0%   { box-shadow: inset 0 0 12px rgba(59, 130, 246, 0.6); background: rgba(59, 130, 246, 0.12); }
+  70%  { box-shadow: inset 0 0 8px rgba(59, 130, 246, 0.35); background: rgba(59, 130, 246, 0.07); }
+  100% { box-shadow: inset 0 0 0 transparent; background: transparent; }
+}
+.search-highlight-glow {
+  animation: searchRowGlow 3.5s ease-out forwards;
 }

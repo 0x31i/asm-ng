@@ -780,9 +780,9 @@ class SpiderFootWebUi:
         operator_keys = ('type', 'module', 'risk', 'after', 'before')
         remaining_terms = []
         for token in value.split():
-            if ':' in token and token.split(':')[0] in operator_keys:
+            if ':' in token and token.split(':')[0].lower() in operator_keys:
                 key, val = token.split(':', 1)
-                parsed_operators[key] = val
+                parsed_operators[key.lower()] = val
             else:
                 remaining_terms.append(token)
         original_query = value
