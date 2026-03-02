@@ -139,6 +139,15 @@
                   Full Backup (.zip) &mdash; All Data + pg_dump
                 </a>
               </li>
+              <li class="divider"></li>
+              <li class="dropdown-header">
+                <i class="glyphicon glyphicon-hdd"></i> Database
+              </li>
+              <li>
+                <a class="link" onClick='downloadPgBackup()'>
+                  PostgreSQL Backup (.sql) &mdash; Entire Database
+                </a>
+              </li>
             </ul>
         </div>
     <div class='btn-group search-group'>
@@ -12260,6 +12269,14 @@
             _fetchAndDownload(
                 '${docroot}/scanfullbackup?id=' + instanceId,
                 'FULL_BACKUP.zip'
+            );
+        }
+
+        // Download a standalone pg_dump of the entire database
+        function downloadPgBackup() {
+            _fetchAndDownload(
+                '${docroot}/dbbackupdownload',
+                'asmng_pg_backup.sql'
             );
         }
 

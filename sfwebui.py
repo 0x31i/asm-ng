@@ -7151,6 +7151,41 @@ class SpiderFootWebUi:
                 return {'status': 'error', 'error': str(e)}
 
     @cherrypy.expose
+    def dbbackupdownload(self: 'SpiderFootWebUi') -> bytes:
+        """Download a pg_dump backup of the entire database as a .sql file.
+
+        Returns:
+            bytes: SQL file download
+        """
+        import tempfile
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                with tempfile.NamedTemporaryFile(suffix='.sql', delete=False) as tmp:
+                    tmp_path = tmp.name
+
+                dbh.backupDB(tmp_path)
+                with open(tmp_path, 'rb') as f:
+                    data = f.read()
+                os.unlink(tmp_path)
+
+                timestamp = time.strftime("%Y%m%d_%H%M%S")
+                filename = f"asmng_pg_backup_{timestamp}.sql"
+
+                cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+                cherrypy.response.headers['Content-Type'] = 'application/sql'
+                cherrypy.response.headers['Pragma'] = 'no-cache'
+                return data
+            except Exception as e:
+                self.log.error(f"DB backup download failed: {e}", exc_info=True)
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
+                cherrypy.response.headers['Content-Type'] = 'application/json'
+                return json.dumps({'error': f'Database backup failed: {e}'}).encode('utf-8')
+
+    @cherrypy.expose
     @cherrypy.tools.json_out()
     def dbintegritycheck(self):
         """Run a full integrity check on the database.
