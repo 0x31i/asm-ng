@@ -4664,26 +4664,41 @@ class SpiderFootWebUi:
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
+        # Reverse map: asset_type → possible SF event types for FP propagation
+        _asset_to_sf_types = {
+            'ip': ['IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'],
+            'domain': ['DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
+                       'CO_HOSTED_SITE', 'SIMILARDOMAIN', 'INTERNET_NAME_UNRESOLVED'],
+            'email': ['EMAILADDR', 'AFFILIATE_EMAILADDR'],
+            'human_name': ['HUMAN_NAME'],
+            'username': ['USERNAME', 'SOCIAL_MEDIA'],
+        }
+
         def _propagate_fp(dbh, assets):
             """Mark scan data as FP for SYNC_VERIFIED/VERIFY_MATCH known assets."""
             for a in assets:
                 entry_method = a[13] if len(a) > 13 else 'MANUAL'
-                event_type = a[14] if len(a) > 14 else None
                 if entry_method not in ('SYNC_VERIFIED', 'VERIFY_MATCH'):
                     continue
-                if not event_type:
-                    continue
                 target = a[1]
+                asset_type = a[2]
                 event_data = a[11] or a[3]  # raw_value or asset_value
-                try:
-                    # Add target-level FP so it persists across scans
-                    dbh.targetFalsePositiveAdd(target, event_type, event_data)
-                    # Remove target-level validated so it's no longer considered verified
-                    dbh.targetValidatedRemove(target, event_type, event_data)
-                    # Sync FP flag (1) across all scans for this target
-                    dbh.syncFalsePositiveAcrossScans(target, event_type, event_data, event_data, 1)
-                except Exception:
-                    pass  # best-effort — don't fail the removal
+                event_type = a[14] if len(a) > 14 else None
+
+                # Build list of SF event types to propagate FP for
+                if event_type:
+                    sf_types = [event_type]
+                else:
+                    # No stored event_type — try all possible types for this asset_type
+                    sf_types = _asset_to_sf_types.get(asset_type, [])
+
+                for et in sf_types:
+                    try:
+                        dbh.targetFalsePositiveAdd(target, et, event_data)
+                        dbh.targetValidatedRemove(target, et, event_data)
+                        dbh.syncFalsePositiveAcrossScans(target, et, event_data, event_data, 1)
+                    except Exception:
+                        pass  # best-effort
 
         with SpiderFootDb(self.config) as dbh:
             try:
@@ -5290,6 +5305,25 @@ class SpiderFootWebUi:
                     if etype in username_types: return 'username'
                     return None
 
+                # Load target-level FPs to skip entries the user already rejected
+                target_fps = set()
+                try:
+                    for fp_tuple in dbh.targetFalsePositivesForTarget(target):
+                        # (event_type, event_data, source_data) — index by (type, data)
+                        target_fps.add((fp_tuple[0], fp_tuple[1]))
+                except Exception:
+                    pass
+
+                def _is_target_fp(evt, evd):
+                    """Check if this event was marked as FP at the target level."""
+                    if (evt, evd) in target_fps:
+                        return True
+                    # Also check cleaned value in case FP was stored with clean val
+                    cv = cleanAssetValue(evd)
+                    if cv != evd and (evt, cv) in target_fps:
+                        return True
+                    return False
+
                 # Collect all items for batch insert
                 batch_items = []
                 for ev in events:
@@ -5300,6 +5334,8 @@ class SpiderFootWebUi:
                     event_data = ev[1]
                     if not event_data:
                         continue
+                    if _is_target_fp(event_type, event_data):
+                        continue  # skip — user already marked this as FP
                     asset_type = _classify_event(event_type)
                     if asset_type:
                         clean_val = cleanAssetValue(event_data)
@@ -5312,6 +5348,8 @@ class SpiderFootWebUi:
                     for (evt, evd, esd) in targetValidated:
                         if not evd:
                             continue
+                        if _is_target_fp(evt, evd):
+                            continue  # skip — user already marked this as FP
                         asset_type = _classify_event(evt)
                         if asset_type:
                             clean_val = cleanAssetValue(evd)
