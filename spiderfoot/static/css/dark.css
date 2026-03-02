@@ -1865,12 +1865,26 @@ pre.table-border-bg-inherit {
   overflow-wrap: break-word;
 }
 
-/* DATA table column hints — min-widths prevent squeezing, auto layout distributes the rest */
+/* DATA table — fixed layout keeps columns from blowing out on long URLs/values.
+   Checkbox(36) + Status(100) + Module(140) + Tracking(80) = 356px fixed.
+   Data Element and Source Data Element split the remaining space equally. */
+#scansummary-content.tablesorter:not(.discovery-path-table) {
+  table-layout: fixed;
+  width: 100%;
+}
 .col-data-chk { width: 36px; }
 .col-data-status { width: 100px; }
-.col-data-element { min-width: 200px; }
-.col-data-module { min-width: 130px; }
-.col-data-tracking { width: 90px; }
+.col-data-element { width: 30%; }
+.col-data-source { width: 30%; }
+.col-data-module { width: 140px; }
+.col-data-tracking { width: 80px; }
+
+/* Truncate collapsed pre content so long values don't overflow the cell */
+td.pre-expandable.pre-collapsed pre.table-border-bg-inherit {
+  max-height: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* Source data element cells */
 .table td pre {
