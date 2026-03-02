@@ -2330,6 +2330,16 @@ td.pre-expandable.pre-expanded .pre-expand-hint {
   border-left: 3px solid #0284c7;
 }
 
+/* Amber accent for comments */
+.info-panel-wrapper.mode-comments .info-panel {
+  border-color: rgba(217, 119, 6, 0.25);
+  border-left: 3px solid #d97706;
+}
+
+.mode-comments .info-panel-title {
+  color: #92400e;
+}
+
 .info-panel-header {
   display: flex;
   align-items: center;
@@ -9696,6 +9706,80 @@ a.data-type-btn:hover {
   background: rgba(217, 119, 6, 0.25);
   color: #78350f;
   box-shadow: 0 1px 4px rgba(217, 119, 6, 0.3);
+}
+
+/* ============================================
+   Analyst Comments (Type-Level) — light mode
+   ============================================ */
+.analyst-comment-container {
+  padding: 4px 0;
+}
+
+.analyst-comment-textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+}
+
+.analyst-comment-textarea:focus {
+  outline: none;
+  border-color: #d97706;
+  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.15);
+}
+
+.analyst-comment-textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.btn-save-comment {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border: 1px solid #d97706;
+  border-radius: 3px;
+  background: rgba(217, 119, 6, 0.1);
+  color: #92400e;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-save-comment:hover {
+  background: rgba(217, 119, 6, 0.25);
+  color: #78350f;
+  box-shadow: 0 1px 4px rgba(217, 119, 6, 0.3);
+}
+
+.comment-save-status,
+.note-save-status {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  transition: opacity 0.3s ease;
+}
+
+.comment-save-status.saved,
+.note-save-status.saved {
+  color: #16a34a;
+}
+
+.comment-save-status.error,
+.note-save-status.error {
+  color: #dc2626;
 }
 
 /* ============================================
