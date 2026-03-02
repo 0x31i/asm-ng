@@ -7048,7 +7048,7 @@ i.glyphicon-white,
   padding: 6px 14px;
   border-radius: 4px;
 }
-.assets-action-cell { white-space: nowrap; text-align: right; width: 60px; padding: 4px 6px !important; }
+.assets-action-cell { white-space: nowrap; text-align: center; width: 70px; padding: 4px 4px !important; }
 
 /* Sticky stats bar - z-index must be higher than table stacking context */
 .assets-sticky-bar { position: sticky; top: 0; z-index: 200; background: #f8fafc !important; border-bottom: 1px solid #cbd5e1; }
@@ -7080,7 +7080,7 @@ i.glyphicon-white,
 
 .assets-matches-compact .assets-col-select { width: 36px; text-align: center; vertical-align: middle; }
 .assets-matches-compact .assets-col-status { width: 140px; text-align: center; }
-.assets-matches-compact .assets-col-actions { width: 60px; text-align: right; }
+.assets-matches-compact .assets-col-actions { width: 70px; text-align: center; }
 
 .assets-cell-select {
   text-align: center; vertical-align: middle;
