@@ -7569,3 +7569,136 @@ class SpiderFootDb:
                 return {(r[0], r[1], r[2]): r[3] for r in rows}
             except DatabaseError as e:
                 raise IOError("SQL error fetching row notes for target") from e
+
+    # ------------------------------------------------------------------
+    # Bulk-read methods for Full Backup export
+    # ------------------------------------------------------------------
+
+    def scanResultEventRaw(self, instanceId: str) -> list:
+        """Return raw scan result rows for backup export.
+
+        Unlike scanResultEvent() which does a 3-table JOIN, this queries
+        tbl_scan_results directly and returns the hash and source_event_hash
+        needed to reconstruct discovery paths on restore.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            list: tuples of (hash, type, generated, confidence, visibility,
+                  risk, module, data, false_positive, source_event_hash,
+                  imported_from_scan, tracking)
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(f"instanceId is {type(instanceId)}; expected str()") from None
+
+        qry = "SELECT hash, type, generated, confidence, visibility, risk, " \
+              "module, data, false_positive, source_event_hash, " \
+              "imported_from_scan, tracking " \
+              "FROM tbl_scan_results WHERE scan_instance_id = ? " \
+              "ORDER BY generated ASC"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [instanceId])
+                return self.dbh.fetchall()
+            except DatabaseError as e:
+                raise IOError("SQL error fetching raw scan results for backup") from e
+
+    def correlationEventHashes(self, instanceId: str) -> dict:
+        """Bulk-read event hashes for all correlations of a scan.
+
+        Args:
+            instanceId (str): scan instance ID
+
+        Returns:
+            dict: {correlation_id: [event_hash, ...]}
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(f"instanceId is {type(instanceId)}; expected str()") from None
+
+        qry = "SELECT e.correlation_id, e.event_hash " \
+              "FROM tbl_scan_correlation_results_events e " \
+              "JOIN tbl_scan_correlation_results c ON e.correlation_id = c.id " \
+              "WHERE c.scan_instance_id = ? " \
+              "ORDER BY e.correlation_id"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [instanceId])
+                result = {}
+                for row in self.dbh.fetchall():
+                    result.setdefault(row[0], []).append(row[1])
+                return result
+            except DatabaseError as e:
+                raise IOError("SQL error fetching correlation event hashes") from e
+
+    def typeCommentsForTarget(self, target: str) -> list:
+        """Bulk-load all analyst type comments for a target.
+
+        Args:
+            target (str): the seed_target value
+
+        Returns:
+            list: tuples of (event_type, comment_text, date_modified)
+        """
+        if not isinstance(target, str):
+            raise TypeError(f"target is {type(target)}; expected str()") from None
+
+        qry = "SELECT event_type, comment_text, date_modified " \
+              "FROM tbl_analyst_type_comments WHERE target = ? ORDER BY event_type"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target,))
+                return self.dbh.fetchall()
+            except DatabaseError as e:
+                raise IOError("SQL error fetching type comments for target") from e
+
+    def targetFalsePositiveListFull(self, target: str) -> list:
+        """Get full target-level false positive rows including notes and source_data.
+
+        Args:
+            target (str): the seed_target value
+
+        Returns:
+            list: tuples of (id, target, event_type, event_data, source_data, date_added, notes)
+        """
+        if not isinstance(target, str):
+            raise TypeError(f"target is {type(target)}; expected str()") from None
+
+        qry = "SELECT id, target, event_type, event_data, source_data, " \
+              "date_added/1000 as date_added, notes " \
+              "FROM tbl_target_false_positives WHERE target = ? " \
+              "ORDER BY date_added DESC"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target,))
+                return self.dbh.fetchall()
+            except DatabaseError as e:
+                raise IOError("SQL error fetching full target false positives") from e
+
+    def targetValidatedListFull(self, target: str) -> list:
+        """Get full target-level validated rows including notes and source_data.
+
+        Args:
+            target (str): the seed_target value
+
+        Returns:
+            list: tuples of (id, target, event_type, event_data, source_data, date_added, notes)
+        """
+        if not isinstance(target, str):
+            raise TypeError(f"target is {type(target)}; expected str()") from None
+
+        qry = "SELECT id, target, event_type, event_data, source_data, " \
+              "date_added/1000 as date_added, notes " \
+              "FROM tbl_target_validated WHERE target = ? " \
+              "ORDER BY date_added DESC"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target,))
+                return self.dbh.fetchall()
+            except DatabaseError as e:
+                raise IOError("SQL error fetching full target validated entries") from e

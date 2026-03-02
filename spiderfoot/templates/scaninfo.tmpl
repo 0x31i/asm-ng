@@ -130,6 +130,15 @@
                   CSV (.zip) &mdash; All Asset Types
                 </a>
               </li>
+              <li class="divider"></li>
+              <li class="dropdown-header" style="color: #dc2626; font-weight: bold;">
+                <i class="glyphicon glyphicon-save"></i> Full Backup
+              </li>
+              <li>
+                <a class="link" onClick='exportFullBackup("${id}")'>
+                  Full Backup (.zip) &mdash; All Data + pg_dump
+                </a>
+              </li>
             </ul>
         </div>
     <div class='btn-group search-group'>
@@ -12243,6 +12252,14 @@
             _fetchAndDownload(
                 '${docroot}/knownassetexportzip?target=' + encodeURIComponent('${seedtarget}'),
                 'SpiderFoot-Assets.zip'
+            );
+        }
+
+        // Export full backup ZIP (all data layers + pg_dump)
+        function exportFullBackup(instanceId) {
+            _fetchAndDownload(
+                '${docroot}/scanfullbackup?id=' + instanceId,
+                'FULL_BACKUP.zip'
             );
         }
 
