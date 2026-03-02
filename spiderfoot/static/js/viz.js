@@ -638,8 +638,8 @@ function sf_viz_dendrogram(targetId, data) {
 
         // Detect dark mode for styling
         var isDarkMode = document.body.classList.contains('dark-mode') ||
-                         document.documentElement.getAttribute('data-theme') === 'dark' ||
-                         window.matchMedia('(prefers-color-scheme: dark)').matches;
+                         localStorage.getItem('theme') === 'dark-theme' ||
+                         document.documentElement.getAttribute('data-theme') === 'dark';
 
         var textColor = isDarkMode ? '#f3f4f6' : '#1f2937';
         var labelColor = isDarkMode ? '#9ca3af' : '#4b5563';
@@ -721,8 +721,8 @@ function sf_viz_dendrogram(targetId, data) {
     function showInfoPanel(pMessage, pX, pY, pShow) {
         // Detect dark mode
         var isDarkMode = document.body.classList.contains('dark-mode') ||
-                         document.documentElement.getAttribute('data-theme') === 'dark' ||
-                         window.matchMedia('(prefers-color-scheme: dark)').matches;
+                         localStorage.getItem('theme') === 'dark-theme' ||
+                         document.documentElement.getAttribute('data-theme') === 'dark';
 
         var bgColor = isDarkMode ? 'rgba(17, 24, 39, 0.98)' : 'rgba(255, 255, 255, 0.98)';
         var textColor = isDarkMode ? '#f3f4f6' : '#1f2937';
