@@ -2266,6 +2266,40 @@ td.pre-expandable.pre-expanded .pre-expand-hint {
   box-shadow: 0 1px 6px rgba(2, 132, 199, 0.4);
 }
 
+/* Comments button - amber/gold theme (light mode) */
+.btn-comments {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border: 1px solid #d97706;
+  border-radius: 4px;
+  background: rgba(217, 119, 6, 0.1);
+  color: #92400e;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-comments:hover {
+  background: rgba(217, 119, 6, 0.2);
+  color: #78350f;
+  box-shadow: 0 1px 4px rgba(217, 119, 6, 0.3);
+}
+
+.btn-comments.disabled,
+.btn-comments[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-comments.active {
+  background: rgba(217, 119, 6, 0.25);
+  color: #78350f;
+  box-shadow: 0 1px 6px rgba(217, 119, 6, 0.4);
+}
+
 /* ============================================
    Expandable Info Panel
    ============================================ */
@@ -2294,6 +2328,16 @@ td.pre-expandable.pre-expanded .pre-expand-hint {
 .info-panel-wrapper.mode-instructions .info-panel {
   border-color: rgba(2, 132, 199, 0.25);
   border-left: 3px solid #0284c7;
+}
+
+/* Amber accent for comments */
+.info-panel-wrapper.mode-comments .info-panel {
+  border-color: rgba(217, 119, 6, 0.25);
+  border-left: 3px solid #d97706;
+}
+
+.mode-comments .info-panel-title {
+  color: #92400e;
 }
 
 .info-panel-header {
@@ -9592,6 +9636,153 @@ a.data-type-btn:hover {
 }
 
 /* ============================================
+   Per-row Analyst Note (light mode)
+   ============================================ */
+.detail-analyst-note {
+  grid-column: 1 / -1;
+  padding: 10px 0 4px 0;
+  margin-top: 8px;
+  border-top: 1px solid var(--glass-border);
+  border-left: 3px solid rgba(217, 119, 6, 0.4);
+  padding-left: 12px;
+}
+
+.detail-analyst-note .finding-detail-label {
+  color: #92400e;
+  margin-bottom: 6px;
+}
+
+.analyst-note-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.analyst-note-textarea {
+  flex: 1;
+  min-height: 36px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+}
+
+.analyst-note-textarea:focus {
+  outline: none;
+  border-color: #d97706;
+  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.15);
+}
+
+.analyst-note-textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+/* Save note button (light mode) */
+.btn-save-note {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border: 1px solid #d97706;
+  border-radius: 3px;
+  background: rgba(217, 119, 6, 0.1);
+  color: #92400e;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  align-self: center;
+}
+
+.btn-save-note:hover {
+  background: rgba(217, 119, 6, 0.25);
+  color: #78350f;
+  box-shadow: 0 1px 4px rgba(217, 119, 6, 0.3);
+}
+
+/* ============================================
+   Analyst Comments (Type-Level) — light mode
+   ============================================ */
+.analyst-comment-container {
+  padding: 4px 0;
+}
+
+.analyst-comment-textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+}
+
+.analyst-comment-textarea:focus {
+  outline: none;
+  border-color: #d97706;
+  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.15);
+}
+
+.analyst-comment-textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.btn-save-comment {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border: 1px solid #d97706;
+  border-radius: 3px;
+  background: rgba(217, 119, 6, 0.1);
+  color: #92400e;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-save-comment:hover {
+  background: rgba(217, 119, 6, 0.25);
+  color: #78350f;
+  box-shadow: 0 1px 4px rgba(217, 119, 6, 0.3);
+}
+
+.comment-save-status,
+.note-save-status {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  transition: opacity 0.3s ease;
+}
+
+.comment-save-status.saved,
+.note-save-status.saved {
+  color: #16a34a;
+}
+
+.comment-save-status.error,
+.note-save-status.error {
+  color: #dc2626;
+}
+
+/* ============================================
    Scan Monitoring Dashboard
    ============================================ */
 
@@ -10096,16 +10287,19 @@ mark {
 }
 
 /* ============================================
-   Search Navigate Link
+   Search Navigate Cell
    ============================================ */
-.search-goto-link {
+.search-goto-cell {
+  cursor: pointer !important;
   color: #8b5cf6;
-  cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-  font-size: 14px;
+  text-align: center;
+  vertical-align: middle !important;
+  transition: background 0.15s ease, color 0.15s ease;
+  font-size: 15px;
+  opacity: 0.5;
 }
-.search-goto-link:hover {
+.search-goto-cell:hover {
+  background: rgba(139, 92, 246, 0.1) !important;
   opacity: 1;
 }
 

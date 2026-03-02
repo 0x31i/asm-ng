@@ -10761,16 +10761,19 @@ mark {
 }
 
 /* ============================================
-   Search Navigate Link (Dark)
+   Search Navigate Cell (Dark)
    ============================================ */
-.search-goto-link {
+.search-goto-cell {
+  cursor: pointer !important;
   color: #a78bfa;
-  cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-  font-size: 14px;
+  text-align: center;
+  vertical-align: middle !important;
+  transition: background 0.15s ease, color 0.15s ease;
+  font-size: 15px;
+  opacity: 0.5;
 }
-.search-goto-link:hover {
+.search-goto-cell:hover {
+  background: rgba(167, 139, 250, 0.15) !important;
   opacity: 1;
 }
 

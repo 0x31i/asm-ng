@@ -1593,7 +1593,7 @@ class SpiderFootDb:
             qvars.append(criteria['scan_id'])
 
         if criteria.get('type') is not None:
-            qry += " AND c.type = ? "
+            qry += " AND UPPER(c.type) = UPPER(?) "
             qvars.append(criteria['type'])
 
         if criteria.get('value') is not None:
@@ -1616,7 +1616,7 @@ class SpiderFootDb:
             qvars.append(criteria['regex'])
 
         if criteria.get('module') is not None:
-            qry += " AND c.module = ? "
+            qry += " AND LOWER(c.module) = LOWER(?) "
             qvars.append(criteria['module'])
 
         if criteria.get('risk') is not None:

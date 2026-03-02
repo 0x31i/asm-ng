@@ -406,6 +406,10 @@
 
         // Navigate from search result to DATA view row
         function navigateToDataRow(instanceId, eventType, eventTypeLabel, hash) {
+            // Clean up all search-specific DOM elements before leaving search view
+            $('#search-scope-bar').remove();
+            $('.search-results-info').remove();
+            $('#search-chips-bar').remove();
             _pendingScrollToHash = hash;
             dataEventData(instanceId, eventTypeLabel, eventType, 'full');
         }
@@ -4175,9 +4179,8 @@
                                         var navEventType = data[i][10] || data[i][9] || '';
                                         var navEventLabel = data[i][8] || data[i][9] || '';
                                         var navHash = data[i][7] || '';
-                                        table += "<td class='text-center' onclick='event.stopPropagation()'>";
-                                        table += "<span class='search-goto-link' title='Go to this row in DATA view' onclick='navigateToDataRow(\"" + _instanceId + "\", \"" + sf.escapeHtml(navEventType) + "\", \"" + sf.escapeHtml(navEventLabel) + "\", \"" + sf.escapeHtml(navHash) + "\")'>";
-                                        table += "<i class='glyphicon glyphicon-arrow-right'></i></span></td>";
+                                        table += "<td class='search-goto-cell' title='Go to this row in DATA view' onclick='event.stopPropagation(); navigateToDataRow(\"" + _instanceId + "\", \"" + sf.escapeHtml(navEventType) + "\", \"" + sf.escapeHtml(navEventLabel) + "\", \"" + sf.escapeHtml(navHash) + "\")'>";
+                                        table += "<i class='glyphicon glyphicon-arrow-right'></i></td>";
                                     }
                                     table += "</tr>";
                                     // Hidden detail row
@@ -11164,6 +11167,10 @@
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
             $(".data-list-legend").remove();
+            // Clean up search-specific elements
+            $("#search-scope-bar").remove();
+            $(".search-results-info").remove();
+            $("#search-chips-bar").remove();
             navTo("btn-data");
             pushViewState('btn-data', {dataType: 'ALL', dataTypeName: 'All'});
             $("#loader").show();
@@ -11259,6 +11266,10 @@
             $("#breadcrumbs").remove();
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
+            // Clean up search-specific elements when entering DATA view
+            $("#search-scope-bar").remove();
+            $(".search-results-info").remove();
+            $("#search-chips-bar").remove();
             $("#loader").show();
             navTo("btn-data");
             $("#btn-export").show();
