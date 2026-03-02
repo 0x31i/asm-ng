@@ -843,10 +843,9 @@
                     // Auto-size analyst note textareas to fit content
                     $(this).find('.analyst-note-textarea').each(function() {
                         if (this.value) {
-                            this.style.overflow = 'hidden';
+                            this.style.overflowY = 'hidden';
                             this.style.height = 'auto';
                             this.style.height = (this.scrollHeight + 2) + 'px';
-                            this.style.overflow = '';
                         }
                     });
                 });
