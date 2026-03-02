@@ -9736,7 +9736,8 @@
             $('#globe-hotspot-count').html(countText);
 
             var cx = w / 2;
-            var cy = h * 0.85; // push center down so only upper hemisphere shows
+            var baseCy = h * 0.85; // push center down so only upper hemisphere shows
+            var cy = baseCy;
             var baseRadius = Math.min(w, h) * 0.38 * globeZoomScale; // scaled up globe
             var radius = baseRadius;
 
@@ -9839,7 +9840,7 @@
             function drawFrame() {
                 var now = Date.now();
 
-                // Zoom animation
+                // Zoom animation — also animate cy to center the dot on screen
                 if (globeFocusTarget) {
                     var targetRotY = globeFocusTarget.lon * Math.PI / 180;
                     var targetRotX = globeFocusTarget.lat * Math.PI / 180;
@@ -9854,8 +9855,10 @@
                     globeRotY += dY * 0.08;
                     globeRotX += (targetRotX - globeRotX) * 0.08;
                     globeFocusZoom += (2.2 - globeFocusZoom) * 0.08;
+                    cy += (h * 0.5 - cy) * 0.08;
                     if (Math.abs(globeFocusZoom - 2.2) < 0.01) {
                         globeFocusZoom = 2.2;
+                        cy = h * 0.5;
                         if (!globeFocused) {
                             globeFocused = true;
                             showGlobeDetail(globeFocusData);
@@ -9863,7 +9866,11 @@
                     }
                 } else if (globeFocusZoom > 1.01) {
                     globeFocusZoom += (1.0 - globeFocusZoom) * 0.08;
-                    if (Math.abs(globeFocusZoom - 1.0) < 0.01) globeFocusZoom = 1.0;
+                    cy += (baseCy - cy) * 0.08;
+                    if (Math.abs(globeFocusZoom - 1.0) < 0.01) {
+                        globeFocusZoom = 1.0;
+                        cy = baseCy;
+                    }
                 }
                 radius = baseRadius * globeFocusZoom;
 

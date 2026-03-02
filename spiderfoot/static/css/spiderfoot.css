@@ -10359,8 +10359,9 @@ mark {
   background: rgba(0, 0, 0, 0.05);
   color: var(--text-primary);
   font-size: 16px;
-  line-height: 26px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   padding: 0;
   z-index: 21;
