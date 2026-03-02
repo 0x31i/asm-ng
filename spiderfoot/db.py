@@ -1456,6 +1456,7 @@ class SpiderFootDb:
         Raises:
             IOError: if the backup fails
         """
+        import glob
         import os
         import shutil
         import subprocess
@@ -1465,22 +1466,46 @@ class SpiderFootDb:
         if dest_dir and not os.path.exists(dest_dir):
             os.makedirs(dest_dir, exist_ok=True)
 
-        # Find pg_dump — check PATH first, then common Homebrew/system locations
+        # Find pg_dump:
+        #   1. PATH (covers standard apt/yum installs at /usr/bin/pg_dump)
+        #   2. Debian/Kali versioned: /usr/lib/postgresql/*/bin/pg_dump
+        #   3. RHEL/CentOS versioned: /usr/pgsql-*/bin/pg_dump
+        #   4. Compiled from source:  /usr/local/pgsql/bin/pg_dump
+        #   5. Homebrew ARM macOS:    /opt/homebrew/opt/postgresql@*/bin/pg_dump
+        #   6. Homebrew Intel macOS:  /usr/local/opt/postgresql@*/bin/pg_dump
         pg_dump = shutil.which('pg_dump')
         if not pg_dump:
-            for candidate in [
-                '/opt/homebrew/opt/postgresql@16/bin/pg_dump',
-                '/opt/homebrew/opt/postgresql@17/bin/pg_dump',
-                '/opt/homebrew/opt/postgresql@15/bin/pg_dump',
-                '/opt/homebrew/bin/pg_dump',
+            # Glob patterns for versioned installs — sorted descending
+            # so the newest version is preferred
+            search_patterns = [
+                '/usr/lib/postgresql/*/bin/pg_dump',       # Debian/Ubuntu/Kali
+                '/usr/pgsql-*/bin/pg_dump',                # RHEL/CentOS/Fedora
+                '/opt/homebrew/opt/postgresql@*/bin/pg_dump',  # Homebrew ARM
+                '/usr/local/opt/postgresql@*/bin/pg_dump',     # Homebrew Intel
+            ]
+            # Fixed paths (no version wildcard)
+            fixed_paths = [
+                '/usr/local/pgsql/bin/pg_dump',  # compiled from source
                 '/usr/local/bin/pg_dump',
                 '/usr/bin/pg_dump',
-            ]:
+            ]
+
+            candidates = []
+            for pattern in search_patterns:
+                candidates.extend(sorted(glob.glob(pattern), reverse=True))
+            candidates.extend(fixed_paths)
+
+            for candidate in candidates:
                 if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
                     pg_dump = candidate
                     break
+
         if not pg_dump:
-            raise IOError("pg_dump not found on PATH or in common install locations")
+            raise IOError(
+                "pg_dump not found. Searched PATH plus: "
+                "/usr/lib/postgresql/*/bin, /usr/pgsql-*/bin, "
+                "/opt/homebrew/opt/postgresql@*/bin, /usr/local/pgsql/bin"
+            )
 
         with self.dbhLock:
             try:
