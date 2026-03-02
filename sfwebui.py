@@ -1020,8 +1020,8 @@ class SpiderFootWebUi:
         """Generate a full backup ZIP for a scan.
 
         The ZIP contains CSVs for every data layer (scan results, findings,
-        vulns, correlations, assets, analyst notes, etc.) plus a pg_dump SQL
-        file and a MANIFEST.json with metadata and row counts.
+        vulns, correlations, assets, analyst notes, etc.) and a MANIFEST.json
+        with metadata and row counts.
 
         Args:
             id (str): scan instance ID
@@ -1030,7 +1030,6 @@ class SpiderFootWebUi:
             bytes: ZIP file
         """
         import zipfile
-        import tempfile
 
         with SpiderFootDb(self.config) as dbh:
             scan = dbh.scanInstanceGet(id)
@@ -1245,22 +1244,6 @@ class SpiderFootWebUi:
                     ['key', 'value'],
                     config_rows, manifest['row_counts'], 'scan_config'
                 )
-
-                # --- DATABASE_BACKUP.sql (non-fatal) ---
-                try:
-                    with tempfile.NamedTemporaryFile(suffix='.sql', delete=False) as tmp:
-                        tmp_path = tmp.name
-                    dbh.backupDB(tmp_path)
-                    zf.write(tmp_path, 'DATABASE_BACKUP.sql')
-                    manifest['row_counts']['database_backup'] = 'included'
-                    os.unlink(tmp_path)
-                except Exception as e:
-                    self.log.warning(f"pg_dump for backup failed (non-fatal): {e}")
-                    manifest['row_counts']['database_backup'] = 'unavailable'
-                    try:
-                        os.unlink(tmp_path)
-                    except Exception:
-                        pass
 
                 # --- MANIFEST.json ---
                 zf.writestr('MANIFEST.json', json.dumps(manifest, indent=2))
@@ -7149,6 +7132,41 @@ class SpiderFootWebUi:
                 }
             except Exception as e:
                 return {'status': 'error', 'error': str(e)}
+
+    @cherrypy.expose
+    def dbbackupdownload(self: 'SpiderFootWebUi') -> bytes:
+        """Download a pg_dump backup of the entire database as a .sql file.
+
+        Returns:
+            bytes: SQL file download
+        """
+        import tempfile
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                with tempfile.NamedTemporaryFile(suffix='.sql', delete=False) as tmp:
+                    tmp_path = tmp.name
+
+                dbh.backupDB(tmp_path)
+                with open(tmp_path, 'rb') as f:
+                    data = f.read()
+                os.unlink(tmp_path)
+
+                timestamp = time.strftime("%Y%m%d_%H%M%S")
+                filename = f"asmng_pg_backup_{timestamp}.sql"
+
+                cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+                cherrypy.response.headers['Content-Type'] = 'application/sql'
+                cherrypy.response.headers['Pragma'] = 'no-cache'
+                return data
+            except Exception as e:
+                self.log.error(f"DB backup download failed: {e}", exc_info=True)
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
+                cherrypy.response.headers['Content-Type'] = 'application/json'
+                return json.dumps({'error': f'Database backup failed: {e}'}).encode('utf-8')
 
     @cherrypy.expose
     @cherrypy.tools.json_out()

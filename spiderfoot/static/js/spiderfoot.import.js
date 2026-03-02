@@ -42,7 +42,6 @@ $(document).ready(function() {
     // File type configuration per import type
     var fileTypeConfig = {
         'legacy':      { accept: '.csv', hint: 'ACCEPTED FORMAT: CSV' },
-        'scan':        { accept: '.csv', hint: 'ACCEPTED FORMAT: CSV' },
         'fullrestore': { accept: '.zip', hint: 'ACCEPTED FORMAT: ZIP (Full Backup)' },
         'selective':   { accept: '.csv', hint: 'ACCEPTED FORMAT: CSV' }
     };
