@@ -127,7 +127,7 @@
               <li class="dropdown-header">Assets Export</li>
               <li>
                 <a class="link" onClick='exportAssetsZip()'>
-                  CSV (.zip) &mdash; IPs, Domains, Employees
+                  CSV (.zip) &mdash; All Asset Types
                 </a>
               </li>
             </ul>
@@ -12238,7 +12238,7 @@
             );
         }
 
-        // Export known assets as a ZIP (IPs.csv, DOMAINS.csv, EMPLOYEES.csv)
+        // Export known assets as a ZIP (one CSV per asset type)
         function exportAssetsZip() {
             _fetchAndDownload(
                 '${docroot}/knownassetexportzip?target=' + encodeURIComponent('${seedtarget}'),

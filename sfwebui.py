@@ -5182,12 +5182,7 @@ class SpiderFootWebUi:
     def knownassetexportzip(self: 'SpiderFootWebUi', target: str = None) -> bytes:
         """Export known assets as a ZIP containing separate CSVs per asset type.
 
-        Creates CSV files bundled in a zip:
-        - IPs.csv
-        - DOMAINS.csv
-        - EMAILS.csv
-        - HUMAN_NAMES.csv
-        - USERNAMES.csv
+        Creates CSV files bundled in a zip (one per asset type with data).
 
         Args:
             target (str): the scan target
@@ -5210,6 +5205,8 @@ class SpiderFootWebUi:
                 'email': [],
                 'human_name': [],
                 'username': [],
+                'misc': [],
+                'uncategorized': [],
             }
             for r in rows:
                 asset_type = r[2]
@@ -5224,6 +5221,8 @@ class SpiderFootWebUi:
                 'email': 'EMAILS.csv',
                 'human_name': 'HUMAN_NAMES.csv',
                 'username': 'USERNAMES.csv',
+                'misc': 'MISC.csv',
+                'uncategorized': 'UNCATEGORIZED.csv',
             }
 
             zip_buf = BytesIO()
