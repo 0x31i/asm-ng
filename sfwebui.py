@@ -826,11 +826,14 @@ class SpiderFootWebUi:
             if 'before' in parsed_operators:
                 criteria['before'] = parsed_operators['before']
 
+            search_limit = 1000
             try:
-                data = dbh.search(criteria)
+                data = dbh.search(criteria, limit=search_limit)
             except Exception:
                 return {'results': retdata, 'total': 0, 'query': original_query,
                         'operators': parsed_operators, 'scope': scope}
+
+            truncated = len(data) >= search_limit
 
             for row in data:
                 lastseen = time.strftime(
@@ -842,7 +845,8 @@ class SpiderFootWebUi:
                                 row[11], row[4], row[13], row[14], row[15]])
 
             return {'results': retdata, 'total': len(retdata), 'query': original_query,
-                    'operators': parsed_operators, 'scope': scope}
+                    'operators': parsed_operators, 'scope': scope,
+                    'truncated': truncated, 'limit': search_limit}
 
     def _compute_fp_flag(self, row_fp_field, event_type, event_data, source_data, targetFps):
         """Compute the false positive flag value.

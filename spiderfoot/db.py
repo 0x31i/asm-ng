@@ -1524,7 +1524,7 @@ class SpiderFootDb:
 
         return health
 
-    def search(self, criteria: dict, filterFp: bool = False) -> list:
+    def search(self, criteria: dict, filterFp: bool = False, limit: int = 1000) -> list:
         """Search database.
 
         Args:
@@ -1541,6 +1541,7 @@ class SpiderFootDb:
                 - before (filter results generated on or before this timestamp)
                 ** at least one criterion must be set **
             filterFp (bool): filter out false positives
+            limit (int): maximum number of results to return (default 1000, 0 for unlimited)
 
         Returns:
             list: search results
@@ -1642,6 +1643,10 @@ class SpiderFootDb:
             qvars.append(before_epoch)
 
         qry += " ORDER BY c.data"
+
+        if limit and limit > 0:
+            qry += " LIMIT ?"
+            qvars.append(limit)
 
         with self.dbhLock:
             try:
