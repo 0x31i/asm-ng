@@ -432,9 +432,9 @@
         // Rotating placeholder hints
         var searchHints = [
             'Search "admin"...',
-            'Try type:EMAIL_ADDRESS...',
+            'Try type:email...',
             'Try risk:high...',
-            'Try module:sfp_hunter...',
+            'Try module:hunter...',
             'Try /regex/pattern/...',
             'Try after:2026-01-01...'
         ];
@@ -486,9 +486,9 @@
             // Show tips when input is empty or very short
             if (inputVal.length < 2) {
                 var tips = [
-                    {text: 'type:EMAIL_ADDRESS', desc: 'Filter by data type'},
+                    {text: 'type:email', desc: 'Fuzzy match type (email, ip, domain...)'},
                     {text: 'risk:high', desc: 'Filter by risk level'},
-                    {text: 'module:sfp_hunter', desc: 'Filter by source module'},
+                    {text: 'module:hunter', desc: 'Fuzzy match module name'},
                     {text: '/regex/pattern/', desc: 'Search with regex'},
                     {text: 'after:2026-01-01', desc: 'Results after date'}
                 ];

@@ -1593,8 +1593,12 @@ class SpiderFootDb:
             qvars.append(criteria['scan_id'])
 
         if criteria.get('type') is not None:
-            qry += " AND UPPER(c.type) = UPPER(?) "
-            qvars.append(criteria['type'])
+            # Use LIKE for flexible matching: 'EMAIL' matches EMAILADDR,
+            # 'email address' matches the description, etc.
+            qry += " AND (UPPER(c.type) LIKE UPPER(?) OR UPPER(t.event_descr) LIKE UPPER(?)) "
+            type_pattern = f"%{criteria['type']}%"
+            qvars.append(type_pattern)
+            qvars.append(type_pattern)
 
         if criteria.get('value') is not None:
             value = criteria['value']
@@ -1616,8 +1620,8 @@ class SpiderFootDb:
             qvars.append(criteria['regex'])
 
         if criteria.get('module') is not None:
-            qry += " AND LOWER(c.module) = LOWER(?) "
-            qvars.append(criteria['module'])
+            qry += " AND LOWER(c.module) LIKE LOWER(?) "
+            qvars.append(f"%{criteria['module']}%")
 
         if criteria.get('risk') is not None:
             risk_map = {'high': '3', 'medium': '2', 'low': '1', 'info': '0'}
