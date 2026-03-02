@@ -1020,8 +1020,8 @@ class SpiderFootWebUi:
         """Generate a full backup ZIP for a scan.
 
         The ZIP contains CSVs for every data layer (scan results, findings,
-        vulns, correlations, assets, analyst notes, etc.) plus a pg_dump SQL
-        file and a MANIFEST.json with metadata and row counts.
+        vulns, correlations, assets, analyst notes, etc.) and a MANIFEST.json
+        with metadata and row counts.
 
         Args:
             id (str): scan instance ID
@@ -1030,7 +1030,6 @@ class SpiderFootWebUi:
             bytes: ZIP file
         """
         import zipfile
-        import tempfile
 
         with SpiderFootDb(self.config) as dbh:
             scan = dbh.scanInstanceGet(id)
@@ -1245,22 +1244,6 @@ class SpiderFootWebUi:
                     ['key', 'value'],
                     config_rows, manifest['row_counts'], 'scan_config'
                 )
-
-                # --- DATABASE_BACKUP.sql (non-fatal) ---
-                try:
-                    with tempfile.NamedTemporaryFile(suffix='.sql', delete=False) as tmp:
-                        tmp_path = tmp.name
-                    dbh.backupDB(tmp_path)
-                    zf.write(tmp_path, 'DATABASE_BACKUP.sql')
-                    manifest['row_counts']['database_backup'] = 'included'
-                    os.unlink(tmp_path)
-                except Exception as e:
-                    self.log.warning(f"pg_dump for backup failed (non-fatal): {e}")
-                    manifest['row_counts']['database_backup'] = 'unavailable'
-                    try:
-                        os.unlink(tmp_path)
-                    except Exception:
-                        pass
 
                 # --- MANIFEST.json ---
                 zf.writestr('MANIFEST.json', json.dumps(manifest, indent=2))
