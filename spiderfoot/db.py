@@ -1216,6 +1216,37 @@ class SpiderFootDb:
                 except DatabaseError:
                     pass
 
+            # Migration: Add GIN trigram index for fast ILIKE substring search
+            try:
+                self.dbh.execute("SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm'")
+                if not self.dbh.fetchone():
+                    self.dbh.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
+                self.dbh.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_scan_results_data_trgm "
+                    "ON tbl_scan_results USING gin (data gin_trgm_ops)"
+                )
+                self.conn.commit()
+            except DatabaseError:
+                pass  # Extension may not be available; ILIKE still works without it
+
+            # Migration: Create tbl_saved_searches table
+            try:
+                self.dbh.execute("SELECT COUNT(*) FROM tbl_saved_searches")
+            except DatabaseError:
+                try:
+                    self.dbh.execute(
+                        "CREATE TABLE IF NOT EXISTS tbl_saved_searches ( "
+                        "id SERIAL PRIMARY KEY, "
+                        "name VARCHAR NOT NULL, "
+                        "query VARCHAR NOT NULL, "
+                        "scope VARCHAR DEFAULT 'scan', "
+                        "created TIMESTAMP DEFAULT CURRENT_TIMESTAMP "
+                        ")"
+                    )
+                    self.conn.commit()
+                except DatabaseError:
+                    pass
+
             # Restore normal transaction mode after migrations
             self.conn.autocommit = False
 
@@ -1501,8 +1532,14 @@ class SpiderFootDb:
                 - scan_id (search within a scan, if omitted search all)
                 - type (search a specific type, if omitted search all)
                 - value (search values for a specific string, if omitted search all)
+                  Plain text defaults to ILIKE substring match.
+                  Wrap in * for wildcard (LIKE), or /regex/ for regex (~*).
                 - regex (search values for a regular expression)
-                ** at least two criteria must be set **
+                - module (filter by source module name)
+                - risk (filter by risk level: high/medium/low/info or 3/2/1/0)
+                - after (filter results generated on or after this timestamp)
+                - before (filter results generated on or before this timestamp)
+                ** at least one criterion must be set **
             filterFp (bool): filter out false positives
 
         Returns:
@@ -1517,7 +1554,8 @@ class SpiderFootDb:
             raise TypeError(
                 f"criteria is {type(criteria)}; expected dict()") from None
 
-        valid_criteria = ['scan_id', 'type', 'value', 'regex']
+        valid_criteria = ['scan_id', 'type', 'value', 'regex',
+                          'module', 'risk', 'after', 'before']
 
         for key in list(criteria.keys()):
             if key not in valid_criteria:
@@ -1535,10 +1573,6 @@ class SpiderFootDb:
         if len(criteria) == 0:
             raise ValueError(
                 f"No valid search criteria provided; expected: {', '.join(valid_criteria)}") from None
-
-        if len(criteria) == 1:
-            raise ValueError(
-                "Only one search criteria provided; expected at least two")
 
         qvars = list()
         qry = "SELECT c.generated, c.data, \
@@ -1562,14 +1596,41 @@ class SpiderFootDb:
             qvars.append(criteria['type'])
 
         if criteria.get('value') is not None:
-            qry += " AND (c.data LIKE ? OR s.data LIKE ?) "
-            qvars.append(criteria['value'])
-            qvars.append(criteria['value'])
+            value = criteria['value']
+            if '%' in value:
+                # Wildcard search (already converted from * by caller)
+                qry += " AND (c.data LIKE ? OR s.data LIKE ?) "
+                qvars.append(value)
+                qvars.append(value)
+            else:
+                # Default: case-insensitive substring match
+                qry += " AND (c.data ILIKE ? OR s.data ILIKE ?) "
+                ilike_val = f"%{value}%"
+                qvars.append(ilike_val)
+                qvars.append(ilike_val)
 
         if criteria.get('regex') is not None:
             qry += " AND (c.data ~* ? OR s.data ~* ?) "
             qvars.append(criteria['regex'])
             qvars.append(criteria['regex'])
+
+        if criteria.get('module') is not None:
+            qry += " AND c.module = ? "
+            qvars.append(criteria['module'])
+
+        if criteria.get('risk') is not None:
+            risk_map = {'high': '3', 'medium': '2', 'low': '1', 'info': '0'}
+            risk_val = risk_map.get(criteria['risk'].lower(), criteria['risk'])
+            qry += " AND c.risk = ? "
+            qvars.append(risk_val)
+
+        if criteria.get('after') is not None:
+            qry += " AND c.generated >= ? "
+            qvars.append(criteria['after'])
+
+        if criteria.get('before') is not None:
+            qry += " AND c.generated <= ? "
+            qvars.append(criteria['before'])
 
         qry += " ORDER BY c.data"
 
@@ -1580,6 +1641,70 @@ class SpiderFootDb:
             except DatabaseError as e:
                 raise IOError(
                     "SQL error encountered when fetching search results") from e
+
+    def savedSearchAdd(self, name: str, query: str, scope: str = 'scan') -> int:
+        """Add a saved search.
+
+        Args:
+            name: display name for the saved search
+            query: the search query string
+            scope: 'scan' or 'all'
+
+        Returns:
+            int: the ID of the new saved search
+
+        Raises:
+            IOError: database I/O failed
+        """
+        qry = "INSERT INTO tbl_saved_searches (name, query, scope) VALUES (?, ?, ?) RETURNING id"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (name, query, scope))
+                row = self.dbh.fetchone()
+                self.conn.commit()
+                return row[0] if row else 0
+            except DatabaseError as e:
+                self.conn.rollback()
+                raise IOError("SQL error encountered when adding saved search") from e
+
+    def savedSearchList(self) -> list:
+        """List all saved searches.
+
+        Returns:
+            list: saved searches as (id, name, query, scope, created)
+
+        Raises:
+            IOError: database I/O failed
+        """
+        qry = "SELECT id, name, query, scope, created FROM tbl_saved_searches ORDER BY created DESC"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry)
+                return self.dbh.fetchall()
+            except DatabaseError as e:
+                raise IOError("SQL error encountered when listing saved searches") from e
+
+    def savedSearchDelete(self, search_id: int) -> bool:
+        """Delete a saved search.
+
+        Args:
+            search_id: ID of the saved search to delete
+
+        Returns:
+            bool: True on success
+
+        Raises:
+            IOError: database I/O failed
+        """
+        qry = "DELETE FROM tbl_saved_searches WHERE id = ?"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (search_id,))
+                self.conn.commit()
+                return True
+            except DatabaseError as e:
+                self.conn.rollback()
+                raise IOError("SQL error encountered when deleting saved search") from e
 
     def eventTypes(self) -> list:
         """Get event types.
