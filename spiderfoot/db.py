@@ -4166,12 +4166,12 @@ class SpiderFootDb:
 
         Returns:
             tuple: (id, target, asset_type, asset_value, source, import_batch,
-                    date_added, added_by, notes, affinity, tag, raw_value, status, entry_method)
+                    date_added, added_by, notes, affinity, tag, raw_value, status, entry_method, event_type)
                    or None if not found
         """
         qry = "SELECT id, target, asset_type, asset_value, source, import_batch, \
             date_added, added_by, notes, affinity, tag, raw_value, status, \
-            COALESCE(entry_method, 'MANUAL') as entry_method \
+            COALESCE(entry_method, 'MANUAL') as entry_method, event_type \
             FROM tbl_known_assets WHERE id = ?"
         with self.dbhLock:
             try:
@@ -4179,6 +4179,29 @@ class SpiderFootDb:
                 return self.dbh.fetchone()
             except DatabaseError as e:
                 raise IOError("SQL error encountered when fetching known asset") from e
+
+    def knownAssetGetBulk(self, assetIds: list) -> list:
+        """Get multiple known assets by ID list.
+
+        Args:
+            assetIds: list of primary keys
+
+        Returns:
+            list: list of asset tuples (same columns as knownAssetGet)
+        """
+        if not assetIds:
+            return []
+        placeholders = ','.join(['?' for _ in assetIds])
+        qry = f"SELECT id, target, asset_type, asset_value, source, import_batch, \
+            date_added, added_by, notes, affinity, tag, raw_value, status, \
+            COALESCE(entry_method, 'MANUAL') as entry_method, event_type \
+            FROM tbl_known_assets WHERE id IN ({placeholders})"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [int(aid) for aid in assetIds])
+                return self.dbh.fetchall()
+            except DatabaseError as e:
+                raise IOError("SQL error encountered when bulk fetching known assets") from e
 
     def knownAssetFindConflict(self, target: str, assetType: str, assetValue: str,
                                excludeId: int = None) -> tuple:
