@@ -4313,18 +4313,22 @@ class SpiderFootWebUi:
                         elif fp == "2":
                             val_adds.append((eventType, evData, sourceData))
                             fp_removes.append((eventType, evData, sourceData))
-                            ka_type = 'domain'
+                            ka_type = None
                             if eventType in ('IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'):
                                 ka_type = 'ip'
+                            elif eventType in ('DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
+                                               'CO_HOSTED_SITE', 'SIMILARDOMAIN', 'INTERNET_NAME_UNRESOLVED'):
+                                ka_type = 'domain'
                             elif eventType in ('EMAILADDR', 'AFFILIATE_EMAILADDR'):
                                 ka_type = 'email'
                             elif eventType == 'HUMAN_NAME':
                                 ka_type = 'human_name'
                             elif eventType in ('USERNAME', 'SOCIAL_MEDIA'):
                                 ka_type = 'username'
-                            clean_val = cleanAssetValue(evData)
-                            raw_val = evData if clean_val != evData else None
-                            ka_adds.append((ka_type, clean_val, raw_val))
+                            if ka_type:
+                                clean_val = cleanAssetValue(evData)
+                                raw_val = evData if clean_val != evData else None
+                                ka_adds.append((ka_type, clean_val, raw_val))
                         else:
                             fp_removes.append((eventType, evData, sourceData))
                             val_removes.append((eventType, evData, sourceData))
