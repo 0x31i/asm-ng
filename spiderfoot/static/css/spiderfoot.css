@@ -3061,9 +3061,9 @@ tr:active,
   background: rgba(255, 255, 255, 0.05) !important;
 }
 
-/* Text selection - neutral instead of blue */
+/* Text selection */
 ::selection {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(37, 99, 235, 0.25);
   color: var(--text-primary);
 }
 

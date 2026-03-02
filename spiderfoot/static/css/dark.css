@@ -2842,10 +2842,10 @@ tr:active,
   background: rgba(255, 255, 255, 0.05) !important;
 }
 
-/* Text selection - neutral instead of blue */
+/* Text selection */
 ::selection {
-  background: rgba(255, 255, 255, 0.2);
-  color: var(--text-primary);
+  background: rgba(99, 143, 235, 0.35);
+  color: #fff;
 }
 
 ::-moz-selection {
