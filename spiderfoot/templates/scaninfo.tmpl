@@ -4159,9 +4159,7 @@
                                     table += "<th class='sorter-false'>Data Element Type</th>";
                                 }
                                 table += "<th>Data Element</th><th>Source Data Element</th><th>Source Module</th><th>Identified</th>";
-                                if (respScope !== 'all') {
-                                    table += "<th class='sorter-false' style='width:30px;'></th>";
-                                }
+                                table += "<th class='sorter-false' style='width:30px;'></th>";
                                 table += "</tr></thead><tbody>";
                                 for (var i = 0; i < data.length; i++) {
                                     var rowRisk = String(data[i][6] || '0');
@@ -4186,6 +4184,9 @@
                                         var navHash = data[i][7] || '';
                                         table += "<td class='search-goto-cell' title='Go to this row in DATA view' onclick='event.stopPropagation(); navigateToDataRow(\"" + _instanceId + "\", \"" + sf.escapeHtml(navEventType) + "\", \"" + sf.escapeHtml(navEventLabel) + "\", \"" + sf.escapeHtml(navHash) + "\")'>";
                                         table += "<i class='glyphicon glyphicon-arrow-right'></i></td>";
+                                    } else {
+                                        table += "<td class='search-goto-cell search-goto-disabled' title='Navigation unavailable in ALL SCANS mode — switch to a single scan to jump to DATA view'>";
+                                        table += "<i class='glyphicon glyphicon-ban-circle'></i></td>";
                                     }
                                     table += "</tr>";
                                     // Hidden detail row
@@ -9840,7 +9841,7 @@
 
                 // Zoom animation
                 if (globeFocusTarget) {
-                    var targetRotY = -globeFocusTarget.lon * Math.PI / 180;
+                    var targetRotY = globeFocusTarget.lon * Math.PI / 180;
                     var targetRotX = globeFocusTarget.lat * Math.PI / 180;
                     // Normalize globeRotY to [-PI, PI] for shortest-path rotation
                     globeRotY = globeRotY % (2 * Math.PI);
