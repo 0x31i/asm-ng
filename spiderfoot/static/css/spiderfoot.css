@@ -2052,8 +2052,21 @@ pre.table-border-bg-inherit {
   border: none !important;
   color: var(--text-primary) !important;
   white-space: pre-wrap;
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
+
+/* DATA table column sizing — fixed layout with proportional widths */
+#scansummary-content.tablesorter:not(.discovery-path-table) {
+  table-layout: fixed;
+  width: 100%;
+}
+.col-data-chk { width: 36px; }
+.col-data-status { width: 100px; }
+.col-data-element { width: 35%; }
+.col-data-source { width: auto; }
+.col-data-module { width: 130px; }
+.col-data-tracking { width: 90px; }
 
 /* Expandable pre cells in data tables */
 td.pre-expandable {

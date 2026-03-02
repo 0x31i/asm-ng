@@ -11655,12 +11655,12 @@
                             var table = "<table id='scansummary-content' class='table table-bordered table-striped small tablesorter'>";
                             var thStyle = "";
                             table += "<thead><tr>";
-                            table += "<th class='text-center' " + thStyle + "><input id='checkall' type='checkbox' onClick='switchSelectAll()'></th>";
-                            table += "<th class='text-center validation-status' " + thStyle + ">Status</th>";
-                            table += "<th " + thStyle + ">Data Element</th>";
-                            table += "<th " + thStyle + ">Source Data Element</th>";
-                            table += "<th " + thStyle + ">Source Module</th>";
-                            table += "<th " + thStyle + ">Tracking</th>";
+                            table += "<th class='text-center col-data-chk' " + thStyle + "><input id='checkall' type='checkbox' onClick='switchSelectAll()'></th>";
+                            table += "<th class='text-center validation-status col-data-status' " + thStyle + ">Status</th>";
+                            table += "<th class='col-data-element' " + thStyle + ">Data Element</th>";
+                            table += "<th class='col-data-source' " + thStyle + ">Source Data Element</th>";
+                            table += "<th class='col-data-module' " + thStyle + ">Source Module</th>";
+                            table += "<th class='col-data-tracking' " + thStyle + ">Tracking</th>";
                             table += "</tr></thead><tbody>";
 
                             // Store data for tracking operations
