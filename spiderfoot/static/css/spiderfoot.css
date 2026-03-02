@@ -7336,7 +7336,7 @@ i.glyphicon-white,
 
 /* Segment hover highlight */
 .assets-hl-cell { cursor: default; }
-.assets-seg.assets-hl-active {
+.assets-hl-active {
   background: rgba(34, 197, 94, 0.25) !important; color: #15803d !important;
   border-radius: 2px; padding: 2px 3px; margin: -2px -3px;
   box-shadow: 0 0 6px rgba(34, 197, 94, 0.3); font-weight: 800;

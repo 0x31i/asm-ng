@@ -7483,7 +7483,7 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   cursor: default;
 }
 
-.assets-seg.assets-hl-active {
+.assets-hl-active {
   background: rgba(34, 197, 94, 0.4) !important;
   color: #ffffff !important;
   text-shadow: 0 0 12px var(--glow-green), 0 0 24px var(--glow-green);
