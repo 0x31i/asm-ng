@@ -4682,23 +4682,37 @@ class SpiderFootWebUi:
                     continue
                 target = a[1]
                 asset_type = a[2]
-                event_data = a[11] or a[3]  # raw_value or asset_value
+                asset_value = a[3]   # cleaned value
+                raw_value = a[11]    # original raw value (may be None)
                 event_type = a[14] if len(a) > 14 else None
 
                 # Build list of SF event types to propagate FP for
                 if event_type:
                     sf_types = [event_type]
                 else:
-                    # No stored event_type — try all possible types for this asset_type
                     sf_types = _asset_to_sf_types.get(asset_type, [])
 
+                # Try both raw and clean values — scan data stores the original
+                data_variants = [v for v in [raw_value, asset_value] if v]
+                # Deduplicate while preserving order
+                seen = set()
+                unique_variants = []
+                for v in data_variants:
+                    if v not in seen:
+                        seen.add(v)
+                        unique_variants.append(v)
+
                 for et in sf_types:
-                    try:
-                        dbh.targetFalsePositiveAdd(target, et, event_data)
-                        dbh.targetValidatedRemove(target, et, event_data)
-                        dbh.syncFalsePositiveAcrossScans(target, et, event_data, event_data, 1)
-                    except Exception:
-                        pass  # best-effort
+                    for ev_data in unique_variants:
+                        try:
+                            # Add target-level FP (persists across scans)
+                            dbh.targetFalsePositiveAdd(target, et, ev_data)
+                            # Remove target-level validated
+                            dbh.targetValidatedRemove(target, et, ev_data)
+                            # Mark scan data as FP — simple type+data match, no source filter
+                            dbh.syncFpByTypeAndData(target, et, ev_data, 1)
+                        except Exception:
+                            pass  # best-effort
 
         with SpiderFootDb(self.config) as dbh:
             try:
