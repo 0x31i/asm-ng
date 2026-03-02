@@ -10640,3 +10640,102 @@ a.data-type-btn:hover {
   color: var(--text-muted);
   margin-bottom: 8px;
 }
+
+/* =====================================================================
+   SEARCH OVERHAUL — Enhanced Search Styles (Dark Theme)
+   ===================================================================== */
+
+/* Search chips */
+.search-chip {
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.7);
+}
+.search-chip:hover {
+  background: #3a3a3a;
+}
+.search-chip.active {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+.search-chip-clear {
+  background: rgba(220, 38, 38, 0.15);
+  border-color: rgba(220, 38, 38, 0.3);
+  color: #fca5a5;
+}
+.search-chip-clear:hover {
+  background: rgba(220, 38, 38, 0.25);
+}
+
+/* Search highlight */
+mark {
+  background: rgba(250, 204, 21, 0.3);
+  color: #fef08a;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* Scope toggle */
+.search-scope-toggle {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.search-scope-btn {
+  background: #1e1e1e;
+  color: rgba(255, 255, 255, 0.6);
+}
+.search-scope-btn:hover {
+  background: #2a2a2a;
+}
+.search-scope-btn.active {
+  background: #2563eb;
+  color: white;
+}
+
+/* Search hint badge */
+.search-hint-badge {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Search history dropdown */
+.search-history {
+  background: #1e1e1e;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+.search-history-section {
+  color: rgba(255, 255, 255, 0.4);
+}
+.search-history-item {
+  color: rgba(255, 255, 255, 0.7);
+}
+.search-history-item:hover {
+  background: #2a2a2a;
+}
+.search-history-delete {
+  color: rgba(255, 255, 255, 0.3);
+}
+.search-history-delete:hover {
+  color: #ef4444;
+}
+
+/* Search detail row */
+.search-detail-row {
+  background: #1a1a1a;
+}
+.search-detail-grid {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Search result row hover */
+.search-result-row:hover {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+/* Sort direction indicators */
+.tablesorter-headerAsc .tablesorter-header-inner::after {
+  color: rgba(255, 255, 255, 0.5);
+}
+.tablesorter-headerDesc .tablesorter-header-inner::after {
+  color: rgba(255, 255, 255, 0.5);
+}

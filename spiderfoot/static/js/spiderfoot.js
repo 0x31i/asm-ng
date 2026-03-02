@@ -133,10 +133,10 @@ sf.remove_sfurltag = function (data) {
   return data;
 };
 
-sf.search = function (scan_id, value, type, postFunc) {
+sf.search = function (scan_id, value, type, postFunc, scope) {
   sf.fetchData(
     docroot + "/search",
-    { id: scan_id, eventType: type, value: value },
+    { id: scan_id, eventType: type, value: value, scope: scope || 'scan' },
     postFunc
   );
 };

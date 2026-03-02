@@ -754,47 +754,83 @@ class SpiderFootWebUi:
 
         return ret
 
-    def searchBase(self: 'SpiderFootWebUi', id: str = None, eventType: str = None, value: str = None) -> list:
+    def searchBase(self: 'SpiderFootWebUi', id: str = None, eventType: str = None,
+                   value: str = None, scope: str = 'scan') -> dict:
         """Search.
 
         Args:
             id (str): scan ID
-            eventType (str): TBD
-            value (str): TBD
+            eventType (str): filter by event type
+            value (str): search query (supports operators: type:, module:, risk:, after:, before:)
+            scope (str): 'scan' to search within one scan, 'all' for all scans
 
         Returns:
-            list: search results
+            dict: {results: list, total: int, query: str, operators: dict, scope: str}
         """
         retdata = []
+        parsed_operators = {}
 
         if not id and not eventType and not value:
-            return retdata
+            return {'results': retdata, 'total': 0, 'query': '', 'operators': {}, 'scope': scope}
 
         if not value:
             value = ''
 
+        # Extract operators from value (type:X, module:X, risk:X, after:X, before:X)
+        operator_keys = ('type', 'module', 'risk', 'after', 'before')
+        remaining_terms = []
+        for token in value.split():
+            if ':' in token and token.split(':')[0] in operator_keys:
+                key, val = token.split(':', 1)
+                parsed_operators[key] = val
+            else:
+                remaining_terms.append(token)
+        original_query = value
+        value = ' '.join(remaining_terms)
+
+        # Override eventType if type: operator was used
+        if 'type' in parsed_operators:
+            eventType = parsed_operators['type']
+
         regex = ""
-        if value.startswith("/") and value.endswith("/"):
+        if value.startswith("/") and value.endswith("/") and len(value) > 2:
             regex = value[1:len(value) - 1]
             value = ""
 
-        value = value.replace('*', '%')
+        # Convert wildcards (* → %) for explicit wildcard searches
+        if '*' in value:
+            value = value.replace('*', '%')
+
         if value in [None, ""] and regex in [None, ""]:
             value = "%"
             regex = ""
 
         with SpiderFootDb(self.config) as dbh:
             criteria = {
-                'scan_id': id or '',
                 'type': eventType or '',
                 'value': value or '',
                 'regex': regex or '',
             }
 
+            # Only filter by scan_id if scope is 'scan' and id is provided
+            if scope != 'all' and id:
+                criteria['scan_id'] = id
+
+            # Add operator-based criteria
+            if 'module' in parsed_operators:
+                criteria['module'] = parsed_operators['module']
+            if 'risk' in parsed_operators:
+                criteria['risk'] = parsed_operators['risk']
+            if 'after' in parsed_operators:
+                criteria['after'] = parsed_operators['after']
+            if 'before' in parsed_operators:
+                criteria['before'] = parsed_operators['before']
+
             try:
                 data = dbh.search(criteria)
             except Exception:
-                return retdata
+                return {'results': retdata, 'total': 0, 'query': original_query,
+                        'operators': parsed_operators, 'scope': scope}
 
             for row in data:
                 lastseen = time.strftime(
@@ -805,7 +841,8 @@ class SpiderFootWebUi:
                                 row[3], row[5], row[6], row[7], row[8], row[10],
                                 row[11], row[4], row[13], row[14], row[15]])
 
-            return retdata
+            return {'results': retdata, 'total': len(retdata), 'query': original_query,
+                    'operators': parsed_operators, 'scope': scope}
 
     def _compute_fp_flag(self, row_fp_field, event_type, event_data, source_data, targetFps):
         """Compute the false positive flag value.
@@ -9128,21 +9165,92 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
-    def search(self: 'SpiderFootWebUi', id: str = None, eventType: str = None, value: str = None) -> list:
+    def search(self: 'SpiderFootWebUi', id: str = None, eventType: str = None,
+               value: str = None, scope: str = 'scan') -> dict:
         """Search scans.
 
         Args:
             id (str): filter search results by scan ID
             eventType (str): filter search results by event type
             value (str): filter search results by event value
+            scope (str): 'scan' for current scan, 'all' for all scans
 
         Returns:
-            list: search results
+            dict: search results with metadata
         """
         try:
-            return self.searchBase(id, eventType, value)
+            return self.searchBase(id, eventType, value, scope)
         except Exception:
-            return []
+            return {'results': [], 'total': 0, 'query': value or '', 'operators': {}, 'scope': scope}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def savedsearchadd(self: 'SpiderFootWebUi', name: str = None, query: str = None,
+                       scope: str = 'scan') -> dict:
+        """Save a search query.
+
+        Args:
+            name (str): display name for the saved search
+            query (str): the search query string
+            scope (str): 'scan' or 'all'
+
+        Returns:
+            dict: {success: bool, id: int}
+        """
+        if not name or not query:
+            return {'success': False, 'error': 'name and query are required'}
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                search_id = dbh.savedSearchAdd(name, query, scope)
+                return {'success': True, 'id': search_id}
+            except Exception:
+                return {'success': False, 'error': 'Failed to save search'}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def savedsearchlist(self: 'SpiderFootWebUi') -> list:
+        """List all saved searches.
+
+        Returns:
+            list: saved searches
+        """
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                data = dbh.savedSearchList()
+                results = []
+                for row in data:
+                    results.append({
+                        'id': row[0],
+                        'name': row[1],
+                        'query': row[2],
+                        'scope': row[3],
+                        'created': str(row[4]) if row[4] else ''
+                    })
+                return results
+            except Exception:
+                return []
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def savedsearchdelete(self: 'SpiderFootWebUi', id: str = None) -> dict:
+        """Delete a saved search.
+
+        Args:
+            id (str): saved search ID
+
+        Returns:
+            dict: {success: bool}
+        """
+        if not id:
+            return {'success': False, 'error': 'id is required'}
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                dbh.savedSearchDelete(int(id))
+                return {'success': True}
+            except Exception:
+                return {'success': False, 'error': 'Failed to delete saved search'}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()

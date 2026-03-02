@@ -132,14 +132,23 @@
               </li>
             </ul>
         </div>
-    <div class='btn-group search-group'>
-        <div id='btn-search' class='input-group'>
-          <input class='form-control' id='searchvalue' type='text' placeholder='Search...' data-toggle='popover' data-html='true' data-animation='true' data-title='Usage' data-content="Supply a regular expression encapsulated in '/', e.g. <i>/searchregex/</i> or a simple wildcard search, e.g. <i>*string*</i> or an exact value, e.g. <i>string</i>.<br /><br /><b>Note</b> that the current scope is what's searched.">
+    <div class='btn-group search-group search-group-enhanced'>
+        <div id='btn-search' class='input-group' style='position:relative;'>
+          <input class='form-control' id='searchvalue' type='text' placeholder='Search "admin"...' autocomplete='off'>
             <div class='input-group-btn' style='width: 0px'> <!-- Chrome fix -->
-              <button class='btn btn-primary' id='searchbutton' type='button' onClick="$('#btn-search').popover('toggle');searchDirector('${id}')">
+              <button class='btn btn-primary' id='searchbutton' type='button' onClick="searchDirector('${id}')">
                 <i class='glyphicon glyphicon-search glyphicon glyphicon-white'></i>
               </button>
+              <button class='btn btn-default' id='searchsavebutton' type='button' onClick="saveCurrentSearch()" title='Save this search'>
+                <i class='glyphicon glyphicon-star'></i>
+              </button>
             </div>
+          <div class='search-scope-toggle'>
+            <span class='search-scope-btn active' data-scope='scan' onclick='setSearchScope("scan")'>This Scan</span>
+            <span class='search-scope-btn' data-scope='all' onclick='setSearchScope("all")'>All Scans</span>
+          </div>
+          <div id='search-hint-badge' class='search-hint-badge' style='display:none;'></div>
+          <div id='search-history-dropdown' class='search-history' style='display:none;'></div>
         </div>
     </div>
   </div>
@@ -390,9 +399,192 @@
             }
         });
 
-        $('#searchvalue').popover({ 'trigger': 'focus', 'placement': 'bottom'});
+        // Search scope state
+        var searchScope = 'scan';
+
+        function setSearchScope(scope) {
+            searchScope = scope;
+            $('.search-scope-btn').removeClass('active');
+            $('.search-scope-btn[data-scope="' + scope + '"]').addClass('active');
+        }
+
+        // Rotating placeholder hints
+        var searchHints = [
+            'Search "admin"...',
+            'Try type:EMAIL_ADDRESS...',
+            'Try risk:high...',
+            'Try module:sfp_hunter...',
+            'Try /regex/pattern/...',
+            'Try after:2026-01-01...'
+        ];
+        var hintIdx = 0;
+        setInterval(function() {
+            if (document.activeElement && document.activeElement.id === 'searchvalue') return;
+            hintIdx = (hintIdx + 1) % searchHints.length;
+            $('#searchvalue').attr('placeholder', searchHints[hintIdx]);
+        }, 4000);
+
+        // Smart input detection badge
+        function updateSearchHintBadge(val) {
+            var badge = $('#search-hint-badge');
+            if (!val || val.length < 2) { badge.hide(); return; }
+            var hint = '';
+            if (val.indexOf('@') !== -1) hint = 'Searching emails...';
+            else if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(val)) hint = 'Searching IPs...';
+            else if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/.test(val) && val.indexOf(' ') === -1) hint = 'Searching domains...';
+            else if (/:\d+/.test(val) && val.indexOf('type:') === -1 && val.indexOf('module:') === -1) hint = 'Searching endpoints...';
+            if (hint) { badge.text(hint).show(); } else { badge.hide(); }
+        }
+
+        // Search history (localStorage)
+        function getSearchHistory() {
+            try { return JSON.parse(localStorage.getItem('searchHistory') || '[]'); }
+            catch(e) { return []; }
+        }
+        function addSearchHistory(query) {
+            if (!query || query.length < 2) return;
+            var history = getSearchHistory();
+            history = history.filter(function(h) { return h !== query; });
+            history.unshift(query);
+            if (history.length > 10) history.pop();
+            localStorage.setItem('searchHistory', JSON.stringify(history));
+        }
+        function showSearchHistory() {
+            var dropdown = $('#search-history-dropdown');
+            var history = getSearchHistory();
+            var saved = [];
+            // Load saved searches
+            $.ajax({
+                url: docroot + '/savedsearchlist',
+                dataType: 'json',
+                async: false,
+                success: function(data) { saved = data || []; }
+            });
+            if (history.length === 0 && saved.length === 0) { dropdown.hide(); return; }
+            var html = '';
+            if (saved.length > 0) {
+                html += '<div class="search-history-section">Saved</div>';
+                for (var i = 0; i < saved.length; i++) {
+                    html += '<div class="search-history-item search-history-saved" data-query="' + sf.escapeHtml(saved[i].query) + '" data-scope="' + sf.escapeHtml(saved[i].scope) + '">';
+                    html += '<i class="glyphicon glyphicon-star" style="color:#f59e0b;margin-right:6px;"></i>';
+                    html += '<span>' + sf.escapeHtml(saved[i].name) + '</span>';
+                    html += '<span class="search-history-delete" data-saved-id="' + saved[i].id + '" title="Delete">&times;</span>';
+                    html += '</div>';
+                }
+            }
+            if (history.length > 0) {
+                html += '<div class="search-history-section">Recent</div>';
+                for (var j = 0; j < history.length; j++) {
+                    html += '<div class="search-history-item" data-query="' + sf.escapeHtml(history[j]) + '">';
+                    html += '<i class="glyphicon glyphicon-time" style="color:#9ca3af;margin-right:6px;"></i>';
+                    html += sf.escapeHtml(history[j]) + '</div>';
+                }
+            }
+            dropdown.html(html).show();
+        }
+
+        // Keyboard shortcut: / to focus search
+        $(document).on('keydown', function(e) {
+            if (e.key === '/' && !$(e.target).is('input, textarea, select')) {
+                e.preventDefault();
+                $('#searchvalue').focus();
+            }
+        });
+
+        $('#searchvalue').on('input', function() {
+            updateSearchHintBadge($(this).val());
+        });
+        $('#searchvalue').on('focus', function() {
+            showSearchHistory();
+        });
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('#btn-search').length) {
+                $('#search-history-dropdown').hide();
+            }
+        });
+        $(document).on('click', '.search-history-item', function(e) {
+            if ($(e.target).hasClass('search-history-delete')) {
+                var savedId = $(e.target).data('saved-id');
+                $.get(docroot + '/savedsearchdelete?id=' + savedId, function() {
+                    showSearchHistory();
+                });
+                return;
+            }
+            var query = $(this).data('query');
+            var scope = $(this).data('scope');
+            if (scope) setSearchScope(scope);
+            $('#searchvalue').val(query);
+            $('#search-history-dropdown').hide();
+            searchDirector('${id}');
+        });
+
+        // Save current search
+        function saveCurrentSearch() {
+            var query = $('#searchvalue').val();
+            if (!query) { alert('Enter a search query first.'); return; }
+            var name = prompt('Save search as:', query);
+            if (!name) return;
+            $.ajax({
+                url: docroot + '/savedsearchadd',
+                data: { name: name, query: query, scope: searchScope },
+                dataType: 'json',
+                success: function(resp) {
+                    if (resp && resp.success) {
+                        $('#searchsavebutton .glyphicon').css('color', '#f59e0b');
+                        setTimeout(function() { $('#searchsavebutton .glyphicon').css('color', ''); }, 2000);
+                    }
+                }
+            });
+        }
+
+        // Search highlighting helper
+        function highlightTerm(text, term) {
+            if (!term || term.startsWith('/') || term === '%') return text;
+            // Strip operators from term for highlighting
+            var parts = term.split(' ').filter(function(t) { return t.indexOf(':') === -1 || ['type','module','risk','after','before'].indexOf(t.split(':')[0]) === -1; });
+            var cleanTerm = parts.join(' ');
+            if (!cleanTerm) return text;
+            var escaped = cleanTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            return text.replace(new RegExp('(' + escaped + ')', 'gi'), '<mark>$1</mark>');
+        }
+
+        // Export search results to CSV
+        function exportSearchCSV() {
+            var table = document.getElementById('scansummary-content');
+            if (!table) return;
+            var rows = table.querySelectorAll('tr');
+            var csv = [];
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].classList.contains('search-row-hidden') || rows[i].classList.contains('search-detail-row')) continue;
+                var cols = rows[i].querySelectorAll('td, th');
+                var row = [];
+                for (var j = 0; j < cols.length; j++) {
+                    var text = (cols[j].innerText || cols[j].textContent).replace(/"/g, '""');
+                    row.push('"' + text + '"');
+                }
+                csv.push(row.join(','));
+            }
+            var blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'search_results.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // escapeHtml helper if not on sf object
+        if (!sf.escapeHtml) {
+            sf.escapeHtml = function(text) {
+                var div = document.createElement('div');
+                div.appendChild(document.createTextNode(text));
+                return div.innerHTML;
+            };
+        }
+
         $('#searchvalue').keyup(function(event) {
             if (event.keyCode == 13) {
+                $('#search-history-dropdown').hide();
                 $('#searchbutton').click();
             }
         });
@@ -3793,6 +3985,8 @@
 
         function searchDirector(instanceId) {
             qry = $("#searchvalue").val();
+            addSearchHistory(qry);
+            $('#search-history-dropdown').hide();
             if (currentType == "ALL") {
                 searchResults(instanceId, qry);
             } else {
@@ -3803,6 +3997,7 @@
         function searchResults(instanceId, query, typeName) {
             // Remove pre-existing tables if they exist
             $("#scansummary-content").remove();
+            $("#search-chips-bar").remove();
             $("#load-all-bar").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
@@ -3821,15 +4016,66 @@
             $("#btn-search").show();
             $("#scanreminder").hide();
             refresh = function() { searchResults(instanceId, query, typeName); }
-            sf.search(instanceId, query, typeName, function(data) {
+            sf.search(instanceId, query, typeName, function(response) {
+                            // Handle both new dict format and legacy array format
+                            var data, total, respQuery, operators, respScope;
+                            if (response && response.results) {
+                                data = response.results;
+                                total = response.total;
+                                respQuery = response.query || query;
+                                operators = response.operators || {};
+                                respScope = response.scope || searchScope;
+                            } else {
+                                data = response || [];
+                                total = data.length;
+                                respQuery = query;
+                                operators = {};
+                                respScope = searchScope;
+                            }
+
                             lastSearchType = typeName;
                             lastSearchQuery = query;
 
                             if (data.length == 0) {
-                                var table = "<div id='scansummary-content'>&nbsp;&nbsp;No results found. Try broadening your search criteria.</div>";
+                                var table = "<div id='scansummary-content'>&nbsp;&nbsp;No results found. Try broadening your search criteria or use plain text for substring matching.</div>";
                             } else {
-                                // Search results info bar
-                                var infoBar = "<div class='search-results-info'>Search results: " + data.length + " records</div>";
+                                // Build operator display string
+                                var opStr = '';
+                                for (var k in operators) {
+                                    if (operators.hasOwnProperty(k)) opStr += ' (' + k + ':' + operators[k] + ')';
+                                }
+                                var scopeLabel = respScope === 'all' ? 'all scans' : 'current scan';
+
+                                // Search results info bar with export button
+                                var infoBar = "<div class='search-results-info'>";
+                                infoBar += "SEARCH RESULTS &mdash; " + total + " results for &quot;" + sf.escapeHtml(respQuery) + "&quot;" + sf.escapeHtml(opStr) + " in " + scopeLabel;
+                                infoBar += " <button class='btn btn-default btn-xs search-export-btn' onclick='exportSearchCSV()' title='Export to CSV'><i class='glyphicon glyphicon-download-alt'></i> Export CSV</button>";
+                                infoBar += "</div>";
+
+                                // Build filter chips from result data
+                                var typeFreq = {};
+                                var riskFreq = {};
+                                var riskLabels = {'0': 'INFO', '1': 'LOW', '2': 'MEDIUM', '3': 'HIGH'};
+                                for (var ci = 0; ci < data.length; ci++) {
+                                    var et = data[ci][8] || data[ci][9] || '';
+                                    typeFreq[et] = (typeFreq[et] || 0) + 1;
+                                    var rv = String(data[ci][6] || '0');
+                                    var rl = riskLabels[rv] || rv;
+                                    riskFreq[rl] = (riskFreq[rl] || 0) + 1;
+                                }
+                                var chipsBar = "<div id='search-chips-bar' class='search-chips-bar'>";
+                                for (var etype in typeFreq) {
+                                    if (typeFreq.hasOwnProperty(etype)) {
+                                        chipsBar += "<span class='search-chip' data-filter-type='type' data-filter-value='" + sf.escapeHtml(etype) + "'>" + sf.escapeHtml(etype) + ": " + typeFreq[etype] + "</span>";
+                                    }
+                                }
+                                for (var rname in riskFreq) {
+                                    if (riskFreq.hasOwnProperty(rname)) {
+                                        chipsBar += "<span class='search-chip' data-filter-type='risk' data-filter-value='" + rname + "'>risk:" + rname + ": " + riskFreq[rname] + "</span>";
+                                    }
+                                }
+                                chipsBar += "<span class='search-chip search-chip-clear' style='display:none;'>Clear All</span>";
+                                chipsBar += "</div>";
 
                                 var table = "<table id='scansummary-content' class='table table-bordered table-striped small tablesorter'><thead><tr>";
                                 if (typeName == null) {
@@ -3837,29 +4083,91 @@
                                 }
                                 table += "<th>Data Element</th><th>Source Data Element</th><th>Source Module</th><th>Identified</th></tr></thead><tbody>";
                                 for (var i = 0; i < data.length; i++) {
-                                    table += "<tr>";
+                                    var rowRisk = String(data[i][6] || '0');
+                                    var rowRiskLabel = riskLabels[rowRisk] || rowRisk;
+                                    var rowType = data[i][8] || data[i][9] || '';
+                                    table += "<tr class='search-result-row' data-row-type='" + sf.escapeHtml(rowType) + "' data-row-risk='" + rowRiskLabel + "' data-row-idx='" + i + "'>";
                                     if (typeName == null) {
-                                        table += "<td><pre class='table-border-bg-inherit'>" + data[i][8] + "</pre></td>";
+                                        table += "<td><pre class='table-border-bg-inherit'>" + sf.escapeHtml(rowType) + "</pre></td>";
                                     }
                                     table += "<td class='pre-expandable pre-collapsed'><pre class='table-border-bg-inherit'>";
-                                    table += sf.replace_sfurltag(data[i][1]);
+                                    table += highlightTerm(sf.replace_sfurltag(data[i][1]), respQuery);
                                     table += "</pre><div class='pre-expand-hint'></div></td>";
                                     table += "<td class='pre-expandable pre-collapsed'><pre class='table-border-bg-inherit'>";
-                                    table += sf.replace_sfurltag(data[i][2]);
+                                    table += highlightTerm(sf.replace_sfurltag(data[i][2]), respQuery);
                                     table += "</pre><div class='pre-expand-hint'></div></td>";
                                     table += "<td><pre class='table-border-bg-inherit'>" + data[i][3];
                                     table += "</pre></td><td><pre class='table-border-bg-inherit'>" + data[i][0];
                                     table += "</pre></td>";
                                     table += "</tr>";
+                                    // Hidden detail row
+                                    var conf = data[i][4] || ''; var vis = data[i][5] || ''; var risk = data[i][6] || '';
+                                    var hash = data[i][7] || ''; var fp = data[i][11] || 0; var parentFp = data[i][12] || 0;
+                                    var mod = data[i][3] || ''; var fullData = data[i][1] || '';
+                                    table += "<tr class='search-detail-row' style='display:none;'><td colspan='99'>";
+                                    table += "<div class='search-detail-grid'>";
+                                    table += "<div><strong>Hash:</strong> <span style='font-size:10px;'>" + sf.escapeHtml(String(hash)) + "</span></div>";
+                                    table += "<div><strong>Confidence:</strong> " + conf + "</div>";
+                                    table += "<div><strong>Visibility:</strong> " + vis + "</div>";
+                                    table += "<div><strong>Risk:</strong> " + risk + "</div>";
+                                    table += "<div><strong>False Positive:</strong> " + (fp == 1 ? 'Yes' : (fp == 2 ? 'Verified' : 'No')) + "</div>";
+                                    table += "<div><strong>Source Module:</strong> " + sf.escapeHtml(String(mod)) + "</div>";
+                                    table += "</div>";
+                                    table += "<div style='padding:8px 16px;'><strong>Full Data:</strong><pre style='white-space:pre-wrap;word-break:break-all;max-height:200px;overflow:auto;'>" + sf.escapeHtml(String(fullData)) + "</pre></div>";
+                                    table += "</td></tr>";
                                 }
                                 table += "</tbody></table>"
-                                table = infoBar + table;
+                                table = infoBar + chipsBar + table;
                             }
                             $("#loader").fadeOut(500);
                             $("#mainbody").append(table);
                             $("#scansummary-content").tablesorter();
                             initExpandableCells();
-            });
+
+                            // Filter chip click handlers
+                            $(document).off('click.searchChip').on('click.searchChip', '.search-chip', function() {
+                                if ($(this).hasClass('search-chip-clear')) {
+                                    // Clear all filters
+                                    $('.search-chip').removeClass('active');
+                                    $('.search-chip-clear').hide();
+                                    $('.search-result-row').removeClass('search-row-hidden').show();
+                                    $('.search-detail-row').hide();
+                                    return;
+                                }
+                                $(this).toggleClass('active');
+                                var activeFilters = [];
+                                $('.search-chip.active').each(function() {
+                                    activeFilters.push({ type: $(this).data('filter-type'), value: $(this).data('filter-value') });
+                                });
+                                if (activeFilters.length === 0) {
+                                    $('.search-result-row').removeClass('search-row-hidden').show();
+                                    $('.search-detail-row').hide();
+                                    $('.search-chip-clear').hide();
+                                } else {
+                                    $('.search-chip-clear').show();
+                                    $('.search-result-row').each(function() {
+                                        var row = $(this);
+                                        var match = false;
+                                        for (var f = 0; f < activeFilters.length; f++) {
+                                            if (activeFilters[f].type === 'type' && row.data('row-type') === activeFilters[f].value) match = true;
+                                            if (activeFilters[f].type === 'risk' && row.data('row-risk') === activeFilters[f].value) match = true;
+                                        }
+                                        if (match) {
+                                            row.removeClass('search-row-hidden').show();
+                                        } else {
+                                            row.addClass('search-row-hidden').hide();
+                                            row.next('.search-detail-row').hide();
+                                        }
+                                    });
+                                }
+                            });
+
+                            // Expandable detail row click handler
+                            $(document).off('click.searchDetail').on('click.searchDetail', '.search-result-row', function(e) {
+                                if ($(e.target).closest('.pre-expandable, a, button, input').length) return;
+                                $(this).next('.search-detail-row').toggle();
+                            });
+            }, searchScope);
         }
 
         // Vulnerabilities page - NESSUS and BURP imports with data tables
