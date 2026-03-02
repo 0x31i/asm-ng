@@ -4328,7 +4328,7 @@ class SpiderFootWebUi:
                                 ka_type = 'uncategorized'
                             clean_val = cleanAssetValue(evData)
                             raw_val = evData if clean_val != evData else None
-                                ka_adds.append((ka_type, clean_val, raw_val))
+                            ka_adds.append((ka_type, clean_val, raw_val))
                         else:
                             fp_removes.append((eventType, evData, sourceData))
                             val_removes.append((eventType, evData, sourceData))
