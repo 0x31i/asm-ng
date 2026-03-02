@@ -10629,18 +10629,33 @@ a.data-type-btn:hover {
    SEARCH OVERHAUL — Enhanced Search Styles (Dark Theme)
    ===================================================================== */
 
-/* Scope bar */
+/* Scope bar — sits between toolbar and results */
 .search-scope-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  margin-bottom: 4px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
   border-color: rgba(255, 255, 255, 0.1);
 }
 
 /* Scope toggle */
 .search-scope-toggle {
+  display: inline-flex;
+  border-radius: 4px;
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 11px;
 }
 .search-scope-btn {
+  padding: 4px 12px;
+  cursor: pointer;
   background: #1e1e1e;
   color: rgba(255, 255, 255, 0.6);
+  transition: all 0.15s ease;
+  user-select: none;
+  font-family: inherit;
 }
 .search-scope-btn:hover {
   background: #2a2a2a;
@@ -10650,30 +10665,61 @@ a.data-type-btn:hover {
   color: white;
 }
 
-/* Save button */
+/* Save button in scope bar */
 .search-save-btn {
+  font-size: 11px;
+  padding: 3px 10px;
   color: rgba(255, 255, 255, 0.6);
   border-color: rgba(255, 255, 255, 0.15);
 }
 
-/* Hint badge */
+/* Hint badge in scope bar */
 .search-hint-badge {
+  font-size: 10px;
   color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+  margin-left: auto;
+}
+.search-hint-badge:empty {
+  display: none;
 }
 
-/* Search results info bar */
+/* Search results info bar — flex layout with text + export */
 .search-results-info {
+  padding: 12px 16px;
+  margin-bottom: 15px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   color: rgba(255, 255, 255, 0.6);
   background: linear-gradient(180deg, #1e1e1e 0%, #141414 100%);
   border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-/* Search chips */
+/* Search chips bar */
+.search-chips-bar {
+  padding: 8px 0;
+  margin-bottom: 8px;
+}
 .search-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  margin: 2px 4px;
+  border-radius: 12px;
+  font-size: 11px;
+  cursor: pointer;
   background: #2a2a2a;
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: rgba(255, 255, 255, 0.7);
+  transition: all 0.15s ease;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
 }
 .search-chip:hover {
   background: #3a3a3a;
@@ -10702,37 +10748,82 @@ mark {
 
 /* Search history dropdown */
 .search-history {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
   background: #1e1e1e;
   border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
 }
 .search-history-section {
+  padding: 6px 12px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   color: rgba(255, 255, 255, 0.4);
 }
 .search-history-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
   color: rgba(255, 255, 255, 0.7);
 }
 .search-history-item:hover {
   background: #2a2a2a;
 }
 .search-history-delete {
+  margin-left: auto;
   color: rgba(255, 255, 255, 0.3);
+  font-size: 16px;
+  padding: 0 4px;
+  line-height: 1;
 }
 .search-history-delete:hover {
   color: #ef4444;
+}
+
+/* Search row hidden by filter */
+.search-row-hidden {
+  display: none !important;
 }
 
 /* Search detail row */
 .search-detail-row {
   background: #1a1a1a;
 }
+.search-detail-row td {
+  padding: 0 !important;
+}
 .search-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  padding: 12px 16px;
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.7);
 }
 
-/* Search result row hover */
+/* Search result row hover for expandable hint */
+.search-result-row {
+  cursor: pointer;
+}
 .search-result-row:hover {
   background: rgba(37, 99, 235, 0.08);
+}
+
+/* Export button */
+.search-export-btn {
+  font-size: 11px;
+  padding: 4px 10px;
+  flex-shrink: 0;
 }
 
 /* Sort direction indicators */
