@@ -10227,8 +10227,9 @@
             // Build header
             var hHtml = '';
             if (hit.type === 'COUNTRY') {
+                var countryCount = hit.count || items.length;
                 hHtml += '<div class="globe-detail-title">' + $('<span>').text(hit.label).html() + '</div>';
-                hHtml += '<div class="globe-detail-subtitle">' + items.length + ' HIT' + (items.length !== 1 ? 'S' : '') + '</div>';
+                hHtml += '<div class="globe-detail-subtitle">' + countryCount + ' HIT' + (countryCount !== 1 ? 'S' : '') + '</div>';
             } else {
                 hHtml += '<div class="globe-detail-title">' + hit.lat.toFixed(4) + ', ' + hit.lon.toFixed(4) + '</div>';
                 hHtml += '<div class="globe-detail-subtitle">' + (hit.type || 'COORDINATES') + '</div>';
@@ -10250,6 +10251,9 @@
                 lHtml += '<div class="globe-detail-item-label">' + safeLabel + '</div>';
                 if (safeSource) {
                     lHtml += '<div class="globe-detail-item-meta">MODULE: ' + safeSource + '</div>';
+                }
+                if (item.type === 'COUNTRY' && item.count > 1) {
+                    lHtml += '<div class="globe-detail-item-meta">' + item.count + ' COUNTRY_NAME EVENTS</div>';
                 }
                 lHtml += '<div class="globe-detail-item-meta">TYPE: ' + safeTypeName + '</div>';
                 lHtml += '<a class="globe-detail-nav" onclick="event.stopPropagation(); dataEventData(\'' + globeInstanceId.replace(/'/g, "\\'") + '\', \'' + safeTypeName.replace(/'/g, "\\'") + '\', \'' + safeEvtType.replace(/'/g, "\\'") + '\', \'full\'); window.scrollTo(0,0); return false;">&#8594; VIEW IN DATA</a>';
