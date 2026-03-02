@@ -4313,7 +4313,6 @@ class SpiderFootWebUi:
                         elif fp == "2":
                             val_adds.append((eventType, evData, sourceData))
                             fp_removes.append((eventType, evData, sourceData))
-                            ka_type = None
                             if eventType in ('IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'):
                                 ka_type = 'ip'
                             elif eventType in ('DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
@@ -4325,9 +4324,10 @@ class SpiderFootWebUi:
                                 ka_type = 'human_name'
                             elif eventType in ('USERNAME', 'SOCIAL_MEDIA'):
                                 ka_type = 'username'
-                            if ka_type:
-                                clean_val = cleanAssetValue(evData)
-                                raw_val = evData if clean_val != evData else None
+                            else:
+                                ka_type = 'uncategorized'
+                            clean_val = cleanAssetValue(evData)
+                            raw_val = evData if clean_val != evData else None
                                 ka_adds.append((ka_type, clean_val, raw_val))
                         else:
                             fp_removes.append((eventType, evData, sourceData))
@@ -4625,7 +4625,7 @@ class SpiderFootWebUi:
         if not target or not asset_type or not asset_value:
             return json.dumps(["ERROR", "target, asset_type, and asset_value are required."]).encode('utf-8')
 
-        if asset_type not in ('ip', 'domain', 'email', 'human_name', 'username'):
+        if asset_type not in ('ip', 'domain', 'email', 'human_name', 'username', 'misc', 'uncategorized'):
             return json.dumps(["ERROR", "asset_type must be ip, domain, email, or human_name."]).encode('utf-8')
 
         if source not in ('CLIENT_PROVIDED', 'ANALYST_CONFIRMED'):
@@ -4675,6 +4675,35 @@ class SpiderFootWebUi:
                 return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
     @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def knownassetpurgebysource(self: 'SpiderFootWebUi', target: str = None, source: str = None) -> str:
+        """Remove all known assets for a target with a given source.
+
+        Args:
+            target: scan target
+            source: source value (e.g. 'ANALYST_CONFIRMED')
+
+        Returns:
+            str: JSON status with count removed
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not target or not source:
+            return json.dumps(["ERROR", "target and source required."]).encode('utf-8')
+
+        # Admin-only operation
+        user_role = cherrypy.session.get('role', 'analyst')
+        if user_role != 'admin':
+            return json.dumps(["ERROR", "Admin access required."]).encode('utf-8')
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                count = dbh.knownAssetRemoveBySource(target, source)
+                return json.dumps(["SUCCESS", f"Purged {count} assets with source={source}."]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
+
+    @cherrypy.expose
     def knownassetupdate(self: 'SpiderFootWebUi', id: str = None,
                          notes: str = None, source: str = None,
                          affinity: str = None, tag: str = None,
@@ -4689,7 +4718,7 @@ class SpiderFootWebUi:
         if not id:
             return json.dumps(["ERROR", "id is required."]).encode('utf-8')
 
-        if asset_type and asset_type not in ('ip', 'domain', 'email', 'human_name', 'username'):
+        if asset_type and asset_type not in ('ip', 'domain', 'email', 'human_name', 'username', 'misc', 'uncategorized'):
             return json.dumps(["ERROR", f"Invalid asset type: {asset_type}"]).encode('utf-8')
 
         if status and status not in ('CONFIRMED', 'PENDING'):
@@ -4764,7 +4793,7 @@ class SpiderFootWebUi:
         if affinity and affinity not in ('DIRECT', 'ASSOCIATED'):
             return json.dumps(["ERROR", "Invalid affinity."]).encode('utf-8')
 
-        if asset_type and asset_type not in ('ip', 'domain', 'email', 'human_name', 'username'):
+        if asset_type and asset_type not in ('ip', 'domain', 'email', 'human_name', 'username', 'misc', 'uncategorized'):
             return json.dumps(["ERROR", "Invalid asset type."]).encode('utf-8')
 
         id_list = json.loads(ids)
@@ -4870,7 +4899,7 @@ class SpiderFootWebUi:
         if not target or not asset_type or not importfile:
             return json.dumps(["ERROR", "target, asset_type, and importfile are required."]).encode('utf-8')
 
-        if asset_type not in ('ip', 'domain', 'email', 'human_name', 'username'):
+        if asset_type not in ('ip', 'domain', 'email', 'human_name', 'username', 'misc', 'uncategorized'):
             return json.dumps(["ERROR", "asset_type must be ip, domain, email, or human_name."]).encode('utf-8')
 
         current_user = cherrypy.session.get('user', 'anonymous')
@@ -5227,7 +5256,7 @@ class SpiderFootWebUi:
                     if etype in email_types: return 'email'
                     if etype in human_name_types: return 'human_name'
                     if etype in username_types: return 'username'
-                    return None
+                    return 'uncategorized'
 
                 # Collect all items for batch insert
                 batch_items = []
@@ -5441,15 +5470,19 @@ class SpiderFootWebUi:
                             ev = eventMap[h]
                             event_type = ev[4]
                             event_data = ev[1]
-                            asset_type = 'domain'
                             if event_type in ('IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'):
                                 asset_type = 'ip'
+                            elif event_type in ('DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
+                                                'CO_HOSTED_SITE', 'SIMILARDOMAIN', 'INTERNET_NAME_UNRESOLVED'):
+                                asset_type = 'domain'
                             elif event_type in ('EMAILADDR', 'AFFILIATE_EMAILADDR'):
                                 asset_type = 'email'
                             elif event_type == 'HUMAN_NAME':
                                 asset_type = 'human_name'
                             elif event_type in ('USERNAME', 'SOCIAL_MEDIA'):
                                 asset_type = 'username'
+                            else:
+                                asset_type = 'uncategorized'
                             clean_val = cleanAssetValue(event_data)
                             dbh.knownAssetAdd(target, asset_type, clean_val,
                                               source='ANALYST_CONFIRMED', addedBy=current_user,

@@ -4077,6 +4077,28 @@ class SpiderFootDb:
                 raise IOError("SQL error encountered when bulk removing known assets") from e
         return count
 
+    def knownAssetRemoveBySource(self, target: str, source: str) -> int:
+        """Remove all known assets for a target with a given source.
+
+        Args:
+            target: scan target
+            source: source value to match (e.g. 'ANALYST_CONFIRMED')
+
+        Returns:
+            int: number removed
+        """
+        if not target or not source:
+            return 0
+        qry = "DELETE FROM tbl_known_assets WHERE target = ? AND source = ?"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [target, source])
+                count = self.dbh.rowcount if self.dbh.rowcount > 0 else 0
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error encountered when removing known assets by source") from e
+        return count
+
     def knownAssetUpdate(self, assetId: int, notes: str = None, source: str = None,
                          affinity: str = None, tag: str = None,
                          assetType: str = None, status: str = None) -> bool:
@@ -4405,7 +4427,7 @@ class SpiderFootDb:
         """
         qry = "SELECT asset_type, asset_value FROM tbl_known_assets WHERE target = ?"
 
-        result = {'ip': set(), 'domain': set(), 'email': set(), 'human_name': set(), 'username': set()}
+        result = {'ip': set(), 'domain': set(), 'email': set(), 'human_name': set(), 'username': set(), 'misc': set(), 'uncategorized': set()}
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, (target,))
@@ -4428,7 +4450,7 @@ class SpiderFootDb:
         result = {'total': 0, 'confirmed': 0, 'pending': 0,
                   'client_provided': 0, 'analyst_confirmed': 0,
                   'direct': 0, 'associated': 0,
-                  'by_type': {'ip': 0, 'domain': 0, 'email': 0, 'human_name': 0, 'username': 0}}
+                  'by_type': {'ip': 0, 'domain': 0, 'email': 0, 'human_name': 0, 'username': 0, 'misc': 0, 'uncategorized': 0}}
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, (target,))

@@ -6607,6 +6607,10 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
 .assets-breakdown-card-human i { color: #f59e0b; }
 .assets-breakdown-card-username { border-left: 4px solid #10b981; }
 .assets-breakdown-card-username i { color: #10b981; }
+.assets-breakdown-card-misc { border-left: 4px solid #6b7280; }
+.assets-breakdown-card-misc i { color: #9ca3af; }
+.assets-breakdown-card-uncategorized { border-left: 4px solid #eab308; }
+.assets-breakdown-card-uncategorized i { color: #fbbf24; }
 .assets-breakdown-card-matches { border-left: 4px solid #ef4444; }
 .assets-breakdown-card-matches i { color: #ef4444; }
 .assets-breakdown-card-direct { border-left: 4px solid #22c55e; }
@@ -6615,11 +6619,12 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
 .assets-breakdown-card-associated i { color: #6366f1; }
 
 /* Balanced breakdown grid rows */
+.assets-breakdown-row-7 { grid-template-columns: repeat(7, 1fr); }
 .assets-breakdown-row-5 { grid-template-columns: repeat(5, 1fr); }
 .assets-breakdown-row-4 { grid-template-columns: repeat(4, 1fr); }
 .assets-breakdown-row-3 { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 768px) {
-  .assets-breakdown-row-5, .assets-breakdown-row-4, .assets-breakdown-row-3 { grid-template-columns: repeat(2, 1fr); }
+  .assets-breakdown-row-7, .assets-breakdown-row-5, .assets-breakdown-row-4, .assets-breakdown-row-3 { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* Callout banner */
@@ -6763,6 +6768,20 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   color: #34d399;
   border: 1px solid rgba(16, 185, 129, 0.3);
   text-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
+}
+
+.assets-type-misc {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+  border: 1px solid rgba(107, 114, 128, 0.3);
+  text-shadow: 0 0 6px rgba(107, 114, 128, 0.4);
+}
+
+.assets-type-uncategorized {
+  background: rgba(234, 179, 8, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  text-shadow: 0 0 6px rgba(234, 179, 8, 0.4);
 }
 
 /* Source badges */
