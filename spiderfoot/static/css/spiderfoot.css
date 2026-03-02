@@ -6315,44 +6315,65 @@ i.glyphicon-white,
   box-shadow: 0 0 8px rgba(34,197,94,0.1);
 }
 
-.assets-action-buttons { display: flex; gap: 8px; }
+.assets-action-buttons { display: flex; gap: 4px; align-items: center; }
 
-.assets-import-btn {
+.assets-action-btn {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 5px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.assets-action-sync {
+  background: rgba(8, 145, 178, 0.1) !important;
+  color: #0891b2 !important;
+  border: 1px solid rgba(8, 145, 178, 0.3) !important;
+}
+.assets-action-sync:hover {
+  background: rgba(8, 145, 178, 0.18) !important;
+}
+
+.assets-action-import {
   background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
   color: white !important;
   border: none !important;
-  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+}
+.assets-action-import:hover {
+  box-shadow: 0 2px 8px rgba(34,197,94,0.3);
 }
 
-.assets-add-btn {
-  background: #f1f5f9 !important;
+.assets-action-add {
+  background: rgba(34,197,94,0.1) !important;
   color: #16a34a !important;
   border: 1px solid rgba(34,197,94,0.3) !important;
-  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+}
+.assets-action-add:hover {
+  background: rgba(34,197,94,0.18) !important;
 }
 
-.assets-sync-btn {
+.assets-action-export {
   background: #f1f5f9 !important;
-  color: #0891b2 !important;
-  border: 1px solid rgba(8, 145, 178, 0.3) !important;
-  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  color: #64748b !important;
+  border: 1px solid #e2e8f0 !important;
+}
+.assets-action-export:hover {
+  background: #e2e8f0 !important;
+  color: #334155 !important;
 }
 
-.assets-sync-btn:hover {
-  background: rgba(8, 145, 178, 0.08) !important;
-  border-color: rgba(8, 145, 178, 0.5) !important;
+.assets-action-tags {
+  background: rgba(139, 92, 246, 0.1) !important;
+  color: #7c3aed !important;
+  border: 1px solid rgba(139, 92, 246, 0.3) !important;
+}
+.assets-action-tags:hover {
+  background: rgba(139, 92, 246, 0.18) !important;
 }
 
 .assets-cards-row {

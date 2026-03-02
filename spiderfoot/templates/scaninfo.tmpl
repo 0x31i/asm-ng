@@ -4350,7 +4350,7 @@
 
             var grid = "<div id='scansummary-content'>";
 
-            // Top button bar for view switching
+            // Single bar: navigation tabs left, action buttons right
             grid += "<div class='assets-view-bar'>";
             grid += "<div class='assets-view-buttons'>";
             grid += "<button id='assets-btn-overview' class='assets-view-btn assets-view-btn-active' onclick='assetsShowOverview(\"" + instanceId + "\")'>";
@@ -4360,18 +4360,17 @@
             grid += "<button id='assets-btn-potential' class='assets-view-btn' onclick='assetsShowPotential(\"" + instanceId + "\")'>";
             grid += "<i class='glyphicon glyphicon-search'></i>&nbsp;&nbsp;POTENTIAL MATCHES</button>";
             grid += "</div>";
-            // Action buttons
             grid += "<div class='assets-action-buttons'>";
-            grid += "<button class='btn btn-sm assets-sync-btn' onclick='assetsSyncVerified(\"" + instanceId + "\")'>";
-            grid += "<i class='glyphicon glyphicon-refresh'></i>&nbsp;&nbsp;SYNC VERIFIED</button>";
-            grid += "<button class='btn btn-sm assets-import-btn' onclick='assetsShowImportModal()'>";
-            grid += "<i class='glyphicon glyphicon-upload'></i>&nbsp;&nbsp;IMPORT LIST</button>";
-            grid += "<button class='btn btn-sm assets-add-btn' onclick='assetsShowAddModal()'>";
-            grid += "<i class='glyphicon glyphicon-plus'></i>&nbsp;&nbsp;ADD ASSET</button>";
-            grid += "<button class='btn btn-sm assets-add-btn' onclick='assetsExportCsv()'>";
-            grid += "<i class='glyphicon glyphicon-download-alt'></i>&nbsp;&nbsp;EXPORT CSV</button>";
-            grid += "<button class='btn btn-sm assets-import-btn' onclick='assetsShowTagModal()'>";
-            grid += "<i class='glyphicon glyphicon-tags'></i>&nbsp;&nbsp;MANAGE TAGS</button>";
+            grid += "<button class='btn btn-sm assets-action-btn assets-action-sync' onclick='assetsSyncVerified(\"" + instanceId + "\")'>";
+            grid += "<i class='glyphicon glyphicon-refresh'></i>&nbsp;SYNC</button>";
+            grid += "<button class='btn btn-sm assets-action-btn assets-action-import' onclick='assetsShowImportModal()'>";
+            grid += "<i class='glyphicon glyphicon-upload'></i>&nbsp;IMPORT</button>";
+            grid += "<button class='btn btn-sm assets-action-btn assets-action-add' onclick='assetsShowAddModal()'>";
+            grid += "<i class='glyphicon glyphicon-plus'></i>&nbsp;ADD</button>";
+            grid += "<button class='btn btn-sm assets-action-btn assets-action-export' onclick='assetsExportCsv()'>";
+            grid += "<i class='glyphicon glyphicon-download-alt'></i>&nbsp;EXPORT</button>";
+            grid += "<button class='btn btn-sm assets-action-btn assets-action-tags' onclick='assetsShowTagModal()'>";
+            grid += "<i class='glyphicon glyphicon-tags'></i>&nbsp;TAGS</button>";
             grid += "</div>";
             grid += "</div>";
 
