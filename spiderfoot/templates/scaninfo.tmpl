@@ -6209,12 +6209,28 @@
             }
         }
 
-        // Segment-based hover highlight
+        // Segment-based hover highlight — highlights matching chunks in BOTH cells
         function assetsInitSegmentHighlight() {
             var $table = $('#potential-matches-table');
             if (!$table.length) return;
 
-            // Highlight matching text segments between data and known asset on row hover
+            function getChunks(text) {
+                // Split on common delimiters: . - @ : / ' " , space { } [ ] =
+                return text.split(/[\s.\-@:\/'"',\{\}\[\]=]+/).filter(function(s) { return s.length > 2; });
+            }
+
+            function highlightCell($cell, matchingChunks) {
+                var html = $cell.html();
+                for (var i = 0; i < matchingChunks.length; i++) {
+                    var chunk = matchingChunks[i];
+                    var escaped = chunk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    // Only replace text content, skip inside HTML tags
+                    var re = new RegExp('(?![^<]*>)(' + escaped + ')', 'gi');
+                    html = html.replace(re, '<span class="assets-hl-active">$1</span>');
+                }
+                return html;
+            }
+
             $table.on('mouseenter', '.assets-match-row', function() {
                 var $row = $(this);
                 var $dataCell = $row.find('.assets-value-cell.assets-hl-cell');
@@ -6224,28 +6240,42 @@
                 var dataText = $dataCell.text().toLowerCase();
                 var knownText = $knownCell.text().toLowerCase();
 
-                // Find common segments (split both by delimiters)
-                var knownSegs = knownText.split(/[.\-@:\/]+/).filter(function(s) { return s.length > 1; });
-                if (!knownSegs.length) return;
-
-                // Highlight matching segments in the data cell
-                var dataHtml = $dataCell.html();
-                for (var i = 0; i < knownSegs.length; i++) {
-                    var seg = knownSegs[i];
-                    var re = new RegExp('(' + seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
-                    dataHtml = dataHtml.replace(re, '<span class="assets-hl-active">$1</span>');
+                // Find chunks that appear in both cells
+                var dataChunks = getChunks(dataText);
+                var knownChunks = getChunks(knownText);
+                var knownSet = {};
+                for (var i = 0; i < knownChunks.length; i++) knownSet[knownChunks[i]] = true;
+                var common = [];
+                var seen = {};
+                for (var i = 0; i < dataChunks.length; i++) {
+                    var c = dataChunks[i];
+                    if (knownSet[c] && !seen[c]) {
+                        seen[c] = true;
+                        common.push(c);
+                    }
                 }
+                if (!common.length) return;
+
+                // Sort longest first so longer matches take priority
+                common.sort(function(a, b) { return b.length - a.length; });
+
+                // Highlight both cells
                 $dataCell.data('orig-html', $dataCell.html());
-                $dataCell.html(dataHtml);
+                $knownCell.data('orig-html', $knownCell.html());
+                $dataCell.html(highlightCell($dataCell, common));
+                $knownCell.html(highlightCell($knownCell, common));
             });
 
             $table.on('mouseleave', '.assets-match-row', function() {
-                var $dataCell = $(this).find('.assets-value-cell.assets-hl-cell');
-                var origHtml = $dataCell.data('orig-html');
-                if (origHtml !== undefined) {
-                    $dataCell.html(origHtml);
-                    $dataCell.removeData('orig-html');
-                }
+                var $row = $(this);
+                $row.find('.assets-hl-cell').each(function() {
+                    var $cell = $(this);
+                    var origHtml = $cell.data('orig-html');
+                    if (origHtml !== undefined) {
+                        $cell.html(origHtml);
+                        $cell.removeData('orig-html');
+                    }
+                });
             });
         }
 
