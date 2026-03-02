@@ -30,7 +30,7 @@
 <div class="row import-cards-row">
 
   <!-- Legacy Scan Import (CSV) -->
-  <div class="col-sm-6">
+  <div class="col-sm-6 col-md-3">
     <div class="import-card import-card-lg" id="card-legacy" data-import-type="legacy">
       <div class="import-card-icon">
         <i class="glyphicon glyphicon-file"></i>
@@ -42,13 +42,37 @@
   </div>
 
   <!-- ASM-NG Scan Backup Restore (CSV) -->
-  <div class="col-sm-6">
+  <div class="col-sm-6 col-md-3">
     <div class="import-card import-card-lg import-card-alt" id="card-scan" data-import-type="scan">
       <div class="import-card-icon">
         <i class="glyphicon glyphicon-refresh"></i>
       </div>
       <h4 class="import-card-title">SCAN BACKUP RESTORE</h4>
       <p class="import-card-desc">RESTORE SCANS FROM ASM-NG / SPIDERFOOT CSV BACKUP FILES.</p>
+      <span class="import-card-filetype">.CSV</span>
+    </div>
+  </div>
+
+  <!-- Full Backup Restore (ZIP) -->
+  <div class="col-sm-6 col-md-3">
+    <div class="import-card import-card-lg import-card-backup" id="card-fullrestore" data-import-type="fullrestore">
+      <div class="import-card-icon">
+        <i class="glyphicon glyphicon-save"></i>
+      </div>
+      <h4 class="import-card-title">FULL BACKUP RESTORE</h4>
+      <p class="import-card-desc">RESTORE A COMPLETE SCAN FROM A FULL BACKUP .ZIP FILE.</p>
+      <span class="import-card-filetype">.ZIP</span>
+    </div>
+  </div>
+
+  <!-- Selective CSV Restore -->
+  <div class="col-sm-6 col-md-3">
+    <div class="import-card import-card-lg import-card-selective" id="card-selective" data-import-type="selective">
+      <div class="import-card-icon">
+        <i class="glyphicon glyphicon-th-list"></i>
+      </div>
+      <h4 class="import-card-title">SELECTIVE CSV RESTORE</h4>
+      <p class="import-card-desc">UPLOAD INDIVIDUAL CSV FILES TO ATTACH TO AN EXISTING SCAN OR CREATE A NEW ONE.</p>
       <span class="import-card-filetype">.CSV</span>
     </div>
   </div>
@@ -78,7 +102,40 @@
       </div>
     </div>
 
-    <div class="row">
+    <!-- Selective restore: CSV type dropdown -->
+    <div class="row" id="selective-csv-type-row" style="display: none;">
+      <div class="col-sm-4">
+        <div class="form-group">
+          <label for="selective-csv-type">CSV TYPE <small class="text-danger">*</small></label>
+          <select class="form-control import-scan-selector" id="selective-csv-type" name="selective_csv_type">
+            <option value="">-- SELECT CSV TYPE --</option>
+            <option value="scan_results">Scan Results</option>
+            <option value="findings">Findings</option>
+            <option value="ext_vulns">External Vulnerabilities (Nessus)</option>
+            <option value="webapp_vulns">Web App Vulnerabilities (Burp)</option>
+            <option value="correlations">Correlations</option>
+            <option value="target_fps">Target False Positives</option>
+            <option value="target_validated">Target Validated</option>
+            <option value="type_comments">Analyst Type Comments</option>
+            <option value="row_notes">Analyst Row Notes</option>
+            <option value="known_assets">Known Assets</option>
+            <option value="asset_tags">Asset Tags</option>
+            <option value="grade_snapshots">Grade Snapshots</option>
+          </select>
+          <small class="import-help-blurb" id="csv-type-help"></small>
+        </div>
+      </div>
+      <div class="col-sm-4">
+        <div class="form-group">
+          <label for="selective-scan-selector">ATTACH TO SCAN</label>
+          <select class="form-control import-scan-selector" id="selective-scan-selector" name="selective_scan_id">
+            <option value="">-- CREATE NEW SCAN --</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="row" id="import-name-target-row">
       <div class="col-sm-4">
         <div class="form-group">
           <label for="import-scan-name">SCAN NAME <small class="text-danger">*</small></label>

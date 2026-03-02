@@ -177,6 +177,28 @@ def _cached_scan_summary(dbh, scan_id: str, by: str):
     return data
 
 
+def _write_backup_csv(zf, filename, headers, rows, manifest, count_key):
+    """Write a CSV file with QUOTE_ALL into a ZipFile and update manifest counts.
+
+    Args:
+        zf: ZipFile object open for writing
+        filename (str): name of the CSV file inside the ZIP
+        headers (list): column header names
+        rows (list): iterable of row tuples/lists
+        manifest (dict): manifest dict to update with row count
+        count_key (str): key name to store the row count in manifest
+    """
+    buf = StringIO()
+    writer = csv.writer(buf, quoting=csv.QUOTE_ALL)
+    writer.writerow(headers)
+    count = 0
+    for row in rows:
+        writer.writerow([str(c) if c is not None else '' for c in row])
+        count += 1
+    zf.writestr(filename, buf.getvalue())
+    manifest[count_key] = count
+
+
 class SpiderFootWebUi:
     """SpiderFoot web interface."""
 
@@ -992,6 +1014,265 @@ class SpiderFootWebUi:
             cherrypy.response.headers['Content-Type'] = "application/csv"
             cherrypy.response.headers['Pragma'] = "no-cache"
             return fileobj.getvalue().encode('utf-8')
+
+    @cherrypy.expose
+    def scanfullbackup(self: 'SpiderFootWebUi', id: str) -> bytes:
+        """Generate a full backup ZIP for a scan.
+
+        The ZIP contains CSVs for every data layer (scan results, findings,
+        vulns, correlations, assets, analyst notes, etc.) plus a pg_dump SQL
+        file and a MANIFEST.json with metadata and row counts.
+
+        Args:
+            id (str): scan instance ID
+
+        Returns:
+            bytes: ZIP file
+        """
+        import zipfile
+        import tempfile
+
+        with SpiderFootDb(self.config) as dbh:
+            scan = dbh.scanInstanceGet(id)
+            if not scan:
+                cherrypy.response.headers['Content-Type'] = 'application/json'
+                return json.dumps({'error': 'Scan not found'}).encode('utf-8')
+
+            scan_name = scan[0]
+            target = scan[1]
+            now = dt_datetime.now()
+
+            manifest = {
+                'version': __version__,
+                'backup_date': now.strftime('%Y-%m-%d %H:%M:%S'),
+                'scan_id': id,
+                'scan_name': scan_name,
+                'target': target,
+                'scan_created': scan[2],
+                'scan_started': scan[3],
+                'scan_ended': scan[4],
+                'scan_status': scan[5],
+                'row_counts': {},
+            }
+
+            zbuf = BytesIO()
+            with zipfile.ZipFile(zbuf, 'w', zipfile.ZIP_DEFLATED) as zf:
+
+                # --- SCAN_RESULTS.csv ---
+                raw_results = dbh.scanResultEventRaw(id)
+                _write_backup_csv(
+                    zf, 'SCAN_RESULTS.csv',
+                    ['hash', 'type', 'generated', 'confidence', 'visibility',
+                     'risk', 'module', 'data', 'false_positive',
+                     'source_event_hash', 'imported_from_scan', 'tracking'],
+                    raw_results, manifest['row_counts'], 'scan_results'
+                )
+
+                # --- CORRELATIONS.csv ---
+                corr_list = dbh.scanCorrelationList(id)
+                corr_hashes = dbh.correlationEventHashes(id)
+                corr_rows = []
+                for row in corr_list:
+                    cid = row[0]
+                    hashes = corr_hashes.get(cid, [])
+                    corr_rows.append(list(row) + ['|'.join(hashes)])
+                _write_backup_csv(
+                    zf, 'CORRELATIONS.csv',
+                    ['id', 'title', 'rule_id', 'rule_risk', 'rule_name',
+                     'rule_descr', 'rule_logic', 'event_count',
+                     'event_types', 'event_hashes'],
+                    corr_rows, manifest['row_counts'], 'correlations'
+                )
+
+                # --- FINDINGS.csv ---
+                findings = dbh.scanFindingsList(id)
+                _write_backup_csv(
+                    zf, 'FINDINGS.csv',
+                    ['id', 'priority', 'category', 'tab', 'item',
+                     'description', 'recommendation', 'created'],
+                    findings, manifest['row_counts'], 'findings'
+                )
+
+                # --- EXT_VULNS.csv ---
+                nessus = dbh.scanNessusList(id)
+                _write_backup_csv(
+                    zf, 'EXT_VULNS.csv',
+                    ['id', 'severity', 'severity_number', 'plugin_name',
+                     'plugin_id', 'host_ip', 'host_name', 'operating_system',
+                     'description', 'synopsis', 'solution', 'see_also',
+                     'service_name', 'port', 'protocol', 'request',
+                     'plugin_output', 'cvss3_base_score', 'tracking', 'created'],
+                    nessus, manifest['row_counts'], 'ext_vulns'
+                )
+
+                # --- WEBAPP_VULNS.csv ---
+                burp = dbh.scanBurpList(id)
+                _write_backup_csv(
+                    zf, 'WEBAPP_VULNS.csv',
+                    ['id', 'severity', 'severity_number', 'host_ip',
+                     'host_name', 'plugin_name', 'issue_type', 'path',
+                     'location', 'confidence', 'issue_background',
+                     'issue_detail', 'solutions', 'see_also',
+                     'reference_links', 'vulnerability_classifications',
+                     'request', 'response', 'tracking', 'created'],
+                    burp, manifest['row_counts'], 'webapp_vulns'
+                )
+
+                # --- TARGET_FALSE_POSITIVES.csv ---
+                try:
+                    fps = dbh.targetFalsePositiveListFull(target)
+                except Exception:
+                    fps = []
+                _write_backup_csv(
+                    zf, 'TARGET_FALSE_POSITIVES.csv',
+                    ['id', 'target', 'event_type', 'event_data',
+                     'source_data', 'date_added', 'notes'],
+                    fps, manifest['row_counts'], 'target_false_positives'
+                )
+
+                # --- TARGET_VALIDATED.csv ---
+                try:
+                    validated = dbh.targetValidatedListFull(target)
+                except Exception:
+                    validated = []
+                _write_backup_csv(
+                    zf, 'TARGET_VALIDATED.csv',
+                    ['id', 'target', 'event_type', 'event_data',
+                     'source_data', 'date_added', 'notes'],
+                    validated, manifest['row_counts'], 'target_validated'
+                )
+
+                # --- ANALYST_TYPE_COMMENTS.csv ---
+                try:
+                    comments = dbh.typeCommentsForTarget(target)
+                except Exception:
+                    comments = []
+                _write_backup_csv(
+                    zf, 'ANALYST_TYPE_COMMENTS.csv',
+                    ['event_type', 'comment_text', 'date_modified'],
+                    comments, manifest['row_counts'], 'analyst_type_comments'
+                )
+
+                # --- ANALYST_ROW_NOTES.csv ---
+                try:
+                    notes_dict = dbh.rowNotesForTarget(target)
+                    notes_rows = [(k[0], k[1], k[2], v) for k, v in notes_dict.items()]
+                except Exception:
+                    notes_rows = []
+                _write_backup_csv(
+                    zf, 'ANALYST_ROW_NOTES.csv',
+                    ['event_type', 'event_data', 'source_data', 'note_text'],
+                    notes_rows, manifest['row_counts'], 'analyst_row_notes'
+                )
+
+                # --- KNOWN_ASSETS/*.csv ---
+                asset_type_map = {
+                    'ip': 'IPs', 'domain': 'DOMAINS', 'email': 'EMAILS',
+                    'human_name': 'HUMAN_NAMES', 'username': 'USERNAMES',
+                    'misc': 'MISC', 'uncategorized': 'UNCATEGORIZED',
+                }
+                asset_headers = [
+                    'id', 'target', 'asset_type', 'asset_value', 'source',
+                    'import_batch', 'date_added', 'added_by', 'notes',
+                    'affinity', 'tag', 'raw_value', 'status', 'entry_method',
+                    'event_type'
+                ]
+                total_assets = 0
+                for atype, fname in asset_type_map.items():
+                    try:
+                        assets = dbh.knownAssetList(target, assetType=atype)
+                    except Exception:
+                        assets = []
+                    _write_backup_csv(
+                        zf, f'KNOWN_ASSETS/{fname}.csv',
+                        asset_headers, assets,
+                        manifest['row_counts'], f'known_assets_{atype}'
+                    )
+                    total_assets += len(assets)
+                manifest['row_counts']['known_assets_total'] = total_assets
+
+                # --- ASSET_TAGS.csv ---
+                try:
+                    tags = dbh.assetTagList(target)
+                    tag_rows = [(t['id'], t['target'], t['tag'], t['color']) for t in tags]
+                except Exception:
+                    tag_rows = []
+                _write_backup_csv(
+                    zf, 'ASSET_TAGS.csv',
+                    ['id', 'target', 'tag', 'color'],
+                    tag_rows, manifest['row_counts'], 'asset_tags'
+                )
+
+                # --- GRADE_SNAPSHOT.csv ---
+                try:
+                    snapshots = dbh.gradeSnapshotsForTarget(target, include_excluded=True)
+                    snap_rows = []
+                    for s in snapshots:
+                        snap_rows.append([
+                            s.get('scan_id', ''),
+                            s.get('seed_target', ''),
+                            s.get('overall_score', 0),
+                            s.get('overall_grade', ''),
+                            json.dumps(s.get('category_scores', {})),
+                            json.dumps(s.get('finding_counts', {})),
+                            s.get('total_findings', 0),
+                            s.get('unique_findings', 0),
+                            json.dumps(s.get('correlation_counts', {})),
+                            s.get('scan_started', 0),
+                            s.get('scan_ended', 0),
+                            s.get('created', 0),
+                        ])
+                except Exception:
+                    snap_rows = []
+                _write_backup_csv(
+                    zf, 'GRADE_SNAPSHOT.csv',
+                    ['scan_instance_id', 'seed_target', 'overall_score',
+                     'overall_grade', 'category_scores', 'finding_counts',
+                     'total_findings', 'unique_findings',
+                     'correlation_counts', 'scan_started', 'scan_ended',
+                     'created'],
+                    snap_rows, manifest['row_counts'], 'grade_snapshots'
+                )
+
+                # --- SCAN_CONFIG.csv ---
+                try:
+                    config_data = dbh.scanConfigGet(id)
+                    config_rows = [(k, v) for k, v in config_data.items()]
+                except Exception:
+                    config_rows = []
+                _write_backup_csv(
+                    zf, 'SCAN_CONFIG.csv',
+                    ['key', 'value'],
+                    config_rows, manifest['row_counts'], 'scan_config'
+                )
+
+                # --- DATABASE_BACKUP.sql (non-fatal) ---
+                try:
+                    with tempfile.NamedTemporaryFile(suffix='.sql', delete=False) as tmp:
+                        tmp_path = tmp.name
+                    dbh.backupDB(tmp_path)
+                    zf.write(tmp_path, 'DATABASE_BACKUP.sql')
+                    manifest['row_counts']['database_backup'] = 'included'
+                    os.unlink(tmp_path)
+                except Exception as e:
+                    self.log.warning(f"pg_dump for backup failed (non-fatal): {e}")
+                    manifest['row_counts']['database_backup'] = 'unavailable'
+                    try:
+                        os.unlink(tmp_path)
+                    except Exception:
+                        pass
+
+                # --- MANIFEST.json ---
+                zf.writestr('MANIFEST.json', json.dumps(manifest, indent=2))
+
+            # Build filename and serve
+            safe_target = re.sub(r'[^\w\-.]', '_', target or 'Export').strip('_') or 'Export'
+            zip_filename = f"{safe_target}_FULL_BACKUP_{now.strftime('%m')}_{now.strftime('%Y')}.zip"
+
+            cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={zip_filename}'
+            cherrypy.response.headers['Content-Type'] = 'application/zip'
+            cherrypy.response.headers['Pragma'] = 'no-cache'
+            return zbuf.getvalue()
 
     @cherrypy.expose
     def scancorrelationsexport(self: 'SpiderFootWebUi', id: str, filetype: str = "csv", dialect: str = "excel") -> str:
@@ -3325,6 +3606,736 @@ class SpiderFootWebUi:
                 'event_types_count': len(set(r['plugin_name'] for r in results if r['plugin_name'])),
                 'errors': [],
             }
+
+    # ------------------------------------------------------------------
+    # Full Backup Restore — private helpers
+    # ------------------------------------------------------------------
+
+    def _restore_scan_results(self, dbh, zf, scan_id):
+        """Restore SCAN_RESULTS.csv into a scan. Inserts raw rows with original hashes."""
+        try:
+            raw = zf.read('SCAN_RESULTS.csv').decode('utf-8', errors='replace')
+        except KeyError:
+            return 0, ['SCAN_RESULTS.csv not found in ZIP']
+        reader = csv.DictReader(StringIO(raw))
+        count = 0
+        errors = []
+        for row in reader:
+            try:
+                qry = "INSERT INTO tbl_scan_results " \
+                      "(hash, type, generated, confidence, visibility, risk, " \
+                      "module, data, false_positive, source_event_hash, " \
+                      "scan_instance_id, imported_from_scan, tracking) " \
+                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                params = [
+                    row.get('hash', ''),
+                    row.get('type', ''),
+                    float(row.get('generated', 0)),
+                    int(row.get('confidence', 0)),
+                    int(row.get('visibility', 0)),
+                    int(row.get('risk', 0)),
+                    row.get('module', ''),
+                    row.get('data', ''),
+                    int(row.get('false_positive', 0)),
+                    row.get('source_event_hash', ''),
+                    scan_id,
+                    row.get('imported_from_scan', ''),
+                    int(row.get('tracking', 0)),
+                ]
+                dbh.dbh.execute(qry, params)
+                count += 1
+            except Exception as e:
+                errors.append(f"Row {count + 1}: {e}")
+        dbh.conn.commit()
+        return count, errors
+
+    def _restore_correlations(self, dbh, zf, scan_id):
+        """Restore CORRELATIONS.csv into a scan."""
+        try:
+            raw = zf.read('CORRELATIONS.csv').decode('utf-8', errors='replace')
+        except KeyError:
+            return 0, []
+        reader = csv.DictReader(StringIO(raw))
+        count = 0
+        errors = []
+        for row in reader:
+            try:
+                event_hashes_str = row.get('event_hashes', '')
+                event_hashes = [h for h in event_hashes_str.split('|') if h]
+                dbh.correlationResultCreate(
+                    instanceId=scan_id,
+                    event_hash=event_hashes[0] if event_hashes else '',
+                    ruleId=row.get('rule_id', ''),
+                    ruleName=row.get('rule_name', ''),
+                    ruleDescr=row.get('rule_descr', ''),
+                    ruleRisk=row.get('rule_risk', ''),
+                    ruleYaml=row.get('rule_logic', ''),
+                    correlationTitle=row.get('title', ''),
+                    eventHashes=event_hashes,
+                )
+                count += 1
+            except Exception as e:
+                errors.append(f"Correlation row {count + 1}: {e}")
+        return count, errors
+
+    def _restore_findings(self, dbh, zf, scan_id):
+        """Restore FINDINGS.csv into a scan (replaces existing)."""
+        try:
+            raw = zf.read('FINDINGS.csv').decode('utf-8', errors='replace')
+        except KeyError:
+            return 0, []
+        reader = csv.DictReader(StringIO(raw))
+        findings = []
+        for row in reader:
+            findings.append({
+                'priority': row.get('priority', ''),
+                'category': row.get('category', ''),
+                'tab': row.get('tab', ''),
+                'item': row.get('item', ''),
+                'description': row.get('description', ''),
+                'recommendation': row.get('recommendation', ''),
+            })
+        if findings:
+            count = dbh.scanFindingsStore(scan_id, findings)
+            return count, []
+        return 0, []
+
+    def _restore_nessus(self, dbh, zf, scan_id):
+        """Restore EXT_VULNS.csv into a scan (replaces existing)."""
+        try:
+            raw = zf.read('EXT_VULNS.csv').decode('utf-8', errors='replace')
+        except KeyError:
+            return 0, []
+        reader = csv.DictReader(StringIO(raw))
+        results = []
+        for row in reader:
+            results.append({
+                'severity': row.get('severity', ''),
+                'severity_number': int(row.get('severity_number', 0)),
+                'plugin_name': row.get('plugin_name', ''),
+                'plugin_id': row.get('plugin_id', ''),
+                'host_ip': row.get('host_ip', ''),
+                'host_name': row.get('host_name', ''),
+                'operating_system': row.get('operating_system', ''),
+                'description': row.get('description', ''),
+                'synopsis': row.get('synopsis', ''),
+                'solution': row.get('solution', ''),
+                'see_also': row.get('see_also', ''),
+                'service_name': row.get('service_name', ''),
+                'port': int(row.get('port', 0)),
+                'protocol': row.get('protocol', ''),
+                'request': row.get('request', ''),
+                'plugin_output': row.get('plugin_output', ''),
+                'cvss3_base_score': row.get('cvss3_base_score', ''),
+            })
+        if results:
+            # Preserve tracking status from backup
+            tracked = set()
+            raw2 = zf.read('EXT_VULNS.csv').decode('utf-8', errors='replace')
+            for r in csv.DictReader(StringIO(raw2)):
+                t = int(r.get('tracking', 0))
+                if t:
+                    tracked.add((r.get('plugin_name', ''), r.get('host_ip', ''), r.get('host_name', ''), t))
+            count = dbh.scanNessusStore(scan_id, results, tracked if tracked else None)
+            return count, []
+        return 0, []
+
+    def _restore_burp(self, dbh, zf, scan_id):
+        """Restore WEBAPP_VULNS.csv into a scan (replaces existing)."""
+        try:
+            raw = zf.read('WEBAPP_VULNS.csv').decode('utf-8', errors='replace')
+        except KeyError:
+            return 0, []
+        reader = csv.DictReader(StringIO(raw))
+        results = []
+        for row in reader:
+            results.append({
+                'severity': row.get('severity', ''),
+                'severity_number': int(row.get('severity_number', 0)),
+                'host_ip': row.get('host_ip', ''),
+                'host_name': row.get('host_name', ''),
+                'plugin_name': row.get('plugin_name', ''),
+                'issue_type': row.get('issue_type', ''),
+                'path': row.get('path', ''),
+                'location': row.get('location', ''),
+                'confidence': row.get('confidence', ''),
+                'issue_background': row.get('issue_background', ''),
+                'issue_detail': row.get('issue_detail', ''),
+                'solutions': row.get('solutions', ''),
+                'see_also': row.get('see_also', ''),
+                'references': row.get('reference_links', ''),
+                'vulnerability_classifications': row.get('vulnerability_classifications', ''),
+                'request': row.get('request', ''),
+                'response': row.get('response', ''),
+            })
+        if results:
+            tracked = set()
+            raw2 = zf.read('WEBAPP_VULNS.csv').decode('utf-8', errors='replace')
+            for r in csv.DictReader(StringIO(raw2)):
+                t = int(r.get('tracking', 0))
+                if t:
+                    tracked.add((r.get('plugin_name', ''), r.get('host_ip', ''), r.get('host_name', ''), t))
+            count = dbh.scanBurpStore(scan_id, results, tracked if tracked else None)
+            return count, []
+        return 0, []
+
+    def _restore_target_fps(self, dbh, zf, target):
+        """Restore TARGET_FALSE_POSITIVES.csv (adds to existing)."""
+        try:
+            raw = zf.read('TARGET_FALSE_POSITIVES.csv').decode('utf-8', errors='replace')
+        except KeyError:
+            return 0, []
+        reader = csv.DictReader(StringIO(raw))
+        count = 0
+        errors = []
+        for row in reader:
+            try:
+                dbh.targetFalsePositiveAdd(
+                    target=target,
+                    eventType=row.get('event_type', ''),
+                    eventData=row.get('event_data', ''),
+                    sourceData=row.get('source_data') or None,
+                    notes=row.get('notes') or None,
+                )
+                count += 1
+            except Exception as e:
+                errors.append(f"FP row {count + 1}: {e}")
+        return count, errors
+
+    def _restore_target_validated(self, dbh, zf, target):
+        """Restore TARGET_VALIDATED.csv (adds to existing)."""
+        try:
+            raw = zf.read('TARGET_VALIDATED.csv').decode('utf-8', errors='replace')
+        except KeyError:
+            return 0, []
+        reader = csv.DictReader(StringIO(raw))
+        count = 0
+        errors = []
+        for row in reader:
+            try:
+                dbh.targetValidatedAdd(
+                    target=target,
+                    eventType=row.get('event_type', ''),
+                    eventData=row.get('event_data', ''),
+                    sourceData=row.get('source_data') or None,
+                    notes=row.get('notes') or None,
+                )
+                count += 1
+            except Exception as e:
+                errors.append(f"Validated row {count + 1}: {e}")
+        return count, errors
+
+    def _restore_type_comments(self, dbh, zf, target):
+        """Restore ANALYST_TYPE_COMMENTS.csv (overwrites matching types)."""
+        try:
+            raw = zf.read('ANALYST_TYPE_COMMENTS.csv').decode('utf-8', errors='replace')
+        except KeyError:
+            return 0, []
+        reader = csv.DictReader(StringIO(raw))
+        count = 0
+        errors = []
+        for row in reader:
+            try:
+                dbh.typeCommentSet(
+                    target=target,
+                    eventType=row.get('event_type', ''),
+                    commentText=row.get('comment_text', ''),
+                )
+                count += 1
+            except Exception as e:
+                errors.append(f"Comment row {count + 1}: {e}")
+        return count, errors
+
+    def _restore_row_notes(self, dbh, zf, target):
+        """Restore ANALYST_ROW_NOTES.csv (overwrites matching rows)."""
+        try:
+            raw = zf.read('ANALYST_ROW_NOTES.csv').decode('utf-8', errors='replace')
+        except KeyError:
+            return 0, []
+        reader = csv.DictReader(StringIO(raw))
+        count = 0
+        errors = []
+        for row in reader:
+            try:
+                dbh.rowNoteSet(
+                    target=target,
+                    eventType=row.get('event_type', ''),
+                    eventData=row.get('event_data', ''),
+                    sourceData=row.get('source_data') or None,
+                    noteText=row.get('note_text', ''),
+                )
+                count += 1
+            except Exception as e:
+                errors.append(f"Note row {count + 1}: {e}")
+        return count, errors
+
+    def _restore_known_assets(self, dbh, zf, target):
+        """Restore KNOWN_ASSETS/*.csv files (adds new, ignores duplicates)."""
+        asset_type_map = {
+            'IPs': 'ip', 'DOMAINS': 'domain', 'EMAILS': 'email',
+            'HUMAN_NAMES': 'human_name', 'USERNAMES': 'username',
+            'MISC': 'misc', 'UNCATEGORIZED': 'uncategorized',
+        }
+        count = 0
+        errors = []
+        for fname, atype in asset_type_map.items():
+            try:
+                raw = zf.read(f'KNOWN_ASSETS/{fname}.csv').decode('utf-8', errors='replace')
+            except KeyError:
+                continue
+            reader = csv.DictReader(StringIO(raw))
+            for row in reader:
+                try:
+                    dbh.knownAssetAdd(
+                        target=target,
+                        assetType=atype,
+                        assetValue=row.get('asset_value', ''),
+                        source=row.get('source', 'CLIENT_PROVIDED'),
+                        importBatch=row.get('import_batch') or None,
+                        addedBy=row.get('added_by') or None,
+                        notes=row.get('notes') or None,
+                        affinity=row.get('affinity', 'DIRECT'),
+                        tag=row.get('tag') or None,
+                        rawValue=row.get('raw_value') or None,
+                        status=row.get('status', 'CONFIRMED'),
+                        entryMethod=row.get('entry_method', 'IMPORT'),
+                        eventType=row.get('event_type') or None,
+                    )
+                    count += 1
+                except Exception as e:
+                    errors.append(f"Asset {fname} row: {e}")
+        return count, errors
+
+    def _restore_asset_tags(self, dbh, zf, target):
+        """Restore ASSET_TAGS.csv (adds new, ignores duplicates)."""
+        try:
+            raw = zf.read('ASSET_TAGS.csv').decode('utf-8', errors='replace')
+        except KeyError:
+            return 0, []
+        reader = csv.DictReader(StringIO(raw))
+        count = 0
+        errors = []
+        for row in reader:
+            try:
+                dbh.assetTagAdd(
+                    target=target,
+                    tag=row.get('tag', ''),
+                    color=row.get('color', '#64748b'),
+                )
+                count += 1
+            except Exception as e:
+                errors.append(f"Tag row {count + 1}: {e}")
+        return count, errors
+
+    def _restore_grade_snapshots(self, dbh, zf, target):
+        """Restore GRADE_SNAPSHOT.csv."""
+        try:
+            raw = zf.read('GRADE_SNAPSHOT.csv').decode('utf-8', errors='replace')
+        except KeyError:
+            return 0, []
+        reader = csv.DictReader(StringIO(raw))
+        count = 0
+        errors = []
+        for row in reader:
+            try:
+                grade_data = {
+                    'overall_score': float(row.get('overall_score', 0)),
+                    'overall_grade': row.get('overall_grade', ''),
+                    'categories': json.loads(row.get('category_scores', '{}')),
+                }
+                corr_counts = json.loads(row.get('correlation_counts', '{}'))
+                dbh.gradeSnapshotStore(
+                    scanId=row.get('scan_instance_id', ''),
+                    target=target,
+                    gradeData=grade_data,
+                    totalFindings=int(row.get('total_findings', 0)),
+                    uniqueFindings=int(row.get('unique_findings', 0)),
+                    correlationCounts=corr_counts,
+                    scanStarted=int(float(row.get('scan_started', 0))),
+                    scanEnded=int(float(row.get('scan_ended', 0))),
+                )
+                count += 1
+            except Exception as e:
+                errors.append(f"Snapshot row {count + 1}: {e}")
+        return count, errors
+
+    def _restore_scan_config(self, dbh, zf, scan_id):
+        """Restore SCAN_CONFIG.csv."""
+        try:
+            raw = zf.read('SCAN_CONFIG.csv').decode('utf-8', errors='replace')
+        except KeyError:
+            return 0, []
+        reader = csv.DictReader(StringIO(raw))
+        config = {}
+        for row in reader:
+            config[row.get('key', '')] = row.get('value', '')
+        if config:
+            dbh.scanConfigSet(scan_id, config)
+            return len(config), []
+        return 0, []
+
+    # ------------------------------------------------------------------
+    # Full Backup Restore — endpoint
+    # ------------------------------------------------------------------
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scanfullrestore(self: 'SpiderFootWebUi', importfile=None,
+                        scan_name: str = None, target: str = None,
+                        dry_run: str = None) -> dict:
+        """Restore a complete scan from a full backup ZIP file.
+
+        Args:
+            importfile: uploaded ZIP file (CherryPy file upload Part)
+            scan_name (str): name for the restored scan
+            target (str): target for the restored scan
+            dry_run (str): if '1', validate only without importing
+
+        Returns:
+            dict: restore results
+        """
+        import zipfile
+
+        if self.currentUserRole() != 'admin':
+            return {'success': False, 'message': 'Unauthorized'}
+        if importfile is None:
+            return {'success': False, 'message': 'No file was uploaded.'}
+
+        is_dry_run = dry_run == '1'
+
+        try:
+            raw = importfile.file.read()
+        except Exception as e:
+            return {'success': False, 'message': f'Failed to read uploaded file: {e}'}
+
+        try:
+            zf = zipfile.ZipFile(BytesIO(raw))
+        except zipfile.BadZipFile:
+            return {'success': False, 'message': 'Invalid ZIP file.'}
+
+        # Validate MANIFEST.json
+        try:
+            manifest = json.loads(zf.read('MANIFEST.json').decode('utf-8'))
+        except (KeyError, json.JSONDecodeError):
+            return {'success': False, 'message': 'MANIFEST.json not found or invalid in ZIP.'}
+
+        # Use provided name/target or fall back to manifest values
+        scan_name = scan_name or manifest.get('scan_name', 'Restored Scan')
+        target = target or manifest.get('target', 'unknown')
+
+        # Count rows in each CSV for preview
+        csv_files = [n for n in zf.namelist() if n.endswith('.csv')]
+        file_counts = {}
+        for cf in csv_files:
+            try:
+                content = zf.read(cf).decode('utf-8', errors='replace')
+                row_count = max(0, content.count('\n') - 1)  # subtract header
+                file_counts[cf] = row_count
+            except Exception:
+                file_counts[cf] = 0
+
+        if is_dry_run:
+            return {
+                'success': True,
+                'dry_run': True,
+                'message': f'Validation passed. ZIP contains {len(csv_files)} CSV files.',
+                'scan_name': scan_name,
+                'target': target,
+                'manifest': manifest,
+                'file_counts': file_counts,
+                'rows_read': sum(file_counts.values()),
+                'rows_imported': 0,
+                'event_types_count': 0,
+                'errors': [],
+            }
+
+        # Actual restore
+        new_scan_id = str(uuid.uuid4())
+        all_errors = []
+        stats = {}
+
+        with SpiderFootDb(self.config) as dbh:
+            # Create scan instance
+            dbh.scanInstanceCreate(new_scan_id, scan_name, target)
+            now = str(int(time.time() * 1000))
+            dbh.scanInstanceSet(new_scan_id, started=now)
+
+            # Step 1: SCAN_RESULTS (must go first — creates event hashes)
+            c, e = self._restore_scan_results(dbh, zf, new_scan_id)
+            stats['scan_results'] = c
+            all_errors.extend(e)
+
+            # Step 2: CORRELATIONS (depends on event hashes from step 1)
+            c, e = self._restore_correlations(dbh, zf, new_scan_id)
+            stats['correlations'] = c
+            all_errors.extend(e)
+
+            # Step 3: Everything else (independent, any order)
+            c, e = self._restore_findings(dbh, zf, new_scan_id)
+            stats['findings'] = c
+            all_errors.extend(e)
+
+            c, e = self._restore_nessus(dbh, zf, new_scan_id)
+            stats['ext_vulns'] = c
+            all_errors.extend(e)
+
+            c, e = self._restore_burp(dbh, zf, new_scan_id)
+            stats['webapp_vulns'] = c
+            all_errors.extend(e)
+
+            c, e = self._restore_target_fps(dbh, zf, target)
+            stats['target_fps'] = c
+            all_errors.extend(e)
+
+            c, e = self._restore_target_validated(dbh, zf, target)
+            stats['target_validated'] = c
+            all_errors.extend(e)
+
+            c, e = self._restore_type_comments(dbh, zf, target)
+            stats['type_comments'] = c
+            all_errors.extend(e)
+
+            c, e = self._restore_row_notes(dbh, zf, target)
+            stats['row_notes'] = c
+            all_errors.extend(e)
+
+            c, e = self._restore_known_assets(dbh, zf, target)
+            stats['known_assets'] = c
+            all_errors.extend(e)
+
+            c, e = self._restore_asset_tags(dbh, zf, target)
+            stats['asset_tags'] = c
+            all_errors.extend(e)
+
+            c, e = self._restore_grade_snapshots(dbh, zf, target)
+            stats['grade_snapshots'] = c
+            all_errors.extend(e)
+
+            c, e = self._restore_scan_config(dbh, zf, new_scan_id)
+            stats['scan_config'] = c
+            all_errors.extend(e)
+
+            # Mark scan finished
+            dbh.scanInstanceSet(new_scan_id, ended=str(int(time.time() * 1000)), status='FINISHED')
+
+        total_imported = sum(stats.values())
+        return {
+            'success': True,
+            'dry_run': False,
+            'message': f'Full restore complete. {total_imported} total records imported across {len([v for v in stats.values() if v > 0])} data layers.',
+            'scan_id': new_scan_id,
+            'scan_name': scan_name,
+            'target': target,
+            'stats': stats,
+            'rows_read': sum(file_counts.values()),
+            'rows_imported': total_imported,
+            'rows_skipped': 0,
+            'event_types_count': 0,
+            'fps_imported': stats.get('target_fps', 0),
+            'validated_imported': stats.get('target_validated', 0),
+            'errors': all_errors[:50],  # cap at 50 errors in response
+        }
+
+    # ------------------------------------------------------------------
+    # Selective CSV Restore — endpoint
+    # ------------------------------------------------------------------
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scanrestoreselective(self: 'SpiderFootWebUi', importfile=None,
+                             import_type: str = None, scan_id: str = None,
+                             scan_name: str = None, target: str = None,
+                             dry_run: str = None) -> dict:
+        """Restore individual CSV files to an existing scan or a new one.
+
+        Args:
+            importfile: uploaded CSV file
+            import_type (str): CSV type (scan_results, findings, ext_vulns, etc.)
+            scan_id (str): existing scan ID to attach to (None = create new)
+            scan_name (str): name for new scan (required if scan_id is None)
+            target (str): target (required if scan_id is None, or for target-scoped data)
+            dry_run (str): if '1', validate only
+
+        Returns:
+            dict: restore results
+        """
+        import zipfile
+
+        if self.currentUserRole() != 'admin':
+            return {'success': False, 'message': 'Unauthorized'}
+        if importfile is None:
+            return {'success': False, 'message': 'No file was uploaded.'}
+        if not import_type:
+            return {'success': False, 'message': 'CSV type (import_type) is required.'}
+
+        is_dry_run = dry_run == '1'
+
+        # Target-scoped types don't need scan_id
+        target_scoped = {'target_fps', 'target_validated', 'type_comments',
+                         'row_notes', 'known_assets', 'asset_tags'}
+
+        try:
+            raw_bytes = importfile.file.read()
+            content = raw_bytes.decode('utf-8', errors='replace')
+        except Exception as e:
+            return {'success': False, 'message': f'Failed to read file: {e}'}
+
+        # Count rows for preview
+        row_count = max(0, content.count('\n') - 1)
+
+        if is_dry_run:
+            return {
+                'success': True,
+                'dry_run': True,
+                'message': f'Validation passed. {row_count} rows found in CSV.',
+                'rows_read': row_count,
+                'rows_imported': 0,
+                'event_types_count': 0,
+                'errors': [],
+            }
+
+        # For target-scoped data, we only need target
+        if import_type in target_scoped:
+            if not target:
+                # Try to get target from scan_id
+                if scan_id:
+                    with SpiderFootDb(self.config) as dbh:
+                        scan = dbh.scanInstanceGet(scan_id)
+                        if scan:
+                            target = scan[1]
+                if not target:
+                    return {'success': False, 'message': 'Target is required for this import type.'}
+
+        # For scan-scoped data, create new scan if needed
+        if import_type not in target_scoped:
+            if not scan_id:
+                if not scan_name or not target:
+                    return {'success': False, 'message': 'Scan name and target are required to create a new scan.'}
+                if import_type != 'scan_results':
+                    return {'success': False, 'message': 'SCAN_RESULTS.csv is required to create a new scan. Upload scan results first.'}
+                scan_id = str(uuid.uuid4())
+                with SpiderFootDb(self.config) as dbh:
+                    dbh.scanInstanceCreate(scan_id, scan_name, target)
+                    now = str(int(time.time() * 1000))
+                    dbh.scanInstanceSet(scan_id, started=now)
+
+        # Create a temporary ZipFile with just this one CSV so restore helpers can use it
+        zbuf = BytesIO()
+        with zipfile.ZipFile(zbuf, 'w') as tmp_zf:
+            type_to_filename = {
+                'scan_results': 'SCAN_RESULTS.csv',
+                'findings': 'FINDINGS.csv',
+                'ext_vulns': 'EXT_VULNS.csv',
+                'webapp_vulns': 'WEBAPP_VULNS.csv',
+                'correlations': 'CORRELATIONS.csv',
+                'target_fps': 'TARGET_FALSE_POSITIVES.csv',
+                'target_validated': 'TARGET_VALIDATED.csv',
+                'type_comments': 'ANALYST_TYPE_COMMENTS.csv',
+                'row_notes': 'ANALYST_ROW_NOTES.csv',
+                'asset_tags': 'ASSET_TAGS.csv',
+                'grade_snapshots': 'GRADE_SNAPSHOT.csv',
+                'scan_config': 'SCAN_CONFIG.csv',
+            }
+
+            # For known_assets, write to KNOWN_ASSETS/ directory based on content
+            if import_type == 'known_assets':
+                # Read CSV to detect asset types and split
+                reader = csv.DictReader(StringIO(content))
+                by_type = {}
+                for row in reader:
+                    atype = row.get('asset_type', 'uncategorized')
+                    by_type.setdefault(atype, []).append(row)
+
+                type_to_fname = {
+                    'ip': 'IPs', 'domain': 'DOMAINS', 'email': 'EMAILS',
+                    'human_name': 'HUMAN_NAMES', 'username': 'USERNAMES',
+                    'misc': 'MISC', 'uncategorized': 'UNCATEGORIZED',
+                }
+                for atype, rows in by_type.items():
+                    fname = type_to_fname.get(atype, 'UNCATEGORIZED')
+                    buf = StringIO()
+                    if rows:
+                        writer = csv.DictWriter(buf, fieldnames=rows[0].keys(), quoting=csv.QUOTE_ALL)
+                        writer.writeheader()
+                        writer.writerows(rows)
+                    tmp_zf.writestr(f'KNOWN_ASSETS/{fname}.csv', buf.getvalue())
+            else:
+                filename = type_to_filename.get(import_type, f'{import_type.upper()}.csv')
+                tmp_zf.writestr(filename, content)
+
+        # Re-open the temp zip for reading
+        zbuf.seek(0)
+        zf = zipfile.ZipFile(zbuf, 'r')
+
+        with SpiderFootDb(self.config) as dbh:
+            # Route to appropriate helper
+            restore_map = {
+                'scan_results': lambda: self._restore_scan_results(dbh, zf, scan_id),
+                'findings': lambda: self._restore_findings(dbh, zf, scan_id),
+                'ext_vulns': lambda: self._restore_nessus(dbh, zf, scan_id),
+                'webapp_vulns': lambda: self._restore_burp(dbh, zf, scan_id),
+                'correlations': lambda: self._restore_correlations(dbh, zf, scan_id),
+                'target_fps': lambda: self._restore_target_fps(dbh, zf, target),
+                'target_validated': lambda: self._restore_target_validated(dbh, zf, target),
+                'type_comments': lambda: self._restore_type_comments(dbh, zf, target),
+                'row_notes': lambda: self._restore_row_notes(dbh, zf, target),
+                'known_assets': lambda: self._restore_known_assets(dbh, zf, target),
+                'asset_tags': lambda: self._restore_asset_tags(dbh, zf, target),
+                'grade_snapshots': lambda: self._restore_grade_snapshots(dbh, zf, target),
+                'scan_config': lambda: self._restore_scan_config(dbh, zf, scan_id),
+            }
+
+            handler = restore_map.get(import_type)
+            if not handler:
+                return {'success': False, 'message': f'Unknown import type: {import_type}'}
+
+            c, errors = handler()
+
+            # Mark scan finished if we just created it
+            if import_type == 'scan_results' and scan_name:
+                dbh.scanInstanceSet(scan_id, ended=str(int(time.time() * 1000)), status='FINISHED')
+
+        return {
+            'success': True,
+            'dry_run': False,
+            'message': f'Selective restore complete. {c} records imported for {import_type}.',
+            'scan_id': scan_id,
+            'rows_read': row_count,
+            'rows_imported': c,
+            'rows_skipped': 0,
+            'event_types_count': 0,
+            'fps_imported': c if import_type == 'target_fps' else 0,
+            'validated_imported': c if import_type == 'target_validated' else 0,
+            'errors': errors[:50],
+        }
+
+    # ------------------------------------------------------------------
+    # Scans List JSON — for selective restore dropdown
+    # ------------------------------------------------------------------
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scanslistjson(self: 'SpiderFootWebUi') -> list:
+        """Return a JSON list of scans for the selective restore dropdown.
+
+        Returns:
+            list: [{id, name, target, status}, ...]
+        """
+        try:
+            with SpiderFootDb(self.config) as dbh:
+                data = dbh.scanInstanceList()
+                result = []
+                for row in data:
+                    result.append({
+                        'id': row[0],
+                        'name': row[1],
+                        'target': row[2],
+                        'status': row[6],
+                    })
+                return result
+        except Exception as e:
+            self.log.error(f"scanslistjson failed: {e}", exc_info=True)
+            return []
 
     @cherrypy.expose
     def clonescan(self: 'SpiderFootWebUi', id: str) -> str:

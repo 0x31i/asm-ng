@@ -8219,6 +8219,64 @@ table.discovery-path-table td.validation-status {
   color: #fff;
 }
 
+/* Full Backup Restore card (red accent) */
+.import-card-backup {
+  border-color: rgba(220, 38, 38, 0.25);
+}
+
+.import-card-backup .import-card-icon {
+  color: #dc2626;
+}
+
+.import-card-backup:hover {
+  border-color: #dc2626;
+  box-shadow: var(--shadow-md), 0 0 15px rgba(220, 38, 38, 0.25);
+  transform: translateY(-2px);
+}
+
+.import-card-backup.import-card-selected {
+  border-color: #dc2626 !important;
+  box-shadow: var(--shadow-lg), 0 0 20px rgba(220, 38, 38, 0.3) !important;
+  background: rgba(220, 38, 38, 0.05);
+}
+
+/* Selective CSV Restore card (blue accent) */
+.import-card-selective {
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+.import-card-selective .import-card-icon {
+  color: #2563eb;
+}
+
+.import-card-selective:hover {
+  border-color: #2563eb;
+  box-shadow: var(--shadow-md), 0 0 15px rgba(37, 99, 235, 0.25);
+  transform: translateY(-2px);
+}
+
+.import-card-selective.import-card-selected {
+  border-color: #2563eb !important;
+  box-shadow: var(--shadow-lg), 0 0 20px rgba(37, 99, 235, 0.3) !important;
+  background: rgba(37, 99, 235, 0.05);
+}
+
+/* Help blurb below CSV type dropdown */
+.import-help-blurb {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* Scan selector dropdown */
+.import-scan-selector {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
 /* Import Info Panel */
 .import-info-panel {
   background: var(--bg-elevated);
