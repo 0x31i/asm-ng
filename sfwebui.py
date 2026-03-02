@@ -4328,7 +4328,7 @@ class SpiderFootWebUi:
                                 ka_type = 'uncategorized'
                             clean_val = cleanAssetValue(evData)
                             raw_val = evData if clean_val != evData else None
-                            ka_adds.append((ka_type, clean_val, raw_val))
+                            ka_adds.append((ka_type, clean_val, raw_val, eventType))
                         else:
                             fp_removes.append((eventType, evData, sourceData))
                             val_removes.append((eventType, evData, sourceData))
@@ -4605,6 +4605,7 @@ class SpiderFootWebUi:
                         'display': display,
                         'status': r[12] if len(r) > 12 else 'CONFIRMED',
                         'entry_method': r[13] if len(r) > 13 else 'MANUAL',
+                        'event_type': r[14] if len(r) > 14 else None,
                     })
                 return json.dumps({'items': result, 'total': total}).encode('utf-8')
             except Exception as e:
@@ -5272,7 +5273,7 @@ class SpiderFootWebUi:
                     if asset_type:
                         clean_val = cleanAssetValue(event_data)
                         raw = event_data if clean_val != event_data else None
-                        batch_items.append((asset_type, clean_val, raw))
+                        batch_items.append((asset_type, clean_val, raw, event_type))
 
                 # Also collect from target-level validated entries
                 try:
@@ -5284,7 +5285,7 @@ class SpiderFootWebUi:
                         if asset_type:
                             clean_val = cleanAssetValue(evd)
                             raw = evd if clean_val != evd else None
-                            batch_items.append((asset_type, clean_val, raw))
+                            batch_items.append((asset_type, clean_val, raw, evt))
                 except Exception:
                     pass
 
@@ -5487,7 +5488,8 @@ class SpiderFootWebUi:
                             dbh.knownAssetAdd(target, asset_type, clean_val,
                                               source='ANALYST_CONFIRMED', addedBy=current_user,
                                               rawValue=event_data if clean_val != event_data else None,
-                                              entryMethod='VERIFY_MATCH')
+                                              entryMethod='VERIFY_MATCH',
+                                              eventType=event_type)
 
                     return json.dumps(["SUCCESS", f"Verified {len(hashes)} items."]).encode('utf-8')
 
