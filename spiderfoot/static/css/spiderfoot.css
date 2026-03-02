@@ -10314,3 +10314,110 @@ mark {
 .search-highlight-glow {
   animation: searchRowGlow 3.5s ease-out forwards;
 }
+
+/* ============================================
+   Globe Detail Sidebar (Light)
+   ============================================ */
+#globe-detail-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 260px;
+  height: 100%;
+  overflow-y: auto;
+  z-index: 20;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  border-left: 2px solid #22c55e;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--text-primary);
+}
+#globe-detail-panel.open {
+  transform: translateX(0);
+}
+#globe-detail-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
+  font-size: 16px;
+  line-height: 26px;
+  text-align: center;
+  cursor: pointer;
+  padding: 0;
+  z-index: 21;
+  transition: background 0.2s;
+}
+#globe-detail-close:hover {
+  background: rgba(239, 68, 68, 0.7);
+  border-color: rgba(239, 68, 68, 0.9);
+  color: #fff;
+}
+#globe-detail-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+.globe-detail-title {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  padding-right: 30px;
+}
+.globe-detail-subtitle {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+#globe-detail-list {
+  padding: 0;
+}
+.globe-detail-item {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.globe-detail-item-label {
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-bottom: 3px;
+  padding-left: 12px;
+  position: relative;
+}
+.globe-detail-item-label::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+}
+.globe-detail-item-meta {
+  color: var(--text-muted);
+  font-size: 10px;
+  padding-left: 12px;
+  margin-top: 1px;
+}
+.globe-detail-nav {
+  display: block;
+  color: #22c55e;
+  font-size: 10px;
+  padding-left: 12px;
+  margin-top: 4px;
+  cursor: pointer;
+  text-decoration: none;
+  pointer-events: auto;
+}
+.globe-detail-nav:hover {
+  text-decoration: underline;
+  color: #16a34a;
+}
