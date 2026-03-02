@@ -7195,16 +7195,17 @@ i.glyphicon-white,
 
 .assets-matches-compact .assets-matched-asset,
 .assets-matches-compact .assets-value-cell {
-  word-break: normal; overflow-wrap: normal; white-space: normal;
+  word-break: normal; overflow-wrap: break-word; white-space: normal;
   line-height: 1.5; padding: 6px 10px !important;
   position: relative;
 }
 .assets-col-status-cell { padding: 4px 2px !important; }
 
 .assets-seg {
-  display: inline; white-space: nowrap; cursor: pointer;
+  display: inline; cursor: pointer;
   transition: background 0.1s ease, color 0.1s ease;
   border-radius: 2px; padding: 1px 0;
+  overflow-wrap: break-word;
 }
 
 /* Override global .table > tbody > tr for match rows */
