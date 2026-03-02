@@ -843,10 +843,9 @@
                     // Auto-size analyst note textareas to fit content
                     $(this).find('.analyst-note-textarea').each(function() {
                         if (this.value) {
-                            this.style.overflow = 'hidden';
+                            this.style.overflowY = 'hidden';
                             this.style.height = 'auto';
                             this.style.height = (this.scrollHeight + 2) + 'px';
-                            this.style.overflow = '';
                         }
                     });
                 });
@@ -4665,7 +4664,7 @@
             html += "</div>";
 
             // Type Breakdown Row (5 columns)
-            html += "<div class='assets-breakdown-row assets-breakdown-row-5'>";
+            html += "<div class='assets-breakdown-row assets-breakdown-row-7'>";
             html += "<div class='assets-breakdown-card assets-breakdown-card-ip'>";
             html += "<i class='glyphicon glyphicon-map-marker'></i>";
             html += "<span class='assets-breakdown-count'>" + (counts.by_type.ip || 0) + "</span>";
@@ -4690,6 +4689,17 @@
             html += "<i class='glyphicon glyphicon-comment'></i>";
             html += "<span class='assets-breakdown-count'>" + (counts.by_type.username || 0) + "</span>";
             html += "<span class='assets-breakdown-label'>USERNAMES</span></div>";
+
+            html += "<div class='assets-breakdown-card assets-breakdown-card-uncategorized'>";
+            html += "<div class='assets-breakdown-card assets-breakdown-card-misc'>";
+            html += "<i class='glyphicon glyphicon-tag'></i>";
+            html += "<span class='assets-breakdown-count'>" + (counts.by_type.misc || 0) + "</span>";
+            html += "<span class='assets-breakdown-label'>MISC</span></div>";
+
+            html += "<div class='assets-breakdown-card assets-breakdown-card-uncategorized'>";
+            html += "<i class='glyphicon glyphicon-question-sign'></i>";
+            html += "<span class='assets-breakdown-count'>" + (counts.by_type.uncategorized || 0) + "</span>";
+            html += "<span class='assets-breakdown-label'>UNCATEGORIZED</span></div>";
 
             // Mixed Breakdown Row (3 columns)
             html += "<div class='assets-breakdown-row assets-breakdown-row-3' style='margin-top:0;'>";
@@ -4778,15 +4788,17 @@
                 var html = "";
 
                 // Count by type and source
-                var ipCount = 0, domainCount = 0, emailCount = 0, humanNameCount = 0, usernameCount = 0;
+                var ipCount = 0, domainCount = 0, emailCount = 0, humanNameCount = 0, usernameCount = 0, miscCount = 0, uncategorizedCount = 0;
                 var clientCount = 0, analystCount = 0, directCount = 0, associatedCount = 0;
                 var tagCounts = {}, untaggedCount = 0;
                 for (var i = 0; i < data.length; i++) {
                     if (data[i].asset_type === 'ip') ipCount++;
-                    if (data[i].asset_type === 'domain') domainCount++;
-                    if (data[i].asset_type === 'email') emailCount++;
-                    if (data[i].asset_type === 'human_name') humanNameCount++;
-                    if (data[i].asset_type === 'username') usernameCount++;
+                    else if (data[i].asset_type === 'domain') domainCount++;
+                    else if (data[i].asset_type === 'email') emailCount++;
+                    else if (data[i].asset_type === 'human_name') humanNameCount++;
+                    else if (data[i].asset_type === 'username') usernameCount++;
+                    else if (data[i].asset_type === 'misc') miscCount++;
+                    else uncategorizedCount++;
                     if (data[i].source === 'CLIENT_PROVIDED') clientCount++;
                     if (data[i].source === 'ANALYST_CONFIRMED') analystCount++;
                     if (data[i].affinity === 'ASSOCIATED') associatedCount++;
@@ -4824,6 +4836,10 @@
                 html += "<i class='glyphicon glyphicon-user'></i>&nbsp;&nbsp;HUMAN NAMES (" + humanNameCount + ")</button>";
                 html += "<button class='assets-known-filter-btn assets-known-filter-type" + (knownActiveFilters.type === 'username' ? " assets-known-filter-active assets-known-filter-active-type" : "") + "' onclick='knownFilterType(\"username\", this)'>";
                 html += "<i class='glyphicon glyphicon-comment'></i>&nbsp;&nbsp;USERNAMES (" + usernameCount + ")</button>";
+                html += "<button class='assets-known-filter-btn assets-known-filter-type" + (knownActiveFilters.type === 'misc' ? " assets-known-filter-active assets-known-filter-active-type" : "") + "' onclick='knownFilterType(\"misc\", this)'>";
+                html += "<i class='glyphicon glyphicon-tag'></i>&nbsp;&nbsp;MISC (" + miscCount + ")</button>";
+                html += "<button class='assets-known-filter-btn assets-known-filter-type" + (knownActiveFilters.type === 'uncategorized' ? " assets-known-filter-active assets-known-filter-active-type" : "") + "' onclick='knownFilterType(\"uncategorized\", this)'>";
+                html += "<i class='glyphicon glyphicon-question-sign'></i>&nbsp;&nbsp;UNCATEGORIZED (" + uncategorizedCount + ")</button>";
                 html += "</div>";
                 html += "<div class='assets-known-filter-group assets-known-filter-group-affinity'>";
                 html += "<span class='assets-known-filter-label assets-known-filter-label-affinity'>AFFINITY</span>";
@@ -4953,7 +4969,7 @@
                         html += "<div class='assets-detail-grid'>";
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>TYPE</div><div class='assets-detail-card-value'>";
                         html += "<select class='assets-type-select' onchange='knownChangeType(" + a.id + ", this.value)' onclick='event.stopPropagation()'>";
-                        var typeOpts = [['ip','IP'],['domain','DOMAIN'],['email','EMAIL'],['human_name','HUMAN NAME'],['username','USERNAME']];
+                        var typeOpts = [['ip','IP'],['domain','DOMAIN'],['email','EMAIL'],['human_name','HUMAN NAME'],['username','USERNAME'],['misc','MISC'],['uncategorized','UNCATEGORIZED']];
                         for (var ti = 0; ti < typeOpts.length; ti++) {
                             html += "<option value='" + typeOpts[ti][0] + "'" + (a.asset_type === typeOpts[ti][0] ? " selected" : "") + ">" + typeOpts[ti][1] + "</option>";
                         }
@@ -5115,7 +5131,7 @@
             h += "<td colspan='7'><div class='assets-detail-grid'>";
             h += "<div class='assets-detail-card'><div class='assets-detail-card-label'>TYPE</div><div class='assets-detail-card-value'>";
             h += "<select class='assets-type-select' onchange='knownChangeType(" + a.id + ", this.value)' onclick='event.stopPropagation()'>";
-            var typeOpts = [['ip','IP'],['domain','DOMAIN'],['email','EMAIL'],['human_name','HUMAN NAME'],['username','USERNAME']];
+            var typeOpts = [['ip','IP'],['domain','DOMAIN'],['email','EMAIL'],['human_name','HUMAN NAME'],['username','USERNAME'],['misc','MISC'],['uncategorized','UNCATEGORIZED']];
             for (var ti = 0; ti < typeOpts.length; ti++) {
                 h += "<option value='" + typeOpts[ti][0] + "'" + (a.asset_type === typeOpts[ti][0] ? " selected" : "") + ">" + typeOpts[ti][1] + "</option>";
             }
@@ -5528,7 +5544,9 @@
                 'domain': [['DOMAIN_NAME', 'Domain Name'], ['INTERNET_NAME', 'Internet Name']],
                 'email': [['EMAILADDR', 'Email Address']],
                 'human_name': [['HUMAN_NAME', 'Human Name']],
-                'username': [['USERNAME', 'Username'], ['SOCIAL_MEDIA', 'Social Media']]
+                'username': [['USERNAME', 'Username'], ['SOCIAL_MEDIA', 'Social Media']],
+                'misc': [],
+                'uncategorized': []
             };
             return map[assetType] || [];
         }
