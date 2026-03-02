@@ -5256,7 +5256,7 @@ class SpiderFootWebUi:
                     if etype in email_types: return 'email'
                     if etype in human_name_types: return 'human_name'
                     if etype in username_types: return 'username'
-                    return 'uncategorized'
+                    return None
 
                 # Collect all items for batch insert
                 batch_items = []

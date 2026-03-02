@@ -7852,7 +7852,7 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
 }
 
 .assets-known-col-select { width: 36px; text-align: center; vertical-align: middle; }
-.assets-known-col-type { width: 90px; }
+.assets-known-col-type { width: 120px; }
 .assets-known-col-source { width: 100px; }
 .assets-known-col-actions { width: 70px; text-align: center; }
 
