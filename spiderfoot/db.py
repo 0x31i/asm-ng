@@ -3313,6 +3313,35 @@ class SpiderFootDb:
             except DatabaseError as e:
                 raise IOError("SQL error encountered when syncing false positive across scans") from e
 
+    def syncFpByTypeAndData(self, target: str, eventType: str, eventData: str, fpFlag: int) -> int:
+        """Set the FP flag on all scan results matching type + data for a target.
+
+        Unlike syncFalsePositiveAcrossScans, this does NOT filter by source_data,
+        so it catches all instances regardless of which parent event produced them.
+
+        Args:
+            target: seed_target value
+            eventType: SF event type (e.g. 'HUMAN_NAME')
+            eventData: the event data to match
+            fpFlag: 0=unvalidated, 1=FP, 2=validated
+
+        Returns:
+            int: number of rows updated
+        """
+        qry = """UPDATE tbl_scan_results
+            SET false_positive = ?
+            WHERE scan_instance_id IN (SELECT guid FROM tbl_scan_instance WHERE seed_target = ?)
+            AND type = ?
+            AND data = ?"""
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (fpFlag, target, eventType, eventData))
+                rowcount = self.dbh.rowcount
+                self.conn.commit()
+                return rowcount
+            except DatabaseError as e:
+                raise IOError("SQL error in syncFpByTypeAndData") from e
+
     def syncFalsePositiveAcrossScansMulti(self, target: str, items: list) -> int:
         """Sync FP flags across all scans of the same target for multiple items in one transaction.
 
