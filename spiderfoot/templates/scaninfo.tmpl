@@ -4725,7 +4725,6 @@
             html += "<span class='assets-breakdown-count'>" + (counts.by_type.username || 0) + "</span>";
             html += "<span class='assets-breakdown-label'>USERNAMES</span></div>";
 
-            html += "<div class='assets-breakdown-card assets-breakdown-card-uncategorized'>";
             html += "<div class='assets-breakdown-card assets-breakdown-card-misc'>";
             html += "<i class='glyphicon glyphicon-tag'></i>";
             html += "<span class='assets-breakdown-count'>" + (counts.by_type.misc || 0) + "</span>";
@@ -4735,6 +4734,7 @@
             html += "<i class='glyphicon glyphicon-question-sign'></i>";
             html += "<span class='assets-breakdown-count'>" + (counts.by_type.uncategorized || 0) + "</span>";
             html += "<span class='assets-breakdown-label'>UNCATEGORIZED</span></div>";
+            html += "</div>";
 
             // Mixed Breakdown Row (3 columns)
             html += "<div class='assets-breakdown-row assets-breakdown-row-3' style='margin-top:0;'>";
