@@ -10193,6 +10193,7 @@ a.data-type-btn:hover {
   flex: 1;
   min-height: 36px;
   padding: 6px 10px;
+  box-sizing: border-box;
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid var(--glass-border);
   border-radius: 4px;
@@ -10925,8 +10926,9 @@ mark {
   background: rgba(255, 255, 255, 0.05);
   color: #f3f4f6;
   font-size: 16px;
-  line-height: 26px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   padding: 0;
   z-index: 21;

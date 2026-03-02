@@ -839,7 +839,17 @@
             } else {
                 row.addClass('finding-expanded');
                 detail.show();
-                detail.find('.finding-detail').slideDown(150);
+                detail.find('.finding-detail').slideDown(150, function() {
+                    // Auto-size analyst note textareas to fit content
+                    $(this).find('.analyst-note-textarea').each(function() {
+                        if (this.value) {
+                            this.style.overflow = 'hidden';
+                            this.style.height = 'auto';
+                            this.style.height = (this.scrollHeight + 2) + 'px';
+                            this.style.overflow = '';
+                        }
+                    });
+                });
                 // Lazy-load discovery path on first expand
                 var d = currentViewData ? currentViewData[idx] : null;
                 if (d && d[7] && !dpPathCache[d[7]]) {
@@ -9736,7 +9746,8 @@
             $('#globe-hotspot-count').html(countText);
 
             var cx = w / 2;
-            var cy = h * 0.85; // push center down so only upper hemisphere shows
+            var baseCy = h * 0.85; // push center down so only upper hemisphere shows
+            var cy = baseCy;
             var baseRadius = Math.min(w, h) * 0.38 * globeZoomScale; // scaled up globe
             var radius = baseRadius;
 
@@ -9839,7 +9850,7 @@
             function drawFrame() {
                 var now = Date.now();
 
-                // Zoom animation
+                // Zoom animation — also animate cy to center the dot on screen
                 if (globeFocusTarget) {
                     var targetRotY = globeFocusTarget.lon * Math.PI / 180;
                     var targetRotX = globeFocusTarget.lat * Math.PI / 180;
@@ -9854,8 +9865,10 @@
                     globeRotY += dY * 0.08;
                     globeRotX += (targetRotX - globeRotX) * 0.08;
                     globeFocusZoom += (2.2 - globeFocusZoom) * 0.08;
+                    cy += (h * 0.5 - cy) * 0.08;
                     if (Math.abs(globeFocusZoom - 2.2) < 0.01) {
                         globeFocusZoom = 2.2;
+                        cy = h * 0.5;
                         if (!globeFocused) {
                             globeFocused = true;
                             showGlobeDetail(globeFocusData);
@@ -9863,7 +9876,11 @@
                     }
                 } else if (globeFocusZoom > 1.01) {
                     globeFocusZoom += (1.0 - globeFocusZoom) * 0.08;
-                    if (Math.abs(globeFocusZoom - 1.0) < 0.01) globeFocusZoom = 1.0;
+                    cy += (baseCy - cy) * 0.08;
+                    if (Math.abs(globeFocusZoom - 1.0) < 0.01) {
+                        globeFocusZoom = 1.0;
+                        cy = baseCy;
+                    }
                 }
                 radius = baseRadius * globeFocusZoom;
 
@@ -10227,8 +10244,9 @@
             // Build header
             var hHtml = '';
             if (hit.type === 'COUNTRY') {
+                var countryCount = hit.count || items.length;
                 hHtml += '<div class="globe-detail-title">' + $('<span>').text(hit.label).html() + '</div>';
-                hHtml += '<div class="globe-detail-subtitle">' + items.length + ' HIT' + (items.length !== 1 ? 'S' : '') + '</div>';
+                hHtml += '<div class="globe-detail-subtitle">' + countryCount + ' HIT' + (countryCount !== 1 ? 'S' : '') + '</div>';
             } else {
                 hHtml += '<div class="globe-detail-title">' + hit.lat.toFixed(4) + ', ' + hit.lon.toFixed(4) + '</div>';
                 hHtml += '<div class="globe-detail-subtitle">' + (hit.type || 'COORDINATES') + '</div>';
@@ -10250,6 +10268,9 @@
                 lHtml += '<div class="globe-detail-item-label">' + safeLabel + '</div>';
                 if (safeSource) {
                     lHtml += '<div class="globe-detail-item-meta">MODULE: ' + safeSource + '</div>';
+                }
+                if (item.type === 'COUNTRY' && item.count > 1) {
+                    lHtml += '<div class="globe-detail-item-meta">' + item.count + ' COUNTRY_NAME EVENTS</div>';
                 }
                 lHtml += '<div class="globe-detail-item-meta">TYPE: ' + safeTypeName + '</div>';
                 lHtml += '<a class="globe-detail-nav" onclick="event.stopPropagation(); dataEventData(\'' + globeInstanceId.replace(/'/g, "\\'") + '\', \'' + safeTypeName.replace(/'/g, "\\'") + '\', \'' + safeEvtType.replace(/'/g, "\\'") + '\', \'full\'); window.scrollTo(0,0); return false;">&#8594; VIEW IN DATA</a>';
