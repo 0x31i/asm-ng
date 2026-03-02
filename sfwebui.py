@@ -789,8 +789,11 @@ class SpiderFootWebUi:
         value = ' '.join(remaining_terms)
 
         # Override eventType if type: operator was used
+        # Uppercase the value — event types in DB are always UPPER (e.g. EMAIL_ADDRESS)
+        # text-transform:uppercase in CSS makes input *look* uppercase but $.val()
+        # returns the original case, so we must normalise here.
         if 'type' in parsed_operators:
-            eventType = parsed_operators['type']
+            eventType = parsed_operators['type'].upper()
 
         regex = ""
         if value.startswith("/") and value.endswith("/") and len(value) > 2:
@@ -816,9 +819,9 @@ class SpiderFootWebUi:
             if scope != 'all' and id:
                 criteria['scan_id'] = id
 
-            # Add operator-based criteria
+            # Add operator-based criteria (normalise case to match DB conventions)
             if 'module' in parsed_operators:
-                criteria['module'] = parsed_operators['module']
+                criteria['module'] = parsed_operators['module'].lower()
             if 'risk' in parsed_operators:
                 criteria['risk'] = parsed_operators['risk']
             if 'after' in parsed_operators:
