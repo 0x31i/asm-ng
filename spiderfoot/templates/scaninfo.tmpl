@@ -406,6 +406,10 @@
 
         // Navigate from search result to DATA view row
         function navigateToDataRow(instanceId, eventType, eventTypeLabel, hash) {
+            // Clean up all search-specific DOM elements before leaving search view
+            $('#search-scope-bar').remove();
+            $('.search-results-info').remove();
+            $('#search-chips-bar').remove();
             _pendingScrollToHash = hash;
             dataEventData(instanceId, eventTypeLabel, eventType, 'full');
         }
@@ -11164,6 +11168,10 @@
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
             $(".data-list-legend").remove();
+            // Clean up search-specific elements
+            $("#search-scope-bar").remove();
+            $(".search-results-info").remove();
+            $("#search-chips-bar").remove();
             navTo("btn-data");
             pushViewState('btn-data', {dataType: 'ALL', dataTypeName: 'All'});
             $("#loader").show();
@@ -11259,6 +11267,10 @@
             $("#breadcrumbs").remove();
             $("#stats-bar").remove();
             $("#dedup-bar").remove();
+            // Clean up search-specific elements when entering DATA view
+            $("#search-scope-bar").remove();
+            $(".search-results-info").remove();
+            $("#search-chips-bar").remove();
             $("#loader").show();
             navTo("btn-data");
             $("#btn-export").show();
