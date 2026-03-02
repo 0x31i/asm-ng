@@ -844,7 +844,7 @@
                     $(this).find('.analyst-note-textarea').each(function() {
                         if (this.value) {
                             this.style.height = 'auto';
-                            this.style.height = this.scrollHeight + 'px';
+                            this.style.height = (this.scrollHeight + 2) + 'px';
                         }
                     });
                 });

@@ -9662,6 +9662,7 @@ a.data-type-btn:hover {
   flex: 1;
   min-height: 36px;
   padding: 6px 10px;
+  box-sizing: border-box;
   background: rgba(0, 0, 0, 0.03);
   border: 1px solid var(--glass-border);
   border-radius: 4px;
