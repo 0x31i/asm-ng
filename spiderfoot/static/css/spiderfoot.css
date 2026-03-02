@@ -7651,22 +7651,6 @@ i.glyphicon-white,
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
-/* Search results info bar */
-.search-results-info {
-  padding: 12px 16px;
-  margin-bottom: 15px;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #4b5563;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
 /* =====================================================================
    DISCOVERY PATH VIEW - Modern Overhaul (Light Theme)
    ===================================================================== */
@@ -9893,9 +9877,74 @@ a.data-type-btn:hover {
    SEARCH OVERHAUL — Enhanced Search Styles (Light Theme)
    ===================================================================== */
 
-/* Search group enhancement */
-.search-group-enhanced {
-  max-width: 320px;
+/* Scope bar — sits between toolbar and results */
+.search-scope-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  margin-bottom: 4px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+}
+
+/* Scope toggle */
+.search-scope-toggle {
+  display: inline-flex;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+  font-size: 11px;
+}
+.search-scope-btn {
+  padding: 4px 12px;
+  cursor: pointer;
+  background: #f9fafb;
+  transition: all 0.15s ease;
+  user-select: none;
+  font-family: inherit;
+}
+.search-scope-btn:hover {
+  background: #e5e7eb;
+}
+.search-scope-btn.active {
+  background: #2563eb;
+  color: white;
+}
+
+/* Save button in scope bar */
+.search-save-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+}
+
+/* Hint badge in scope bar */
+.search-hint-badge {
+  font-size: 10px;
+  color: #6b7280;
+  font-style: italic;
+  margin-left: auto;
+}
+.search-hint-badge:empty {
+  display: none;
+}
+
+/* Search results info bar — flex layout with text + export */
+.search-results-info {
+  padding: 12px 16px;
+  margin-bottom: 15px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #4b5563;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 /* Search chips bar */
@@ -9913,6 +9962,7 @@ a.data-type-btn:hover {
   background: #f3f4f6;
   border: 1px solid #d1d5db;
   transition: all 0.15s ease;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
 }
 .search-chip:hover {
   background: #e5e7eb;
@@ -9936,40 +9986,6 @@ mark {
   background: #fef08a;
   padding: 0 2px;
   border-radius: 2px;
-}
-
-/* Scope toggle */
-.search-scope-toggle {
-  display: inline-flex;
-  border-radius: 4px;
-  overflow: hidden;
-  border: 1px solid #d1d5db;
-  margin-left: 8px;
-  margin-top: 4px;
-  font-size: 11px;
-}
-.search-scope-btn {
-  padding: 4px 10px;
-  cursor: pointer;
-  background: #f9fafb;
-  transition: all 0.15s ease;
-  user-select: none;
-}
-.search-scope-btn:hover {
-  background: #e5e7eb;
-}
-.search-scope-btn.active {
-  background: #2563eb;
-  color: white;
-}
-
-/* Search hint badge */
-.search-hint-badge {
-  font-size: 10px;
-  color: #6b7280;
-  padding: 2px 8px;
-  margin-top: 2px;
-  font-style: italic;
 }
 
 /* Search history dropdown */
@@ -10047,8 +10063,7 @@ mark {
 .search-export-btn {
   font-size: 11px;
   padding: 4px 10px;
-  margin-left: 10px;
-  vertical-align: middle;
+  flex-shrink: 0;
 }
 
 /* Sort direction indicators on tablesorter */

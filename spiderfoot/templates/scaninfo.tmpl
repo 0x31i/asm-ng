@@ -132,22 +132,14 @@
               </li>
             </ul>
         </div>
-    <div class='btn-group search-group search-group-enhanced'>
-        <div id='btn-search' class='input-group' style='position:relative;'>
+    <div class='btn-group search-group'>
+        <div id='btn-search' class='input-group'>
           <input class='form-control' id='searchvalue' type='text' placeholder='Search "admin"...' autocomplete='off'>
             <div class='input-group-btn' style='width: 0px'> <!-- Chrome fix -->
               <button class='btn btn-primary' id='searchbutton' type='button' onClick="searchDirector('${id}')">
                 <i class='glyphicon glyphicon-search glyphicon glyphicon-white'></i>
               </button>
-              <button class='btn btn-default' id='searchsavebutton' type='button' onClick="saveCurrentSearch()" title='Save this search'>
-                <i class='glyphicon glyphicon-star'></i>
-              </button>
             </div>
-          <div class='search-scope-toggle'>
-            <span class='search-scope-btn active' data-scope='scan' onclick='setSearchScope("scan")'>This Scan</span>
-            <span class='search-scope-btn' data-scope='all' onclick='setSearchScope("all")'>All Scans</span>
-          </div>
-          <div id='search-hint-badge' class='search-hint-badge' style='display:none;'></div>
           <div id='search-history-dropdown' class='search-history' style='display:none;'></div>
         </div>
     </div>
@@ -530,8 +522,8 @@
                 dataType: 'json',
                 success: function(resp) {
                     if (resp && resp.success) {
-                        $('#searchsavebutton .glyphicon').css('color', '#f59e0b');
-                        setTimeout(function() { $('#searchsavebutton .glyphicon').css('color', ''); }, 2000);
+                        $('.search-save-btn .glyphicon').css('color', '#f59e0b');
+                        setTimeout(function() { $('.search-save-btn .glyphicon').css('color', ''); }, 2000);
                     }
                 }
             });
@@ -3995,9 +3987,11 @@
         }
 
         function searchResults(instanceId, query, typeName) {
-            // Remove pre-existing tables if they exist
+            // Remove pre-existing search results and related elements
             $("#scansummary-content").remove();
+            $(".search-results-info").remove();
             $("#search-chips-bar").remove();
+            $("#search-scope-bar").remove();
             $("#load-all-bar").remove();
             $("#ai-correlation-section").remove();
             $("#ai-correlation-table-single").remove();
@@ -4036,6 +4030,18 @@
                             lastSearchType = typeName;
                             lastSearchQuery = query;
 
+                            // Build scope toggle + action bar (always shown)
+                            var scopeBar = "<div id='search-scope-bar' class='search-scope-bar'>";
+                            scopeBar += "<div class='search-scope-toggle'>";
+                            scopeBar += "<span class='search-scope-btn" + (searchScope === 'scan' ? ' active' : '') + "' data-scope='scan' onclick='setSearchScope(\"scan\")'>This Scan</span>";
+                            scopeBar += "<span class='search-scope-btn" + (searchScope === 'all' ? ' active' : '') + "' data-scope='all' onclick='setSearchScope(\"all\")'>All Scans</span>";
+                            scopeBar += "</div>";
+                            scopeBar += "<div class='search-scope-actions'>";
+                            scopeBar += "<button class='btn btn-default btn-xs search-save-btn' onclick='saveCurrentSearch()' title='Save this search'><i class='glyphicon glyphicon-star'></i> Save</button>";
+                            scopeBar += "</div>";
+                            scopeBar += "<div id='search-hint-badge' class='search-hint-badge'></div>";
+                            scopeBar += "</div>";
+
                             if (data.length == 0) {
                                 var table = "<div id='scansummary-content'>&nbsp;&nbsp;No results found. Try broadening your search criteria or use plain text for substring matching.</div>";
                             } else {
@@ -4048,8 +4054,8 @@
 
                                 // Search results info bar with export button
                                 var infoBar = "<div class='search-results-info'>";
-                                infoBar += "SEARCH RESULTS &mdash; " + total + " results for &quot;" + sf.escapeHtml(respQuery) + "&quot;" + sf.escapeHtml(opStr) + " in " + scopeLabel;
-                                infoBar += " <button class='btn btn-default btn-xs search-export-btn' onclick='exportSearchCSV()' title='Export to CSV'><i class='glyphicon glyphicon-download-alt'></i> Export CSV</button>";
+                                infoBar += "<span class='search-results-text'>" + total + " results for &quot;" + sf.escapeHtml(respQuery) + "&quot;" + sf.escapeHtml(opStr) + " in " + scopeLabel + "</span>";
+                                infoBar += "<button class='btn btn-default btn-xs search-export-btn' onclick='exportSearchCSV()' title='Export to CSV'><i class='glyphicon glyphicon-download-alt'></i> Export CSV</button>";
                                 infoBar += "</div>";
 
                                 // Build filter chips from result data
@@ -4120,7 +4126,7 @@
                                 table = infoBar + chipsBar + table;
                             }
                             $("#loader").fadeOut(500);
-                            $("#mainbody").append(table);
+                            $("#mainbody").append(scopeBar + table);
                             $("#scansummary-content").tablesorter();
                             initExpandableCells();
 
