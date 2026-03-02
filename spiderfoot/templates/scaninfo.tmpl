@@ -8262,6 +8262,11 @@
             grid += "<div class='panel-body' style='padding: 0; position: relative; overflow: hidden;'>";
             grid += "<canvas id='globe-canvas' style='width: 100%; display: block; background: var(--bg-primary);'></canvas>";
             grid += "<div id='globe-tooltip' style='display:none;position:absolute;background:rgba(12,12,12,0.95);border:1px solid rgba(255,255,255,0.2);border-radius:0;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:#fff;text-transform:uppercase;letter-spacing:0.5px;pointer-events:none;z-index:10;box-shadow:0 0 15px rgba(255,255,255,0.1);text-shadow:0 0 8px rgba(255,255,255,0.5);max-width:280px;'></div>";
+            grid += "<div id='globe-detail-panel'>";
+            grid += "<button id='globe-detail-close'>&times;</button>";
+            grid += "<div id='globe-detail-header'></div>";
+            grid += "<div id='globe-detail-list'></div>";
+            grid += "</div>";
             grid += "<div id='globe-loading' style='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--font-mono);font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 10px rgba(255,255,255,0.3);'><i class='glyphicon glyphicon-refresh glyphicon-spin'></i>&nbsp;SCANNING COORDINATES...</div>";
             grid += "</div></div></div>";
             grid += "</div>"; // end row 3
@@ -8452,7 +8457,7 @@
                                 var lat = parseFloat(parts[0].trim());
                                 var lon = parseFloat(parts[1].trim());
                                 if (!isNaN(lat) && !isNaN(lon)) {
-                                    geoPoints.push({lat: lat, lon: lon, label: raw.trim(), type: 'COORDINATES', source: data[i][2] || ''});
+                                    geoPoints.push({lat: lat, lon: lon, label: raw.trim(), type: 'COORDINATES', eventType: 'PHYSICAL_COORDINATES', source: data[i][2] || ''});
                                 }
                             }
                         }
@@ -8468,7 +8473,7 @@
                                 var lat = parseFloat(latMatch[1]);
                                 var lon = parseFloat(lonMatch[1]);
                                 if (!isNaN(lat) && !isNaN(lon)) {
-                                    geoPoints.push({lat: lat, lon: lon, label: raw.substring(0, 80), type: 'GEOINFO', source: data[i][2] || ''});
+                                    geoPoints.push({lat: lat, lon: lon, label: raw.substring(0, 80), type: 'GEOINFO', eventType: 'GEOINFO', source: data[i][2] || ''});
                                 }
                             }
                             var parts = raw.split(',');
@@ -8476,7 +8481,7 @@
                                 var lat2 = parseFloat(parts[0].trim());
                                 var lon2 = parseFloat(parts[1].trim());
                                 if (!isNaN(lat2) && !isNaN(lon2) && Math.abs(lat2) <= 90 && Math.abs(lon2) <= 180) {
-                                    geoPoints.push({lat: lat2, lon: lon2, label: raw.substring(0, 80), type: 'GEOINFO', source: data[i][2] || ''});
+                                    geoPoints.push({lat: lat2, lon: lon2, label: raw.substring(0, 80), type: 'GEOINFO', eventType: 'GEOINFO', source: data[i][2] || ''});
                                 }
                             }
                         }
@@ -9507,6 +9512,20 @@
         var globeRotX = 0.3; // tilt (slight downward angle to show upper hemisphere)
         var globeRotY = 0;
         var globeHotspots = [];
+        var globeFocusTarget = null;    // {lat, lon} to animate toward
+        var globeFocusZoom = 1.0;       // 1.0 = default, 2.2 = zoomed in
+        var globeFocused = false;       // rotation paused, detail shown
+        var globeFocusData = null;      // hotspot data for focused point
+        var globeAllGeoPoints = [];     // all raw geoPoints (before dedup) for detail lookups
+        var globeCountryHits = {};      // raw countryHits map for detail lookups
+        var globeInstanceId = '';       // scan instanceId for navigation links
+
+        // Event type display names
+        var geoTypeLabels = {
+            'PHYSICAL_COORDINATES': 'Physical Coordinates',
+            'GEOINFO': 'Physical Location',
+            'COUNTRY_NAME': 'Country Name'
+        };
 
         // Country name to approximate centroid lat/lon lookup
         var countryCoords = {
@@ -9645,6 +9664,11 @@
             var canvas = document.getElementById('globe-canvas');
             if (!canvas) return;
 
+            // Store refs for click handler detail panel
+            globeAllGeoPoints = geoPoints.slice();
+            globeCountryHits = countryHits;
+            globeInstanceId = instanceId;
+
             var container = canvas.parentElement;
             var w = container.offsetWidth;
             var h = Math.max(380, Math.min(480, w * 0.6));
@@ -9693,7 +9717,7 @@
 
             // Store on hotspots for hover detection
             for (var i = 0; i < globeCountryData.length; i++) {
-                globeHotspots.push({lat: globeCountryData[i].lat, lon: globeCountryData[i].lon, label: globeCountryData[i].name, type: 'COUNTRY', source: '', count: globeCountryData[i].count, intensity: globeCountryData[i].intensity});
+                globeHotspots.push({lat: globeCountryData[i].lat, lon: globeCountryData[i].lon, label: globeCountryData[i].name, type: 'COUNTRY', eventType: 'COUNTRY_NAME', source: '', count: globeCountryData[i].count, intensity: globeCountryData[i].intensity});
             }
 
             var totalCountries = Object.keys(countryHits).length;
@@ -9708,7 +9732,8 @@
 
             var cx = w / 2;
             var cy = h * 0.85; // push center down so only upper hemisphere shows
-            var radius = Math.min(w, h) * 0.38 * globeZoomScale; // scaled up globe
+            var baseRadius = Math.min(w, h) * 0.38 * globeZoomScale; // scaled up globe
+            var radius = baseRadius;
 
             // Globe interaction
             canvas.onmousedown = function(e) {
@@ -9719,12 +9744,73 @@
                 if (globeDragging) {
                     globeRotY = globeDragStart.rotY + (e.clientX - globeDragStart.x) * 0.005;
                     globeRotX = Math.max(-Math.PI/2, Math.min(Math.PI/2, globeDragStart.rotX + (e.clientY - globeDragStart.y) * 0.005));
-                } else {
+                } else if (!globeFocused) {
                     checkGlobeHover(e, canvas, cx, cy, radius);
                 }
             };
             canvas.onmouseup = function() { globeDragging = false; };
             canvas.onmouseleave = function() { globeDragging = false; $('#globe-tooltip').hide(); };
+
+            // Click-to-zoom handler
+            canvas.onclick = function(e) {
+                if (globeDragStart && (Math.abs(e.clientX - globeDragStart.x) > 5 || Math.abs(e.clientY - globeDragStart.y) > 5)) return; // was a drag
+                var rect = canvas.getBoundingClientRect();
+                var mx = e.clientX - rect.left;
+                var my = e.clientY - rect.top;
+                var hit = null;
+
+                if (canvas._project) {
+                    for (var i = 0; i < globeHotspots.length; i++) {
+                        var pt = globeHotspots[i];
+                        var p = canvas._project(pt.lat, pt.lon);
+                        if (!p.visible) continue;
+                        var dx = mx - p.x;
+                        var dy = my - p.y;
+                        var hitRadius = pt.type === 'COUNTRY' ? 400 : 225;
+                        if (dx * dx + dy * dy < hitRadius) { hit = pt; break; }
+                    }
+                }
+
+                if (hit) {
+                    var focusData = [];
+                    if (hit.type === 'COUNTRY') {
+                        // Gather country entry + any coordinates within ±5° of centroid
+                        var cLat = hit.lat, cLon = hit.lon;
+                        focusData.push({lat: cLat, lon: cLon, label: hit.label, type: 'COUNTRY', eventType: 'COUNTRY_NAME', source: '', count: hit.count});
+                        for (var j = 0; j < globeAllGeoPoints.length; j++) {
+                            var gp = globeAllGeoPoints[j];
+                            if (Math.abs(gp.lat - cLat) <= 5 && Math.abs(gp.lon - cLon) <= 5) {
+                                focusData.push(gp);
+                            }
+                        }
+                    } else {
+                        // Coordinate hit — gather nearby coordinates within 1° radius
+                        for (var j = 0; j < globeAllGeoPoints.length; j++) {
+                            var gp = globeAllGeoPoints[j];
+                            if (Math.abs(gp.lat - hit.lat) <= 1 && Math.abs(gp.lon - hit.lon) <= 1) {
+                                focusData.push(gp);
+                            }
+                        }
+                        if (focusData.length === 0) focusData.push(hit);
+                    }
+                    globeFocusTarget = {lat: hit.lat, lon: hit.lon};
+                    globeFocusData = {hit: hit, items: focusData};
+                    globeFocused = false;
+                    $('#globe-tooltip').hide();
+                } else if (globeFocused) {
+                    unfocusGlobe();
+                }
+            };
+
+            // Escape key unfocuses
+            $(document).off('keydown.globefocus').on('keydown.globefocus', function(e) {
+                if (e.key === 'Escape' && globeFocused) unfocusGlobe();
+            });
+
+            // Close button handler
+            $(document).off('click.globeclose').on('click.globeclose', '#globe-detail-close', function() {
+                unfocusGlobe();
+            });
 
             function project(lat, lon) {
                 var phi = lat * Math.PI / 180;
@@ -9747,6 +9833,27 @@
 
             function drawFrame() {
                 var now = Date.now();
+
+                // Zoom animation
+                if (globeFocusTarget) {
+                    var targetRotY = -globeFocusTarget.lon * Math.PI / 180;
+                    var targetRotX = globeFocusTarget.lat * Math.PI / 180;
+                    globeRotY += (targetRotY - globeRotY) * 0.08;
+                    globeRotX += (targetRotX - globeRotX) * 0.08;
+                    globeFocusZoom += (2.2 - globeFocusZoom) * 0.08;
+                    if (Math.abs(globeFocusZoom - 2.2) < 0.01) {
+                        globeFocusZoom = 2.2;
+                        if (!globeFocused) {
+                            globeFocused = true;
+                            showGlobeDetail(globeFocusData);
+                        }
+                    }
+                } else if (globeFocusZoom > 1.01) {
+                    globeFocusZoom += (1.0 - globeFocusZoom) * 0.08;
+                    if (Math.abs(globeFocusZoom - 1.0) < 0.01) globeFocusZoom = 1.0;
+                }
+                radius = baseRadius * globeFocusZoom;
+
                 ctx.clearRect(0, 0, w, h);
 
                 // Background
@@ -10043,7 +10150,7 @@
                 ctx.lineWidth = 1;
                 ctx.stroke();
 
-                if (!globeDragging) {
+                if (!globeDragging && !globeFocused && !globeFocusTarget) {
                     globeRotY += 0.002;
                 }
 
@@ -10094,6 +10201,59 @@
                 }
             }
             if (!found) tooltip.hide();
+        }
+
+        function showGlobeDetail(data) {
+            if (!data) return;
+            var panel = $('#globe-detail-panel');
+            var header = $('#globe-detail-header');
+            var list = $('#globe-detail-list');
+            var hit = data.hit;
+            var items = data.items;
+
+            // Build header
+            var hHtml = '';
+            if (hit.type === 'COUNTRY') {
+                hHtml += '<div class="globe-detail-title">' + $('<span>').text(hit.label).html() + '</div>';
+                hHtml += '<div class="globe-detail-subtitle">' + items.length + ' HIT' + (items.length !== 1 ? 'S' : '') + '</div>';
+            } else {
+                hHtml += '<div class="globe-detail-title">' + hit.lat.toFixed(4) + ', ' + hit.lon.toFixed(4) + '</div>';
+                hHtml += '<div class="globe-detail-subtitle">' + (hit.type || 'COORDINATES') + '</div>';
+            }
+            header.html(hHtml);
+
+            // Build item list
+            var lHtml = '';
+            for (var i = 0; i < items.length; i++) {
+                var item = items[i];
+                var evtType = item.eventType || 'PHYSICAL_COORDINATES';
+                var typeName = geoTypeLabels[evtType] || evtType;
+                var safeLabel = $('<span>').text((item.label || '').substring(0, 60)).html();
+                var safeSource = $('<span>').text((item.source || '').substring(0, 50)).html();
+                var safeEvtType = $('<span>').text(evtType).html();
+                var safeTypeName = $('<span>').text(typeName).html();
+
+                lHtml += '<div class="globe-detail-item">';
+                lHtml += '<div class="globe-detail-item-label">' + safeLabel + '</div>';
+                if (safeSource) {
+                    lHtml += '<div class="globe-detail-item-meta">MODULE: ' + safeSource + '</div>';
+                }
+                lHtml += '<div class="globe-detail-item-meta">TYPE: ' + safeTypeName + '</div>';
+                lHtml += '<a class="globe-detail-nav" onclick="event.stopPropagation(); dataEventData(\'' + globeInstanceId.replace(/'/g, "\\'") + '\', \'' + safeTypeName.replace(/'/g, "\\'") + '\', \'' + safeEvtType.replace(/'/g, "\\'") + '\', \'full\'); window.scrollTo(0,0); return false;">&#8594; VIEW IN DATA</a>';
+                lHtml += '</div>';
+            }
+            list.html(lHtml);
+
+            // Slide panel in
+            panel.addClass('open');
+        }
+
+        function unfocusGlobe() {
+            globeFocused = false;
+            globeFocusTarget = null;
+            globeFocusData = null;
+            $('#globe-detail-panel').removeClass('open');
+            $('#globe-tooltip').hide();
         }
 
         // Simplified continent outlines for the globe

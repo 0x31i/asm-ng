@@ -18,11 +18,13 @@ document.addEventListener("DOMContentLoaded", () => {
   overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#1a1a2e;opacity:0;pointer-events:none;transition:opacity 0.15s ease;z-index:99999;';
   document.body.appendChild(overlay);
 
-  // Set initial toggle state based on current theme
+  // Set initial toggle state and body class based on current theme
   if (localStorage.getItem("theme") === "dark-theme") {
     themeToggler.checked = true;
+    document.body.classList.add('dark-mode');
   } else {
     themeToggler.checked = false;
+    document.body.classList.remove('dark-mode');
     overlay.style.background = '#ffffff';
   }
 

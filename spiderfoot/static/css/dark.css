@@ -2842,10 +2842,10 @@ tr:active,
   background: rgba(255, 255, 255, 0.05) !important;
 }
 
-/* Text selection - neutral instead of blue */
+/* Text selection */
 ::selection {
-  background: rgba(255, 255, 255, 0.2);
-  color: var(--text-primary);
+  background: rgba(99, 143, 235, 0.35);
+  color: #fff;
 }
 
 ::-moz-selection {
@@ -10787,4 +10787,113 @@ mark {
 }
 .search-highlight-glow {
   animation: searchRowGlow 3.5s ease-out forwards;
+}
+
+/* ============================================
+   Globe Detail Sidebar (Dark)
+   ============================================ */
+#globe-detail-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 260px;
+  height: 100%;
+  overflow-y: auto;
+  z-index: 20;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  border-left: 2px solid #22c55e;
+  background: rgba(12, 12, 12, 0.95);
+  color: #f3f4f6;
+  box-shadow: -4px 0 15px rgba(34, 197, 94, 0.15);
+}
+#globe-detail-panel.open {
+  transform: translateX(0);
+}
+#globe-detail-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f3f4f6;
+  font-size: 16px;
+  line-height: 26px;
+  text-align: center;
+  cursor: pointer;
+  padding: 0;
+  z-index: 21;
+  transition: background 0.2s;
+}
+#globe-detail-close:hover {
+  background: rgba(239, 68, 68, 0.7);
+  border-color: rgba(239, 68, 68, 0.9);
+}
+#globe-detail-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.globe-detail-title {
+  font-weight: 700;
+  font-size: 12px;
+  color: #fff;
+  margin-bottom: 4px;
+  padding-right: 30px;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+.globe-detail-subtitle {
+  color: #9ca3af;
+  font-size: 10px;
+}
+#globe-detail-list {
+  padding: 0;
+}
+.globe-detail-item {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.globe-detail-item-label {
+  color: #d1d5db;
+  font-weight: 600;
+  margin-bottom: 3px;
+  padding-left: 12px;
+  position: relative;
+}
+.globe-detail-item-label::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+}
+.globe-detail-item-meta {
+  color: #6b7280;
+  font-size: 10px;
+  padding-left: 12px;
+  margin-top: 1px;
+}
+.globe-detail-nav {
+  display: block;
+  color: #22c55e;
+  font-size: 10px;
+  padding-left: 12px;
+  margin-top: 4px;
+  cursor: pointer;
+  text-decoration: none;
+  pointer-events: auto;
+}
+.globe-detail-nav:hover {
+  text-decoration: underline;
+  color: #4ade80;
 }
