@@ -4652,6 +4652,9 @@ class SpiderFootWebUi:
     def knownassetremove(self: 'SpiderFootWebUi', id: str = None, ids: str = None) -> str:
         """Remove known asset(s) by ID.
 
+        For SYNC_VERIFIED / VERIFY_MATCH entries, also propagates FP status
+        back to the scan data so the entry won't be re-imported on next sync.
+
         Args:
             id: single asset ID
             ids: JSON array of IDs for bulk removal
@@ -4661,13 +4664,41 @@ class SpiderFootWebUi:
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
+        def _propagate_fp(dbh, assets):
+            """Mark scan data as FP for SYNC_VERIFIED/VERIFY_MATCH known assets."""
+            for a in assets:
+                entry_method = a[13] if len(a) > 13 else 'MANUAL'
+                event_type = a[14] if len(a) > 14 else None
+                if entry_method not in ('SYNC_VERIFIED', 'VERIFY_MATCH'):
+                    continue
+                if not event_type:
+                    continue
+                target = a[1]
+                event_data = a[11] or a[3]  # raw_value or asset_value
+                try:
+                    # Add target-level FP so it persists across scans
+                    dbh.targetFalsePositiveAdd(target, event_type, event_data)
+                    # Remove target-level validated so it's no longer considered verified
+                    dbh.targetValidatedRemove(target, event_type, event_data)
+                    # Sync FP flag (1) across all scans for this target
+                    dbh.syncFalsePositiveAcrossScans(target, event_type, event_data, event_data, 1)
+                except Exception:
+                    pass  # best-effort — don't fail the removal
+
         with SpiderFootDb(self.config) as dbh:
             try:
                 if ids:
                     id_list = json.loads(ids)
+                    # Look up assets before deletion to propagate FP
+                    assets = dbh.knownAssetGetBulk(id_list)
+                    _propagate_fp(dbh, assets)
                     count = dbh.knownAssetRemoveBulk(id_list)
                     return json.dumps(["SUCCESS", f"Removed {count} assets."]).encode('utf-8')
                 elif id:
+                    # Look up asset before deletion to propagate FP
+                    asset = dbh.knownAssetGet(int(id))
+                    if asset:
+                        _propagate_fp(dbh, [asset])
                     dbh.knownAssetRemove(assetId=int(id))
                     return json.dumps(["SUCCESS", ""]).encode('utf-8')
                 else:
