@@ -4294,7 +4294,8 @@ class SpiderFootWebUi:
                         dbh.targetValidatedRemoveBatch(target, val_removes)
                     if ka_adds:
                         dbh.knownAssetAddBatch(target, ka_adds,
-                                               source='ANALYST_CONFIRMED', addedBy=current_user)
+                                               source='ANALYST_CONFIRMED', addedBy=current_user,
+                                               entryMethod='VERIFY_MATCH')
 
                     # Defer cross-scan sync to background thread — doesn't block response
                     if sync_items:
@@ -4501,28 +4502,41 @@ class SpiderFootWebUi:
     # -------------------------------------------------------------------
 
     @cherrypy.expose
-    def knownassetlist(self: 'SpiderFootWebUi', target: str = None, asset_type: str = None) -> str:
+    def knownassetlist(self: 'SpiderFootWebUi', target: str = None, asset_type: str = None,
+                       status: str = None, limit: str = '0', offset: str = '0') -> str:
         """List known assets for a target.
 
         Args:
             target: scan target
             asset_type: optional filter by type (ip, domain, email, human_name)
+            status: optional filter by status ('CONFIRMED' or 'PENDING')
+            limit: max rows (0 = all)
+            offset: skip rows
 
         Returns:
-            str: JSON list of assets
+            str: JSON object with 'items' list and 'total' count
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
         if not target:
-            return json.dumps([]).encode('utf-8')
+            return json.dumps({'items': [], 'total': 0}).encode('utf-8')
+
+        try:
+            limit_int = int(limit)
+            offset_int = int(offset)
+        except (ValueError, TypeError):
+            limit_int = 0
+            offset_int = 0
 
         with SpiderFootDb(self.config) as dbh:
             try:
-                rows = dbh.knownAssetList(target, asset_type)
+                total = dbh.knownAssetTotal(target, status=status)
+                rows = dbh.knownAssetList(target, asset_type, status=status,
+                                          limit=limit_int, offset=offset_int)
                 result = []
                 for r in rows:
                     raw = r[11] if len(r) > 11 else None
-                    display = parseAssetDisplay(raw or r[3], r[2])
+                    display = parseAssetDisplay(raw, r[2]) if raw else {'clean_value': r[3], 'platform': None, 'username': None, 'url': None}
                     result.append({
                         'id': r[0],
                         'target': r[1],
@@ -4537,10 +4551,12 @@ class SpiderFootWebUi:
                         'tag': r[10],
                         'raw_value': raw,
                         'display': display,
+                        'status': r[12] if len(r) > 12 else 'CONFIRMED',
+                        'entry_method': r[13] if len(r) > 13 else 'MANUAL',
                     })
-                return json.dumps(result).encode('utf-8')
+                return json.dumps({'items': result, 'total': total}).encode('utf-8')
             except Exception as e:
-                return json.dumps([]).encode('utf-8')
+                return json.dumps({'items': [], 'total': 0}).encode('utf-8')
 
     @cherrypy.expose
     def knownassetadd(self: 'SpiderFootWebUi', target: str = None, asset_type: str = None,
@@ -4569,9 +4585,12 @@ class SpiderFootWebUi:
         current_user = cherrypy.session.get('user', 'anonymous')
         with SpiderFootDb(self.config) as dbh:
             try:
-                dbh.knownAssetAdd(target, asset_type, asset_value.strip(),
+                inserted = dbh.knownAssetAdd(target, asset_type, asset_value.strip(),
                                   source=source, addedBy=current_user, notes=notes,
-                                  affinity=affinity, tag=tag if tag else None)
+                                  affinity=affinity, tag=tag if tag else None,
+                                  status='CONFIRMED', entryMethod='MANUAL')
+                if not inserted:
+                    return json.dumps(["DUPLICATE", "This asset already exists."]).encode('utf-8')
                 return json.dumps(["SUCCESS", ""]).encode('utf-8')
             except Exception as e:
                 return json.dumps(["ERROR", str(e)]).encode('utf-8')
@@ -4607,7 +4626,7 @@ class SpiderFootWebUi:
     def knownassetupdate(self: 'SpiderFootWebUi', id: str = None,
                          notes: str = None, source: str = None,
                          affinity: str = None, tag: str = None,
-                         asset_type: str = None) -> str:
+                         asset_type: str = None, status: str = None) -> str:
         """Update a known asset's metadata including type reassignment.
 
         Returns:
@@ -4621,17 +4640,164 @@ class SpiderFootWebUi:
         if asset_type and asset_type not in ('ip', 'domain', 'email', 'human_name', 'username'):
             return json.dumps(["ERROR", f"Invalid asset type: {asset_type}"]).encode('utf-8')
 
+        if status and status not in ('CONFIRMED', 'PENDING'):
+            return json.dumps(["ERROR", f"Invalid status: {status}"]).encode('utf-8')
+
         with SpiderFootDb(self.config) as dbh:
+            # Pre-check for type change collision so we can offer merge
+            if asset_type:
+                current = dbh.knownAssetGet(int(id))
+                if current and current[2] != asset_type:
+                    conflict = dbh.knownAssetFindConflict(current[1], asset_type, current[3], excludeId=int(id))
+                    if conflict:
+                        return json.dumps(["CONFLICT",
+                            f"A {asset_type.upper()} entry for {current[3]} already exists.",
+                            conflict[0]]).encode('utf-8')
+
             try:
                 dbh.knownAssetUpdate(int(id), notes=notes, source=source,
                                      affinity=affinity, tag=tag,
-                                     assetType=asset_type)
+                                     assetType=asset_type, status=status)
                 return json.dumps(["SUCCESS", ""]).encode('utf-8')
             except Exception as e:
                 msg = str(e)
                 if 'unique' in msg.lower() or 'duplicate' in msg.lower():
                     return json.dumps(["ERROR", "An asset with that type and value already exists."]).encode('utf-8')
                 return json.dumps(["ERROR", msg]).encode('utf-8')
+
+    @cherrypy.expose
+    def knownassetmerge(self: 'SpiderFootWebUi', source_id: str = None,
+                        target_id: str = None) -> str:
+        """Merge two known asset rows. Source is deleted, target survives.
+
+        Args:
+            source_id: the row being merged away
+            target_id: the row that survives
+
+        Returns:
+            str: JSON status
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not source_id or not target_id:
+            return json.dumps(["ERROR", "source_id and target_id are required."]).encode('utf-8')
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                dbh.knownAssetMerge(int(source_id), int(target_id))
+                return json.dumps(["SUCCESS", "Assets merged."]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
+
+    @cherrypy.expose
+    def knownassetbulkupdate(self: 'SpiderFootWebUi', ids: str = None,
+                              affinity: str = None, tag: str = None,
+                              asset_type: str = None) -> str:
+        """Bulk update a property on multiple known assets.
+
+        Args:
+            ids: JSON array of asset IDs
+            affinity: optional new affinity
+            tag: optional new tag (empty string to remove)
+            asset_type: optional new asset type
+
+        Returns:
+            str: JSON status
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not ids:
+            return json.dumps(["ERROR", "ids is required."]).encode('utf-8')
+
+        if affinity and affinity not in ('DIRECT', 'ASSOCIATED'):
+            return json.dumps(["ERROR", "Invalid affinity."]).encode('utf-8')
+
+        if asset_type and asset_type not in ('ip', 'domain', 'email', 'human_name', 'username'):
+            return json.dumps(["ERROR", "Invalid asset type."]).encode('utf-8')
+
+        id_list = json.loads(ids)
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                count = dbh.knownAssetBulkUpdate(id_list, affinity=affinity,
+                                                  tag=tag, assetType=asset_type)
+                return json.dumps(["SUCCESS", f"Updated {count} assets."]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
+
+    @cherrypy.expose
+    def knownassetsetstatus(self: 'SpiderFootWebUi', id: str = None,
+                            ids: str = None, status: str = None) -> str:
+        """Set the status of one or more known assets (CONFIRMED/PENDING).
+
+        Args:
+            id: single asset ID
+            ids: JSON array of asset IDs for bulk update
+            status: 'CONFIRMED' or 'PENDING'
+
+        Returns:
+            str: JSON status
+        """
+        cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+
+        if not status or status not in ('CONFIRMED', 'PENDING'):
+            return json.dumps(["ERROR", "status must be CONFIRMED or PENDING."]).encode('utf-8')
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                if ids:
+                    id_list = json.loads(ids)
+                    count = dbh.knownAssetSetStatusBulk(id_list, status)
+                    return json.dumps(["SUCCESS", f"Updated {count} assets to {status}."]).encode('utf-8')
+                elif id:
+                    dbh.knownAssetSetStatus(int(id), status)
+                    return json.dumps(["SUCCESS", ""]).encode('utf-8')
+                else:
+                    return json.dumps(["ERROR", "id or ids required."]).encode('utf-8')
+            except Exception as e:
+                return json.dumps(["ERROR", str(e)]).encode('utf-8')
+
+    @cherrypy.expose
+    def knownassetexport(self: 'SpiderFootWebUi', target: str = None,
+                         asset_type: str = None, fmt: str = 'csv') -> bytes:
+        """Export known assets as CSV.
+
+        Args:
+            target: scan target
+            asset_type: optional filter by type
+            fmt: 'csv' (default)
+
+        Returns:
+            bytes: CSV file download
+        """
+        if not target:
+            cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+            return json.dumps(["ERROR", "target is required."]).encode('utf-8')
+
+        cherrypy.response.headers['Content-Type'] = "text/csv; charset=utf-8"
+        cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="known_assets_{target}.csv"'
+
+        with SpiderFootDb(self.config) as dbh:
+            rows = dbh.knownAssetList(target, asset_type, status='CONFIRMED')
+            lines = ['type,value,source,affinity,tag,added_by,date_added,entry_method,notes']
+            for r in rows:
+                # r: [id, target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, raw_value, status, entry_method]
+                def esc(v):
+                    v = str(v) if v else ''
+                    if ',' in v or '"' in v or '\n' in v:
+                        return '"' + v.replace('"', '""') + '"'
+                    return v
+                lines.append(','.join([
+                    esc(r[2]),   # asset_type
+                    esc(r[3]),   # asset_value
+                    esc(r[4]),   # source
+                    esc(r[9]),   # affinity
+                    esc(r[10]),  # tag
+                    esc(r[7]),   # added_by
+                    esc(r[6]),   # date_added
+                    esc(r[13] if len(r) > 13 else 'MANUAL'),  # entry_method
+                    esc(r[8]),   # notes
+                ]))
+            return '\n'.join(lines).encode('utf-8')
 
     @cherrypy.expose
     def knownassetimport(self: 'SpiderFootWebUi', target: str = None,
@@ -4732,7 +4898,9 @@ class SpiderFootWebUi:
                                               importBatch=import_batch,
                                               addedBy=current_user,
                                               affinity=affinity if affinity in ('DIRECT', 'ASSOCIATED') else 'DIRECT',
-                                              tag=tag if tag else None)
+                                              tag=tag if tag else None,
+                                              status='PENDING',
+                                              entryMethod='IMPORT')
                 dbh.assetImportHistoryAdd(target, asset_type, file_name, count, current_user)
                 return json.dumps(["SUCCESS", f"Imported {count} new assets ({len(assets)} total in file)."]).encode('utf-8')
             except Exception as e:
@@ -4771,6 +4939,7 @@ class SpiderFootWebUi:
                 for m in matches:
                     m['isTargetFp'] = 0
                     m['isTargetValidated'] = 0
+                    m['isPendingAsset'] = False
                     # Check target-level status
                     for fp_tuple in targetFps:
                         if fp_tuple[0] == m['type'] and fp_tuple[1] == m['data']:
@@ -4780,6 +4949,32 @@ class SpiderFootWebUi:
                         if val_tuple[0] == m['type'] and val_tuple[1] == m['data']:
                             m['isTargetValidated'] = 1
                             break
+
+                # Append PENDING assets as rows in the potential matches list
+                pendingAssets = dbh.knownAssetList(target, status='PENDING')
+                for pa in pendingAssets:
+                    raw = pa[11] if len(pa) > 11 else None
+                    display = parseAssetDisplay(raw or pa[3], pa[2])
+                    matches.append({
+                        'hash': f'pending-asset-{pa[0]}',
+                        'type': pa[2].upper(),
+                        'data': pa[3],
+                        'module': pa[4],
+                        'matched_asset': pa[3],
+                        'match_type': 'pending_import',
+                        'confidence': 100,
+                        'false_positive': 0,
+                        'isTargetFp': 0,
+                        'isTargetValidated': 0,
+                        'isPendingAsset': True,
+                        'pendingAssetId': pa[0],
+                        'source': pa[4],
+                        'affinity': pa[9] if len(pa) > 9 else 'DIRECT',
+                        'added_by': pa[7],
+                        'notes': pa[8],
+                        'date_added': pa[6],
+                        'display': display,
+                    })
 
                 return json.dumps(matches).encode('utf-8')
             except Exception as e:
@@ -4815,7 +5010,7 @@ class SpiderFootWebUi:
             return b''
 
         with SpiderFootDb(self.config) as dbh:
-            rows = dbh.knownAssetList(target)
+            rows = dbh.knownAssetList(target, status='CONFIRMED')
 
             if format == 'excel':
                 cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -4864,7 +5059,7 @@ class SpiderFootWebUi:
         import zipfile
 
         with SpiderFootDb(self.config) as dbh:
-            rows = dbh.knownAssetList(target)
+            rows = dbh.knownAssetList(target, status='CONFIRMED')
 
             # Separate rows by asset type
             asset_buckets = {
@@ -4967,7 +5162,6 @@ class SpiderFootWebUi:
 
                 # Get all validated entries from this scan
                 events = dbh.scanResultEvent(id)
-                count = 0
                 ip_types = {'IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'}
                 domain_types = {'DOMAIN_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME',
                                 'CO_HOSTED_SITE', 'SIMILARDOMAIN', 'INTERNET_NAME_UNRESOLVED'}
@@ -4975,6 +5169,16 @@ class SpiderFootWebUi:
                 human_name_types = {'HUMAN_NAME'}
                 username_types = {'USERNAME', 'SOCIAL_MEDIA'}
 
+                def _classify_event(etype):
+                    if etype in ip_types: return 'ip'
+                    if etype in domain_types: return 'domain'
+                    if etype in email_types: return 'email'
+                    if etype in human_name_types: return 'human_name'
+                    if etype in username_types: return 'username'
+                    return None
+
+                # Collect all items for batch insert
+                batch_items = []
                 for ev in events:
                     fp_flag = ev[13]  # false_positive column
                     if fp_flag != 2:
@@ -4983,60 +5187,33 @@ class SpiderFootWebUi:
                     event_data = ev[1]
                     if not event_data:
                         continue
-
-                    # Determine asset type
-                    asset_type = None
-                    if event_type in ip_types:
-                        asset_type = 'ip'
-                    elif event_type in domain_types:
-                        asset_type = 'domain'
-                    elif event_type in email_types:
-                        asset_type = 'email'
-                    elif event_type in human_name_types:
-                        asset_type = 'human_name'
-                    elif event_type in username_types:
-                        asset_type = 'username'
-
+                    asset_type = _classify_event(event_type)
                     if asset_type:
-                        try:
-                            clean_val = cleanAssetValue(event_data)
-                            dbh.knownAssetAdd(target, asset_type, clean_val,
-                                              source='ANALYST_CONFIRMED', addedBy=current_user,
-                                              rawValue=event_data if clean_val != event_data else None)
-                            count += 1
-                        except Exception:
-                            pass  # Duplicate - already exists
+                        clean_val = cleanAssetValue(event_data)
+                        raw = event_data if clean_val != event_data else None
+                        batch_items.append((asset_type, clean_val, raw))
 
-                # Also sync from target-level validated entries
+                # Also collect from target-level validated entries
                 try:
                     targetValidated = dbh.targetValidatedForTarget(target)
                     for (evt, evd, esd) in targetValidated:
                         if not evd:
                             continue
-                        asset_type = None
-                        if evt in ip_types:
-                            asset_type = 'ip'
-                        elif evt in domain_types:
-                            asset_type = 'domain'
-                        elif evt in email_types:
-                            asset_type = 'email'
-                        elif evt in human_name_types:
-                            asset_type = 'human_name'
-                        elif evt in username_types:
-                            asset_type = 'username'
+                        asset_type = _classify_event(evt)
                         if asset_type:
-                            try:
-                                clean_val = cleanAssetValue(evd)
-                                dbh.knownAssetAdd(target, asset_type, clean_val,
-                                                  source='ANALYST_CONFIRMED', addedBy=current_user,
-                                                  rawValue=evd if clean_val != evd else None)
-                                count += 1
-                            except Exception:
-                                pass
+                            clean_val = cleanAssetValue(evd)
+                            raw = evd if clean_val != evd else None
+                            batch_items.append((asset_type, clean_val, raw))
                 except Exception:
                     pass
 
-                return json.dumps(["SUCCESS", f"Synced {count} verified entries to known assets."]).encode('utf-8')
+                # Single batch insert for all collected items
+                if batch_items:
+                    dbh.knownAssetAddBatch(target, batch_items,
+                                           source='ANALYST_CONFIRMED', addedBy=current_user,
+                                           status='CONFIRMED', entryMethod='SYNC_VERIFIED')
+
+                return json.dumps(["SUCCESS", f"Synced {len(batch_items)} verified entries to known assets."]).encode('utf-8')
             except Exception as e:
                 return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
@@ -5165,6 +5342,24 @@ class SpiderFootWebUi:
                     return json.dumps(["ERROR", "Scan not found."]).encode('utf-8')
                 target = scan_info[1]
 
+                # Split hashes: pending-asset-* hashes go through status change, regular hashes through scan result logic
+                pendingHashes = [h for h in hashes if h.startswith('pending-asset-')]
+                scanHashes = [h for h in hashes if not h.startswith('pending-asset-')]
+
+                if pendingHashes:
+                    pendingIds = [int(h.replace('pending-asset-', '')) for h in pendingHashes]
+                    if action == 'verify':
+                        dbh.knownAssetSetStatusBulk(pendingIds, 'CONFIRMED')
+                    elif action == 'fp':
+                        dbh.knownAssetRemoveBulk(pendingIds)
+                    elif action == 'reset':
+                        dbh.knownAssetSetStatusBulk(pendingIds, 'PENDING')
+
+                if not scanHashes:
+                    return json.dumps(["SUCCESS", f"Updated {len(pendingHashes)} pending assets."]).encode('utf-8')
+
+                hashes = scanHashes
+
                 # Build event map from all scan results (same pattern as resultsetfppersist)
                 events = dbh.scanResultEvent(id)
                 eventMap = {row[8]: row for row in events}  # hash -> event row
@@ -5206,7 +5401,8 @@ class SpiderFootWebUi:
                             clean_val = cleanAssetValue(event_data)
                             dbh.knownAssetAdd(target, asset_type, clean_val,
                                               source='ANALYST_CONFIRMED', addedBy=current_user,
-                                              rawValue=event_data if clean_val != event_data else None)
+                                              rawValue=event_data if clean_val != event_data else None,
+                                              entryMethod='VERIFY_MATCH')
 
                     return json.dumps(["SUCCESS", f"Verified {len(hashes)} items."]).encode('utf-8')
 
