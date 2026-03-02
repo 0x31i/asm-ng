@@ -2571,7 +2571,7 @@ td.pre-expandable.pre-expanded .pre-expand-hint {
   margin-left: auto;
   flex-shrink: 1;
   min-width: 150px;
-  max-width: 200px;
+  max-width: 350px;
 }
 
 /* Container for the nav tabs - sharp modern style like main menu */
@@ -3122,7 +3122,7 @@ tr.active td {
   background: transparent !important;
   border: none !important;
   border-radius: 0 !important;
-  width: 120px;
+  width: 280px;
   font-family: var(--font-mono);
   font-size: 11px;
   text-transform: uppercase;
@@ -10076,4 +10076,47 @@ mark {
   content: ' \25BC';
   font-size: 9px;
   color: #6b7280;
+}
+
+/* ============================================
+   Search Tips Items
+   ============================================ */
+.search-tips-item {
+  border-left: 3px solid #8b5cf6 !important;
+  padding-left: 10px !important;
+}
+.search-tips-item:hover {
+  background: rgba(139, 92, 246, 0.08) !important;
+}
+.search-tips-item code {
+  background: rgba(139, 92, 246, 0.12);
+  padding: 1px 5px;
+  border-radius: 2px;
+  color: #7c3aed;
+}
+
+/* ============================================
+   Search Navigate Link
+   ============================================ */
+.search-goto-link {
+  color: #8b5cf6;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  font-size: 14px;
+}
+.search-goto-link:hover {
+  opacity: 1;
+}
+
+/* ============================================
+   Search Row Highlight Glow
+   ============================================ */
+@keyframes searchRowGlow {
+  0%   { box-shadow: inset 0 0 12px rgba(59, 130, 246, 0.5); background: rgba(59, 130, 246, 0.08); }
+  70%  { box-shadow: inset 0 0 8px rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.05); }
+  100% { box-shadow: inset 0 0 0 transparent; background: transparent; }
+}
+.search-highlight-glow {
+  animation: searchRowGlow 3.5s ease-out forwards;
 }
