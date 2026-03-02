@@ -279,6 +279,7 @@
         var currentDataFormat = "full";
         var lastSearchType = "ALL";
         var lastSearchQuery = "";
+        var _searchGeneration = 0; // generation counter to discard stale search callbacks
         var dataloaders = [];
         var sharedSigma = "";
         var loadersrunning = false;
@@ -4067,7 +4068,10 @@
             $("#btn-search").show();
             $("#scanreminder").hide();
             refresh = function() { searchResults(instanceId, query, typeName); }
+            var thisGen = ++_searchGeneration;
             sf.search(instanceId, query, typeName, function(response) {
+                            // Discard stale callback if a newer search was started
+                            if (thisGen !== _searchGeneration) return;
                             // Handle both new dict format and legacy array format
                             var data, total, respQuery, operators, respScope, truncated, searchLimit;
                             if (response && response.results) {
@@ -9838,7 +9842,15 @@
                 if (globeFocusTarget) {
                     var targetRotY = -globeFocusTarget.lon * Math.PI / 180;
                     var targetRotX = globeFocusTarget.lat * Math.PI / 180;
-                    globeRotY += (targetRotY - globeRotY) * 0.08;
+                    // Normalize globeRotY to [-PI, PI] for shortest-path rotation
+                    globeRotY = globeRotY % (2 * Math.PI);
+                    if (globeRotY > Math.PI) globeRotY -= 2 * Math.PI;
+                    if (globeRotY < -Math.PI) globeRotY += 2 * Math.PI;
+                    // Pick shortest rotation path
+                    var dY = targetRotY - globeRotY;
+                    if (dY > Math.PI) dY -= 2 * Math.PI;
+                    if (dY < -Math.PI) dY += 2 * Math.PI;
+                    globeRotY += dY * 0.08;
                     globeRotX += (targetRotX - globeRotX) * 0.08;
                     globeFocusZoom += (2.2 - globeFocusZoom) * 0.08;
                     if (Math.abs(globeFocusZoom - 2.2) < 0.01) {
