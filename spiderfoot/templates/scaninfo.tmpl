@@ -4474,6 +4474,41 @@
             grid += "</div></div></div>";
 
             // Bulk Tag Picker Modal
+            grid += "<div id='assets-bulk-type-modal' class='assets-modal-overlay' style='display:none;'>";
+            grid += "<div class='assets-modal'>";
+            grid += "<div class='assets-modal-header'>";
+            grid += "<span class='assets-modal-title'>CHANGE TYPE</span>";
+            grid += "<button class='close-btn' onclick='assetsCloseModals()'>&times;</button>";
+            grid += "</div>";
+            grid += "<div class='assets-modal-body' style='text-align:center;'>";
+            grid += "<div class='assets-modal-btn-grid'>";
+            grid += "<button class='btn assets-modal-choice-btn' onclick='knownBulkType(\"ip\");assetsCloseModals();'>IP</button>";
+            grid += "<button class='btn assets-modal-choice-btn' onclick='knownBulkType(\"domain\");assetsCloseModals();'>DOMAIN</button>";
+            grid += "<button class='btn assets-modal-choice-btn' onclick='knownBulkType(\"email\");assetsCloseModals();'>EMAIL</button>";
+            grid += "<button class='btn assets-modal-choice-btn' onclick='knownBulkType(\"human_name\");assetsCloseModals();'>HUMAN NAME</button>";
+            grid += "<button class='btn assets-modal-choice-btn' onclick='knownBulkType(\"username\");assetsCloseModals();'>USERNAME</button>";
+            grid += "<button class='btn assets-modal-choice-btn' onclick='knownBulkType(\"misc\");assetsCloseModals();'>MISC</button>";
+            grid += "<button class='btn assets-modal-choice-btn' onclick='knownBulkType(\"uncategorized\");assetsCloseModals();'>UNCATEGORIZED</button>";
+            grid += "</div></div>";
+            grid += "<div class='assets-modal-footer'>";
+            grid += "<button class='btn assets-btn-cancel' onclick='assetsCloseModals()'>CANCEL</button>";
+            grid += "</div></div></div>";
+
+            grid += "<div id='assets-bulk-affinity-modal' class='assets-modal-overlay' style='display:none;'>";
+            grid += "<div class='assets-modal'>";
+            grid += "<div class='assets-modal-header'>";
+            grid += "<span class='assets-modal-title'>CHANGE AFFINITY</span>";
+            grid += "<button class='close-btn' onclick='assetsCloseModals()'>&times;</button>";
+            grid += "</div>";
+            grid += "<div class='assets-modal-body' style='text-align:center;'>";
+            grid += "<div class='assets-modal-btn-grid'>";
+            grid += "<button class='btn assets-modal-choice-btn' onclick='knownBulkAffinity(\"DIRECT\");assetsCloseModals();'>DIRECT</button>";
+            grid += "<button class='btn assets-modal-choice-btn' onclick='knownBulkAffinity(\"ASSOCIATED\");assetsCloseModals();'>ASSOCIATED</button>";
+            grid += "</div></div>";
+            grid += "<div class='assets-modal-footer'>";
+            grid += "<button class='btn assets-btn-cancel' onclick='assetsCloseModals()'>CANCEL</button>";
+            grid += "</div></div></div>";
+
             grid += "<div id='assets-bulk-tag-modal' class='assets-modal-overlay' style='display:none;'>";
             grid += "<div class='assets-modal'>";
             grid += "<div class='assets-modal-header'>";
@@ -5727,21 +5762,8 @@
         // ---- BULK AFFINITY / TAG ACTIONS ----
 
         function knownBulkAffinityPrompt() {
-            alertify.confirm(
-                "<div style='text-align:center;font-family:monospace;'>" +
-                "<p style='margin-bottom:12px;font-weight:700;'>CHANGE AFFINITY FOR SELECTED ASSETS</p>" +
-                "<button class='btn assets-known-bulk-affinity-btn' style='display:inline-block;margin:4px;' onclick='knownBulkAffinity(\"DIRECT\");alertify.closeAll();'>DIRECT</button>" +
-                "<button class='btn assets-known-bulk-affinity-btn' style='display:inline-block;margin:4px;' onclick='knownBulkAffinity(\"ASSOCIATED\");alertify.closeAll();'>ASSOCIATED</button>" +
-                "</div>",
-                function() {} // OK callback (unused, buttons handle it)
-            ).setting({
-                'labels': {ok: 'CANCEL', cancel: ''},
-                'closable': true
-            });
-            // Hide the default cancel button
-            setTimeout(function() {
-                $(".alertify .ajs-footer .ajs-cancel").hide();
-            }, 50);
+            assetsCloseModals();
+            $("#assets-bulk-affinity-modal").show();
         }
 
         function knownBulkAffinity(newAffinity) {
@@ -5768,18 +5790,8 @@
         }
 
         function knownBulkTypePrompt() {
-            alertify.confirm(
-                "<div style='text-align:center;font-family:monospace;'>" +
-                "<p style='margin-bottom:12px;font-weight:700;'>CHANGE TYPE FOR SELECTED ASSETS</p>" +
-                "<button class='btn assets-known-bulk-affinity-btn' style='display:inline-block;margin:4px;' onclick='knownBulkType(\"ip\");alertify.closeAll();'>IP</button>" +
-                "<button class='btn assets-known-bulk-affinity-btn' style='display:inline-block;margin:4px;' onclick='knownBulkType(\"domain\");alertify.closeAll();'>DOMAIN</button>" +
-                "<button class='btn assets-known-bulk-affinity-btn' style='display:inline-block;margin:4px;' onclick='knownBulkType(\"email\");alertify.closeAll();'>EMAIL</button>" +
-                "<button class='btn assets-known-bulk-affinity-btn' style='display:inline-block;margin:4px;' onclick='knownBulkType(\"human_name\");alertify.closeAll();'>HUMAN NAME</button>" +
-                "<button class='btn assets-known-bulk-affinity-btn' style='display:inline-block;margin:4px;' onclick='knownBulkType(\"username\");alertify.closeAll();'>USERNAME</button>" +
-                "</div>",
-                function() {}
-            ).setting({'labels': {ok: 'CANCEL', cancel: ''}, 'closable': true});
-            setTimeout(function() { $(".alertify .ajs-footer .ajs-cancel").hide(); }, 50);
+            assetsCloseModals();
+            $("#assets-bulk-type-modal").show();
         }
 
         function knownBulkType(newType) {
