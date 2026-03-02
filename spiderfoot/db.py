@@ -1648,11 +1648,16 @@ class SpiderFootDb:
             qry += " LIMIT ?"
             qvars.append(limit)
 
+        _log.info("Search: criteria=%s qvars=%s", criteria, qvars)
+
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, qvars)
-                return self.dbh.fetchall()
+                results = self.dbh.fetchall()
+                _log.info("Search: returned %d rows", len(results))
+                return results
             except DatabaseError as e:
+                _log.error("Search SQL error: %s (criteria=%s)", e, criteria)
                 raise IOError(
                     "SQL error encountered when fetching search results") from e
 

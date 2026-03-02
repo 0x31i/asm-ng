@@ -4104,7 +4104,8 @@
                             scopeBar += "</div>";
 
                             if (data.length == 0) {
-                                var table = "<div id='scansummary-content'>&nbsp;&nbsp;No results found. Try broadening your search criteria or use plain text for substring matching.</div>";
+                                var errMsg = response.error ? "<br><br><span style='color:#dc2626;font-family:monospace;font-size:11px;'>&nbsp;&nbsp;Server error: " + $('<span>').text(response.error).html() + "</span>" : "";
+                                var table = "<div id='scansummary-content'>&nbsp;&nbsp;No results found. Try broadening your search criteria or use plain text for substring matching." + errMsg + "</div>";
                             } else {
                                 // Build operator display string
                                 var opStr = '';
