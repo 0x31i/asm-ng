@@ -5028,12 +5028,7 @@
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>ADDED BY</div><div class='assets-detail-card-value'>" + (a.added_by || '-') + "</div></div>";
 
                         // FOUND IN card — links to DATA tab filtered by element type
-                        var sfTypes = knownAssetTypeToSfTypes(a.asset_type);
-                        var foundInHtml = "";
-                        for (var fi = 0; fi < sfTypes.length; fi++) {
-                            if (fi > 0) foundInHtml += " &nbsp; ";
-                            foundInHtml += "<a class='assets-found-in-link' onclick='dataEventData(\"" + instanceId + "\", \"" + sfTypes[fi][1] + "\", \"" + sfTypes[fi][0] + "\", \"full\")'>" + sfTypes[fi][1].toUpperCase() + "</a>";
-                        }
+                        var foundInHtml = knownAssetFoundInHtml(a, instanceId);
                         html += "<div class='assets-detail-card'><div class='assets-detail-card-label'>FOUND IN</div><div class='assets-detail-card-value'>" + (foundInHtml || '-') + "</div></div>";
 
                         // NOTES card — click to edit inline
@@ -5180,12 +5175,7 @@
             h += "<div class='assets-detail-card'><div class='assets-detail-card-label'>TAG</div><div class='assets-detail-card-value'>" + (a.tag ? tagHtml : '-') + "</div></div>";
             h += "<div class='assets-detail-card'><div class='assets-detail-card-label'>DATE ADDED</div><div class='assets-detail-card-value'>" + d.toLocaleDateString() + "</div></div>";
             h += "<div class='assets-detail-card'><div class='assets-detail-card-label'>ADDED BY</div><div class='assets-detail-card-value'>" + (a.added_by || '-') + "</div></div>";
-            var sfTypes = knownAssetTypeToSfTypes(a.asset_type);
-            var foundInHtml = "";
-            for (var fi = 0; fi < sfTypes.length; fi++) {
-                if (fi > 0) foundInHtml += " &nbsp; ";
-                foundInHtml += "<a class='assets-found-in-link' onclick='dataEventData(\"" + instanceId + "\", \"" + sfTypes[fi][1] + "\", \"" + sfTypes[fi][0] + "\", \"full\")'>" + sfTypes[fi][1].toUpperCase() + "</a>";
-            }
+            var foundInHtml = knownAssetFoundInHtml(a, instanceId);
             h += "<div class='assets-detail-card'><div class='assets-detail-card-label'>FOUND IN</div><div class='assets-detail-card-value'>" + (foundInHtml || '-') + "</div></div>";
             h += "<div class='assets-detail-card assets-notes-card' data-asset-id='" + a.id + "' onclick='knownEditNotes(this, " + a.id + ")'>";
             h += "<div class='assets-detail-card-label'>NOTES</div>";
@@ -5573,6 +5563,24 @@
         }
 
         // ---- ASSET TYPE → SF DATA TYPE MAPPING ----
+        // Map SF event type codes to display labels
+        var sfEventTypeLabels = {
+            'IP_ADDRESS': 'IP Address',
+            'IPV6_ADDRESS': 'IPv6 Address',
+            'AFFILIATE_IPADDR': 'Affiliate IP',
+            'DOMAIN_NAME': 'Domain Name',
+            'INTERNET_NAME': 'Internet Name',
+            'AFFILIATE_INTERNET_NAME': 'Affiliate Internet Name',
+            'CO_HOSTED_SITE': 'Co-Hosted Site',
+            'SIMILARDOMAIN': 'Similar Domain',
+            'INTERNET_NAME_UNRESOLVED': 'Unresolved Internet Name',
+            'EMAILADDR': 'Email Address',
+            'AFFILIATE_EMAILADDR': 'Affiliate Email',
+            'HUMAN_NAME': 'Human Name',
+            'USERNAME': 'Username',
+            'SOCIAL_MEDIA': 'Social Media'
+        };
+
         function knownAssetTypeToSfTypes(assetType) {
             var map = {
                 'ip': [['IP_ADDRESS', 'IP Address'], ['IPV6_ADDRESS', 'IPv6 Address']],
@@ -5584,6 +5592,29 @@
                 'uncategorized': []
             };
             return map[assetType] || [];
+        }
+
+        // Build FOUND IN HTML — use stored event_type if available, fall back to static mapping
+        function knownAssetFoundInHtml(asset, instanceId) {
+            if (asset.event_type && sfEventTypeLabels[asset.event_type]) {
+                var code = asset.event_type;
+                var label = sfEventTypeLabels[code];
+                return "<a class='assets-found-in-link' onclick='dataEventData(\"" + instanceId + "\", \"" + label + "\", \"" + code + "\", \"full\")'>" + label.toUpperCase() + "</a>";
+            }
+            if (asset.event_type) {
+                // event_type stored but not in our label map — show it raw
+                var code = asset.event_type;
+                var label = code.replace(/_/g, ' ');
+                return "<a class='assets-found-in-link' onclick='dataEventData(\"" + instanceId + "\", \"" + label + "\", \"" + code + "\", \"full\")'>" + label + "</a>";
+            }
+            // Fallback for older entries without stored event_type
+            var sfTypes = knownAssetTypeToSfTypes(asset.asset_type);
+            var html = "";
+            for (var fi = 0; fi < sfTypes.length; fi++) {
+                if (fi > 0) html += " &nbsp; ";
+                html += "<a class='assets-found-in-link' onclick='dataEventData(\"" + instanceId + "\", \"" + sfTypes[fi][1] + "\", \"" + sfTypes[fi][0] + "\", \"full\")'>" + sfTypes[fi][1].toUpperCase() + "</a>";
+            }
+            return html;
         }
 
         // ---- TYPE REASSIGNMENT ----

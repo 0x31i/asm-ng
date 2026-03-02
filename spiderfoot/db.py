@@ -1159,6 +1159,13 @@ class SpiderFootDb:
                 except DatabaseError:
                     pass
 
+            # Migration: Add event_type column to known assets for FOUND IN tracing
+            try:
+                self.dbh.execute("ALTER TABLE tbl_known_assets ADD COLUMN event_type VARCHAR DEFAULT NULL")
+                self.conn.commit()
+            except DatabaseError:
+                pass
+
             # Migration: Add composite index on (target, status) for filtered asset queries
             try:
                 self.dbh.execute("CREATE INDEX idx_known_assets_target_status ON tbl_known_assets (target, status)")
@@ -3789,14 +3796,15 @@ class SpiderFootDb:
             status = 'CONFIRMED'
 
         qry = self._insert_or_ignore("INSERT OR IGNORE INTO tbl_known_assets \
-            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, raw_value, status, entry_method) \
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, raw_value, status, entry_method, event_type) \
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         now = int(time.time() * 1000)
         params_list = []
         for item in items:
             at, av = item[0], item[1]
             rv = item[2] if len(item) > 2 else None
-            params_list.append((target, at, av, source, None, now, addedBy, None, 'DIRECT', None, rv, status, entryMethod))
+            et = item[3] if len(item) > 3 else None
+            params_list.append((target, at, av, source, None, now, addedBy, None, 'DIRECT', None, rv, status, entryMethod, et))
 
         with self.dbhLock:
             try:
@@ -3931,7 +3939,7 @@ class SpiderFootDb:
                       addedBy: str = None, notes: str = None,
                       affinity: str = 'DIRECT', tag: str = None,
                       rawValue: str = None, status: str = 'CONFIRMED',
-                      entryMethod: str = 'MANUAL') -> bool:
+                      entryMethod: str = 'MANUAL', eventType: str = None) -> bool:
         """Add a known asset entry.
 
         Args:
@@ -3958,14 +3966,14 @@ class SpiderFootDb:
             status = 'CONFIRMED'
 
         qry = self._insert_or_ignore("INSERT OR IGNORE INTO tbl_known_assets \
-            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, raw_value, status, entry_method) \
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            (target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, raw_value, status, entry_method, event_type) \
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, (target, assetType, assetValue, source,
                                        importBatch, int(time.time() * 1000), addedBy, notes,
-                                       affinity, tag, rawValue, status, entryMethod))
+                                       affinity, tag, rawValue, status, entryMethod, eventType))
                 inserted = self.dbh.rowcount > 0
                 self.conn.commit()
                 _log.info(f"Known asset add: target={target} type={assetType} value={assetValue} status={status} inserted={inserted}")
@@ -4365,7 +4373,7 @@ class SpiderFootDb:
             offset: number of rows to skip
 
         Returns:
-            list: list of asset rows [id, target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, raw_value, status, entry_method]
+            list: list of asset rows [id, target, asset_type, asset_value, source, import_batch, date_added, added_by, notes, affinity, tag, raw_value, status, entry_method, event_type]
         """
         conditions = ["target = ?"]
         qvars = [target]
@@ -4380,7 +4388,7 @@ class SpiderFootDb:
         order = "date_added DESC" if assetType else "asset_type, date_added DESC"
         qry = f"SELECT id, target, asset_type, asset_value, source, import_batch, \
             date_added/1000 as date_added, added_by, notes, affinity, tag, raw_value, status, \
-            COALESCE(entry_method, 'MANUAL') as entry_method \
+            COALESCE(entry_method, 'MANUAL') as entry_method, event_type \
             FROM tbl_known_assets WHERE {where} ORDER BY {order}"
         if limit > 0:
             qry += f" LIMIT {int(limit)} OFFSET {int(offset)}"
