@@ -5974,11 +5974,24 @@
         var assetsHideResolved = true; // default: resolved rows hidden
         var assetsHideFps = true; // default: false positive rows hidden
 
-        // Break text into segments at . - @ : / delimiters for wrapping and highlight
+        // Break text into segments at delimiters — each segment wrapped in a
+        // hoverable <span class="assets-seg"> for chunk-level highlight comparison
         function assetsRenderWrappable(text) {
-            // Lightweight: just insert <wbr> at break points, no span wrapping
             var escaped = $('<span>').text(text).html();
-            return escaped.replace(/([.\-@:\/])/g, '$1<wbr>');
+            // Split into [segment, delimiter, segment, delimiter, ...]
+            var parts = escaped.split(/([.\-@:\/\s'"',\{\}\[\]=]+)/);
+            var out = '';
+            for (var i = 0; i < parts.length; i++) {
+                var p = parts[i];
+                if (!p) continue;
+                // Odd indices are delimiters, even are segments
+                if (i % 2 === 0 && p.length > 0) {
+                    out += '<span class="assets-seg" data-seg="' + p.toLowerCase() + '">' + p + '</span>';
+                } else {
+                    out += p;
+                }
+            }
+            return out;
         }
 
         function assetsShowPotential(instanceId) {
@@ -6209,73 +6222,27 @@
             }
         }
 
-        // Segment-based hover highlight — highlights matching chunks in BOTH cells
+        // Segment-level hover highlight — hovering one chunk highlights all
+        // matching chunks across both Data Element and Known Asset columns
         function assetsInitSegmentHighlight() {
             var $table = $('#potential-matches-table');
             if (!$table.length) return;
 
-            function getChunks(text) {
-                // Split on common delimiters: . - @ : / ' " , space { } [ ] =
-                return text.split(/[\s.\-@:\/'"',\{\}\[\]=]+/).filter(function(s) { return s.length > 2; });
-            }
-
-            function highlightCell($cell, matchingChunks) {
-                var html = $cell.html();
-                for (var i = 0; i < matchingChunks.length; i++) {
-                    var chunk = matchingChunks[i];
-                    var escaped = chunk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    // Only replace text content, skip inside HTML tags
-                    var re = new RegExp('(?![^<]*>)(' + escaped + ')', 'gi');
-                    html = html.replace(re, '<span class="assets-hl-active">$1</span>');
-                }
-                return html;
-            }
-
-            $table.on('mouseenter', '.assets-match-row', function() {
-                var $row = $(this);
-                var $dataCell = $row.find('.assets-value-cell.assets-hl-cell');
-                var $knownCell = $row.find('.assets-matched-asset.assets-hl-cell');
-                if (!$dataCell.length || !$knownCell.length) return;
-
-                var dataText = $dataCell.text().toLowerCase();
-                var knownText = $knownCell.text().toLowerCase();
-
-                // Find chunks that appear in both cells
-                var dataChunks = getChunks(dataText);
-                var knownChunks = getChunks(knownText);
-                var knownSet = {};
-                for (var i = 0; i < knownChunks.length; i++) knownSet[knownChunks[i]] = true;
-                var common = [];
-                var seen = {};
-                for (var i = 0; i < dataChunks.length; i++) {
-                    var c = dataChunks[i];
-                    if (knownSet[c] && !seen[c]) {
-                        seen[c] = true;
-                        common.push(c);
-                    }
-                }
-                if (!common.length) return;
-
-                // Sort longest first so longer matches take priority
-                common.sort(function(a, b) { return b.length - a.length; });
-
-                // Highlight both cells
-                $dataCell.data('orig-html', $dataCell.html());
-                $knownCell.data('orig-html', $knownCell.html());
-                $dataCell.html(highlightCell($dataCell, common));
-                $knownCell.html(highlightCell($knownCell, common));
+            // Hover a segment → highlight all segments with same data-seg in the row
+            $table.on('mouseenter', '.assets-seg', function() {
+                var seg = $(this).data('seg');
+                if (!seg) return;
+                $(this).closest('.assets-match-row')
+                    .find('.assets-seg[data-seg="' + seg + '"]')
+                    .addClass('assets-hl-active');
             });
 
-            $table.on('mouseleave', '.assets-match-row', function() {
-                var $row = $(this);
-                $row.find('.assets-hl-cell').each(function() {
-                    var $cell = $(this);
-                    var origHtml = $cell.data('orig-html');
-                    if (origHtml !== undefined) {
-                        $cell.html(origHtml);
-                        $cell.removeData('orig-html');
-                    }
-                });
+            $table.on('mouseleave', '.assets-seg', function() {
+                var seg = $(this).data('seg');
+                if (!seg) return;
+                $(this).closest('.assets-match-row')
+                    .find('.assets-seg[data-seg="' + seg + '"]')
+                    .removeClass('assets-hl-active');
             });
         }
 
