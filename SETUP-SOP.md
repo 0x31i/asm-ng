@@ -669,18 +669,22 @@ batch, then come back and collect all the API keys at once.
 
 | # | Service | Signup URL | Module Tab | Setting Key(s) | Notes |
 |---|---------|-----------|-----------|----------------|-------|
-| 49 | ★ Snusbase | https://snusbase.com | Snusbase | `api_key` | Commercial breach database (paid) |
-| 50 | HaveIBeenPwned | https://haveibeenpwned.com/API/Key | HaveIBeenPwned | `api_key` | Paid API key required ($3.50/mo) |
-| 51 | ★ Telegram API | https://my.telegram.org | Telegram | `api_id` + `api_hash` | Free — needed for leak channel monitoring |
-| 52 | MISP | _(your private instance)_ | MISP | `api_key` + `misp_url` | Self-hosted threat intelligence platform |
-| 53 | OpenCTI | _(your private instance)_ | OpenCTI | `api_key` + `opencti_url` | Self-hosted threat intelligence platform |
-| 54 | Google CSE | https://programmablesearchengine.google.com | PasteRack | `api_key` + `cse_id` | Needed for sfp_pasterack (paste site monitoring) |
-| 55 | Dehashed | https://dehashed.com | Dehashed | `api_key` | Breach database (paid) |
-| 56 | LeakCheck | https://leakcheck.io | LeakCheck | `api_key` | Breach database (free tier) |
+| 49 | ★ XposedOrNot | https://xposedornot.com/ | XposedOrNot | `api_key` | **Free** — email lookups work without key; domain breach lookups require free API key |
+| 50 | ★ Snusbase | https://snusbase.com | Snusbase | `api_key` | Commercial breach database (paid) |
+| 51 | HaveIBeenPwned | https://haveibeenpwned.com/API/Key | HaveIBeenPwned | `api_key` | Paid API key required ($3.50/mo) |
+| 52 | ★ Telegram API | https://my.telegram.org | Telegram | `api_id` + `api_hash` | Free — needed for leak channel monitoring |
+| 53 | MISP | _(your private instance)_ | MISP | `api_key` + `misp_url` | Self-hosted threat intelligence platform |
+| 54 | OpenCTI | _(your private instance)_ | OpenCTI | `api_key` + `opencti_url` | Self-hosted threat intelligence platform |
+| 55 | Google CSE | https://programmablesearchengine.google.com | PasteRack | `api_key` + `cse_id` | Needed for sfp_pasterack (paste site monitoring) |
+| 56 | Dehashed | https://dehashed.com | Dehashed | `api_key` | Breach database (paid) |
+| 57 | LeakCheck | https://leakcheck.io | LeakCheck | `api_key` | Breach database (free tier) |
 
-> **No API required** for: sfp_xposedornot, sfp_ransomwatch, sfp_darkweb_aggregate,
+> **★ = Free API key** — XposedOrNot and Telegram are free to register. Prioritize these.
+>
+> **No API required** for: sfp_ransomwatch, sfp_darkweb_aggregate,
 > sfp_stealerlog_check, sfp_deepdarkcti, sfp_brand_darkweb, sfp_ahmia, sfp_torch,
 > sfp_onionsearchengine. These work out of the box with zero configuration.
+> sfp_xposedornot email lookups also work without a key (only domain lookups need one).
 
 ### GreyNoise Community (Bonus — Separate Module)
 
@@ -863,6 +867,8 @@ sfp_tool_h8mail:h8mail_path=h8mail
 # sfp_tool_h8mail:config_file=/path/to/h8mail_config.ini
 
 # --- Dark Web APIs (uncomment and fill in as you obtain keys) ---
+# ★ FREE — get your key at https://xposedornot.com/ (unlocks domain breach lookups):
+# sfp_xposedornot:api_key=YOUR_XPOSEDORNOT_KEY_HERE
 # sfp_snusbase:api_key=YOUR_KEY_HERE
 # sfp_haveibeenpwned:api_key=YOUR_KEY_HERE
 # sfp_dehashed:api_key=YOUR_KEY_HERE
