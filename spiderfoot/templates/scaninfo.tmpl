@@ -11750,16 +11750,24 @@
                             $("#loader").fadeOut(500);
                             $("#mainbody").append(statsBar + table + loadAllHtml);
 
-                            // Set sticky headers below stats bar
+                            // Set sticky headers below stats bar — use ResizeObserver so
+                            // the top value stays correct when buttons wrap (bar grows taller)
+                            // or filter button text changes length.
                             var dataStatsBar = document.getElementById('stats-bar');
                             if (dataStatsBar) {
-                                var barHeight = dataStatsBar.offsetHeight;
-                                $('#scansummary-content thead th').each(function() {
-                                    this.style.setProperty('position', 'sticky', 'important');
-                                    this.style.setProperty('top', barHeight + 'px', 'important');
-                                    this.style.setProperty('z-index', '100', 'important');
-                                    $(this).addClass('data-sticky-th');
-                                });
+                                function updateDataStickyTop() {
+                                    var h = Math.ceil(dataStatsBar.getBoundingClientRect().height);
+                                    $('#scansummary-content thead th').each(function() {
+                                        this.style.setProperty('position', 'sticky', 'important');
+                                        this.style.setProperty('top', h + 'px', 'important');
+                                        this.style.setProperty('z-index', '100', 'important');
+                                        $(this).addClass('data-sticky-th');
+                                    });
+                                }
+                                updateDataStickyTop();
+                                if (typeof ResizeObserver !== 'undefined') {
+                                    new ResizeObserver(updateDataStickyTop).observe(dataStatsBar);
+                                }
                             }
 
                             $("#scansummary-content").tablesorter({ headers: { 0: { sorter: false }, 1: { sorter: false }, 5: { sorter: false } }, cssChildRow: 'data-detail-row' });

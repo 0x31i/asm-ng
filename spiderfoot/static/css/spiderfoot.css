@@ -2057,18 +2057,20 @@ pre.table-border-bg-inherit {
 }
 
 /* DATA table — fixed layout keeps columns from blowing out on long URLs/values.
-   Checkbox(36) + Status(100) + Module(140) + Tracking(80) = 356px fixed.
-   Data Element and Source Data Element split the remaining space equally. */
+   Checkbox(36) + Status(110) + Module(120) + Tracking(90) = 356px fixed.
+   Data Element and Source Data Element split the remaining space equally.
+   min-width ensures a horizontal scroll appears rather than columns squishing. */
 #scansummary-content.tablesorter:not(.discovery-path-table) {
   table-layout: fixed;
   width: 100%;
+  min-width: 680px;
 }
-.col-data-chk { width: 36px; }
-.col-data-status { width: 100px; }
-.col-data-element { width: 30%; }
-.col-data-source { width: 30%; }
-.col-data-module { width: 140px; }
-.col-data-tracking { width: 80px; }
+.col-data-chk     { width: 36px; }
+.col-data-status  { width: 110px; }
+.col-data-element { width: 30%; min-width: 160px; }
+.col-data-source  { width: 30%; min-width: 140px; }
+.col-data-module  { width: 120px; }
+.col-data-tracking{ width: 90px; }
 
 /* Expandable pre cells in data tables */
 td.pre-expandable {
@@ -4675,7 +4677,10 @@ div[id*="Help"].alert-info {
 body {
   padding-top: 0 !important;
   padding-bottom: 40px;
-  /* overflow-x: hidden can break sticky positioning - removed */
+  /* overflow-x: auto at document level provides a horizontal scrollbar when
+     table content is wider than viewport, rather than silently clipping columns.
+     Sticky positioning still works because html handles the Y-scroll context. */
+  overflow-x: auto;
 }
 
 /* Logo container - full width */
@@ -7604,13 +7609,14 @@ i.glyphicon-white,
   gap: 0;
 }
 
-/* Right side: Filter buttons */
+/* Right side: Filter buttons - wraps to a second row when too many buttons */
 .stats-bar-right {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 /* Stats item - clean cells */
@@ -7737,11 +7743,11 @@ i.glyphicon-white,
   background: #ffffff;
 }
 
-/* Sticky table header for scansummary - positioned below stats bar when stats bar exists */
-/* Use adjacent sibling selector so this only applies when stats bar is present */
+/* Sticky table header for scansummary - JS sets top dynamically via ResizeObserver.
+   This rule provides the baseline; the inline style from JS overrides top. */
 #stats-bar + #scansummary-content thead th {
   position: sticky !important;
-  top: 50px !important; /* Below sticky stats bar */
+  top: 50px !important; /* fallback — JS overrides this with measured bar height */
   z-index: 100 !important;
   /* White glass blur effect - matches footer style */
   background: rgba(255, 255, 255, 0.85) !important;
