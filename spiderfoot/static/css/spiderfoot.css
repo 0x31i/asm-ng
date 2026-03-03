@@ -2069,8 +2069,8 @@ pre.table-border-bg-inherit {
 .col-data-status  { width: 110px; }
 .col-data-element { width: 30%; min-width: 160px; }
 .col-data-source  { width: 30%; min-width: 140px; }
-.col-data-module  { width: 120px; }
-.col-data-tracking{ width: 90px; }
+.col-data-module  { width: 110px; }
+.col-data-tracking{ width: 110px; }
 
 /* Expandable pre cells in data tables */
 td.pre-expandable {
@@ -4677,10 +4677,7 @@ div[id*="Help"].alert-info {
 body {
   padding-top: 0 !important;
   padding-bottom: 40px;
-  /* overflow-x: auto at document level provides a horizontal scrollbar when
-     table content is wider than viewport, rather than silently clipping columns.
-     Sticky positioning still works because html handles the Y-scroll context. */
-  overflow-x: auto;
+  /* overflow-x: auto/hidden both break position:sticky — leave at default (visible) */
 }
 
 /* Logo container - full width */
@@ -9330,8 +9327,8 @@ table.discovery-path-table td.validation-status {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.8px;
-  padding: 4px 12px;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;

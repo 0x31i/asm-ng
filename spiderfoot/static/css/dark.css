@@ -1872,12 +1872,12 @@ pre.table-border-bg-inherit {
   table-layout: fixed;
   width: 100%;
 }
-.col-data-chk { width: 36px; }
-.col-data-status { width: 100px; }
-.col-data-element { width: 30%; }
-.col-data-source { width: 30%; }
-.col-data-module { width: 140px; }
-.col-data-tracking { width: 80px; }
+.col-data-chk     { width: 36px; }
+.col-data-status  { width: 110px; }
+.col-data-element { width: 30%; min-width: 160px; }
+.col-data-source  { width: 30%; min-width: 140px; }
+.col-data-module  { width: 110px; }
+.col-data-tracking{ width: 110px; }
 
 /* Truncate collapsed pre content so long values don't overflow the cell */
 td.pre-expandable.pre-collapsed pre.table-border-bg-inherit {
@@ -4805,7 +4805,7 @@ div[id*="Help"].alert-info {
 body {
   padding-top: 0 !important;
   padding-bottom: 40px;
-  overflow-x: auto;
+  /* overflow-x: auto/hidden both break position:sticky — leave at default (visible) */
 }
 
 /* Logo container - full width */
@@ -9900,8 +9900,8 @@ i.glyphicon-white,
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.8px;
-  padding: 4px 12px;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
