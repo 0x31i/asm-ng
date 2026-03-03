@@ -116,7 +116,10 @@ class sfp_ai_governance(SpiderFootPlugin):
             self.opts[opt] = userOpts[opt]
 
     def watchedEvents(self):
-        return ["DOMAIN_NAME", "INTERNET_NAME", "TARGET_WEB_CONTENT"]
+        # Only DOMAIN_NAME — not INTERNET_NAME.  INTERNET_NAME includes
+        # infrastructure hostnames from SSL certs (CRL endpoints, OCSP
+        # responders, CA domains) that should never be probed for AI policies.
+        return ["DOMAIN_NAME", "TARGET_WEB_CONTENT"]
 
     def producedEvents(self):
         return ["AI_GOVERNANCE_FINDING"]
@@ -299,13 +302,17 @@ class sfp_ai_governance(SpiderFootPlugin):
 
         self.debug(f"Received event, {eventName}, from {event.module}")
 
-        if eventName in ("DOMAIN_NAME", "INTERNET_NAME"):
+        if eventName == "DOMAIN_NAME":
             domain = eventData
 
-            # Only probe primary domains (avoid probing every subdomain)
             if domain in self._domains_probed:
                 return
             self._domains_probed.add(domain)
+
+            # Only probe domains that belong to the target
+            if not self.getTarget().matches(domain, includeChildren=True, includeParents=True):
+                self.debug(f"Skipping {domain} — not part of target scope")
+                return
 
             # Probe governance URLs
             found_policies = self._probe_governance_urls(domain, event)
@@ -315,8 +322,15 @@ class sfp_ai_governance(SpiderFootPlugin):
             if self.opts['check_robots_txt']:
                 self._check_robots_for_ai_bots(domain, event)
 
-            # Absence detection
-            if self.opts['absence_is_finding'] and not found_policies:
+            # Absence finding — only for the root target domain, not
+            # every subdomain.  One "no policy" result per scan is enough.
+            target_domain = self.getTarget().targetValue
+            if (self.opts['absence_is_finding']
+                    and not found_policies
+                    and domain == target_domain
+                    and f"absence:{domain}" not in self.results):
+                self.results[f"absence:{domain}"] = True
+
                 detail = (f"No AI governance policy detected for {domain}: "
                           f"probed {len(self.GOVERNANCE_URLS)} well-known "
                           f"governance URLs with no AI policy content found. "
