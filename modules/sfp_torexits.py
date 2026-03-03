@@ -24,7 +24,7 @@ class sfp_torexits(SpiderFootPlugin):
         'name': "TOR Exit Nodes",
         'summary': "Check if an IP adddress or netblock appears on the Tor Metrics exit node list.",
         'flags': [],
-        'useCases': ["Investigate", "Passive"],
+        'useCases': ["Investigate", "Passive", "Dark Web Exposure"],
         'categories': ["Secondary Networks"],
         'dataSource': {
             'website': "https://metrics.torproject.org/",

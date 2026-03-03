@@ -32,6 +32,18 @@ services:
     restart: unless-stopped
     command: ["sf.py", "--both", "-l", "0.0.0.0:5001", "--api-listen", "0.0.0.0:8001"]
 
+  # Tor SOCKS proxy for dark web / .onion access (optional)
+  # Enable with: docker compose --profile darkweb up
+  tor-proxy:
+    image: dperson/torproxy:latest
+    container_name: asm-ng-tor
+    restart: unless-stopped
+    ports:
+      - "9050:9050"
+      - "9051:9051"
+    profiles:
+      - darkweb
+
   react-web-interface:
     build:
       context: ./react-web-interface

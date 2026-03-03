@@ -25,7 +25,7 @@ class sfp_onionsearchengine(SpiderFootPlugin):
         'name': "Onionsearchengine.com",
         'summary': "Search Tor onionsearchengine.com for mentions of the target domain.",
         'flags': ["tor"],
-        'useCases': ["Footprint", "Investigate"],
+        'useCases': ["Footprint", "Investigate", "Dark Web Exposure"],
         'categories': ["Search Engines"],
         'dataSource': {
             'website': "https://as.onionsearchengine.com",

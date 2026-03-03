@@ -1,10 +1,11 @@
 # ASM-NG Setup SOP — Kali Linux + Tailscale Deployment
 
 > Complete setup guide for deploying ASM-NG on a dedicated Kali Linux VM with
-> Tailscale VPN access, all 15 external security tools, and 47+ free API integrations.
+> Tailscale VPN access, all 18 external security tools (including dark web),
+> and 55+ free API integrations.
 >
 > **Audience:** Operator standing up a new client VM from scratch.
-> **OS Target:** Kali Linux (latest rolling release).
+> **OS Target:** Kali Linux (latest rolling release). Also works on Debian, Ubuntu, ParrotOS, and macOS.
 > **Estimated time:** ~60 minutes (excluding API signups).
 
 ---
@@ -13,7 +14,7 @@
 
 - [Part 1 — Kali VM Base Setup](#part-1--kali-vm-base-setup)
 - [Part 2 — ASM-NG Installation](#part-2--asm-ng-installation)
-- [Part 3 — External Tool Installation (15 Tools)](#part-3--external-tool-installation-15-tools)
+- [Part 3 — External Tool Installation (18 Tools)](#part-3--external-tool-installation-18-tools)
 - [Part 4 — Free API Account Signup Checklist](#part-4--free-api-account-signup-checklist)
 - [Part 5 — Ready-to-Import Configuration Template](#part-5--ready-to-import-configuration-template)
 - [Part 6 — Verification Checklist](#part-6--verification-checklist)
@@ -83,10 +84,15 @@ npm --version
 git --version
 ```
 
-> **Kali-specific: PEP 668**
-> Kali Linux marks its system Python as "externally managed." You **must** use a
+> **PEP 668 (Kali / Ubuntu 24.04+ / ParrotOS):**
+> These distros mark system Python as "externally managed." You **must** use a
 > virtual environment for all pip installs. Never run bare `pip install` outside
-> a venv on Kali. This entire SOP uses a venv.
+> a venv. This entire SOP uses a venv.
+
+> **macOS (Homebrew) users:** Replace `apt install` commands with `brew install`.
+> System dependencies: `brew install python3 node git curl wget swig`.
+> PostgreSQL: `brew install postgresql@16 && brew services start postgresql@16`.
+> See `setup-postgresql.sh` for automated macOS setup.
 
 ---
 
@@ -241,9 +247,9 @@ source ~/.bashrc
 
 ---
 
-## Part 3 — External Tool Installation (15 Tools)
+## Part 3 — External Tool Installation (18 Tools)
 
-ASM-NG integrates with 15 external tools. Each tool needs to be installed on
+ASM-NG integrates with 18 external tools. Each tool needs to be installed on
 the system and then have its **path configured in the Settings page**.
 
 Tools are grouped by install method so you can batch the installations efficiently.
@@ -399,7 +405,80 @@ No binary to install. Requires a Wappalyzer API key (see Part 4).
 
 ---
 
-### 3.5 Tool Verification Script
+### 3.5 Dark Web Tools (3 tools)
+
+#### Tool 16: Tor (SOCKS Proxy for .onion Access)
+
+Tor enables direct access to .onion sites for dark web monitoring modules.
+
+**Debian / Kali / ParrotOS / Ubuntu:**
+```bash
+sudo apt install -y tor
+sudo systemctl enable tor
+sudo systemctl start tor
+```
+
+**macOS (Homebrew):**
+```bash
+brew install tor
+brew services start tor
+```
+
+**RHEL / Fedora:**
+```bash
+sudo dnf install -y tor
+sudo systemctl enable tor
+sudo systemctl start tor
+```
+
+Verify: `curl --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip`
+(Should return `{"IsTor":true,...}`)
+
+**ASM-NG Configuration:** Configure in **Settings → Global** (SOCKS proxy settings):
+
+| Setting | Value |
+|---------|-------|
+| `_socks1type` | `TOR` |
+| `_socks2addr` | `127.0.0.1` |
+| `_socks3port` | `9050` |
+
+> **Note:** Most dark web modules use clearnet APIs and portals — Tor is only
+> needed for direct .onion crawling. The modules work without Tor.
+
+#### Tool 17: h8mail (Email Breach Hunting)
+
+```bash
+source ~/asm-ng/venv/bin/activate
+pip install h8mail
+```
+
+Verify: `h8mail --version`
+
+> On macOS, if `h8mail` was installed outside the venv (e.g., `pip3 install --user h8mail`),
+> the binary may be at `~/Library/Python/3.x/bin/h8mail`. ASM-NG auto-detects common
+> install locations, or you can set the full path in Settings.
+
+| Settings Tab | Setting Name | Value to Paste |
+|-------------|-------------|----------------|
+| Tool - h8mail | `h8mail_path` | `h8mail` (or full path if not in PATH) |
+| Tool - h8mail | `config_file` | _(optional: path to h8mail config with API keys)_ |
+
+#### Tool 18: PyMISP (MISP Integration Library)
+
+PyMISP is installed automatically via `requirements.txt`. No manual install needed.
+
+To verify:
+```bash
+source ~/asm-ng/venv/bin/activate
+python3 -c "import pymisp; print(f'pymisp {pymisp.__version__}')"
+```
+
+> PyMISP is only used by the `sfp_misp` module. You need a private MISP instance
+> to use this module — configure the URL and API key in Settings.
+
+---
+
+### 3.6 Tool Verification Script
 
 Run this after completing all tool installs to verify everything is in place:
 
@@ -453,6 +532,24 @@ else
 fi
 
 echo ""
+echo "--- Dark Web Tools ---"
+check_tool "h8mail"      "h8mail"
+check_tool "Tor"         "tor"
+
+echo ""
+echo "--- Dark Web: Tor SOCKS Proxy ---"
+if curl -s --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip 2>/dev/null | grep -q '"IsTor":true'; then
+    echo -e "  [OK]    Tor proxy active (port 9050)"
+else
+    echo -e "  [MISS]  Tor proxy not running (start with: sudo systemctl start tor)"
+fi
+
+echo ""
+echo "--- Dark Web: Python Libraries ---"
+python3 -c "import pymisp; print('  [OK]    pymisp ' + pymisp.__version__)" 2>/dev/null || echo "  [MISS]  pymisp (pip install pymisp)"
+python3 -c "import telethon; print('  [OK]    telethon ' + telethon.__version__)" 2>/dev/null || echo "  [MISS]  telethon (pip install telethon)"
+
+echo ""
 echo "--- Gobuster Wordlist ---"
 if [ -f "/usr/share/wordlists/dirb/common.txt" ]; then
     echo -e "  [OK]    Wordlist: /usr/share/wordlists/dirb/common.txt"
@@ -466,8 +563,8 @@ echo " Verification Complete"
 echo "========================================="
 ```
 
-Save as `~/verify-tools.sh`, run with `bash ~/verify-tools.sh`. All 13 binary
-tools should show `[OK]`.
+Save as `~/verify-tools.sh`, run with `bash ~/verify-tools.sh`. All 15 binary
+tools and 2 Python libraries should show `[OK]`.
 
 ---
 
@@ -567,6 +664,23 @@ batch, then come back and collect all the API keys at once.
 | 45 | CIRCL.lu | https://www.circl.lu/contact/ | CIRCL Passive DNS/SSL | `api_key_login` + `api_key_password` | Email to request access |
 | 46 | NeutrinoAPI | https://www.neutrinoapi.com | NeutrinoAPI | `user_id` + `api_key` | Free after registration |
 | 47 | FOFA | https://fofa.info/user/register | FOFA | `api_email` + `api_key` | Chinese service; free tier available |
+
+### Tier 6: Dark Web Exposure APIs
+
+| # | Service | Signup URL | Module Tab | Setting Key(s) | Notes |
+|---|---------|-----------|-----------|----------------|-------|
+| 49 | ★ Snusbase | https://snusbase.com | Snusbase | `api_key` | Commercial breach database (paid) |
+| 50 | HaveIBeenPwned | https://haveibeenpwned.com/API/Key | HaveIBeenPwned | `api_key` | Paid API key required ($3.50/mo) |
+| 51 | ★ Telegram API | https://my.telegram.org | Telegram | `api_id` + `api_hash` | Free — needed for leak channel monitoring |
+| 52 | MISP | _(your private instance)_ | MISP | `api_key` + `misp_url` | Self-hosted threat intelligence platform |
+| 53 | OpenCTI | _(your private instance)_ | OpenCTI | `api_key` + `opencti_url` | Self-hosted threat intelligence platform |
+| 54 | Google CSE | https://programmablesearchengine.google.com | PasteRack | `api_key` + `cse_id` | Needed for sfp_pasterack (paste site monitoring) |
+| 55 | Dehashed | https://dehashed.com | Dehashed | `api_key` | Breach database (paid) |
+| 56 | LeakCheck | https://leakcheck.io | LeakCheck | `api_key` | Breach database (free tier) |
+
+> **No API required** for: sfp_xposedornot, sfp_ransomwatch, sfp_darkweb_aggregate,
+> sfp_stealerlog_check, sfp_deepdarkcti, sfp_brand_darkweb, sfp_ahmia, sfp_torch,
+> sfp_onionsearchengine. These work out of the box with zero configuration.
 
 ### GreyNoise Community (Bonus — Separate Module)
 
@@ -738,6 +852,40 @@ sfp_archiveorg:javascriptpages=1
 # sfp_neutrinoapi:api_key=YOUR_KEY_HERE
 # sfp_fofa:api_email=YOUR_EMAIL_HERE
 # sfp_fofa:api_key=YOUR_KEY_HERE
+
+
+# ==============================================================================
+# SECTION 4: DARK WEB EXPOSURE MODULES
+# ==============================================================================
+
+# --- Dark Web Tool Paths ---
+sfp_tool_h8mail:h8mail_path=h8mail
+# sfp_tool_h8mail:config_file=/path/to/h8mail_config.ini
+
+# --- Dark Web APIs (uncomment and fill in as you obtain keys) ---
+# sfp_snusbase:api_key=YOUR_KEY_HERE
+# sfp_haveibeenpwned:api_key=YOUR_KEY_HERE
+# sfp_dehashed:api_key=YOUR_KEY_HERE
+# sfp_leakcheck:api_key=YOUR_KEY_HERE
+# sfp_pasterack:api_key=YOUR_GOOGLE_CSE_KEY_HERE
+# sfp_pasterack:cse_id=YOUR_GOOGLE_CSE_ID_HERE
+
+# --- Telegram Leak Channel Monitoring ---
+# sfp_telegram:api_id=YOUR_TELEGRAM_API_ID_HERE
+# sfp_telegram:api_hash=YOUR_TELEGRAM_API_HASH_HERE
+# sfp_telegram:enable_leak_detection=1
+
+# --- MISP / OpenCTI (private instances only) ---
+# sfp_misp:api_key=YOUR_MISP_AUTH_KEY_HERE
+# sfp_misp:misp_url=https://misp.example.com
+# sfp_opencti:api_key=YOUR_OPENCTI_TOKEN_HERE
+# sfp_opencti:opencti_url=https://opencti.example.com
+
+# --- Tor SOCKS Proxy (for direct .onion access — optional) ---
+# Uncomment these if Tor is running on this system:
+# __global__:_socks1type=TOR
+# __global__:_socks2addr=127.0.0.1
+# __global__:_socks3port=9050
 ```
 
 **How to use:**
@@ -761,12 +909,14 @@ After completing Parts 1-5, work through this checklist:
 - [ ] ASM-NG web UI loads at `http://<TAILSCALE_IP>:5001`
 - [ ] Can log in with admin credentials
 - [ ] Settings page shows all advanced modules enabled
-- [ ] All 15 tool tabs in Settings show configured paths (no empty path fields)
+- [ ] All 18 tool tabs in Settings show configured paths (no empty path fields)
 
 ### Tool Verification
 
-- [ ] Run `bash ~/verify-tools.sh` — all 13 binary tools show `[OK]`
+- [ ] Run `bash ~/verify-tools.sh` — all 15 binary tools and 2 Python libraries show `[OK]`
 - [ ] Nuclei templates directory has 1000+ `.yaml` files
+- [ ] Tor proxy active on port 9050 (verification script checks this)
+- [ ] h8mail detectable (in PATH or auto-detected)
 
 ### Quick Scan Test
 
@@ -781,6 +931,31 @@ Run a test scan to verify tools work end-to-end:
    - Tool - testssl.sh
 5. Start the scan
 6. Verify events appear in the scan results (should see OS info, web tech, SSL findings)
+
+### Dark Web Exposure Test
+
+Run the dark web module test suite:
+
+```bash
+source ~/asm-ng/venv/bin/activate
+cd ~/asm-ng
+python3 test/darkweb_exposure_test.py
+```
+
+All 9 core tests should pass. For a live test against a domain you own:
+
+```bash
+python3 test/darkweb_exposure_test.py --live --target yourdomain.com
+```
+
+### Dark Web Scan Test
+
+1. In ASM-NG, click **New Scan**
+2. Target: a domain you own or have authorization to scan
+3. Select use case: **Dark Web Exposure**
+4. All dark web modules will be auto-selected
+5. Start the scan
+6. Verify dark web events appear (breach mentions, paste site hits, etc.)
 
 ### API Verification
 

@@ -22,7 +22,7 @@ class sfp_haveibeenpwned(SpiderFootPlugin):
         'name': "HaveIBeenPwned",
         'summary': "Check HaveIBeenPwned.com for hacked e-mail addresses identified in breaches.",
         'flags': ["apikey"],
-        'useCases': ["Footprint", "Investigate", "Passive"],
+        'useCases': ["Footprint", "Investigate", "Passive", "Dark Web Exposure"],
         'categories': ["Leaks, Dumps and Breaches"],
         'dataSource': {
             'website': "https://haveibeenpwned.com/",

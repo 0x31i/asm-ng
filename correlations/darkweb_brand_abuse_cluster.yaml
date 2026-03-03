@@ -1,0 +1,31 @@
+id: darkweb_brand_abuse_cluster
+version: "1"
+meta:
+  name: >
+    Brand impersonation detected across dark web and clearnet
+  description: >
+    Brand impersonation or typosquatting was detected on the dark web,
+    combined with other dark web mentions or credential leaks.
+
+    This pattern indicates that the target's brand is being actively
+    abused across multiple platforms, potentially for phishing, fraud,
+    or credential harvesting operations.
+  risk: HIGH
+collections:
+  first:
+      - method: exact
+        field: type
+        value: DARKWEB_BRAND_MENTION
+  second:
+      - method: exact
+        field: type
+        value: DARKNET_MENTION_URL
+      - method: exact
+        field: type
+        value: LEAKSITE_URL
+      - method: exact
+        field: type
+        value: EMAILADDR_COMPROMISED
+analysis:
+  - method: match_all_to_first_collection
+headline: "Brand abuse cluster: dark web impersonation + additional exposure detected"

@@ -44,6 +44,31 @@ pip3 install -q --upgrade pip
 echo "Installing dependencies..."
 pip3 install -q -r requirements.txt
 
+# Install venv-based security tools if not already present
+for tool in dnstwist wafw00f snallygaster trufflehog; do
+    if ! command -v "$tool" &>/dev/null; then
+        pip3 install -q "$tool" 2>/dev/null || true
+    fi
+done
+
+# Check for dark web / external tool availability
+echo ""
+echo "Checking optional tools..."
+check_optional() {
+    local name="$1" cmd="$2" install_hint="$3"
+    if command -v "$cmd" &>/dev/null || [ -x "$cmd" ]; then
+        echo "  [OK]   $name"
+    else
+        echo "  [MISS] $name — $install_hint"
+    fi
+}
+
+check_optional "Tor"       "tor"     "Debian/Ubuntu: sudo apt install tor | macOS: brew install tor"
+check_optional "h8mail"    "h8mail"  "pip install h8mail (email breach hunting)"
+check_optional "Nmap"      "nmap"    "Debian/Ubuntu: sudo apt install nmap | macOS: brew install nmap"
+check_optional "Nuclei"    "nuclei"  "See SETUP-SOP.md Part 3"
+echo ""
+
 # Default to web UI on localhost:5001 if no arguments given
 if [ $# -eq 0 ]; then
     echo "Starting ASM-NG web UI on http://127.0.0.1:5001 ..."

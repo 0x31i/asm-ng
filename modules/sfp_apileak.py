@@ -8,7 +8,7 @@ class sfp_apileak(SpiderFootPlugin):
         'name': "API Key/Secret Leak Detector",
         'summary': "Searches for leaked API keys and secrets on GitHub and paste sites.",
         'flags': ['apikey'],
-        'useCases': ['Passive', 'Investigate'],
+        'useCases': ['Passive', 'Investigate', 'Dark Web Exposure'],
         'group': ['Passive', 'Investigate'],
         'categories': ["Leaks, Dumps and Breaches"],
         'dataSource': {

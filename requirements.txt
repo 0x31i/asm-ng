@@ -56,3 +56,5 @@ py-tlsh>=4.7.2
 ppdeep>=20200505
 imagehash>=4.3.1
 mmh3>=4.0
+h8mail>=2.5.6
+pymisp>=2.4.170

@@ -969,6 +969,38 @@ DEFAULT_EVENT_TYPE_GRADING = {
         'category': 'AI Security', 'rank': 2, 'points': -15,
         'logic': 'count_scaled',
     },
+
+    # =========================================================================
+    # Dark Web Exposure
+    # =========================================================================
+    'RANSOMWARE_LEAK_MENTION': {
+        'category': 'Information Leakage', 'rank': 1, 'points': -25,
+        'logic': 'unverified_exists',
+    },
+    'STEALER_LOG_MATCH': {
+        'category': 'Information Leakage', 'rank': 1, 'points': -20,
+        'logic': 'unverified_exists',
+    },
+    'DARKWEB_BRAND_MENTION': {
+        'category': 'Information Leakage', 'rank': 2, 'points': -15,
+        'logic': 'count_scaled',
+    },
+    'DARKWEB_FORUM_MENTION': {
+        'category': 'Information Leakage', 'rank': 2, 'points': -10,
+        'logic': 'unverified_exists',
+    },
+    'TELEGRAM_LEAK_MENTION': {
+        'category': 'Information Leakage', 'rank': 2, 'points': -10,
+        'logic': 'unverified_exists',
+    },
+    'ONION_SERVICE_DETECTED': {
+        'category': 'Information / Reference', 'rank': 3, 'points': -5,
+        'logic': 'unverified_exists',
+    },
+    'THREAT_INTEL_FEED_MATCH': {
+        'category': 'Information Leakage', 'rank': 2, 'points': -10,
+        'logic': 'unverified_exists',
+    },
 }
 
 
@@ -980,6 +1012,12 @@ DEFAULT_EVENT_TYPE_GRADING = {
 _AUTO_CATEGORY_PATTERNS = [
     # Order matters: more specific patterns first
     ('AI_', 'AI Security'),
+    ('RANSOMWARE_', 'Information Leakage'),
+    ('STEALER_', 'Information Leakage'),
+    ('DARKWEB_', 'Information Leakage'),
+    ('TELEGRAM_LEAK', 'Information Leakage'),
+    ('THREAT_INTEL_', 'Information Leakage'),
+    ('ONION_SERVICE_', 'Information / Reference'),
     ('MALICIOUS_', 'IP Reputation'),
     ('BLACKLISTED_', 'IP Reputation'),
     ('DEFACED_', 'Network Security'),

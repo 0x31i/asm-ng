@@ -21,7 +21,7 @@ class sfp_leakcheck(SpiderFootPlugin):
         "name": "LeakCheck.io",
         "summary": "Gather breach data from LeakCheck API.",
         "flags": ["apikey"],
-        "useCases": ["Footprint", "Investigate", "Passive"],
+        "useCases": ["Footprint", "Investigate", "Passive", "Dark Web Exposure"],
         "categories": ["Leaks, Dumps and Breaches"],
         "dataSource": {
             "website": "https://leakcheck.io/",

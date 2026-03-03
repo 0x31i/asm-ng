@@ -6,7 +6,7 @@
 [![Last Commit](https://img.shields.io/github/last-commit/0x31i/asm-ng)](https://github.com/0x31i/asm-ng/commits/master)
 ![Active Development](https://img.shields.io/badge/Maintenance%20Level-Actively%20Developed-brightgreen.svg)
 
-**ASM-NG** is a production-ready attack surface management and OSINT platform. Built on a battle-tested scanning engine with 200+ modules, it extends far beyond traditional OSINT with **workspace management**, **security grading**, **AI/ML infrastructure discovery**, **false positive tracking**, **known asset management**, **external vulnerability tool integration** (Burp Suite Pro, Nessus Pro, Nuclei), **PostgreSQL database backend**, and **multi-layered cross-scan correlation** — making intelligence data truly navigable and actionable.
+**ASM-NG** is a production-ready attack surface management and OSINT platform. Built on a battle-tested scanning engine with 280+ modules, it extends far beyond traditional OSINT with **workspace management**, **security grading**, **dark web exposure monitoring**, **AI/ML infrastructure discovery**, **false positive tracking**, **known asset management**, **external vulnerability tool integration** (Burp Suite Pro, Nessus Pro, Nuclei), **PostgreSQL database backend**, and **multi-layered cross-scan correlation** — making intelligence data truly navigable and actionable.
 
 ASM-NG features an embedded web server with a clean, modern interface and can also be used entirely via the command line. Written in **Python 3** and **MIT-licensed**.
 
@@ -34,8 +34,9 @@ ASM-NG is a ground-up transformation of SpiderFoot into a full attack surface ma
 | **Export** | CSV/JSON | CSV/JSON/XLSX/GEXF with multi-scan export, vulnerability export, asset export |
 | **Database** | SQLite only | PostgreSQL with auto-setup, connection pooling, and 64 concurrent connections |
 | **AI/ML Discovery** | None | 3 modules for external AI infrastructure fingerprinting, AI subdomain discovery, and embedded AI detection |
-| **Modules** | ~200 | 277 modules including AI recon, security hardening, and threat intel modules |
-| **Correlation Rules** | 37 YAML rules | 51 YAML rules + automated single-scan and cross-scan correlation |
+| **Dark Web Exposure** | None | 11 new modules + 16 enhanced modules for dark web monitoring, breach detection, ransomware leak sites, infostealer logs, brand impersonation, and threat intel feeds |
+| **Modules** | ~200 | 288 modules including AI recon, dark web exposure, security hardening, and threat intel modules |
+| **Correlation Rules** | 37 YAML rules | 56 YAML rules + automated single-scan and cross-scan correlation |
 
 ---
 
@@ -598,12 +599,13 @@ You can target the following entities:
 
 ## Modules & Integrations
 
-ASM-NG has **277 modules**, most of which don't require API keys, and many that do have a free tier.
+ASM-NG has **288 modules**, most of which don't require API keys, and many that do have a free tier.
 
 Module categories include:
 - **OSINT Collection** — DNS, WHOIS, web scraping, port scanning, social media enumeration
 - **Threat Intelligence** — SHODAN, HaveIBeenPwned, GreyNoise, AlienVault, SecurityTrails, and more
 - **Vulnerability Scanning** — Nuclei, Nmap, CMSeeK, Whatweb, DNSTwist
+- **Dark Web Exposure** — Ransomware leak sites, infostealer logs, breach databases, dark web brand monitoring, paste sites, Tor search engines, MISP/OpenCTI threat intel, Telegram leak channels
 - **AI/ML Infrastructure Discovery** — AI framework fingerprinting, AI subdomain discovery, embedded AI/SDK detection
 - **Threat Analysis** — cross-scan threat intel, scan summarization
 - **Security Hardening** — built-in hardening configuration module
@@ -615,7 +617,7 @@ See the [Module Guide](documentation/modules.md) for the full list.
 
 ## Correlation Rules
 
-ASM-NG includes **51 YAML correlation rules** plus automated single-scan and cross-scan correlation engines.
+ASM-NG includes **56 YAML correlation rules** plus automated single-scan and cross-scan correlation engines.
 
 See the [Correlation Rules Reference](/correlations/README.md) and the [template.yaml](/correlations/template.yaml) for writing custom rules.
 
