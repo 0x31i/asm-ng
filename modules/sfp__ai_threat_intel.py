@@ -932,13 +932,26 @@ class NLPThreatAnalyzer:
     def __init__(self):
         self.sentiment_analyzer = None
         self.text_vectorizer = None
-        self.threat_keywords = {
-            'malware': ['virus', 'trojan', 'worm', 'ransomware', 'backdoor', 'rootkit'],
-            'phishing': ['phishing', 'spear', 'whaling', 'credential', 'harvest'],
-            'vulnerability': ['exploit', 'vulnerability', 'cve', 'zero-day', 'rce'],
-            'attack': ['attack', 'breach', 'compromise', 'intrusion', 'penetration'],
-            'c2': ['command', 'control', 'c2', 'beacon', 'callback', 'communication']
+        # Threat keywords use word-boundary regex to prevent substring
+        # false positives (e.g. "communication" matching "c2").
+        # Compiled patterns are cached for performance.
+        self._threat_keyword_sources = {
+            'malware': ['virus', 'trojan', 'worm', 'ransomware', 'backdoor', 'rootkit',
+                        'malware', 'keylogger', 'infostealer', 'botnet'],
+            'phishing': ['phishing', 'spear-phishing', 'whaling', 'credential harvesting',
+                         'social engineering'],
+            'vulnerability': ['exploit', 'vulnerability', 'cve-\\d', 'zero-day', 'rce',
+                              'remote code execution', 'sql injection', 'buffer overflow'],
+            'attack': ['data breach', 'compromise', 'intrusion', 'unauthorized access',
+                       'privilege escalation', 'lateral movement'],
+            'c2': ['command and control', 'command-and-control', 'c2 server', 'c2 beacon',
+                   'c2 channel', 'c&c', 'callback server', 'dead drop resolver'],
         }
+        self.threat_keywords = {}
+        for category, keywords in self._threat_keyword_sources.items():
+            self.threat_keywords[category] = [
+                re.compile(r'\b' + kw + r'\b', re.IGNORECASE) for kw in keywords
+            ]
         self._initialize_nlp()
     
     def _initialize_nlp(self):
@@ -987,11 +1000,9 @@ class NLPThreatAnalyzer:
         if not text_data:
             return results
         
-        text_lower = text_data.lower()
-        
-        # Categorize threats based on keywords
-        for category, keywords in self.threat_keywords.items():
-            if any(keyword in text_lower for keyword in keywords):
+        # Categorize threats using word-boundary regex (not substring)
+        for category, patterns in self.threat_keywords.items():
+            if any(pattern.search(text_data) for pattern in patterns):
                 results['threat_categories'].append(category)
         
         # Sentiment analysis
@@ -1002,8 +1013,9 @@ class NLPThreatAnalyzer:
                 results['sentiment_score'] = sentiment['compound']
                 
                 # Determine urgency based on sentiment and keywords
-                urgency_keywords = ['urgent', 'critical', 'immediate', 'emergency', 'severe']
-                has_urgency = any(word in text_lower for word in urgency_keywords)
+                urgency_keywords = [re.compile(r'\b' + w + r'\b', re.I) for w in
+                                    ['urgent', 'critical', 'immediate', 'emergency', 'severe']]
+                has_urgency = any(p.search(text_data) for p in urgency_keywords)
                 
                 if sentiment['compound'] < -0.5 or has_urgency:
                     results['urgency_level'] = 'high'
@@ -1189,6 +1201,24 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
         "THREAT_INTEL_SUMMARY",
     })
 
+    # Event types that contain structured/binary data unsuitable for NLP
+    # analysis.  Running sentiment analysis or keyword matching on SSL
+    # certificate fields, DNS records, or raw API responses produces
+    # false positives (e.g. "command" in cert extensions → "c2" category).
+    _SKIP_NLP_EVENT_TYPES = frozenset({
+        "SSL_CERTIFICATE_RAW", "SSL_CERTIFICATE_ISSUED", "SSL_CERTIFICATE_ISSUER",
+        "SSL_CERTIFICATE_MISMATCH", "SSL_CERTIFICATE_EXPIRED",
+        "SSL_CERTIFICATE_EXPIRING", "SSL_CERTIFICATE_INFO",
+        "RAW_RIR_DATA", "RAW_DNS_RECORDS", "RAW_FILE_META_DATA",
+        "DNS_TEXT", "DNS_SPF", "DNS_SRV", "WEBSERVER_BANNER",
+        "WEBSERVER_HTTPHEADERS", "HTTP_HEADERS", "TARGET_WEB_COOKIE",
+        "IP_ADDRESS", "IPV6_ADDRESS", "DOMAIN_NAME", "INTERNET_NAME",
+        "EMAILADDR", "PHONE_NUMBER", "HASH", "BGP_AS_OWNER",
+        "GEOINFO", "PROVIDER_DNS", "PROVIDER_HOSTING", "PROVIDER_MAIL",
+        "SIMILARDOMAIN", "CO_HOSTED_SITE", "AFFILIATE_DOMAIN_NAME",
+        "COUNTRY_NAME", "PGP_KEY",
+    })
+
     def handleEvent(self, sfEvent):
         """Handle events with threat analysis."""
         if self.errorState:
@@ -1337,12 +1367,15 @@ class sfp__ai_threat_intel(SpiderFootPlugin):
             return
         if hasattr(self, 'nlp_analyzer') and self.opts['enable_nlp_analysis']:
             try:
-                # Only analyze text-heavy events
-                if len(sfEvent.data) > 50:  # Minimum text length
+                # Skip structured/binary event types that produce false positives
+                if sfEvent.eventType in self._SKIP_NLP_EVENT_TYPES:
+                    pass
+                # Only analyze text-heavy events (200+ chars of prose, not short identifiers)
+                elif len(sfEvent.data) > 200:
                     nlp_results = self.nlp_analyzer.analyze_threat_text(sfEvent.data)
                     
                     if (nlp_results['threat_categories'] and
-                        nlp_results['confidence'] > 0.5):
+                        nlp_results['confidence'] > 0.7):
 
                         nlp_event = SpiderFootEvent(
                             "AI_NLP_ANALYSIS",
