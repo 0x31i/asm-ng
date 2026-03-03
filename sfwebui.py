@@ -7468,9 +7468,9 @@ class SpiderFootWebUi:
                     except Exception:
                         pass
 
-                # 3. Recent events feed
+                # 3. Recent events feed (latest 100, most recent first)
                 try:
-                    result['recentEvents'] = dbh.scanRecentEvents(id, 20)
+                    result['recentEvents'] = dbh.scanRecentEvents(id, 100)
                 except Exception:
                     pass
 

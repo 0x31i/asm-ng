@@ -2284,6 +2284,7 @@ class SpiderFootDb:
             'totalEvents': 0,
             'eventsPerSecond': 0.0,
             'progressPercent': 0,
+            'scanStarted': 0,
         }
 
         with self.dbhLock:
@@ -2298,6 +2299,7 @@ class SpiderFootDb:
                     return result
                 result['status'] = row[0]
                 scan_started = row[1] or 0
+                result['scanStarted'] = scan_started
 
                 # Terminal states -> 100%
                 if row[0] in ('FINISHED', 'ABORTED', 'ERROR-FAILED'):
@@ -2388,20 +2390,29 @@ class SpiderFootDb:
                 result['_snapshot_modules'] = snap.get('modules', {})
 
                 # --- Composite progress estimate ---
-                # 50% module reporting (most stable, monotonically increasing)
+                # 80% module reporting — most reliable signal; monotonically
+                # increases as each module produces its first result.
                 module_report_pct = (modules_with_results / modules_total) * 100
-                # 30% module idle ratio
-                idle_pct = (result['modulesIdle'] / modules_total) * 100
-                # 20% logarithmic queue drain (handles 0 to 100k+ gracefully)
+
+                # 20% logarithmic queue drain — secondary signal.
+                # NOTE: modulesIdle was previously included here but removed:
+                # at t=0 all module queues are empty so idle≈total, inflating
+                # progress to ~30% before any real work has happened.
+                # Queue drain also has a cold-start problem: with 0 events queued
+                # at t=0 it would report 100% "drained" — so we only activate it
+                # once the scan has actually produced some events.
                 queued = result['eventsQueued']
-                if queued <= 0:
-                    queue_drain_pct = 100
+                total_ev = result['totalEvents']
+                if total_ev == 0:
+                    # Scan hasn't produced results yet; queue signal is noise
+                    queue_drain_pct = 0.0
+                elif queued <= 0:
+                    queue_drain_pct = 100.0
                 else:
-                    queue_drain_pct = max(0, 100 - 20 * math.log10(queued + 1))
+                    queue_drain_pct = max(0.0, 100.0 - 20.0 * math.log10(queued + 1))
 
                 raw_pct = int(
-                    module_report_pct * 0.50
-                    + idle_pct * 0.30
+                    module_report_pct * 0.80
                     + queue_drain_pct * 0.20
                 )
 
