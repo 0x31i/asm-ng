@@ -2,7 +2,8 @@
 # -------------------------------------------------------------------------------
 # Name:        sfp_darkweb_aggregate
 # Purpose:     Aggregate search across multiple Tor search engines not already
-#              covered by dedicated modules (Haystak, Excavator, Phobos, Tor66).
+#              covered by dedicated modules (Haystak, Tor66).
+#              Requires Tor SOCKS proxy to be configured.
 #
 # Author:      ASM-NG Team
 #
@@ -21,8 +22,8 @@ class sfp_darkweb_aggregate(SpiderFootPlugin):
 
     meta = {
         'name': "Dark Web Aggregate Search",
-        'summary': "Search multiple Tor search engines (Haystak, Excavator, Phobos, Tor66) "
-        "for mentions of the target via their clearnet portals.",
+        'summary': "Search multiple Tor search engines (Haystak, Tor66) for mentions "
+        "of the target. Requires Tor SOCKS proxy (127.0.0.1:9050).",
         'flags': ["tor"],
         'useCases': ["Footprint", "Investigate", "Dark Web Exposure"],
         'categories': ["Search Engines"],
@@ -32,9 +33,10 @@ class sfp_darkweb_aggregate(SpiderFootPlugin):
             'references': [],
             'favIcon': "",
             'logo': "",
-            'description': "Aggregated search across multiple Tor search engines "
-            "that are not covered by dedicated ASM-NG modules. "
-            "Uses clearnet portals where available, with optional Tor verification.",
+            'description': "Aggregated search across Tor-only search engines "
+            "(Haystak, Tor66) that have no clearnet portals. "
+            "Requires a Tor SOCKS proxy to be running. "
+            "Configure SOCKS Type=TOR, Address=127.0.0.1, Port=9050 in scan settings.",
         }
     }
 
@@ -45,27 +47,26 @@ class sfp_darkweb_aggregate(SpiderFootPlugin):
     }
 
     optdescs = {
-        'fetchlinks': "Fetch the darknet pages (via TOR, if enabled) to verify they mention your target.",
+        'fetchlinks': "Fetch the darknet pages (via Tor) to verify they mention your target.",
         'fullnames': "Search for human names?",
         'max_results_per_engine': "Maximum number of results to process per search engine.",
     }
 
     results = None
+    _torAvailable = False
 
-    # Clearnet portals / proxies for Tor search engines
+    # These Tor search engines have NO clearnet portals — Tor is mandatory
     SEARCH_ENGINES = [
         {
             'name': 'Haystak',
-            'url': 'https://haystak5njsmn2hqkewecpaxetahtwhsbsa64jom2k22z5afxhnpxfid.onion/',
-            'clearnet_url': None,  # No clearnet portal; requires Tor
-            'search_path': '/?q={query}',
-            'link_pattern': r'href=["\']([a-z2-7]{56}\.onion[^"\']*)["\']',
+            'url': 'http://haystak5njsmn2hqkewecpaxetahtwhsbsa64jom2k22z5afxhnpxfid.onion/',
+            'search_path': '?q={query}',
+            'link_pattern': r'href=["\'](?:https?://)?([a-z2-7]{56}\.onion[^"\']*)["\']',
         },
         {
             'name': 'Tor66',
             'url': 'http://tor66sewebgixwhcqfnp5inzp5x5uohhdy3kvtnyfxc2e5mxiber7qd.onion/',
-            'clearnet_url': None,
-            'search_path': '/search?q={query}',
+            'search_path': 'search?q={query}',
             'link_pattern': r'href=["\'](?:https?://)?([a-z2-7]{56}\.onion[^"\']*)["\']',
         },
     ]
@@ -73,9 +74,24 @@ class sfp_darkweb_aggregate(SpiderFootPlugin):
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
         self.results = self.tempStorage()
+        self._torAvailable = False
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
+
+    def _checkTorProxy(self):
+        """Check if Tor SOCKS proxy is configured in scan settings."""
+        socks_type = self.opts.get('_socks1type', '')
+        socks_addr = self.opts.get('_socks2addr', '')
+        socks_port = self.opts.get('_socks3port', '')
+
+        if not socks_type or str(socks_type).upper() not in ('TOR', 'SOCKS5', 'HTTP'):
+            return False
+
+        if not socks_addr:
+            return False
+
+        return True
 
     def watchedEvents(self):
         return ["DOMAIN_NAME", "HUMAN_NAME", "EMAILADDR"]
@@ -91,10 +107,9 @@ class sfp_darkweb_aggregate(SpiderFootPlugin):
         """Search a single Tor search engine for the query."""
         results = []
 
-        # Use clearnet URL if available, otherwise try onion URL (requires Tor)
-        base_url = engine.get('clearnet_url') or engine['url']
+        base_url = engine['url']
         search_path = engine['search_path'].format(query=urllib.parse.quote(query))
-        url = base_url + search_path.lstrip('/')
+        url = base_url + search_path
 
         data = self.sf.fetchUrl(
             url,
@@ -148,6 +163,20 @@ class sfp_darkweb_aggregate(SpiderFootPlugin):
 
         self.results[eventData] = True
 
+        # Check Tor availability on first event
+        if not self._torAvailable:
+            if self._checkTorProxy():
+                self._torAvailable = True
+                self.info("Tor SOCKS proxy detected — dark web aggregate search enabled.")
+            else:
+                self.info(
+                    "Dark Web Aggregate Search requires a Tor SOCKS proxy. "
+                    "Configure: SOCKS Type=TOR, Address=127.0.0.1, Port=9050 in scan settings. "
+                    "Install Tor: apt install tor (Linux) or brew install tor (macOS). "
+                    "Skipping dark web search engine queries."
+                )
+                return
+
         allLinks = []
 
         for engine in self.SEARCH_ENGINES:
@@ -156,10 +185,12 @@ class sfp_darkweb_aggregate(SpiderFootPlugin):
 
             self.debug(f"Searching {engine['name']} for: {eventData}")
             links = self.searchEngine(engine, eventData)
+            if links:
+                self.info(f"{engine['name']}: found {len(links)} .onion links for {eventData}")
             allLinks.extend(links)
 
         if not allLinks:
-            self.info(f"No darknet mentions found for: {eventData}")
+            self.info(f"No darknet mentions found across {len(self.SEARCH_ENGINES)} Tor search engines for: {eventData}")
             return
 
         for link in allLinks:

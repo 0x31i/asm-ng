@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # -------------------------------------------------------------------------------
 # Name:        sfp_ransomwatch
-# Purpose:     Search RansomLook API for ransomware leak site mentions of
+# Purpose:     Search ransomware.live API for ransomware leak site mentions of
 #              the target.
 #
 # Author:      ASM-NG Team
@@ -12,7 +12,6 @@
 # -------------------------------------------------------------------------------
 
 import json
-import re
 import urllib.parse
 
 from spiderfoot import SpiderFootEvent, SpiderFootPlugin
@@ -22,21 +21,22 @@ class sfp_ransomwatch(SpiderFootPlugin):
 
     meta = {
         'name': "RansomWatch",
-        'summary': "Search RansomLook API for ransomware leak site mentions of the target.",
+        'summary': "Search ransomware.live API for ransomware group leak site mentions of the target. "
+        "Tracks 300+ ransomware groups and 26,000+ victims.",
         'flags': [],
         'useCases': ["Footprint", "Investigate", "Dark Web Exposure"],
         'categories': ["Leaks, Dumps and Breaches"],
         'dataSource': {
-            'website': "https://www.ransomlook.io/",
-            'model': "FREE_NOAUTH_UNLIMITED",
+            'website': "https://www.ransomware.live/",
+            'model': "FREE_NOAUTH_LIMITED",
             'references': [
-                "https://www.ransomlook.io/api",
+                "https://www.ransomware.live/apidocs",
             ],
             'favIcon': "",
             'logo': "",
-            'description': "RansomLook is a monitoring tool for ransomware leak sites. "
-            "It tracks ransomware groups and their victims to provide threat intelligence "
-            "on active ransomware campaigns.",
+            'description': "ransomware.live is a monitoring tool tracking 300+ ransomware groups "
+            "and their leak sites. It provides searchable victim data, group profiles, "
+            "and .onion claim URLs. Free API with daily rate limits.",
         }
     }
 
@@ -49,10 +49,12 @@ class sfp_ransomwatch(SpiderFootPlugin):
     }
 
     results = None
+    errorState = False
 
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
         self.results = self.tempStorage()
+        self.errorState = False
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -65,12 +67,16 @@ class sfp_ransomwatch(SpiderFootPlugin):
             "RANSOMWARE_LEAK_MENTION",
             "DARKNET_MENTION_URL",
             "DARKNET_MENTION_CONTENT",
+            "RAW_RIR_DATA",
         ]
 
-    def query(self, target):
-        """Query the RansomLook API for a target."""
-        encoded = urllib.parse.quote(target)
-        url = f"https://api.ransomlook.io/v2/search/{encoded}"
+    def _searchVictims(self, keyword):
+        """Search ransomware.live v2 API for victims matching a keyword.
+
+        The API does substring matching across victim name and domain fields.
+        """
+        encoded = urllib.parse.quote(keyword)
+        url = f"https://api.ransomware.live/v2/searchvictims/{encoded}"
 
         res = self.sf.fetchUrl(
             url,
@@ -79,17 +85,28 @@ class sfp_ransomwatch(SpiderFootPlugin):
         )
 
         if not res or not res.get('content'):
-            self.debug(f"No response from RansomLook for: {target}")
+            self.debug(f"No response from ransomware.live for: {keyword}")
             return None
 
-        if res.get('code') != '200':
-            self.debug(f"Unexpected response code from RansomLook: {res.get('code')}")
+        if res.get('code') == '429':
+            self.error("Rate limited by ransomware.live API. Daily limit reached.")
+            return None
+
+        if res.get('code') == '404':
+            self.debug(f"No victims found on ransomware.live for: {keyword}")
+            return None
+
+        if res.get('code') not in ('200', '301', '302'):
+            self.debug(f"Unexpected response code from ransomware.live: {res.get('code')}")
             return None
 
         try:
-            return json.loads(res['content'])
+            data = json.loads(res['content'])
+            if isinstance(data, list):
+                return data
+            return None
         except Exception as e:
-            self.debug(f"Error parsing JSON response: {e}")
+            self.debug(f"Error parsing ransomware.live JSON: {e}")
             return None
 
     def handleEvent(self, event):
@@ -99,98 +116,116 @@ class sfp_ransomwatch(SpiderFootPlugin):
 
         self.debug(f"Received event, {eventName}, from {srcModuleName}")
 
+        if self.errorState:
+            return
+
         if eventData in self.results:
             self.debug(f"Skipping {eventData}, already checked.")
             return
 
         self.results[eventData] = True
 
-        data = self.query(eventData)
-        if not data:
+        # Search by the event data directly
+        victims = self._searchVictims(eventData)
+
+        # For DOMAIN_NAME, also try the bare name without TLD
+        if not victims and eventName == "DOMAIN_NAME" and '.' in eventData:
+            bare = eventData.split('.')[0]
+            if len(bare) > 2:
+                victims = self._searchVictims(bare)
+
+        if not victims:
+            self.debug(f"ransomware.live: no victims found for {eventData}")
             return
 
         count = 0
         maxResults = self.opts.get('max_results', 100)
 
-        # RansomLook returns results grouped by ransomware group
-        entries = data if isinstance(data, list) else data.get('data', data.get('results', []))
-        if isinstance(entries, dict):
-            # Flatten dict-of-lists structure
-            flat = []
-            for group_name, victims in entries.items():
-                if isinstance(victims, list):
-                    for v in victims:
-                        if isinstance(v, dict):
-                            v['_group'] = group_name
-                        flat.append(v)
-                elif isinstance(victims, dict):
-                    victims['_group'] = group_name
-                    flat.append(victims)
-            entries = flat
-
-        if not isinstance(entries, list):
-            return
-
-        for entry in entries:
+        for victim in victims:
             if self.checkForStop():
                 return
 
             if count >= maxResults:
                 break
 
-            if isinstance(entry, dict):
-                group = entry.get('group_name', entry.get('_group', 'Unknown'))
-                victim = entry.get('post_title', entry.get('victim', entry.get('name', '')))
-                post_url = entry.get('post_url', entry.get('url', ''))
-                description = entry.get('description', entry.get('post_content', ''))
-                discovered = entry.get('discovered', entry.get('date', ''))
+            if not isinstance(victim, dict):
+                continue
 
-                mention_text = f"Ransomware group '{group}' listed '{victim}'"
-                if discovered:
-                    mention_text += f" (discovered: {discovered})"
+            group = victim.get('group', 'Unknown')
+            victim_name = victim.get('victim', '')
+            domain = victim.get('domain', '')
+            country = victim.get('country', '')
+            activity = victim.get('activity', '')
+            discovered = victim.get('discovered', '')
+            claim_url = victim.get('claim_url', '')
+            description = victim.get('description', '')
+            screenshot = victim.get('screenshot', '')
+            url = victim.get('url', '')
 
-                evt = SpiderFootEvent(
-                    "RANSOMWARE_LEAK_MENTION",
-                    mention_text,
+            # Build detailed mention text
+            mention_parts = [f"Ransomware group '{group}' listed '{victim_name}'"]
+            if domain:
+                mention_parts.append(f"Domain: {domain}")
+            if country:
+                mention_parts.append(f"Country: {country}")
+            if activity:
+                mention_parts.append(f"Sector: {activity}")
+            if discovered:
+                mention_parts.append(f"Discovered: {discovered}")
+            mention_parts.append("Source: ransomware.live")
+
+            mention_text = " | ".join(mention_parts)
+
+            evt = SpiderFootEvent(
+                "RANSOMWARE_LEAK_MENTION",
+                mention_text,
+                self.__class__.__name__,
+                event,
+            )
+            self.notifyListeners(evt)
+            count += 1
+
+            # Emit .onion claim URL
+            if claim_url and '.onion' in claim_url:
+                evt2 = SpiderFootEvent(
+                    "DARKNET_MENTION_URL",
+                    claim_url,
                     self.__class__.__name__,
                     event,
                 )
-                self.notifyListeners(evt)
-                count += 1
+                self.notifyListeners(evt2)
 
-                if post_url:
-                    evt2 = SpiderFootEvent(
-                        "DARKNET_MENTION_URL",
-                        post_url,
-                        self.__class__.__name__,
-                        event,
-                    )
-                    self.notifyListeners(evt2)
+            # Emit description snippet as content
+            if description:
+                snippet = description[:500]
+                evt3 = SpiderFootEvent(
+                    "DARKNET_MENTION_CONTENT",
+                    f"Ransomware leak site listing for '{victim_name}' by {group}:\n{snippet}",
+                    self.__class__.__name__,
+                    evt,
+                )
+                self.notifyListeners(evt3)
 
-                if description:
-                    try:
-                        startIndex = max(0, description.lower().index(eventData.lower()) - 120)
-                        endIndex = startIndex + len(eventData) + 240
-                        snippet = description[startIndex:endIndex]
-                    except ValueError:
-                        snippet = description[:360]
-
-                    evt3 = SpiderFootEvent(
-                        "DARKNET_MENTION_CONTENT",
-                        f"...{snippet}...",
-                        self.__class__.__name__,
-                        evt,
-                    )
-                    self.notifyListeners(evt3)
-
-            elif isinstance(entry, str):
-                evt = SpiderFootEvent(
-                    "RANSOMWARE_LEAK_MENTION",
-                    f"Target '{eventData}' found in ransomware leak data: {entry}",
+            # Emit full structured data for the first few results
+            if count <= 10:
+                raw = {
+                    'victim': victim_name,
+                    'group': group,
+                    'domain': domain,
+                    'country': country,
+                    'sector': activity,
+                    'discovered': discovered,
+                    'claim_url': claim_url,
+                    'screenshot': screenshot,
+                    'url': url,
+                    'source': 'ransomware.live',
+                }
+                evt4 = SpiderFootEvent(
+                    "RAW_RIR_DATA",
+                    f"ransomware.live victim record:\n{json.dumps(raw, indent=2)}",
                     self.__class__.__name__,
                     event,
                 )
-                self.notifyListeners(evt)
-                count += 1
+                self.notifyListeners(evt4)
 
 # End of sfp_ransomwatch class

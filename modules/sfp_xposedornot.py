@@ -38,10 +38,13 @@ class sfp_xposedornot(SpiderFootPlugin):
     }
 
     opts = {
+        'api_key': '',
         'pause': 1,
     }
 
     optdescs = {
+        'api_key': "XposedOrNot API key. Required for domain breach lookups. "
+        "Free at https://xposedornot.com/ — email lookups work without a key.",
         'pause': "Seconds to wait between API requests to avoid rate limiting.",
     }
 
@@ -65,14 +68,39 @@ class sfp_xposedornot(SpiderFootPlugin):
             "RAW_RIR_DATA",
         ]
 
+    def _flatten_breaches(self, breaches):
+        """Flatten nested breach lists from XposedOrNot API.
+
+        The API returns breaches in various formats:
+        - Nested list: [["breach1","breach2",...]]
+        - Flat list: ["breach1","breach2",...]
+        - List of dicts: [{"breach":"name",...},...]
+        """
+        if not isinstance(breaches, list):
+            return []
+
+        flat = []
+        for item in breaches:
+            if isinstance(item, list):
+                flat.extend(item)
+            elif isinstance(item, (str, dict)):
+                flat.append(item)
+        return flat
+
     def queryEmail(self, email):
         """Query XposedOrNot for a specific email address."""
         url = f"https://api.xposedornot.com/v1/check-email/{email}"
+
+        headers = {}
+        api_key = self.opts.get('api_key', '')
+        if api_key:
+            headers['x-api-key'] = api_key
 
         res = self.sf.fetchUrl(
             url,
             timeout=15,
             useragent=self.opts['_useragent'],
+            headers=headers,
         )
 
         if not res or not res.get('content'):
@@ -98,13 +126,24 @@ class sfp_xposedornot(SpiderFootPlugin):
             return None
 
     def queryDomain(self, domain):
-        """Query XposedOrNot for a specific domain."""
+        """Query XposedOrNot for a specific domain.
+
+        Requires an API key (x-api-key header). Without one the endpoint
+        returns 405 Method Not Allowed.
+        """
+        api_key = self.opts.get('api_key', '')
+        if not api_key:
+            self.debug(f"Skipping domain lookup for {domain} — no XposedOrNot API key configured. "
+                       "Get a free key at https://xposedornot.com/")
+            return None
+
         url = f"https://api.xposedornot.com/v1/domain-breaches/?domain={domain}"
 
         res = self.sf.fetchUrl(
             url,
             timeout=15,
             useragent=self.opts['_useragent'],
+            headers={'x-api-key': api_key},
         )
 
         if not res or not res.get('content'):
@@ -113,6 +152,11 @@ class sfp_xposedornot(SpiderFootPlugin):
 
         if res.get('code') == '404':
             self.debug(f"Domain not found in breaches: {domain}")
+            return None
+
+        if res.get('code') in ('401', '403', '405'):
+            self.error("XposedOrNot API key invalid or domain endpoint requires auth. "
+                       "Check your API key at https://xposedornot.com/")
             return None
 
         if res.get('code') == '429':
@@ -150,29 +194,49 @@ class sfp_xposedornot(SpiderFootPlugin):
             if not data:
                 return
 
-            # XposedOrNot returns breach info in 'breaches' field
-            breaches = data.get('breaches') or data.get('ExposedBreaches', {}).get('breaches_details', [])
+            # XposedOrNot returns breach info in various formats:
+            #   {"breaches":[["breach1","breach2",...]],"email":"...","status":"success"}
+            #   {"ExposedBreaches":{"breaches_details":[...]}}
+            breaches_raw = data.get('breaches') or data.get('ExposedBreaches', {}).get('breaches_details', [])
+            breaches = self._flatten_breaches(breaches_raw)
+
             if not breaches:
+                self.debug(f"XposedOrNot: no breaches found for {eventData}")
                 return
 
-            if isinstance(breaches, list):
-                for breach in breaches:
-                    if self.checkForStop():
-                        return
+            breach_names = []
+            for breach in breaches:
+                if self.checkForStop():
+                    return
 
-                    breachName = breach if isinstance(breach, str) else breach.get('breach', breach.get('domain', 'Unknown'))
+                if isinstance(breach, str):
+                    breachName = breach
+                elif isinstance(breach, dict):
+                    breachName = breach.get('breach', breach.get('domain', breach.get('name', 'Unknown')))
+                else:
+                    continue
 
-                    evt = SpiderFootEvent(
-                        "EMAILADDR_COMPROMISED",
-                        f"{eventData} [{breachName}]",
-                        self.__class__.__name__,
-                        event,
-                    )
-                    self.notifyListeners(evt)
+                breach_names.append(breachName)
 
+                evt = SpiderFootEvent(
+                    "EMAILADDR_COMPROMISED",
+                    f"{eventData} [Breach: {breachName} | Source: XposedOrNot]",
+                    self.__class__.__name__,
+                    event,
+                )
+                self.notifyListeners(evt)
+
+            # Emit summary RAW_RIR_DATA
+            summary = {
+                'email': eventData,
+                'breach_count': len(breach_names),
+                'breaches': breach_names,
+                'source': 'XposedOrNot',
+                'raw': data,
+            }
             evt = SpiderFootEvent(
                 "RAW_RIR_DATA",
-                str(data),
+                f"XposedOrNot breach results for {eventData}:\n{json.dumps(summary, indent=2)}",
                 self.__class__.__name__,
                 event,
             )
@@ -183,28 +247,38 @@ class sfp_xposedornot(SpiderFootPlugin):
             if not data:
                 return
 
-            breaches = data.get('breaches') or data.get('ExposedBreaches', {}).get('breaches_details', [])
+            breaches_raw = data.get('breaches') or data.get('ExposedBreaches', {}).get('breaches_details', [])
+            breaches = self._flatten_breaches(breaches_raw)
+
             if not breaches:
+                self.debug(f"XposedOrNot: no breaches found for domain {eventData}")
                 return
 
-            if isinstance(breaches, list):
-                for breach in breaches:
-                    if self.checkForStop():
-                        return
+            breach_names = []
+            for breach in breaches:
+                if self.checkForStop():
+                    return
 
-                    breachName = breach if isinstance(breach, str) else breach.get('breach', breach.get('domain', 'Unknown'))
+                if isinstance(breach, str):
+                    breachName = breach
+                elif isinstance(breach, dict):
+                    breachName = breach.get('breach', breach.get('domain', breach.get('name', 'Unknown')))
+                else:
+                    continue
 
-                    evt = SpiderFootEvent(
-                        "EMAILADDR_COMPROMISED",
-                        f"@{eventData} [{breachName}]",
-                        self.__class__.__name__,
-                        event,
-                    )
-                    self.notifyListeners(evt)
+                breach_names.append(breachName)
+
+                evt = SpiderFootEvent(
+                    "EMAILADDR_COMPROMISED",
+                    f"@{eventData} [Breach: {breachName} | Source: XposedOrNot]",
+                    self.__class__.__name__,
+                    event,
+                )
+                self.notifyListeners(evt)
 
             evt = SpiderFootEvent(
                 "RAW_RIR_DATA",
-                str(data),
+                f"XposedOrNot domain breach results for {eventData}:\n{json.dumps({'domain': eventData, 'breach_count': len(breach_names), 'breaches': breach_names}, indent=2)}",
                 self.__class__.__name__,
                 event,
             )

@@ -68,10 +68,8 @@ class sfp_stealerlog_check(SpiderFootPlugin):
             "RAW_RIR_DATA",
         ]
 
-    def queryDomain(self, domain):
-        """Query Hudson Rock for a domain."""
-        url = f"https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-domain?domain={domain}"
-
+    def _fetchApi(self, url):
+        """Fetch a Hudson Rock API endpoint and return parsed JSON."""
         res = self.sf.fetchUrl(
             url,
             timeout=30,
@@ -79,7 +77,6 @@ class sfp_stealerlog_check(SpiderFootPlugin):
         )
 
         if not res or not res.get('content'):
-            self.debug(f"No response from Hudson Rock for domain: {domain}")
             return None
 
         if res.get('code') == '429':
@@ -95,6 +92,153 @@ class sfp_stealerlog_check(SpiderFootPlugin):
         except Exception as e:
             self.debug(f"Error parsing JSON response: {e}")
             return None
+
+    def _handleEmail(self, email, event):
+        """Handle EMAILADDR events using the search-by-email endpoint.
+
+        Response: {"stealers":[{...},...], "total_corporate_services":N, ...}
+        """
+        url = f"https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-email?email={email}"
+        data = self._fetchApi(url)
+
+        if not data:
+            return
+
+        stealers = data.get('stealers', [])
+        if not stealers:
+            self.debug(f"Hudson Rock: no stealer logs found for email {email}")
+            return
+
+        for entry in stealers:
+            if self.checkForStop():
+                return
+
+            if not isinstance(entry, dict):
+                continue
+
+            stealer_type = entry.get('stealer_type', entry.get('malware_family', 'Unknown'))
+            computer_name = entry.get('computer_name', '')
+            date_compromised = entry.get('date_compromised', entry.get('date', ''))
+            operating_system = entry.get('operating_system', '')
+            ip = entry.get('ip', '')
+            antiviruses = entry.get('antiviruses', '')
+            log_file_name = entry.get('log_file_name', '')
+
+            # Build detailed mention
+            parts = [f"Email: {email}"]
+            parts.append(f"Malware: {stealer_type}")
+            if date_compromised:
+                parts.append(f"Date: {date_compromised}")
+            if computer_name:
+                parts.append(f"Host: {computer_name}")
+            if operating_system:
+                parts.append(f"OS: {operating_system}")
+            if ip:
+                parts.append(f"IP: {ip}")
+            if antiviruses:
+                parts.append(f"AV: {antiviruses}")
+            parts.append("Source: Hudson Rock Cavalier")
+
+            mention = " | ".join(parts)
+
+            evt = SpiderFootEvent(
+                "STEALER_LOG_MATCH",
+                mention,
+                self.__class__.__name__,
+                event,
+            )
+            self.notifyListeners(evt)
+
+            evt2 = SpiderFootEvent(
+                "EMAILADDR_COMPROMISED",
+                f"{email} [Infostealer: {stealer_type} | Source: Hudson Rock]",
+                self.__class__.__name__,
+                event,
+            )
+            self.notifyListeners(evt2)
+
+        # Emit raw data
+        evt = SpiderFootEvent(
+            "RAW_RIR_DATA",
+            f"Hudson Rock stealer log results for {email}:\n{json.dumps(data, indent=2, default=str)[:5000]}",
+            self.__class__.__name__,
+            event,
+        )
+        self.notifyListeners(evt)
+
+    def _handleDomain(self, domain, event):
+        """Handle DOMAIN_NAME events using the search-by-domain endpoint.
+
+        Response: {"total":N, "employees":N, "users":N, "third_parties":N,
+                   "stealerFamilies":{...}, "data":{"employees_urls":[...],...}, ...}
+        """
+        url = f"https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-domain?domain={domain}"
+        data = self._fetchApi(url)
+
+        if not data:
+            return
+
+        total = data.get('total', 0)
+        employees = data.get('employees', 0)
+        users = data.get('users', 0)
+        third_parties = data.get('third_parties', 0)
+
+        if total == 0 and employees == 0 and users == 0:
+            self.debug(f"Hudson Rock: no stealer logs found for domain {domain}")
+            return
+
+        # Build stealer family summary
+        stealer_families = data.get('stealerFamilies', {})
+        family_str = ', '.join(f"{k}: {v}" for k, v in stealer_families.items()) if stealer_families else 'Unknown'
+
+        last_employee = data.get('last_employee_compromised', '')
+        last_user = data.get('last_user_compromised', '')
+
+        # Emit domain-level stealer log match
+        parts = [f"Domain: {domain}"]
+        parts.append(f"Total compromised: {total}")
+        if employees:
+            parts.append(f"Employees: {employees}")
+        if users:
+            parts.append(f"Users: {users}")
+        if third_parties:
+            parts.append(f"Third-parties: {third_parties}")
+        parts.append(f"Stealer families: {family_str}")
+        if last_employee:
+            parts.append(f"Last employee compromise: {last_employee}")
+        if last_user:
+            parts.append(f"Last user compromise: {last_user}")
+        parts.append("Source: Hudson Rock Cavalier")
+
+        mention = " | ".join(parts)
+
+        evt = SpiderFootEvent(
+            "STEALER_LOG_MATCH",
+            mention,
+            self.__class__.__name__,
+            event,
+        )
+        self.notifyListeners(evt)
+
+        # Emit raw data with summary
+        summary = {
+            'domain': domain,
+            'total': total,
+            'employees': employees,
+            'users': users,
+            'third_parties': third_parties,
+            'stealer_families': stealer_families,
+            'last_employee_compromised': last_employee,
+            'last_user_compromised': last_user,
+            'source': 'Hudson Rock Cavalier',
+        }
+        evt2 = SpiderFootEvent(
+            "RAW_RIR_DATA",
+            f"Hudson Rock domain summary for {domain}:\n{json.dumps(summary, indent=2, default=str)}",
+            self.__class__.__name__,
+            event,
+        )
+        self.notifyListeners(evt2)
 
     def handleEvent(self, event):
         eventName = event.eventType
@@ -113,78 +257,9 @@ class sfp_stealerlog_check(SpiderFootPlugin):
         self.results[eventData] = True
 
         if eventName == "EMAILADDR":
-            # For email, extract the domain and search
-            domain = eventData.split('@')[-1] if '@' in eventData else eventData
-            data = self.queryDomain(domain)
-        else:
-            data = self.queryDomain(eventData)
-
-        if not data:
-            return
-
-        stealers = data.get('stealers', [])
-        if not stealers:
-            return
-
-        for entry in stealers:
-            if self.checkForStop():
-                return
-
-            email = entry.get('email', entry.get('username', ''))
-            password = entry.get('password', '')
-            stealer_type = entry.get('stealer_type', entry.get('malware_family', 'Unknown'))
-            computer_name = entry.get('computer_name', '')
-            date_compromised = entry.get('date_compromised', entry.get('date', ''))
-            url = entry.get('url', '')
-
-            # If searching by email, only report matches for that email
-            if eventName == "EMAILADDR" and email and email.lower() != eventData.lower():
-                continue
-
-            mention = f"Stealer log match: {email or eventData}"
-            if stealer_type:
-                mention += f" (malware: {stealer_type})"
-            if date_compromised:
-                mention += f" (date: {date_compromised})"
-            if computer_name:
-                mention += f" (host: {computer_name})"
-            if url:
-                mention += f" (source: {url})"
-
-            evt = SpiderFootEvent(
-                "STEALER_LOG_MATCH",
-                mention,
-                self.__class__.__name__,
-                event,
-            )
-            self.notifyListeners(evt)
-
-            if email:
-                evt2 = SpiderFootEvent(
-                    "EMAILADDR_COMPROMISED",
-                    f"{email} [Infostealer - {stealer_type}]",
-                    self.__class__.__name__,
-                    event,
-                )
-                self.notifyListeners(evt2)
-
-            if password:
-                evt3 = SpiderFootEvent(
-                    "PASSWORD_COMPROMISED",
-                    f"{email}:{password} [Infostealer - {stealer_type}]",
-                    self.__class__.__name__,
-                    event,
-                )
-                self.notifyListeners(evt3)
-
-        # Emit raw data
-        evt = SpiderFootEvent(
-            "RAW_RIR_DATA",
-            str(data),
-            self.__class__.__name__,
-            event,
-        )
-        self.notifyListeners(evt)
+            self._handleEmail(eventData, event)
+        elif eventName == "DOMAIN_NAME":
+            self._handleDomain(eventData, event)
 
         import time
         time.sleep(self.opts.get('pause', 2))
