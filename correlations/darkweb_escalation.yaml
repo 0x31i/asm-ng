@@ -1,0 +1,39 @@
+id: darkweb_escalation
+version: "1"
+meta:
+  name: >
+    Dark web escalation pattern detected
+  description: >
+    An escalation pattern was detected where the target appeared first in
+    paste sites or leak databases, then in dark web forum discussions, and
+    finally in ransomware leak sites or infostealer logs.
+
+    This pattern indicates progressive targeting: from initial data exposure
+    to active threat actor discussion to confirmed compromise. Immediate
+    incident response and forensic investigation is recommended.
+  risk: HIGH
+collections:
+  first:
+      - method: exact
+        field: type
+        value: LEAKSITE_URL
+      - method: exact
+        field: type
+        value: LEAKSITE_CONTENT
+  second:
+      - method: exact
+        field: type
+        value: DARKWEB_FORUM_MENTION
+      - method: exact
+        field: type
+        value: DARKNET_MENTION_URL
+  third:
+      - method: exact
+        field: type
+        value: RANSOMWARE_LEAK_MENTION
+      - method: exact
+        field: type
+        value: STEALER_LOG_MATCH
+analysis:
+  - method: match_all_to_first_collection
+headline: "Dark web escalation: paste/leak -> forum discussion -> ransomware/stealer compromise"

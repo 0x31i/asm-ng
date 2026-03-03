@@ -77,6 +77,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     coreutils \
     libcap2-bin \
     ca-certificates \
+    # Dark web / Tor support
+    tor \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy virtual environment from builder

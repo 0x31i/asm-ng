@@ -53,6 +53,8 @@
         </td></tr>
             <tr><td style='width: 50px'><input type=radio name='usecase' value='AI Attack Surface' id="usecase_ai_attack_surface"></td><td>AI Attack Surface</td><td><b>Discover and fingerprint AI/ML infrastructure exposed by the target.</b><br><br>Runs AI-focused modules to find ML inference endpoints, exposed models, API keys, AI subdomains, MCP servers, agent frameworks, and vector databases. Includes port scanning and web crawling to feed AI detection modules.
         <br><br></td></tr>
+            <tr><td style='width: 50px'><input type=radio name='usecase' value='Dark Web Exposure' id="usecase_dark_web_exposure"></td><td>Dark Web Exposure</td><td><b>Monitor dark web, paste sites, and breach databases for target exposure.</b><br><br>Searches Tor search engines, ransomware leak sites, infostealer logs, paste sites, and breach databases for mentions of the target. Identifies compromised credentials, brand impersonation, and threat intelligence matches.<br><br><i>Note: Some modules may connect to Tor hidden services if a SOCKS proxy is configured. Ensure you have proper authorization before scanning targets you do not own.</i>
+        <br><br></td></tr>
         </table>
 
         <table class="table table-striped table-condensed" id="moduletable" style="display: none">

@@ -1,0 +1,36 @@
+id: darkweb_multi_source_mention
+version: "1"
+meta:
+  name: >
+    Target mentioned across multiple dark web sources
+  description: >
+    The target was mentioned across two or more independent dark web sources
+    (Tor search engines, ransomware leak sites, paste sites, or Telegram channels).
+
+    Multiple independent dark web mentions significantly increase the likelihood
+    that the target is being actively discussed or targeted by threat actors.
+  risk: HIGH
+collections:
+  collect:
+      - method: exact
+        field: type
+        value: DARKNET_MENTION_URL
+      - method: exact
+        field: type
+        value: DARKNET_MENTION_CONTENT
+      - method: exact
+        field: type
+        value: LEAKSITE_URL
+      - method: exact
+        field: type
+        value: RANSOMWARE_LEAK_MENTION
+      - method: exact
+        field: type
+        value: TELEGRAM_LEAK_MENTION
+aggregation:
+  field: module
+analysis:
+  - method: threshold
+    field: module
+    minimum: 2
+headline: "Target mentioned across multiple dark web sources ({module})"

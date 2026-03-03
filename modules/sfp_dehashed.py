@@ -23,7 +23,7 @@ class sfp_dehashed(SpiderFootPlugin):
         'name': "Dehashed",
         'summary': "Gather breach data from Dehashed API.",
         'flags': ["apikey"],
-        'useCases': ["Footprint", "Investigate", "Passive"],
+        'useCases': ["Footprint", "Investigate", "Passive", "Dark Web Exposure"],
         'categories': ["Leaks, Dumps and Breaches"],
         'dataSource': {
             'website': "https://www.dehashed.com/",

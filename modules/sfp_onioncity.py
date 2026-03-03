@@ -22,7 +22,7 @@ class sfp_onioncity(SpiderFootPlugin):
         'name': "Onion.link",
         'summary': "Search Tor 'Onion City' search engine for mentions of the target domain using Google Custom Search.",
         'flags': ["apikey", "tor"],
-        'useCases': ["Footprint", "Investigate"],
+        'useCases': ["Footprint", "Investigate", "Dark Web Exposure"],
         'categories': ["Search Engines"],
         'dataSource': {
             'website': "https://onion.link/",

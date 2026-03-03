@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 # -------------------------------------------------------------------------------
-# Name:         sfp_pastebin
-# Purpose:      Searches Google for PasteBin content related to the domain in
-#               question.
+# Name:        sfp_pasterack
+# Purpose:     Monitor multiple paste sites beyond PasteBin — GitHub Gists,
+#              Rentry, dpaste, Paste.ee, JustPaste — using Google CSE.
 #
-# Author:      Steve Micallef <steve@binarypool.com> and ShellCodeNoobx
+# Author:      ASM-NG Team
 #
-# Created:     20/03/2014
-# Copyright:   (c) Steve Micallef 2014
+# Created:     2026-03-02
+# Copyright:   (c) ASM-NG Team
 # Licence:     MIT
 # -------------------------------------------------------------------------------
 
@@ -16,51 +16,53 @@ import re
 from spiderfoot import SpiderFootEvent, SpiderFootHelpers, SpiderFootPlugin
 
 
-class sfp_pastebin(SpiderFootPlugin):
+class sfp_pasterack(SpiderFootPlugin):
 
     meta = {
-        'name': "PasteBin",
-        'summary': "PasteBin search (via Google Search API) to identify related content.",
+        'name': "PasteRack",
+        'summary': "Search multiple paste sites (GitHub Gists, Rentry, dpaste, Paste.ee, JustPaste) "
+        "via Google CSE for target mentions.",
         'flags': ["apikey"],
-        'useCases': ["Footprint", "Investigate", "Passive", "AI Attack Surface", "Dark Web Exposure"],
+        'useCases': ["Footprint", "Investigate", "Passive", "Dark Web Exposure"],
         'categories': ["Leaks, Dumps and Breaches"],
         'dataSource': {
-            'website': "https://pastebin.com/",
+            'website': "https://gist.github.com/",
             'model': "FREE_AUTH_LIMITED",
             'references': [
-                "https://pastebin.com/doc_api",
-                "https://pastebin.com/faq"
+                "https://developers.google.com/custom-search/v1/introduction",
             ],
             'apiKeyInstructions': [
                 "Visit https://developers.google.com/custom-search/v1/introduction",
                 "Register a free Google account",
                 "Click on 'Get A Key'",
                 "Connect a Project",
-                "The API Key will be listed under 'YOUR API KEY'"
+                "The API Key will be listed under 'YOUR API KEY'",
             ],
-            'favIcon': "https://pastebin.com/favicon.ico",
-            'logo': "https://pastebin.com/favicon.ico",
-            'description': "Pastebin is a website where you can store any text online for easy sharing. "
-            "The website is mainly used by programmers to store pieces of source code or "
-            "configuration information, but anyone is more than welcome to paste any type of text. "
-            "The idea behind the site is to make it more convenient for people to share large amounts of text online.",
+            'favIcon': "",
+            'logo': "",
+            'description': "Searches multiple paste sites for mentions of target "
+            "domains, hostnames, and email addresses. Uses Google Custom Search "
+            "Engine to find content across GitHub Gists, Rentry, dpaste, Paste.ee, "
+            "and JustPaste.",
         }
     }
 
-    # Default options
     opts = {
         "api_key": "",
-        "cse_id": "013611106330597893267:tfgl3wxdtbp"
+        "cse_id": "013611106330597893267:tfgl3wxdtbp",
     }
 
-    # Option descriptions
     optdescs = {
-        "api_key": "Google API Key for PasteBin search.",
+        "api_key": "Google API Key for paste site search.",
         "cse_id": "Google Custom Search Engine ID.",
     }
 
     domains = {
-        'pastebin': "pastebin.com"
+        'gist': "gist.github.com",
+        'rentry': "rentry.co",
+        'dpaste': "dpaste.org",
+        'pasteee': "paste.ee",
+        'justpaste': "justpaste.it",
     }
 
     results = None
@@ -74,15 +76,11 @@ class sfp_pastebin(SpiderFootPlugin):
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
 
-    # What events is this module interested in for input
     def watchedEvents(self):
         return ["DOMAIN_NAME", "INTERNET_NAME", "EMAILADDR"]
 
-    # What events this module produces
-    # This is to support the end user in selecting modules based on events
-    # produced.
     def producedEvents(self):
-        return ["LEAKSITE_CONTENT", "LEAKSITE_URL"]
+        return ["LEAKSITE_URL", "LEAKSITE_CONTENT"]
 
     def handleEvent(self, event):
         eventData = event.data
@@ -102,6 +100,9 @@ class sfp_pastebin(SpiderFootPlugin):
         self.results[eventData] = True
 
         for dom in list(self.domains.keys()):
+            if self.checkForStop():
+                return
+
             target = self.domains[dom]
             res = self.sf.googleIterate(
                 searchString=f'+site:{target} "{eventData}"',
@@ -114,13 +115,11 @@ class sfp_pastebin(SpiderFootPlugin):
             )
 
             if res is None:
-                # Failed to talk to the Google API or no results returned
-                return
+                continue
 
             urls = res["urls"]
             new_links = list(set(urls) - set(self.results.keys()))
 
-            # Add new links to results
             for link in new_links:
                 self.results[link] = True
 
@@ -150,11 +149,11 @@ class sfp_pastebin(SpiderFootPlugin):
                     continue
 
                 evt1 = SpiderFootEvent(
-                    "LEAKSITE_URL", link, self.__name__, event)
+                    "LEAKSITE_URL", link, self.__class__.__name__, event)
                 self.notifyListeners(evt1)
 
                 evt2 = SpiderFootEvent(
-                    "LEAKSITE_CONTENT", res['content'], self.__name__, evt1)
+                    "LEAKSITE_CONTENT", res['content'], self.__class__.__name__, evt1)
                 self.notifyListeners(evt2)
 
-# End of sfp_pastebin class
+# End of sfp_pasterack class

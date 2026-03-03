@@ -642,6 +642,20 @@ class SpiderFootDb:
             'AI Regulatory Compliance Gap', 0, 'DESCRIPTOR'],
         ['AI_GOVERNANCE_FINDING',
             'AI Governance Policy Finding', 0, 'DESCRIPTOR'],
+        ['RANSOMWARE_LEAK_MENTION',
+            'Ransomware Leak Site Mention', 0, 'DESCRIPTOR'],
+        ['STEALER_LOG_MATCH',
+            'Infostealer Log Credential Match', 0, 'DATA'],
+        ['DARKWEB_BRAND_MENTION',
+            'Dark Web Brand Mention', 0, 'DESCRIPTOR'],
+        ['DARKWEB_FORUM_MENTION',
+            'Dark Web Forum Mention', 0, 'DESCRIPTOR'],
+        ['TELEGRAM_LEAK_MENTION',
+            'Telegram Leak Channel Mention', 0, 'DESCRIPTOR'],
+        ['ONION_SERVICE_DETECTED',
+            'Onion Service Detected', 0, 'ENTITY'],
+        ['THREAT_INTEL_FEED_MATCH',
+            'Threat Intelligence Feed Match', 0, 'DESCRIPTOR'],
     ]
 
     def __init__(self, opts: dict, init: bool = False) -> None:

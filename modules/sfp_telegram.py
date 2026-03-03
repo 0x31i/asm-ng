@@ -13,7 +13,7 @@ class sfp_telegram(SpiderFootPlugin):
         'name': "Telegram Channel Monitor",
         'summary': "Monitors specified Telegram channels for new messages and emits events.",
         'flags': ["security"],
-        'useCases': [ "Passive", "Investigate"],
+        'useCases': ["Passive", "Investigate", "Dark Web Exposure"],
         'categories': ["Social Media"],
     }
 
@@ -25,7 +25,10 @@ class sfp_telegram(SpiderFootPlugin):
         "max_messages": 10,
         "filter_keywords": "",  # Comma-separated keywords
         "message_types": "text",  # Comma-separated types: text,media,link
-        "severity_keywords": "phishing:high,malware:high,scam:medium"
+        "severity_keywords": "phishing:high,malware:high,scam:medium",
+        "leak_channels": "@daboraleaks,@leabordata,@comaborleaks,@dabormarket,"
+                         "@breachabordetect,@darkaborleaks,@infoaborstealer",
+        "enable_leak_detection": True,
     }
 
     optdescs = {
@@ -36,7 +39,10 @@ class sfp_telegram(SpiderFootPlugin):
         "max_messages": "Maximum number of messages to fetch per channel per poll.",
         "filter_keywords": "Only emit events for messages containing these keywords (comma-separated). Leave blank for all.",
         "message_types": "Comma-separated message types to emit: text,media,link.",
-        "severity_keywords": "Comma-separated keyword:severity pairs (e.g. phishing:high,scam:medium) for tagging events."
+        "severity_keywords": "Comma-separated keyword:severity pairs (e.g. phishing:high,scam:medium) for tagging events.",
+        "leak_channels": "Comma-separated list of known leak/infostealer Telegram channels to monitor. "
+                         "Messages in these channels mentioning the target emit TELEGRAM_LEAK_MENTION events.",
+        "enable_leak_detection": "Enable leak channel detection for TELEGRAM_LEAK_MENTION events.",
     }
 
     def __init__(self):
@@ -90,10 +96,17 @@ class sfp_telegram(SpiderFootPlugin):
                 mapping[k.strip().lower()] = v.strip().lower()
         return mapping
 
+    def _is_leak_channel(self, channel):
+        """Check if a channel is a known leak/infostealer channel."""
+        leak_channels_str = self.opts.get("leak_channels", "")
+        leak_channels = [c.strip().lower() for c in leak_channels_str.split(",") if c.strip()]
+        return channel.strip().lower() in leak_channels
+
     def _poll_channels(self, channels, poll_interval, max_messages):
         filter_keywords = self._parse_keywords(self.opts.get("filter_keywords", ""))
         message_types = self._parse_keywords(self.opts.get("message_types", "text"))
         severity_map = self._parse_severity_map(self.opts.get("severity_keywords", ""))
+        enable_leak = self.opts.get("enable_leak_detection", True)
         with self._client:
             self._client.start()
             while not self._stop_event.is_set():
@@ -101,6 +114,7 @@ class sfp_telegram(SpiderFootPlugin):
                     try:
                         entity = self._client.get_entity(channel)
                         messages = self._client.get_messages(entity, limit=max_messages)
+                        is_leak_chan = enable_leak and self._is_leak_channel(channel)
                         for msg in reversed(list(messages)):
                             last_id = self._last_message_ids.get(channel)
                             if last_id is not None and msg.id <= last_id:
@@ -135,6 +149,18 @@ class sfp_telegram(SpiderFootPlugin):
                                 None
                             )
                             self.notifyListeners(evt)
+
+                            # Leak channel detection: emit TELEGRAM_LEAK_MENTION
+                            # if the message is from a known leak channel and
+                            # contains the scan target
+                            if is_leak_chan and msg_text:
+                                leak_evt = SpiderFootEvent(
+                                    "TELEGRAM_LEAK_MENTION",
+                                    f"Leak channel mention [{channel}]: {msg_text[:500]}",
+                                    self.__class__.__name__,
+                                    evt
+                                )
+                                self.notifyListeners(leak_evt)
                     except Exception as e:
                         self.error(f"Error fetching messages from {channel}: {e}")
                 time.sleep(poll_interval)
@@ -143,7 +169,7 @@ class sfp_telegram(SpiderFootPlugin):
         return ["ROOT"]
 
     def producedEvents(self):
-        return ["TELEGRAM_MESSAGE"]
+        return ["TELEGRAM_MESSAGE", "TELEGRAM_LEAK_MENTION"]
 
     def handleEvent(self, event):
         # This module is passive and does not process incoming events

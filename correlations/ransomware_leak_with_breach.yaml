@@ -1,0 +1,31 @@
+id: ransomware_leak_with_breach
+version: "1"
+meta:
+  name: >
+    Ransomware leak combined with credential breach indicates active compromise
+  description: >
+    The target was found on a ransomware leak site AND has compromised
+    credentials (breached emails, passwords, or infostealer log matches).
+
+    This combination strongly suggests an active or recent compromise where
+    both data exfiltration (ransomware) and credential theft have occurred.
+    Immediate incident response is recommended.
+  risk: HIGH
+collections:
+  first:
+      - method: exact
+        field: type
+        value: RANSOMWARE_LEAK_MENTION
+  second:
+      - method: exact
+        field: type
+        value: EMAILADDR_COMPROMISED
+      - method: exact
+        field: type
+        value: PASSWORD_COMPROMISED
+      - method: exact
+        field: type
+        value: STEALER_LOG_MATCH
+analysis:
+  - method: match_all_to_first_collection
+headline: "Ransomware leak AND credential breach detected — possible active compromise"
