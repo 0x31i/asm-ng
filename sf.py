@@ -808,11 +808,23 @@ def prepare_modules(args, sf, sfModules, log, targetType):
             'investigate': 'Investigate',
             'passive': 'Passive',
             'ai_attack_surface': 'AI Attack Surface',
+            'dark_web_exposure': 'Dark Web Exposure',
         }
         usecase = usecase_map.get(args.u, args.u[0].upper() + args.u[1:])
         for mod in sfConfig['__modules__']:
             if usecase == 'All' or usecase in sfConfig['__modules__'][mod]['group']:
                 modlist.append(mod)
+
+        # Auto-include essential feeder modules that produce seed events
+        if usecase != 'All' and modlist:
+            feeder_modules = [
+                'sfp_dnsresolve', 'sfp_dnsbrute', 'sfp_dnscommonsrv',
+                'sfp_email', 'sfp_emailformat', 'sfp_spider',
+                'sfp_company', 'sfp_dns', 'sfp_certspotter',
+            ]
+            for feeder in feeder_modules:
+                if feeder not in modlist and feeder in sfConfig['__modules__']:
+                    modlist.append(feeder)
 
     # Add sfp__stor_stdout to the module list
     typedata = dbh.eventTypes()

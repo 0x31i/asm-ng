@@ -6843,6 +6843,26 @@ class SpiderFootWebUi:
                                             usecase in self.config['__modules__'][mod]['group']):
                         modlist.append(mod)
 
+                # Auto-include essential feeder modules that produce seed
+                # events (EMAILADDR, INTERNET_NAME, IP_ADDRESS, etc.) so
+                # that use cases like "Dark Web Exposure" don't starve.
+                # These are lightweight recon modules — not the full
+                # recursive dependency tree (which would select everything).
+                feeder_modules = [
+                    'sfp_dnsresolve',       # ROOT -> DOMAIN_NAME, INTERNET_NAME, IP_ADDRESS
+                    'sfp_dnsbrute',          # DOMAIN_NAME -> INTERNET_NAME (subdomain enum)
+                    'sfp_dnscommonsrv',      # DOMAIN_NAME -> INTERNET_NAME (SRV records)
+                    'sfp_email',             # web scraping -> EMAILADDR
+                    'sfp_emailformat',       # DOMAIN_NAME -> EMAILADDR (format guessing)
+                    'sfp_spider',            # web crawling -> feeds many modules
+                    'sfp_company',           # -> COMPANY_NAME
+                    'sfp_dns',               # name resolution -> IP_ADDRESS
+                    'sfp_certspotter',       # DOMAIN_NAME -> INTERNET_NAME (cert enum)
+                ]
+                for feeder in feeder_modules:
+                    if feeder not in modlist and feeder in self.config['__modules__']:
+                        modlist.append(feeder)
+
             # If we somehow got all the way through to here and still don't have any modules selected
             if not modlist:
                 if cherrypy.request.headers.get('Accept') and 'application/json' in cherrypy.request.headers.get('Accept'):
