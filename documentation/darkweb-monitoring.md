@@ -15,9 +15,9 @@ ASM-NG includes comprehensive dark web monitoring capabilities through 12 dedica
 
 | Module | Source | What It Finds |
 |--------|--------|---------------|
-| **sfp_xposedornot** | XposedOrNot | Email/domain breach exposure |
-| **sfp_ransomwatch** | RansomLook | Ransomware leak site mentions |
-| **sfp_darkweb_aggregate** | Haystak, Tor66 | Dark web search engine mentions |
+| **sfp_xposedornot** | XposedOrNot | Email breach exposure (free); domain breaches (API key) |
+| **sfp_ransomwatch** | ransomware.live | Ransomware group leak site victim mentions (300+ groups) |
+| **sfp_darkweb_aggregate** | Haystak, Tor66 | Dark web search engine mentions (**requires Tor**) |
 | **sfp_stealerlog_check** | Hudson Rock | Infostealer log credential matches |
 | **sfp_deepdarkcti** | deepdarkCTI | Known ransomware/forum/market indicators |
 | **sfp_brand_darkweb** | Ahmia + permutations | Brand impersonation on .onion sites |
@@ -25,10 +25,11 @@ ASM-NG includes comprehensive dark web monitoring capabilities through 12 dedica
 | **sfp_torch** | TORCH | Tor search engine mentions |
 | **sfp_onionsearchengine** | OnionSearchEngine | Tor search engine mentions |
 
-### API Key Required
+### API Key Required (or Optional)
 
 | Module | Source | Key Type | What It Finds |
 |--------|--------|----------|---------------|
+| **sfp_xposedornot** | XposedOrNot | Free API key (optional) | Domain-level breach lookups (email lookups work without key) |
 | **sfp_snusbase** | Snusbase | Commercial API | Breached credentials (email, password, hash) |
 | **sfp_pasterack** | Multiple paste sites | Google CSE API | Paste site mentions (Gists, Rentry, dpaste, etc.) |
 | **sfp_tool_h8mail** | h8mail | Config file | Email OSINT breach hunting |
