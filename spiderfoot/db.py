@@ -8025,6 +8025,58 @@ class SpiderFootDb:
             except DatabaseError as e:
                 raise IOError("SQL error revoking external API key") from e
 
+    def extApiKeyReinstate(self, key_id: str) -> bool:
+        """Reactivate a previously revoked external API key (sets active=1).
+
+        Args:
+            key_id (str): the key UUID
+
+        Returns:
+            bool: True if found and updated, False if key_id not found
+        """
+        qry = "UPDATE tbl_ext_api_keys SET active=1 WHERE key_id=?"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [key_id])
+                affected = self.dbh.rowcount
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error reinstating ext API key") from e
+        return affected > 0
+
+    def extApiKeyUpdate(self, key_id: str, scopes: str, allowed_targets,
+                        rate_limit_rpm: int, ip_allowlist, expires_at,
+                        notes) -> bool:
+        """Update mutable fields on an existing external API key.
+
+        Args:
+            key_id (str): the key UUID
+            scopes (str): JSON-encoded list of scope strings
+            allowed_targets: JSON-encoded list of targets, or None (= all)
+            rate_limit_rpm (int): per-key sliding-window RPM ceiling
+            ip_allowlist: JSON-encoded list of CIDRs, or None (= any)
+            expires_at: epoch milliseconds or None (= never)
+            notes: freeform text or None
+
+        Returns:
+            bool: True if found and updated
+        """
+        qry = ("UPDATE tbl_ext_api_keys "
+               "SET scopes=?, allowed_targets=?, rate_limit_rpm=?, "
+               "ip_allowlist=?, expires_at=?, notes=? "
+               "WHERE key_id=?")
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [
+                    scopes, allowed_targets, rate_limit_rpm,
+                    ip_allowlist, expires_at, notes, key_id
+                ])
+                affected = self.dbh.rowcount
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error updating ext API key") from e
+        return affected > 0
+
     def extApiKeyAuditEntries(self, key_id: str, limit: int = 100) -> list:
         """Return audit log entries for a specific external API key.
 

@@ -5101,6 +5101,128 @@ class SpiderFootWebUi:
             return {"entries": [], "error": str(e)}
 
     @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def extapireinstate(self: 'SpiderFootWebUi', id: str = None) -> dict:
+        """Reinstate (reactivate) a previously revoked external API key.
+
+        Args:
+            id (str): key_id to reinstate
+
+        Returns:
+            dict: {"ok": True} or {"ok": False, "error": ...}
+        """
+        self.requireAdmin()
+        if not id:
+            return {"ok": False, "error": "id required"}
+        try:
+            with SpiderFootDb(self.config) as dbh:
+                found = dbh.extApiKeyReinstate(id)
+                if not found:
+                    return {"ok": False, "error": "Key not found"}
+                dbh.auditLog(
+                    self.currentUser(), "EXT_KEY_REINSTATE",
+                    f"Reinstated external API key {id}",
+                    self.clientIP()
+                )
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_in()
+    @cherrypy.tools.json_out()
+    def extapikeyupdate(self: 'SpiderFootWebUi') -> dict:
+        """Update mutable fields on an existing external API key.
+
+        Accepts JSON body with fields: id, scopes, targets, rpm,
+        ip_allowlist, expires, notes.
+
+        Returns:
+            dict: {"ok": True} or {"ok": False, "error": ...}
+        """
+        self.requireAdmin()
+        import json as _json
+        try:
+            body = cherrypy.request.json
+        except Exception:
+            return {"ok": False, "error": "Invalid JSON body"}
+
+        key_id = body.get("id", "").strip()
+        if not key_id:
+            return {"ok": False, "error": "id required"}
+
+        # Scopes
+        scopes_raw = body.get("scopes", [])
+        if not isinstance(scopes_raw, list) or not scopes_raw:
+            return {"ok": False, "error": "scopes must be a non-empty list"}
+        valid_scopes = {"assets:read", "grades:read", "findings:read", "data:read"}
+        for s in scopes_raw:
+            if s not in valid_scopes:
+                return {"ok": False, "error": f"Invalid scope: {s}"}
+        scopes_str = _json.dumps(scopes_raw)
+
+        # Targets
+        targets_raw = body.get("targets", "").strip()
+        if targets_raw:
+            targets_list = [t.strip() for t in targets_raw.split(",") if t.strip()]
+            allowed_targets = _json.dumps(targets_list) if targets_list else None
+        else:
+            allowed_targets = None
+
+        # Rate limit
+        try:
+            rpm = int(body.get("rpm", 60))
+            if rpm < 1 or rpm > 10000:
+                raise ValueError
+        except (ValueError, TypeError):
+            return {"ok": False, "error": "rpm must be an integer 1–10000"}
+
+        # IP allowlist
+        ip_raw = body.get("ip_allowlist", "").strip()
+        if ip_raw:
+            import ipaddress as _ipaddress
+            ip_list = [c.strip() for c in ip_raw.split(",") if c.strip()]
+            for cidr in ip_list:
+                try:
+                    _ipaddress.ip_network(cidr, strict=False)
+                except ValueError:
+                    return {"ok": False, "error": f"Invalid CIDR: {cidr}"}
+            ip_allowlist = _json.dumps(ip_list)
+        else:
+            ip_allowlist = None
+
+        # Expiry
+        expires_str = body.get("expires", "").strip()
+        if expires_str:
+            import datetime as _dt
+            try:
+                d = _dt.datetime.strptime(expires_str, "%Y-%m-%d")
+                expires_at = int(d.replace(tzinfo=_dt.timezone.utc).timestamp() * 1000)
+            except ValueError:
+                return {"ok": False, "error": "expires must be YYYY-MM-DD"}
+        else:
+            expires_at = None
+
+        notes = body.get("notes", "").strip() or None
+
+        try:
+            with SpiderFootDb(self.config) as dbh:
+                found = dbh.extApiKeyUpdate(
+                    key_id, scopes_str, allowed_targets,
+                    rpm, ip_allowlist, expires_at, notes
+                )
+                if not found:
+                    return {"ok": False, "error": "Key not found"}
+                dbh.auditLog(
+                    self.currentUser(), "EXT_KEY_UPDATE",
+                    f"Updated external API key {key_id}",
+                    self.clientIP()
+                )
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    @cherrypy.expose
     def optsexport(self: 'SpiderFootWebUi', pattern: str = None) -> str:
         """Export configuration.
 
