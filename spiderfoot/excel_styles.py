@@ -608,11 +608,12 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
         for c in range(col_start, col_end + 1):
             ws.cell(row=row, column=c).fill = fill
 
-    # ── Column widths ──────────────────────────────────────────────────────
-    widths = {'A': 24, 'B': 14, 'C': 14, 'D': 14, 'E': 14, 'F': 14,
-              'G': 14, 'H': 14, 'I': 14, 'J': 10}
-    for col_letter, w in widths.items():
-        ws.column_dimensions[col_letter].width = w
+    # ── Column widths — dynamic: CATEGORY col wide, date cols narrow, TREND fixed
+    # We don't know n_cols yet (depends on snapshot count) so set a broad default
+    # and override narrow date columns after display_snaps is known (below).
+    ws.column_dimensions['A'].width = 24  # CATEGORY
+    for _ci in range(2, 20):              # pre-set all possible date + trend cols
+        ws.column_dimensions[get_column_letter(_ci)].width = 8
 
     # ── Extract data ───────────────────────────────────────────────────────
     snapshots = snapshot_data.get('snapshots', [])
@@ -874,19 +875,21 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
         ws.cell(row=sr, column=c).border = section_border
     sr += 1
 
+    # Build category comparison from per-snapshot category_scores
+    # Use up to 14 most recent scans (covers a full year of monthly data)
+    display_snaps = snapshots[-14:] if len(snapshots) > 14 else snapshots
+    # Total columns: CATEGORY + N date cols + TREND
+    n_cols = max(10, len(display_snaps) + 2)
+
     # ── CATEGORY COMPARISON sub-banner ────────────────────────────────────
-    ws.merge_cells(start_row=sr, start_column=1, end_row=sr, end_column=10)
+    ws.merge_cells(start_row=sr, start_column=1, end_row=sr, end_column=n_cols)
     cat_banner = ws.cell(row=sr, column=1, value='CATEGORY COMPARISON')
     cat_banner.font = Font(name='Calibri', size=11, bold=True, color='FFFFFFFF')
     cat_banner.fill = sub_banner_fill
     cat_banner.alignment = Alignment(horizontal='left', vertical='center')
-    _fill_row(sr, 2, 10, sub_banner_fill)
+    _fill_row(sr, 2, n_cols, sub_banner_fill)
     ws.row_dimensions[sr].height = 26
     sr += 1
-
-    # Build category comparison from per-snapshot category_scores
-    # Use up to 8 most recent scans
-    display_snaps = snapshots[-8:] if len(snapshots) > 8 else snapshots
 
     # Collect all category names across all snapshots
     all_cats = {}
@@ -1097,7 +1100,7 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
         # ── Build the dark-themed LineChart ────────────────────────────
         chart = LineChart()
         chart.width = 30.86  # 12.15" — matches full A:J banner width
-        chart.height = 14  # cm — balanced proportion
+        chart.height = 16   # cm — extra height gives title room above plot area
 
         # Dark chart area background (#111827) with border
         chart_frame = ChartGP()
@@ -1149,6 +1152,7 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
             latin=DrawingFont(typeface='Calibri'), sz=1800, b=True,
             solidFill='FFFFFF')
         _title_obj = ChartTitle()
+        _title_obj.overlay = False  # push plot area down; title sits above, not over
         _title_obj.tx.rich.paragraphs = [
             Paragraph(
                 pPr=ParagraphProperties(defRPr=_title_font),
