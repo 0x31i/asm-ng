@@ -9309,7 +9309,7 @@
             html += "<col style='width:44px;'>";
             html += "</colgroup>";
 
-            // Header row — unified two-line layout for all columns
+            // Header row — glowing box around date: green = real scan, cyan = manual
             html += "<thead><tr>";
             html += "<th style='text-align:left;padding:6px 8px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);vertical-align:bottom;'>CATEGORY</th>";
             displaySnaps.forEach(function(s) {
@@ -9319,35 +9319,52 @@
                 var yr = dt.getFullYear();
                 var dateStr = mo + '/' + day;
                 var isCurrent = s.scan_id === instanceId;
-                var dateColor = isCurrent ? 'var(--text-primary)' : 'var(--text-muted)';
-                var dateFw = isCurrent ? '700' : '400';
 
-                html += "<th style='text-align:center;padding:4px 2px;border-bottom:1px solid var(--glass-border);vertical-align:bottom;'>";
-                html += "<div style='display:flex;flex-direction:column;align-items:center;gap:1px;'>";
-
-                // Manual entries: amber label line on top
-                if (s.is_manual && s.snapshot_label) {
-                    var safeLabel = s.snapshot_label.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-                    html += "<div style='font-size:8px;color:#f59e0b;max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:0.3px;' title='" + safeLabel + "'>\uD83D\uDCCC " + safeLabel + "</div>";
+                // Color scheme: cyan for manual, green for real
+                var boxColor, boxGlow, textColor;
+                if (s.is_manual) {
+                    boxColor = 'rgba(6,182,212,0.55)';   // cyan border
+                    boxGlow  = 'rgba(6,182,212,0.35)';
+                    textColor = '#06b6d4';
+                } else {
+                    boxColor = isCurrent ? 'rgba(34,197,94,0.8)' : 'rgba(34,197,94,0.45)';
+                    boxGlow  = isCurrent ? 'rgba(34,197,94,0.55)' : 'rgba(34,197,94,0.25)';
+                    textColor = isCurrent ? '#4ade80' : '#86efac';
                 }
 
-                // Date line (same for all)
-                html += "<div style='font-size:11px;font-weight:" + dateFw + ";color:" + dateColor + ";line-height:1.2;'>" + dateStr + "</div>";
+                html += "<th style='text-align:center;padding:4px 2px;border-bottom:1px solid var(--glass-border);vertical-align:bottom;'>";
+                html += "<div style='display:flex;flex-direction:column;align-items:center;gap:2px;'>";
 
-                // Year line (same for all, always muted)
+                // Manual: label above the box (truncated, cyan)
+                if (s.is_manual && s.snapshot_label) {
+                    var safeLabel = s.snapshot_label.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+                    html += "<div style='font-size:8px;color:#06b6d4;max-width:54px;overflow:hidden;text-overflow:ellipsis;" +
+                            "white-space:nowrap;letter-spacing:0.3px;' title='" + safeLabel + "'>" + safeLabel + "</div>";
+                }
+
+                // Glowing date box — same structure for all, color differs
+                html += "<div style='display:inline-flex;align-items:center;justify-content:center;" +
+                        "padding:2px 6px;border-radius:4px;" +
+                        "border:1px solid " + boxColor + ";" +
+                        "box-shadow:0 0 6px " + boxGlow + ",0 0 12px " + boxGlow + ";" +
+                        "background:rgba(0,0,0,0.15);'>";
+                html += "<span style='font-family:var(--font-mono);font-size:11px;font-weight:" + (isCurrent ? '700' : '500') + ";" +
+                        "color:" + textColor + ";line-height:1;letter-spacing:0.3px;'>" + dateStr + "</span>";
+                html += "</div>";
+
+                // Year — always muted, below the box
                 html += "<div style='font-size:8px;color:var(--text-muted);letter-spacing:0.3px;line-height:1.2;'>" + yr + "</div>";
 
-                // Manual entries: delete button below year
+                // Manual: delete button below year
                 if (s.is_manual) {
                     var sid = s.scan_id;
                     html += "<div onclick='deleteManualSnapshot(\"" + sid + "\")' title='Delete manual entry' " +
-                        "style='cursor:pointer;font-size:10px;color:#ef4444;opacity:0.45;line-height:1;margin-top:2px;padding:1px 3px;border-radius:2px;' " +
+                        "style='cursor:pointer;font-size:10px;color:#ef4444;opacity:0.4;line-height:1;padding:1px 4px;border-radius:2px;' " +
                         "onmouseover='this.style.opacity=1;this.style.background=\"rgba(239,68,68,0.12)\"' " +
-                        "onmouseout='this.style.opacity=0.45;this.style.background=\"transparent\"'>&times;</div>";
+                        "onmouseout='this.style.opacity=0.4;this.style.background=\"transparent\"'>&times;</div>";
                 }
 
-                html += "</div>";
-                html += "</th>";
+                html += "</div></th>";
             });
             html += "<th style='text-align:center;padding:4px 4px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);vertical-align:bottom;font-size:9px;'>TREND</th>";
             html += "</tr></thead><tbody>";
