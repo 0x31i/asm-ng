@@ -9312,6 +9312,8 @@
             // Header row — glowing box around date: green = real scan, cyan = manual
             html += "<thead><tr>";
             html += "<th style='text-align:left;padding:6px 8px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);vertical-align:bottom;'>CATEGORY</th>";
+            var _isDark = localStorage.getItem('theme') === 'dark-theme';
+
             displaySnaps.forEach(function(s) {
                 var dt = new Date(s.date);
                 var mo = dt.getMonth() + 1;
@@ -9320,22 +9322,39 @@
                 var dateStr = mo + '/' + day;
                 var isCurrent = s.scan_id === instanceId;
 
-                // Color scheme: cyan for manual, green for real
-                var boxColor, boxGlow, textColor;
+                // Color scheme: cyan for manual, green for real.
+                // Light mode uses fully opaque, darker shades for legibility.
+                var boxColor, boxGlow, textColor, boxBg;
                 if (s.is_manual) {
-                    boxColor = 'rgba(6,182,212,0.55)';   // cyan border
-                    boxGlow  = 'rgba(6,182,212,0.35)';
-                    textColor = '#06b6d4';
+                    if (_isDark) {
+                        boxColor  = 'rgba(6,182,212,0.55)';
+                        boxGlow   = 'rgba(6,182,212,0.35)';
+                        textColor = '#06b6d4';
+                        boxBg     = 'rgba(0,0,0,0.15)';
+                    } else {
+                        boxColor  = '#0891b2';              // dark cyan border
+                        boxGlow   = 'rgba(8,145,178,0.25)';
+                        textColor = '#0e7490';              // dark cyan text
+                        boxBg     = 'rgba(6,182,212,0.08)';
+                    }
                 } else {
-                    boxColor = isCurrent ? 'rgba(34,197,94,0.8)' : 'rgba(34,197,94,0.45)';
-                    boxGlow  = isCurrent ? 'rgba(34,197,94,0.55)' : 'rgba(34,197,94,0.25)';
-                    textColor = isCurrent ? '#4ade80' : '#86efac';
+                    if (_isDark) {
+                        boxColor  = isCurrent ? 'rgba(34,197,94,0.8)'  : 'rgba(34,197,94,0.45)';
+                        boxGlow   = isCurrent ? 'rgba(34,197,94,0.55)' : 'rgba(34,197,94,0.25)';
+                        textColor = isCurrent ? '#4ade80' : '#86efac';
+                        boxBg     = 'rgba(0,0,0,0.15)';
+                    } else {
+                        boxColor  = isCurrent ? '#15803d'              : '#16a34a';  // dark green
+                        boxGlow   = isCurrent ? 'rgba(21,128,61,0.25)' : 'rgba(22,163,74,0.15)';
+                        textColor = isCurrent ? '#14532d'              : '#166534';  // very dark green
+                        boxBg     = isCurrent ? 'rgba(34,197,94,0.12)' : 'rgba(34,197,94,0.06)';
+                    }
                 }
 
                 html += "<th style='text-align:center;padding:4px 2px;border-bottom:1px solid var(--glass-border);vertical-align:bottom;'>";
                 html += "<div style='display:flex;flex-direction:column;align-items:center;gap:2px;'>";
 
-                // Manual: × delete at very top only — no label text, cyan box is the visual indicator
+                // Manual: × delete at very top only
                 if (s.is_manual) {
                     var sid = s.scan_id;
                     html += "<div onclick='deleteManualSnapshot(\"" + sid + "\")' title='Delete manual entry' " +
@@ -9344,17 +9363,17 @@
                         "onmouseout='this.style.opacity=0.4;this.style.background=\"transparent\"'>&times;</div>";
                 }
 
-                // Glowing date box — same structure for all, color differs
+                // Glowing date box
                 html += "<div style='display:inline-flex;align-items:center;justify-content:center;" +
                         "padding:2px 6px;border-radius:4px;" +
                         "border:1px solid " + boxColor + ";" +
                         "box-shadow:0 0 6px " + boxGlow + ",0 0 12px " + boxGlow + ";" +
-                        "background:rgba(0,0,0,0.15);'>";
+                        "background:" + boxBg + ";'>";
                 html += "<span style='font-family:var(--font-mono);font-size:11px;font-weight:" + (isCurrent ? '700' : '500') + ";" +
                         "color:" + textColor + ";line-height:1;letter-spacing:0.3px;'>" + dateStr + "</span>";
                 html += "</div>";
 
-                // Year — always muted, below the box
+                // Year
                 html += "<div style='font-size:8px;color:var(--text-muted);letter-spacing:0.3px;line-height:1.2;'>" + yr + "</div>";
 
                 html += "</div></th>";
