@@ -5166,6 +5166,21 @@ th.th-source-highlight *,
   border: none !important;
 }
 
+/* Divider becomes horizontal separator in vertical toolbar mode */
+#selection-toolbar.toolbar-left .toolbar-divider,
+#selection-toolbar.toolbar-right .toolbar-divider {
+  width: 100% !important;
+  height: 1px !important;
+  margin: 2px 0 !important;
+}
+
+/* Section labels full-width in vertical mode */
+#selection-toolbar.toolbar-left .toolbar-section-label,
+#selection-toolbar.toolbar-right .toolbar-section-label {
+  width: 100%;
+  text-align: center;
+}
+
 /* Hide side snap buttons in vertical mode */
 #selection-toolbar.toolbar-left .toolbar-snap-btn,
 #selection-toolbar.toolbar-right .toolbar-snap-btn {
@@ -7575,6 +7590,62 @@ i.glyphicon-white,
 #selection-toolbar .btn-unvalidated-action .glyphicon,
 #selection-toolbar .btn-unvalidated-action i {
   color: white !important;
+}
+
+/* Toolbar section label + divider */
+#selection-toolbar .toolbar-section-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: rgba(0, 0, 0, 0.4);
+  text-transform: uppercase;
+  align-self: center;
+  padding: 0 2px;
+  white-space: nowrap;
+}
+
+#selection-toolbar .toolbar-divider {
+  display: inline-block;
+  width: 1px;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.15);
+  margin: 0 4px;
+  align-self: center;
+  flex-shrink: 0;
+}
+
+/* Tracking bulk action buttons */
+#selection-toolbar .btn-tracking-open {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%) !important;
+  color: white !important;
+  border: 1px solid #9ca3af !important;
+  box-shadow: 0 0 6px rgba(107, 114, 128, 0.3) !important;
+}
+#selection-toolbar .btn-tracking-open:hover {
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%) !important;
+  box-shadow: 0 0 14px rgba(107, 114, 128, 0.5) !important;
+}
+
+#selection-toolbar .btn-tracking-ticketed {
+  background: linear-gradient(135deg, #e67e22 0%, #d35400 100%) !important;
+  color: white !important;
+  border: 1px solid #f39c12 !important;
+  box-shadow: 0 0 6px rgba(230, 126, 34, 0.35) !important;
+}
+#selection-toolbar .btn-tracking-ticketed:hover {
+  background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%) !important;
+  box-shadow: 0 0 14px rgba(230, 126, 34, 0.55) !important;
+}
+
+#selection-toolbar .btn-tracking-closed {
+  background: linear-gradient(135deg, #27ae60 0%, #1e8449 100%) !important;
+  color: white !important;
+  border: 1px solid #2ecc71 !important;
+  box-shadow: 0 0 6px rgba(39, 174, 96, 0.35) !important;
+}
+#selection-toolbar .btn-tracking-closed:hover {
+  background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%) !important;
+  box-shadow: 0 0 14px rgba(39, 174, 96, 0.55) !important;
 }
 
 /* ============================================

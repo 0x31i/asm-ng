@@ -4895,6 +4895,212 @@ class SpiderFootWebUi:
                         'steps_completed': steps_completed}
 
     @cherrypy.expose
+    def extapi(self: 'SpiderFootWebUi') -> str:
+        """External API management subpage (admin only).
+
+        Returns:
+            str: External API management page HTML
+        """
+        self.requireAdmin()
+        with SpiderFootDb(self.config) as dbh:
+            cfg = dbh.configGet()
+            ext_api_enabled = cfg.get("__ext_api_enabled", "1") == "1"
+            try:
+                keys = dbh.extApiKeyList()
+            except Exception:
+                keys = []
+
+        templ = Template(
+            filename='spiderfoot/templates/extapi.tmpl', lookup=self.lookup)
+        return templ.render(
+            pageid='SETTINGS',
+            version=__version__,
+            docroot=self.docroot,
+            current_user=self.currentUser(),
+            user_role=self.currentUserRole(),
+            ext_api_enabled=ext_api_enabled,
+            keys=keys,
+        )
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def extapisave(self: 'SpiderFootWebUi') -> dict:
+        """Save external API kill switch state.
+
+        Returns:
+            dict: {"ok": True} or {"ok": False, "error": "..."}
+        """
+        self.requireAdmin()
+        try:
+            body = cherrypy.request.body.read()
+            data = json.loads(body)
+            enabled = data.get("enabled", "1")
+            if enabled not in ("0", "1"):
+                return {"ok": False, "error": "Invalid value"}
+            with SpiderFootDb(self.config) as dbh:
+                dbh.configSet({"__ext_api_enabled": enabled})
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def extapicreatekey(self: 'SpiderFootWebUi') -> dict:
+        """Create a new external API vendor key.
+
+        Returns:
+            dict: {"raw_key": ..., "key_id": ...} or {"error": ...}
+        """
+        self.requireAdmin()
+        try:
+            body = cherrypy.request.body.read()
+            data = json.loads(body)
+        except Exception as e:
+            return {"error": f"Bad request body: {e}"}
+
+        try:
+            from spiderfoot.ext_api import generate_ext_api_key
+            import uuid as _uuid
+            raw_key, key_hash, key_encrypted = generate_ext_api_key()
+        except RuntimeError as e:
+            return {"error": str(e)}
+
+        import uuid as _uuid
+        key_id = str(_uuid.uuid4())
+        client_name = data.get("client_name", "").strip()
+        if not client_name:
+            return {"error": "client_name is required"}
+
+        scopes = data.get("scopes") or ["assets:read", "grades:read", "findings:read"]
+        scopes_json = json.dumps(scopes)
+
+        targets = data.get("allowed_targets")
+        targets_json = json.dumps(targets) if targets else None
+
+        ip_allowlist = data.get("ip_allowlist")
+        ip_json = json.dumps(ip_allowlist) if ip_allowlist else None
+
+        rpm = int(data.get("rate_limit_rpm", 60))
+        expires_at = data.get("expires_at")
+        notes = data.get("notes")
+
+        try:
+            with SpiderFootDb(self.config) as dbh:
+                dbh.extApiKeyCreate(
+                    key_id=key_id,
+                    key_hash=key_hash,
+                    key_encrypted=key_encrypted,
+                    client_name=client_name,
+                    scopes=scopes_json,
+                    allowed_targets=targets_json,
+                    rate_limit_rpm=rpm,
+                    ip_allowlist=ip_json,
+                    expires_at=expires_at,
+                    notes=notes,
+                )
+                dbh.auditLog(
+                    self.currentUser(), "EXT_KEY_CREATE",
+                    f"Created external API key for '{client_name}' (id={key_id})",
+                    self.clientIp()
+                )
+        except Exception as e:
+            return {"error": f"DB error: {e}"}
+
+        return {"raw_key": raw_key, "key_id": key_id, "client_name": client_name}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def extapikeyreveal(self: 'SpiderFootWebUi', id: str = None) -> dict:
+        """Decrypt and return the raw key for admin reveal.
+
+        Args:
+            id (str): key_id to reveal
+
+        Returns:
+            dict: {"raw_key": ...} or {"error": ...}
+        """
+        self.requireAdmin()
+        if not id:
+            return {"error": "id required"}
+
+        try:
+            from spiderfoot.ext_api import decrypt_ext_api_key
+            with SpiderFootDb(self.config) as dbh:
+                encrypted = dbh.extApiKeyGetEncrypted(id)
+                if encrypted is None:
+                    return {"error": "Key not found"}
+                raw_key = decrypt_ext_api_key(encrypted)
+                dbh.auditLog(
+                    self.currentUser(), "EXT_KEY_REVEAL",
+                    f"Admin revealed key {id}",
+                    self.clientIp()
+                )
+            return {"raw_key": raw_key}
+        except ValueError as e:
+            return {"error": str(e)}
+        except Exception as e:
+            return {"error": f"Unexpected error: {e}"}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def extapirevoke(self: 'SpiderFootWebUi', id: str = None) -> dict:
+        """Revoke an external API key (sets active=0).
+
+        Args:
+            id (str): key_id to revoke
+
+        Returns:
+            dict: {"ok": True} or {"ok": False, "error": ...}
+        """
+        self.requireAdmin()
+        if not id:
+            return {"ok": False, "error": "id required"}
+        try:
+            with SpiderFootDb(self.config) as dbh:
+                found = dbh.extApiKeyRevoke(id)
+                if not found:
+                    return {"ok": False, "error": "Key not found"}
+                dbh.auditLog(
+                    self.currentUser(), "EXT_KEY_REVOKE",
+                    f"Revoked external API key {id}",
+                    self.clientIp()
+                )
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def extapikeyaudit(self: 'SpiderFootWebUi', id: str = None, limit: int = 5) -> dict:
+        """Return audit log entries for an external API key.
+
+        Args:
+            id (str): key_id
+            limit (int): max entries
+
+        Returns:
+            dict: {"entries": [...]}
+        """
+        self.requireAdmin()
+        if not id:
+            return {"entries": []}
+        try:
+            with SpiderFootDb(self.config) as dbh:
+                entries = dbh.extApiKeyAuditEntries(id, limit=int(limit))
+            return {"entries": [
+                {
+                    "key_id": e["key_id"],
+                    "action": e["action"],
+                    "detail": e["detail"],
+                    "ip_address": e["ip_address"],
+                    "created": e["created"],
+                }
+                for e in entries
+            ]}
+        except Exception as e:
+            return {"entries": [], "error": str(e)}
+
+    @cherrypy.expose
     def optsexport(self: 'SpiderFootWebUi', pattern: str = None) -> str:
         """Export configuration.
 
