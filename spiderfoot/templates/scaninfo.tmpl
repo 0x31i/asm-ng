@@ -9335,11 +9335,18 @@
                 html += "<th style='text-align:center;padding:4px 2px;border-bottom:1px solid var(--glass-border);vertical-align:bottom;'>";
                 html += "<div style='display:flex;flex-direction:column;align-items:center;gap:2px;'>";
 
-                // Manual: label above the box (truncated, cyan)
-                if (s.is_manual && s.snapshot_label) {
-                    var safeLabel = s.snapshot_label.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-                    html += "<div style='font-size:8px;color:#06b6d4;max-width:54px;overflow:hidden;text-overflow:ellipsis;" +
-                            "white-space:nowrap;letter-spacing:0.3px;' title='" + safeLabel + "'>" + safeLabel + "</div>";
+                // Manual: × delete at very top, then label — keeps date box vertically aligned with real scans
+                if (s.is_manual) {
+                    var sid = s.scan_id;
+                    html += "<div onclick='deleteManualSnapshot(\"" + sid + "\")' title='Delete manual entry' " +
+                        "style='cursor:pointer;font-size:10px;color:#ef4444;opacity:0.4;line-height:1;padding:1px 4px;border-radius:2px;' " +
+                        "onmouseover='this.style.opacity=1;this.style.background=\"rgba(239,68,68,0.12)\"' " +
+                        "onmouseout='this.style.opacity=0.4;this.style.background=\"transparent\"'>&times;</div>";
+                    if (s.snapshot_label) {
+                        var safeLabel = s.snapshot_label.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+                        html += "<div style='font-size:8px;color:#06b6d4;max-width:54px;overflow:hidden;text-overflow:ellipsis;" +
+                                "white-space:nowrap;letter-spacing:0.3px;' title='" + safeLabel + "'>" + safeLabel + "</div>";
+                    }
                 }
 
                 // Glowing date box — same structure for all, color differs
@@ -9354,15 +9361,6 @@
 
                 // Year — always muted, below the box
                 html += "<div style='font-size:8px;color:var(--text-muted);letter-spacing:0.3px;line-height:1.2;'>" + yr + "</div>";
-
-                // Manual: delete button below year
-                if (s.is_manual) {
-                    var sid = s.scan_id;
-                    html += "<div onclick='deleteManualSnapshot(\"" + sid + "\")' title='Delete manual entry' " +
-                        "style='cursor:pointer;font-size:10px;color:#ef4444;opacity:0.4;line-height:1;padding:1px 4px;border-radius:2px;' " +
-                        "onmouseover='this.style.opacity=1;this.style.background=\"rgba(239,68,68,0.12)\"' " +
-                        "onmouseout='this.style.opacity=0.4;this.style.background=\"transparent\"'>&times;</div>";
-                }
 
                 html += "</div></th>";
             });
