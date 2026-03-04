@@ -48,16 +48,55 @@ _ext_security = HTTPBearer(auto_error=False)
 # Master key / Fernet helpers
 # ---------------------------------------------------------------------------
 
+def _keyfile_path() -> str:
+    """Return path to the auto-generated master key file."""
+    from spiderfoot import SpiderFootHelpers
+    data_dir = SpiderFootHelpers.dataPath()
+    return os.path.join(data_dir, ".ext_key_master")
+
+
 def _get_fernet() -> Fernet:
-    """Load master Fernet key from environment. Raises RuntimeError if absent."""
+    """Load or auto-generate the Fernet master key.
+
+    Priority:
+      1. ASMNG_EXT_KEY_MASTER environment variable
+      2. Key file at {dataPath}/.ext_key_master (auto-created on first use)
+
+    The keyfile approach keeps the master key off the database while still
+    'just working' without manual setup. Security consequence: an attacker
+    who has both DB access AND filesystem access to the data directory can
+    decrypt vendor keys. An attacker with only DB access cannot.
+    """
+    # 1. Explicit env var always wins
     master = os.environ.get("ASMNG_EXT_KEY_MASTER")
-    if not master:
-        raise RuntimeError(
-            "ASMNG_EXT_KEY_MASTER env var not set — "
-            "cannot manage external API keys. "
-            "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
-        )
-    return Fernet(master.encode())
+    if master:
+        return Fernet(master.strip().encode())
+
+    # 2. Auto-generate and persist to keyfile
+    keyfile = _keyfile_path()
+    try:
+        if os.path.exists(keyfile):
+            with open(keyfile, "r") as f:
+                master = f.read().strip()
+            if master:
+                return Fernet(master.encode())
+    except OSError:
+        pass
+
+    # Generate a new key and save it
+    new_key = Fernet.generate_key().decode()
+    try:
+        # Write with owner-only permissions (600)
+        fd = os.open(keyfile, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(new_key)
+        _log.info(f"Generated new ext API master key — saved to {keyfile}")
+        _log.info("Set ASMNG_EXT_KEY_MASTER env var to the contents of that file "
+                  "if you want to manage the key explicitly.")
+    except OSError as e:
+        _log.warning(f"Could not write ext key master file {keyfile}: {e} — key will be session-only")
+
+    return Fernet(new_key.encode())
 
 
 def generate_ext_api_key() -> tuple:
