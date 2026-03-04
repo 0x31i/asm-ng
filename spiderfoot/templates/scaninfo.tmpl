@@ -8297,6 +8297,10 @@
 
             // Comparison table
             grid += "<div style='padding:0 15px 15px 15px;'>";
+            grid += "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;'>";
+            grid += "<span style='font-family:var(--font-mono);font-size:9px;letter-spacing:1px;color:var(--text-muted);text-transform:uppercase;'>SHOWING</span>";
+            grid += "<div id='snapshot-limit-pills' style='display:flex;gap:4px;font-family:var(--font-mono);font-size:10px;'></div>";
+            grid += "</div>";
             grid += "<div id='snapshot-table-container' style='overflow-x:auto;'></div>";
             grid += "</div>";
 
@@ -9220,7 +9224,46 @@
             container.innerHTML = html;
         }
 
+        // Module-scope cache so limit pills can re-render without a network call
+        var _lastSnapshotTrendData = null;
+        var _lastSnapshotInstanceId = null;
+        var _snapshotTableLimit = 12; // default: show 12 scans
+
+        function setSnapshotLimit(n) {
+            _snapshotTableLimit = n;
+            if (_lastSnapshotTrendData) {
+                renderSnapshotTable(_lastSnapshotTrendData, _lastSnapshotInstanceId);
+            }
+        }
+
+        function renderSnapshotLimitPills(total) {
+            var el = document.getElementById('snapshot-limit-pills');
+            if (!el) return;
+            var options = [8, 12, 16, 24, 0]; // 0 = ALL
+            el.innerHTML = '';
+            options.forEach(function(n) {
+                var label = n === 0 ? 'ALL' : String(n);
+                var isActive = (n === 0 ? _snapshotTableLimit >= total : _snapshotTableLimit === n);
+                var pill = document.createElement('span');
+                pill.textContent = label;
+                pill.title = n === 0 ? 'Show all scans' : 'Show last ' + n + ' scans';
+                pill.style.cssText = 'cursor:pointer;padding:2px 8px;border-radius:10px;border:1px solid ' +
+                    (isActive ? 'var(--accent-blue,#3b82f6)' : 'var(--glass-border)') + ';' +
+                    'color:' + (isActive ? 'var(--accent-blue,#3b82f6)' : 'var(--text-muted)') + ';' +
+                    'background:' + (isActive ? 'rgba(59,130,246,0.12)' : 'transparent') + ';' +
+                    'transition:all 0.15s;';
+                pill.onclick = function() {
+                    _snapshotTableLimit = n === 0 ? 9999 : n;
+                    renderSnapshotTable(_lastSnapshotTrendData, _lastSnapshotInstanceId);
+                };
+                el.appendChild(pill);
+            });
+        }
+
         function renderSnapshotTable(trendData, instanceId) {
+            _lastSnapshotTrendData = trendData;
+            _lastSnapshotInstanceId = instanceId;
+
             var container = document.getElementById('snapshot-table-container');
             if (!container || !trendData.snapshots || trendData.snapshots.length < 2) return;
 
@@ -9230,8 +9273,9 @@
                 container.innerHTML = '';
                 return;
             }
-            // Show last 8 non-excluded scans max
-            var displaySnaps = snaps.slice(-8);
+            var limit = _snapshotTableLimit || 12;
+            var displaySnaps = limit >= snaps.length ? snaps : snaps.slice(-limit);
+            renderSnapshotLimitPills(snaps.length);
 
             // Collect all categories with weight > 0
             var categories = [];
@@ -9240,37 +9284,44 @@
                 if (lastCats[catName].weight > 0) categories.push(catName);
             }
 
-            var html = "<table style='width:100%;font-family:var(--font-mono);font-size:11px;border-collapse:collapse;'>";
+            var html = "<table style='width:100%;font-family:var(--font-mono);font-size:10px;border-collapse:collapse;table-layout:fixed;'>";
+
+            // Category column takes fixed width; date columns share remaining space
+            var dateCols = displaySnaps.length;
+            html += "<colgroup>";
+            html += "<col style='width:130px;'>";
+            for (var ci2 = 0; ci2 < dateCols; ci2++) html += "<col>";
+            html += "<col style='width:44px;'>";
+            html += "</colgroup>";
 
             // Header row with scan dates
             html += "<thead><tr>";
-            html += "<th style='text-align:left;padding:6px 10px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);min-width:140px;'>CATEGORY</th>";
+            html += "<th style='text-align:left;padding:5px 8px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);'>CATEGORY</th>";
             displaySnaps.forEach(function(s) {
                 var dt = new Date(s.date);
                 var dateStr = (dt.getMonth() + 1) + '/' + dt.getDate();
                 var isCurrent = (s.scan_id === instanceId);
                 var cellContent;
                 if (s.is_manual && s.snapshot_label) {
-                    var escapedLabel = s.snapshot_label.replace(/'/g, "\\'");
                     cellContent = "\uD83D\uDCCC " + s.snapshot_label +
                         "<span onclick='deleteManualSnapshot(\"" + s.scan_id + "\")' title='Delete manual entry' " +
-                        "style='cursor:pointer;color:#ef4444;font-size:9px;margin-left:4px;opacity:0.7;' " +
+                        "style='cursor:pointer;color:#ef4444;font-size:9px;margin-left:3px;opacity:0.7;' " +
                         "onmouseover='this.style.opacity=1' onmouseout='this.style.opacity=0.7'>&times;</span>";
                 } else {
                     cellContent = dateStr;
                 }
-                html += "<th style='text-align:center;padding:6px 8px;color:" + (isCurrent ? 'var(--text-primary)' : 'var(--text-muted)') + ";border-bottom:1px solid var(--glass-border);min-width:50px;font-weight:" + (isCurrent ? '700' : '400') + ";white-space:nowrap;'>" + cellContent + "</th>";
+                html += "<th style='text-align:center;padding:5px 3px;color:" + (isCurrent ? 'var(--text-primary)' : 'var(--text-muted)') + ";border-bottom:1px solid var(--glass-border);font-weight:" + (isCurrent ? '700' : '400') + ";white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px;'>" + cellContent + "</th>";
             });
-            html += "<th style='text-align:center;padding:6px 8px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);min-width:40px;'>TREND</th>";
+            html += "<th style='text-align:center;padding:5px 4px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);'>TREND</th>";
             html += "</tr></thead><tbody>";
 
             // Category rows
             categories.forEach(function(catName) {
                 var color = snapshotCategoryColors[catName] || '#6b7280';
                 html += "<tr>";
-                html += "<td style='padding:5px 10px;border-bottom:1px solid var(--glass-border);'>";
-                html += "<span style='display:inline-block;width:3px;height:12px;background:" + color + ";border-radius:1px;margin-right:6px;vertical-align:middle;'></span>";
-                html += "<span style='color:var(--text-secondary);'>" + catName + "</span></td>";
+                html += "<td style='padding:4px 8px;border-bottom:1px solid var(--glass-border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;'>";
+                html += "<span style='display:inline-block;width:3px;height:10px;background:" + color + ";border-radius:1px;margin-right:5px;vertical-align:middle;flex-shrink:0;'></span>";
+                html += "<span style='color:var(--text-secondary);font-size:10px;'>" + catName + "</span></td>";
 
                 var firstScore = null, latestScore = null;
                 displaySnaps.forEach(function(s) {
@@ -9281,8 +9332,8 @@
                     if (firstScore === null && catData) firstScore = score;
                     if (catData) latestScore = score;
                     var gc = gradeGlowColor(grade);
-                    html += "<td style='text-align:center;padding:5px 8px;border-bottom:1px solid var(--glass-border);'>";
-                    html += "<span style='display:inline-block;width:28px;height:22px;line-height:22px;border-radius:3px;font-size:11px;font-weight:600;color:" + gc.text + ";background:var(--bg-tertiary);border:1px solid " + gc.text + ";'>" + grade + "</span>";
+                    html += "<td style='text-align:center;padding:4px 2px;border-bottom:1px solid var(--glass-border);'>";
+                    html += "<span style='display:inline-block;width:24px;height:20px;line-height:20px;border-radius:3px;font-size:10px;font-weight:600;color:" + gc.text + ";background:var(--bg-tertiary);border:1px solid " + gc.text + ";'>" + grade + "</span>";
                     html += "</td>";
                 });
 
@@ -9295,13 +9346,13 @@
                 else if (change <= -2) { trendSymbol = '&#x25BC;'; trendColor = '#f59e0b'; }
                 else { trendSymbol = '&#x25C6;'; trendColor = '#6b7280'; }
 
-                html += "<td style='text-align:center;padding:5px 8px;border-bottom:1px solid var(--glass-border);color:" + trendColor + ";font-size:10px;'>" + trendSymbol + "</td>";
+                html += "<td style='text-align:center;padding:4px 2px;border-bottom:1px solid var(--glass-border);color:" + trendColor + ";font-size:10px;'>" + trendSymbol + "</td>";
                 html += "</tr>";
             });
 
             // Overall row (bold separator)
             html += "<tr style='border-top:2px solid var(--glass-border);'>";
-            html += "<td style='padding:6px 10px;font-weight:700;color:var(--text-primary);'>Overall</td>";
+            html += "<td style='padding:5px 8px;font-weight:700;color:var(--text-primary);font-size:10px;'>Overall</td>";
             var firstOverall = null, latestOverall = null;
             displaySnaps.forEach(function(s) {
                 var grade = s.overall_grade || '-';
@@ -9310,8 +9361,8 @@
                 latestOverall = score;
                 var gc = gradeGlowColor(grade);
                 var isCurrent = (s.scan_id === instanceId);
-                html += "<td style='text-align:center;padding:6px 8px;'>";
-                html += "<span style='display:inline-block;width:28px;height:22px;line-height:22px;border-radius:3px;font-size:12px;font-weight:700;color:" + gc.text + ";background:" + (isCurrent ? 'var(--bg-elevated)' : 'var(--bg-tertiary)') + ";border:1px solid " + gc.text + ";box-shadow:" + (isCurrent ? '0 0 8px ' + gc.glow : 'none') + ";'>" + grade + "</span>";
+                html += "<td style='text-align:center;padding:5px 2px;'>";
+                html += "<span style='display:inline-block;width:24px;height:20px;line-height:20px;border-radius:3px;font-size:11px;font-weight:700;color:" + gc.text + ";background:" + (isCurrent ? 'var(--bg-elevated)' : 'var(--bg-tertiary)') + ";border:1px solid " + gc.text + ";box-shadow:" + (isCurrent ? '0 0 8px ' + gc.glow : 'none') + ";'>" + grade + "</span>";
                 html += "</td>";
             });
 
