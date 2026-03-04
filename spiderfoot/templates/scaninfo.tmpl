@@ -232,6 +232,7 @@
 
       <!-- Action buttons -->
       <div class="toolbar-actions">
+        <span class="toolbar-section-label">STATUS</span>
         <button class="btn btn-validated-action" onclick="setFp(2)" title="Mark as Validated (confirmed belongs to organization)">
           <i class="glyphicon glyphicon-ok-circle"></i>
           Validated
@@ -244,6 +245,18 @@
           <i class="glyphicon glyphicon-minus"></i>
           Unvalidated
         </button>
+        <span class="toolbar-divider"></span>
+        <span class="toolbar-section-label">TRACKING</span>
+        <button class="btn btn-tracking-open" onclick="bulkSetTracking(0)" title="Mark selected as Open">
+          Open
+        </button>
+        <button class="btn btn-tracking-ticketed" onclick="bulkSetTracking(2)" title="Mark selected as Ticketed">
+          Ticketed
+        </button>
+        <button class="btn btn-tracking-closed" onclick="bulkSetTracking(1)" title="Mark selected as Closed">
+          Closed
+        </button>
+        <span class="toolbar-divider"></span>
         <button class="btn btn-clear" onclick="clearSelection()">
           Clear
         </button>
@@ -1159,22 +1172,45 @@
             alertify.success("Selected " + count + " items");
         }
 
-        // Select all known asset rows
+        // Select / deselect all known asset rows (toggle)
+        var _knownAssetsSelected = false;
         function selectKnownAssets() {
-            $("input[id*=cb_]").prop('checked', false);
-            $("#checkall").prop('checked', false);
-            var count = 0;
-            $("tr.known-asset-row").each(function() {
-                var row = $(this);
-                if (row.is(':visible')) {
-                    row.find("input[id*=cb_]").prop('checked', true);
-                    count++;
-                }
-            });
-            if (count > 0) {
-                alertify.success("Selected " + count + " known asset items");
+            var knownRows = $("tr.known-asset-row:visible");
+            if (_knownAssetsSelected) {
+                // Deselect all known asset rows
+                knownRows.each(function() {
+                    $(this).find("input[id*=cb_]").prop('checked', false);
+                });
+                _knownAssetsSelected = false;
+                updateSelectionToolbar();
+                // Restore button text
+                var btn = $(".filter-btn-known-asset");
+                btn.each(function() {
+                    var txt = $(this).text();
+                    $(this).text(txt.replace(/^DESELECT /, 'SELECT '));
+                });
             } else {
-                alertify.warning("No known asset items in current view");
+                // Select all known asset rows (clear others first)
+                $("input[id*=cb_]").prop('checked', false);
+                $("#checkall").prop('checked', false);
+                var count = 0;
+                knownRows.each(function() {
+                    $(this).find("input[id*=cb_]").prop('checked', true);
+                    count++;
+                });
+                if (count > 0) {
+                    _knownAssetsSelected = true;
+                    alertify.success("Selected " + count + " known asset items");
+                    updateSelectionToolbar();
+                    // Flip button text
+                    var btn = $(".filter-btn-known-asset");
+                    btn.each(function() {
+                        var txt = $(this).text();
+                        $(this).text(txt.replace(/^SELECT /, 'DESELECT '));
+                    });
+                } else {
+                    alertify.warning("No known asset items in current view");
+                }
             }
         }
 
@@ -1225,6 +1261,15 @@
         function clearSelection() {
             $("input[id*=cb_]").prop('checked', false);
             $("#checkall").prop('checked', false);
+            // Reset known-assets toggle state and restore button text
+            if (_knownAssetsSelected) {
+                _knownAssetsSelected = false;
+                var btn = $(".filter-btn-known-asset");
+                btn.each(function() {
+                    var txt = $(this).text();
+                    $(this).text(txt.replace(/^DESELECT /, 'SELECT '));
+                });
+            }
             updateSelectionToolbar();
         }
 
@@ -1511,6 +1556,53 @@
             });
 
             return ids;
+        }
+
+        // Bulk set tracking state for all selected DATA rows
+        function bulkSetTracking(trackingVal) {
+            var labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'};
+            var classes = {0: 'tracking-open', 1: 'tracking-closed', 2: 'tracking-ticketed'};
+            var scanId = '${id}';
+            var rows = [];
+            $("input[id*=cb_]:checked").each(function() {
+                var row = $(this).closest("tr");
+                var badge = row.find('.tracking-badge[data-event-hash]');
+                if (badge.length) {
+                    rows.push({badge: badge, hash: badge.attr('data-event-hash')});
+                }
+            });
+            if (rows.length === 0) {
+                alertify.warning("No tracking-enabled rows selected.");
+                return;
+            }
+            var completed = 0;
+            var total = rows.length;
+            rows.forEach(function(r) {
+                sf.fetchData('${docroot}/scaneventsettracking', {'id': scanId, 'resultHash': r.hash, 'tracking': trackingVal},
+                    function(data) {
+                        if (data.success) {
+                            r.badge.removeClass('tracking-open tracking-closed tracking-ticketed');
+                            r.badge.addClass(classes[trackingVal]);
+                            r.badge.text(labels[trackingVal]);
+                            r.badge.attr('data-tracking', trackingVal);
+                            r.badge.attr('onclick', "cycleDataTracking(event, '" + r.hash + "', " + trackingVal + ")");
+                            for (var i = 0; i < currentViewData.length; i++) {
+                                if (currentViewData[i][7] === r.hash) {
+                                    currentViewData[i][15] = trackingVal;
+                                    break;
+                                }
+                            }
+                        }
+                        completed++;
+                        if (completed >= total) {
+                            var labelName = labels[trackingVal];
+                            alertify.success("Set " + total + " item" + (total > 1 ? "s" : "") + " to " + labelName + ".");
+                            updateDataTrackingFilterCounts();
+                            clearSelection();
+                        }
+                    }
+                );
+            });
         }
 
         function setFp(flag, force) {
