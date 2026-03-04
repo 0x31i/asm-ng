@@ -13196,15 +13196,9 @@
             var result = computeManualOverallGrade();
             var target = window.currentTarget || '';
 
-            var payload = {
-                target: target,
-                label: label,
-                date: date,
-                overall_grade: result.grade,
-                categories: {}
-            };
+            var cats = {};
             for (var cat in manualSelectedGrades) {
-                payload.categories[cat] = manualSelectedGrades[cat];
+                cats[cat] = manualSelectedGrades[cat];
             }
 
             var saveBtn = document.querySelector('#manual-snapshot-modal button[onclick="submitManualSnapshot()"]');
@@ -13213,8 +13207,13 @@
             $.ajax({
                 url: '${docroot}/snapshotmanual',
                 method: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify(payload),
+                data: {
+                    target: target,
+                    label: label,
+                    date: date,
+                    overall_grade: result.grade,
+                    categories: JSON.stringify(cats)
+                },
                 success: function(resp) {
                     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'SAVE'; }
                     if (resp && resp.success) {

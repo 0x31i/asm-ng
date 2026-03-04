@@ -7987,21 +7987,18 @@ class SpiderFootWebUi:
                     self.log.error(f"Error deleting manual snapshot {snap_id}: {e}", exc_info=True)
                     return {'success': False, 'message': str(e)}
 
-        # CREATE path: POST /snapshotmanual
+        # CREATE path: POST /snapshotmanual (form-encoded)
         if method != 'POST':
             return {'success': False, 'message': 'Method not allowed'}
 
+        target = (kwargs.get('target') or '').strip()
+        label = (kwargs.get('label') or '').strip()
+        date_str = (kwargs.get('date') or '').strip()
+        overall_grade = (kwargs.get('overall_grade') or '').strip().upper()
         try:
-            body = cherrypy.request.body.read()
-            data = json.loads(body)
-        except Exception as e:
-            return {'success': False, 'message': f'Invalid JSON body: {e}'}
-
-        target = (data.get('target') or '').strip()
-        label = (data.get('label') or '').strip()
-        date_str = (data.get('date') or '').strip()
-        overall_grade = (data.get('overall_grade') or '').strip().upper()
-        categories = data.get('categories') or {}
+            categories = json.loads(kwargs.get('categories') or '{}')
+        except (ValueError, TypeError):
+            return {'success': False, 'message': 'Invalid categories JSON'}
 
         if not target or not label or not date_str or not overall_grade:
             return {'success': False, 'message': 'Missing required fields: target, label, date, overall_grade'}
