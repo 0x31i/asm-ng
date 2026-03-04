@@ -8274,10 +8274,12 @@
             grid += "<div class='row' id='snapshot-row' style='display:none;'>";
             grid += "<div class='col-sm-12'>";
             grid += "<div class='panel panel-default' style='border: 1px solid var(--glass-border); background: var(--bg-secondary);'>";
-            grid += "<div class='panel-heading' style='display:flex; justify-content:space-between; align-items:center;'>";
+            grid += "<div class='panel-heading' style='display:flex;justify-content:space-between;align-items:center;'>";
             grid += "<span><i class='glyphicon glyphicon-stats'></i>&nbsp;&nbsp;SNAPSHOT &mdash; SECURITY POSTURE TREND</span>";
+            grid += "<div style='display:flex;align-items:center;gap:10px;'>";
+            grid += "<button id='snapshot-add-btn' onclick='openManualSnapshotModal()' style='font-family:var(--font-mono);font-size:10px;letter-spacing:1px;padding:4px 10px;background:transparent;border:1px solid var(--glass-border);color:var(--text-secondary);border-radius:3px;cursor:pointer;' title='Add manual historical snapshot'>+ ADD</button>";
             grid += "<span id='snapshot-trajectory-badge' style='font-family:var(--font-mono);font-size:11px;letter-spacing:1px;'></span>";
-            grid += "</div>";
+            grid += "</div></div>";
             grid += "<div class='panel-body' style='padding:0;'>";
 
             // Chart + Key Metrics side by side
@@ -8711,6 +8713,9 @@
             // SNAPSHOT trend data loader
             dataloaders.push(function() {
                 sf.fetchData('${docroot}/scantrend', {'id': instanceId}, function(trendData) {
+                    if (trendData && trendData.target) {
+                        window.currentTarget = trendData.target;
+                    }
                     if (trendData && trendData.snapshots && trendData.snapshots.length > 1) {
                         $('#snapshot-row').show();
                         renderSnapshotChart(trendData, instanceId);
@@ -8724,6 +8729,9 @@
                         $('#snapshot-trajectory-badge').html(
                             "<span style='color:" + tjColor + ";'>" + tjArrow + " " + tj.toUpperCase() + "</span>"
                         );
+                    } else if (trendData && trendData.target) {
+                        // Even with 1 or 0 snapshots, show panel so + ADD is accessible
+                        $('#snapshot-row').show();
                     }
                 }, function() {
                     // Error or no data - keep hidden
@@ -9000,14 +9008,17 @@
                     var dt = new Date(d.date);
                     var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
                     var prefix = d.excluded ? '<span style="color:#ef4444;">EXCLUDED</span> &middot; ' : '';
+                    var manualPrefix = (d.is_manual && d.snapshot_label) ? '<span style="color:var(--text-muted);">\uD83D\uDCCC ' + d.snapshot_label + '</span><br>' : '';
                     var isCurrent = d.scan_id === instanceId;
                     var gcLocal = gradeGlowColor(d.overall_grade);
                     tooltip.html(
+                        manualPrefix +
                         prefix +
                         '<span style="color:var(--text-secondary);">' + months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear() + '</span>' +
                         '<br><span style="font-size:16px;font-weight:700;color:' + gcLocal.text + ';">' + d.overall_grade + '</span>' +
                         ' <span style="color:var(--text-secondary);">' + d.overall_score.toFixed(1) + '</span>' +
-                        (isCurrent ? ' <span style="font-size:8px;background:var(--glass-border);padding:1px 5px;border-radius:3px;color:var(--text-muted);">CURRENT</span>' : '')
+                        (isCurrent ? ' <span style="font-size:8px;background:var(--glass-border);padding:1px 5px;border-radius:3px;color:var(--text-muted);">CURRENT</span>' : '') +
+                        (d.is_manual ? ' <span style="font-size:8px;background:rgba(245,158,11,0.15);padding:1px 5px;border-radius:3px;color:#f59e0b;">MANUAL</span>' : '')
                     ).style('opacity', 1);
                     d3.select(this).transition().duration(150).attr('r', d.excluded ? 4 : 6);
                 })
@@ -9027,8 +9038,23 @@
                 })
                 .append('title').text(function(d) {
                     var dt = new Date(d.date);
-                    return dt.toLocaleDateString() + ' - ' + d.overall_grade + ' (' + d.overall_score.toFixed(1) + ')';
+                    var label = d.is_manual && d.snapshot_label ? '\uD83D\uDCCC ' + d.snapshot_label + '\n' : '';
+                    return label + dt.toLocaleDateString() + ' - ' + d.overall_grade + ' (' + d.overall_score.toFixed(1) + ')';
                 });
+
+            // Hollow dashed ring overlay for manual snapshots
+            svg.selectAll('.dot-manual-ring')
+               .data(snaps.filter(function(d) { return d.is_manual && !d.excluded; }))
+               .enter().append('circle')
+               .attr('class', 'dot-manual-ring')
+               .attr('cx', function(d) { return x(parseDate(d.date)); })
+               .attr('cy', function(d) { return y(d.overall_score); })
+               .attr('r', 8)
+               .style('fill', 'none')
+               .style('stroke', gc.text)
+               .style('stroke-width', 1.5)
+               .style('stroke-dasharray', '3,2')
+               .style('opacity', 0.7);
 
             // ── Category lines (dashed, toggleable) ──────────────────────
             var categoryNames = [];
@@ -9223,7 +9249,17 @@
                 var dt = new Date(s.date);
                 var dateStr = (dt.getMonth() + 1) + '/' + dt.getDate();
                 var isCurrent = (s.scan_id === instanceId);
-                html += "<th style='text-align:center;padding:6px 8px;color:" + (isCurrent ? 'var(--text-primary)' : 'var(--text-muted)') + ";border-bottom:1px solid var(--glass-border);min-width:50px;font-weight:" + (isCurrent ? '700' : '400') + ";'>" + dateStr + "</th>";
+                var cellContent;
+                if (s.is_manual && s.snapshot_label) {
+                    var escapedLabel = s.snapshot_label.replace(/'/g, "\\'");
+                    cellContent = "\uD83D\uDCCC " + s.snapshot_label +
+                        "<span onclick='deleteManualSnapshot(\"" + s.scan_id + "\")' title='Delete manual entry' " +
+                        "style='cursor:pointer;color:#ef4444;font-size:9px;margin-left:4px;opacity:0.7;' " +
+                        "onmouseover='this.style.opacity=1' onmouseout='this.style.opacity=0.7'>&times;</span>";
+                } else {
+                    cellContent = dateStr;
+                }
+                html += "<th style='text-align:center;padding:6px 8px;color:" + (isCurrent ? 'var(--text-primary)' : 'var(--text-muted)') + ";border-bottom:1px solid var(--glass-border);min-width:50px;font-weight:" + (isCurrent ? '700' : '400') + ";white-space:nowrap;'>" + cellContent + "</th>";
             });
             html += "<th style='text-align:center;padding:6px 8px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);min-width:40px;'>TREND</th>";
             html += "</tr></thead><tbody>";
@@ -12935,6 +12971,306 @@
 
         // Check on page load
         checkScanLatest();
+
+        // ===== MANUAL SNAPSHOT MODAL =====
+
+        var MANUAL_GRADE_SCORES = {A: 95, B: 85, C: 75, D: 65, F: 45};
+        var MANUAL_CAT_WEIGHTS = {
+            'Network Security': 1.0, 'Web App Security': 1.0, 'AI Security': 0.9,
+            'Information Leakage': 0.8, 'General Health': 0.8,
+            'External Account Exposure': 0.7, 'DNS Health': 0.7, 'IP Reputation': 0.6
+        };
+        var MANUAL_CAT_ORDER = ['Network Security', 'Web App Security', 'AI Security',
+            'Information Leakage', 'General Health', 'External Account Exposure',
+            'DNS Health', 'IP Reputation'];
+
+        var manualSelectedGrades = {};
+
+        function computeManualOverallGrade() {
+            var weightedSum = 0, totalWeight = 0;
+            for (var cat in MANUAL_CAT_WEIGHTS) {
+                var grade = manualSelectedGrades[cat];
+                if (grade) {
+                    weightedSum += MANUAL_GRADE_SCORES[grade] * MANUAL_CAT_WEIGHTS[cat];
+                    totalWeight += MANUAL_CAT_WEIGHTS[cat];
+                }
+            }
+            var score = totalWeight > 0 ? weightedSum / totalWeight : 0;
+            var grade = score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
+            updateManualGradeBadge(grade, Math.round(score * 10) / 10);
+            return {grade: grade, score: Math.round(score * 10) / 10};
+        }
+
+        function updateManualGradeBadge(grade, score) {
+            var badge = document.getElementById('manual-grade-badge');
+            if (!badge) return;
+            var showGrade = grade || '\u2013';
+            var showScore = (typeof score === 'number' && score > 0) ? score.toFixed(1) : '';
+            var gc = gradeGlowColor(showGrade);
+            if (showGrade === '\u2013') {
+                badge.style.background = 'var(--bg-tertiary)';
+                badge.style.boxShadow = 'none';
+                badge.style.border = '3px solid var(--glass-border)';
+                badge.innerHTML = "<span style='font-family:var(--font-mono);font-size:56px;font-weight:900;line-height:1;color:var(--text-muted);'>\u2013</span>";
+            } else {
+                badge.style.background = gc.grad;
+                badge.style.boxShadow = '0 0 30px ' + gc.glow + ', 0 0 60px ' + gc.glow + ', 0 0 90px ' + gc.glow;
+                badge.style.border = '3px solid rgba(255,255,255,0.2)';
+                badge.style.transform = 'scale(1.08)';
+                badge.innerHTML =
+                    "<span style='font-family:var(--font-mono);font-size:56px;font-weight:900;line-height:1;color:#fff;text-shadow:0 0 20px rgba(255,255,255,0.9),0 0 40px rgba(255,255,255,0.5);'>" + showGrade + "</span>" +
+                    (showScore ? "<span style='font-family:var(--font-mono);font-size:14px;color:rgba(255,255,255,0.8);margin-top:2px;'>" + showScore + "</span>" : '');
+                setTimeout(function() {
+                    var b = document.getElementById('manual-grade-badge');
+                    if (b) b.style.transform = 'scale(1)';
+                }, 150);
+            }
+        }
+
+        function selectManualGrade(cat, grade) {
+            manualSelectedGrades[cat] = grade;
+            // Update pill styles
+            var pills = document.querySelectorAll('[data-manual-cat="' + cat + '"]');
+            for (var i = 0; i < pills.length; i++) {
+                var p = pills[i];
+                var pg = p.getAttribute('data-manual-grade');
+                var gc2 = gradeGlowColor(pg);
+                if (pg === grade) {
+                    p.style.background = gc2.grad;
+                    p.style.boxShadow = '0 0 8px ' + gc2.glow;
+                    p.style.color = '#fff';
+                    p.style.borderColor = gc2.text;
+                } else {
+                    p.style.background = 'transparent';
+                    p.style.boxShadow = 'none';
+                    p.style.color = 'var(--text-muted)';
+                    p.style.borderColor = 'var(--glass-border)';
+                }
+            }
+            computeManualOverallGrade();
+        }
+
+        function openManualSnapshotModal() {
+            // Pre-fill target from page
+            var modal = document.getElementById('manual-snapshot-modal');
+            if (!modal) {
+                buildManualSnapshotModal();
+                modal = document.getElementById('manual-snapshot-modal');
+            }
+            manualSelectedGrades = {};
+            // Reset badge
+            updateManualGradeBadge('\u2013', 0);
+            // Reset pills
+            var allPills = modal.querySelectorAll('[data-manual-grade]');
+            for (var i = 0; i < allPills.length; i++) {
+                allPills[i].style.background = 'transparent';
+                allPills[i].style.boxShadow = 'none';
+                allPills[i].style.color = 'var(--text-muted)';
+                allPills[i].style.borderColor = 'var(--glass-border)';
+            }
+            // Clear form fields
+            document.getElementById('manual-snap-label').value = '';
+            document.getElementById('manual-snap-date').value = '';
+            document.getElementById('manual-snap-error').textContent = '';
+            modal.style.display = 'flex';
+        }
+
+        function closeManualSnapshotModal() {
+            var modal = document.getElementById('manual-snapshot-modal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function buildManualSnapshotModal() {
+            var overlay = document.createElement('div');
+            overlay.id = 'manual-snapshot-modal';
+            overlay.style.cssText = 'display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;';
+            overlay.onclick = function(e) { if (e.target === overlay) closeManualSnapshotModal(); };
+
+            var h = "<div style='background:var(--bg-secondary);border:1px solid var(--glass-border);border-radius:var(--radius-md);width:700px;max-width:95vw;max-height:90vh;overflow-y:auto;font-family:var(--font-mono);'>";
+
+            // Header
+            h += "<div style='display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--glass-border);'>";
+            h += "<span style='font-size:12px;font-weight:700;letter-spacing:1.5px;color:var(--text-primary);text-transform:uppercase;'>+ ADD MANUAL SNAPSHOT</span>";
+            h += "<span onclick='closeManualSnapshotModal()' style='cursor:pointer;color:var(--text-muted);font-size:16px;padding:2px 6px;' title='Close'>&times;</span>";
+            h += "</div>";
+
+            // Body: two columns
+            h += "<div style='display:flex;gap:0;'>";
+
+            // Left column: fields + category pills
+            h += "<div style='flex:1;padding:16px 18px;border-right:1px solid var(--glass-border);'>";
+
+            // Target (read-only, pre-filled from currentTarget)
+            h += "<div style='margin-bottom:12px;'>";
+            h += "<label style='font-size:9px;letter-spacing:1px;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;'>Target</label>";
+            h += "<div id='manual-snap-target-display' style='font-size:12px;color:var(--text-secondary);padding:5px 8px;background:var(--bg-tertiary);border:1px solid var(--glass-border);border-radius:3px;'></div>";
+            h += "</div>";
+
+            // Label
+            h += "<div style='margin-bottom:12px;'>";
+            h += "<label style='font-size:9px;letter-spacing:1px;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;'>Name / Label</label>";
+            h += "<input id='manual-snap-label' type='text' placeholder='e.g. Q1 2025 Baseline' style='width:100%;box-sizing:border-box;font-family:var(--font-mono);font-size:12px;padding:5px 8px;background:var(--bg-tertiary);border:1px solid var(--glass-border);border-radius:3px;color:var(--text-primary);outline:none;'>";
+            h += "</div>";
+
+            // Date
+            h += "<div style='margin-bottom:16px;'>";
+            h += "<label style='font-size:9px;letter-spacing:1px;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;'>Date</label>";
+            h += "<input id='manual-snap-date' type='date' style='width:100%;box-sizing:border-box;font-family:var(--font-mono);font-size:12px;padding:5px 8px;background:var(--bg-tertiary);border:1px solid var(--glass-border);border-radius:3px;color:var(--text-primary);outline:none;'>";
+            h += "</div>";
+
+            // Category grade pills
+            h += "<div style='font-size:9px;letter-spacing:1px;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px;'>Category Grades</div>";
+
+            for (var ci = 0; ci < MANUAL_CAT_ORDER.length; ci++) {
+                var cat = MANUAL_CAT_ORDER[ci];
+                var w = MANUAL_CAT_WEIGHTS[cat];
+                h += "<div style='display:flex;align-items:center;margin-bottom:7px;gap:8px;'>";
+                h += "<span style='flex:1;font-size:11px;color:var(--text-secondary);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' title='" + cat + "'>" + cat + "</span>";
+                h += "<span style='font-size:9px;color:var(--text-muted);min-width:28px;text-align:right;'>" + w.toFixed(1) + "</span>";
+                h += "<div style='display:flex;gap:4px;'>";
+                var grades = ['F', 'D', 'C', 'B', 'A'];
+                for (var gi = 0; gi < grades.length; gi++) {
+                    var g = grades[gi];
+                    h += "<span data-manual-cat='" + cat + "' data-manual-grade='" + g + "' " +
+                         "onclick=\"selectManualGrade('" + cat.replace(/'/g, "\\'") + "','" + g + "')\" " +
+                         "style='cursor:pointer;display:inline-block;width:24px;height:22px;line-height:22px;text-align:center;" +
+                         "border-radius:3px;font-size:11px;font-weight:600;border:1px solid var(--glass-border);" +
+                         "color:var(--text-muted);background:transparent;transition:all 0.15s;'>" + g + "</span>";
+                }
+                h += "</div></div>";
+            }
+
+            h += "</div>"; // end left column
+
+            // Right column: live grade badge
+            h += "<div style='width:180px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 16px;gap:12px;'>";
+            h += "<div id='manual-grade-badge' style='display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:130px;height:130px;border-radius:50%;background:var(--bg-tertiary);border:3px solid var(--glass-border);transition:all 0.3s ease;'>";
+            h += "<span style='font-family:var(--font-mono);font-size:56px;font-weight:900;line-height:1;color:var(--text-muted);'>\u2013</span>";
+            h += "</div>";
+            h += "<div style='font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;text-align:center;'>OVERALL GRADE</div>";
+            h += "</div>";
+
+            h += "</div>"; // end two-column body
+
+            // Footer: error + buttons
+            h += "<div style='display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-top:1px solid var(--glass-border);'>";
+            h += "<span id='manual-snap-error' style='font-size:10px;color:#ef4444;flex:1;'></span>";
+            h += "<div style='display:flex;gap:8px;'>";
+            h += "<button onclick='closeManualSnapshotModal()' style='font-family:var(--font-mono);font-size:10px;letter-spacing:1px;padding:5px 14px;background:transparent;border:1px solid var(--glass-border);color:var(--text-secondary);border-radius:3px;cursor:pointer;'>CANCEL</button>";
+            h += "<button onclick='submitManualSnapshot()' style='font-family:var(--font-mono);font-size:10px;letter-spacing:1px;padding:5px 14px;background:var(--accent-blue,#3b82f6);border:none;color:#fff;border-radius:3px;cursor:pointer;font-weight:700;'>SAVE</button>";
+            h += "</div>";
+            h += "</div>";
+
+            h += "</div>"; // end modal content
+
+            overlay.innerHTML = h;
+            document.body.appendChild(overlay);
+
+            // Pre-fill target
+            var targetEl = document.getElementById('manual-snap-target-display');
+            if (targetEl && window.currentTarget) {
+                targetEl.textContent = window.currentTarget;
+            }
+        }
+
+        function submitManualSnapshot() {
+            var labelEl = document.getElementById('manual-snap-label');
+            var dateEl = document.getElementById('manual-snap-date');
+            var errorEl = document.getElementById('manual-snap-error');
+            var label = labelEl ? labelEl.value.trim() : '';
+            var date = dateEl ? dateEl.value.trim() : '';
+
+            errorEl.textContent = '';
+
+            if (!label) { errorEl.textContent = 'Name / Label is required.'; return; }
+            if (!date) { errorEl.textContent = 'Date is required.'; return; }
+
+            // Validate all categories selected
+            for (var ci = 0; ci < MANUAL_CAT_ORDER.length; ci++) {
+                if (!manualSelectedGrades[MANUAL_CAT_ORDER[ci]]) {
+                    errorEl.textContent = 'Please select a grade for: ' + MANUAL_CAT_ORDER[ci];
+                    return;
+                }
+            }
+
+            var result = computeManualOverallGrade();
+            var target = window.currentTarget || '';
+
+            var payload = {
+                target: target,
+                label: label,
+                date: date,
+                overall_grade: result.grade,
+                categories: {}
+            };
+            for (var cat in manualSelectedGrades) {
+                payload.categories[cat] = manualSelectedGrades[cat];
+            }
+
+            var saveBtn = document.querySelector('#manual-snapshot-modal button[onclick="submitManualSnapshot()"]');
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'SAVING...'; }
+
+            $.ajax({
+                url: '${docroot}/snapshotmanual',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
+                success: function(resp) {
+                    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'SAVE'; }
+                    if (resp && resp.success) {
+                        closeManualSnapshotModal();
+                        // Re-fetch trend data and re-render
+                        var iid = _instanceId;
+                        sf.fetchData('${docroot}/scantrend', {'id': iid}, function(trendData) {
+                            if (trendData && trendData.target) {
+                                window.currentTarget = trendData.target;
+                            }
+                            if (trendData && trendData.snapshots && trendData.snapshots.length > 1) {
+                                $('#snapshot-row').show();
+                                renderSnapshotChart(trendData, iid);
+                                renderSnapshotMetrics(trendData);
+                                renderSnapshotTable(trendData, iid);
+                                injectDeltaBadges(trendData);
+                            }
+                        });
+                    } else {
+                        errorEl.textContent = (resp && resp.message) ? resp.message : 'Error saving snapshot.';
+                    }
+                },
+                error: function(xhr) {
+                    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'SAVE'; }
+                    errorEl.textContent = 'Server error: ' + (xhr.responseText || xhr.status);
+                }
+            });
+        }
+
+        function deleteManualSnapshot(scanId) {
+            if (!scanId || scanId.indexOf('MANUAL_') !== 0) return;
+            if (!confirm('Delete this manual snapshot entry?')) return;
+            $.ajax({
+                url: '${docroot}/snapshotmanual?delete=1&id=' + encodeURIComponent(scanId),
+                method: 'GET',
+                success: function(resp) {
+                    if (resp && resp.success) {
+                        var iid = _instanceId;
+                        sf.fetchData('${docroot}/scantrend', {'id': iid}, function(trendData) {
+                            if (trendData && trendData.snapshots && trendData.snapshots.length > 1) {
+                                renderSnapshotChart(trendData, iid);
+                                renderSnapshotMetrics(trendData);
+                                renderSnapshotTable(trendData, iid);
+                            } else {
+                                $('#snapshot-row').hide();
+                            }
+                        });
+                    } else {
+                        alert('Error deleting snapshot: ' + ((resp && resp.message) || 'unknown error'));
+                    }
+                },
+                error: function(xhr) {
+                    alert('Server error: ' + (xhr.responseText || xhr.status));
+                }
+            });
+        }
 
     </script>
 <!-- Correlation Progress Modal -->
