@@ -1069,9 +1069,14 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
             RegularTextRun, Font as DrawingFont,
         )
 
-        sr += 1  # one spacer row
-        chart_anchor_row = sr  # chart will be placed here visually
-        sr += 1  # another spacer (chart floats over these)
+        sr += 1  # spacer row 1
+        ws.row_dimensions[sr].height = 10  # visible padding above chart
+        sr += 1  # spacer row 2
+        ws.row_dimensions[sr].height = 10  # visible padding above chart
+        sr += 1  # spacer row 3
+        ws.row_dimensions[sr].height = 10  # visible padding above chart
+        chart_anchor_row = sr  # chart anchored here — 3 rows of visible padding
+        sr += 1
         chart_data_start = sr
 
         # Header row for chart data (invisible text)
@@ -1099,7 +1104,7 @@ def build_snapshot_sheet(ws, snapshot_data: dict):
 
         # ── Build the dark-themed LineChart ────────────────────────────
         chart = LineChart()
-        chart.width = 30.86  # 12.15" — matches full A:J banner width
+        chart.width = 27.05  # 10.65" — aligns with CATEGORY COMPARISON header
         chart.height = 16   # cm — extra height gives title room above plot area
 
         # Dark chart area background (#111827) with border
