@@ -384,6 +384,18 @@ class ExtTargetSummary(BaseModel):
     asset_count: int
 
 
+class ExtScanResult(BaseModel):
+    event_type: str
+    event_type_label: str
+    data: str
+    source_data: Optional[str] = None
+    module: str
+    risk: int
+    confidence: int
+    generated: int
+    # Excluded: scan_instance_id, hash, false_positive, tracking, visibility
+
+
 class ExtKeyCreateRequest(BaseModel):
     client_name: str
     scopes: Optional[List[str]] = None
@@ -407,6 +419,18 @@ class ExtKeyInfo(BaseModel):
     last_used_ip: Optional[str] = None
     expires_at: Optional[int] = None
     notes: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Helper: get latest scan ID for a target
+# ---------------------------------------------------------------------------
+
+def _get_latest_scan_id(dbh, target: str) -> Optional[str]:
+    """Return the GUID of the most recent scan for a target, or None."""
+    try:
+        return dbh.getLatestScanForTarget(target)
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -666,6 +690,126 @@ async def ext_target_findings_summary(
         "total_validated": len(validated_rows),
         "total_fp_hidden": True,   # false positives are never surfaced
     }
+
+
+@ext_router.get("/targets/{target}/results", response_model=List[ExtScanResult])
+async def ext_target_results(
+    target: str,
+    type: Optional[str] = Query(None, description="Filter by event type (e.g. IP_ADDRESS, EMAILADDR)"),
+    limit: int = Query(200, ge=1, le=2000),
+    offset: int = Query(0, ge=0),
+    client: dict = Depends(get_ext_client),
+):
+    """All scan event rows from the latest scan for a target.
+
+    Returns every discovered data point (IPs, domains, emails, certs,
+    breach hits, port data, etc.) from the most recent scan.
+    False positives are never returned.
+
+    Requires scope: data:read
+    """
+    require_scope(client, "data:read")
+    require_target_access(client, target)
+
+    dbh = _get_db()
+
+    scan_id = _get_latest_scan_id(dbh, target)
+    if not scan_id:
+        raise HTTPException(404, f"No scans found for target: {target}")
+
+    try:
+        rows = dbh.scanResultEvent(
+            instanceId=scan_id,
+            eventType=type or "ALL",
+            filterFp=True,
+            limit=limit,
+            offset=offset,
+        )
+    except Exception as e:
+        raise HTTPException(500, f"DB error: {e}")
+
+    from spiderfoot.event_type_mapping import translate_event_type
+    results = []
+    for row in rows:
+        # scanResultEvent columns:
+        # generated[0], data[1], source_data[2], module[3], type[4],
+        # confidence[5], visibility[6], risk[7], hash[8], source_event_hash[9],
+        # event_descr[10], event_type[11], scan_instance_id[12],
+        # fp[13], parent_fp[14], imported_from_scan[15], tracking[16]
+        event_type = row[4]
+        label = row[10] or translate_event_type(event_type) or event_type
+        results.append(ExtScanResult(
+            event_type=event_type,
+            event_type_label=label,
+            data=row[1] or "",
+            source_data=row[2] if row[2] != row[1] else None,
+            module=row[3] or "",
+            risk=int(row[7] or 0),
+            confidence=int(row[5] or 0),
+            generated=int(row[0] or 0),
+        ))
+    return results
+
+
+@ext_router.get("/targets/{target}/results/lookup", response_model=List[ExtScanResult])
+async def ext_target_results_lookup(
+    target: str,
+    value: str = Query(..., description="Asset value to look up (IP, domain, email, hash, etc.)"),
+    limit: int = Query(200, ge=1, le=2000),
+    client: dict = Depends(get_ext_client),
+):
+    """Look up everything collected about a specific asset value.
+
+    Given a data point (e.g. '1.2.3.4', 'alice@example.com', 'sub.example.com'),
+    returns every scan result row where that value appears as the primary data
+    OR as the source that triggered another finding.
+
+    Use case: vendor spots an issue, queries for full context on that asset.
+
+    Requires scope: data:read
+    """
+    require_scope(client, "data:read")
+    require_target_access(client, target)
+
+    dbh = _get_db()
+
+    scan_id = _get_latest_scan_id(dbh, target)
+    if not scan_id:
+        raise HTTPException(404, f"No scans found for target: {target}")
+
+    # Query rows where the value is the primary data
+    try:
+        rows = dbh.scanResultEvent(
+            instanceId=scan_id,
+            eventType="ALL",
+            data=[value],
+            filterFp=True,
+            limit=limit,
+        )
+    except Exception as e:
+        raise HTTPException(500, f"DB error: {e}")
+
+    from spiderfoot.event_type_mapping import translate_event_type
+    results = []
+    seen_hashes = set()
+    for row in rows:
+        h = row[8]
+        if h in seen_hashes:
+            continue
+        seen_hashes.add(h)
+        event_type = row[4]
+        label = row[10] or translate_event_type(event_type) or event_type
+        results.append(ExtScanResult(
+            event_type=event_type,
+            event_type_label=label,
+            data=row[1] or "",
+            source_data=row[2] if row[2] != row[1] else None,
+            module=row[3] or "",
+            risk=int(row[7] or 0),
+            confidence=int(row[5] or 0),
+            generated=int(row[0] or 0),
+        ))
+    return results
 
 
 # ---------------------------------------------------------------------------
