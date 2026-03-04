@@ -9309,25 +9309,47 @@
             html += "<col style='width:44px;'>";
             html += "</colgroup>";
 
-            // Header row with scan dates
+            // Header row — unified two-line layout for all columns
             html += "<thead><tr>";
-            html += "<th style='text-align:left;padding:5px 8px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);'>CATEGORY</th>";
+            html += "<th style='text-align:left;padding:6px 8px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);vertical-align:bottom;'>CATEGORY</th>";
             displaySnaps.forEach(function(s) {
                 var dt = new Date(s.date);
-                var dateStr = (dt.getMonth() + 1) + '/' + dt.getDate();
-                var isCurrent = (s.scan_id === instanceId);
-                var cellContent;
+                var mo = dt.getMonth() + 1;
+                var day = dt.getDate();
+                var yr = dt.getFullYear();
+                var dateStr = mo + '/' + day;
+                var isCurrent = s.scan_id === instanceId;
+                var dateColor = isCurrent ? 'var(--text-primary)' : 'var(--text-muted)';
+                var dateFw = isCurrent ? '700' : '400';
+
+                html += "<th style='text-align:center;padding:4px 2px;border-bottom:1px solid var(--glass-border);vertical-align:bottom;'>";
+                html += "<div style='display:flex;flex-direction:column;align-items:center;gap:1px;'>";
+
+                // Manual entries: amber label line on top
                 if (s.is_manual && s.snapshot_label) {
-                    cellContent = "\uD83D\uDCCC " + s.snapshot_label +
-                        "<span onclick='deleteManualSnapshot(\"" + s.scan_id + "\")' title='Delete manual entry' " +
-                        "style='cursor:pointer;color:#ef4444;font-size:9px;margin-left:3px;opacity:0.7;' " +
-                        "onmouseover='this.style.opacity=1' onmouseout='this.style.opacity=0.7'>&times;</span>";
-                } else {
-                    cellContent = dateStr;
+                    var safeLabel = s.snapshot_label.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+                    html += "<div style='font-size:8px;color:#f59e0b;max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:0.3px;' title='" + safeLabel + "'>\uD83D\uDCCC " + safeLabel + "</div>";
                 }
-                html += "<th style='text-align:center;padding:5px 3px;color:" + (isCurrent ? 'var(--text-primary)' : 'var(--text-muted)') + ";border-bottom:1px solid var(--glass-border);font-weight:" + (isCurrent ? '700' : '400') + ";white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px;'>" + cellContent + "</th>";
+
+                // Date line (same for all)
+                html += "<div style='font-size:11px;font-weight:" + dateFw + ";color:" + dateColor + ";line-height:1.2;'>" + dateStr + "</div>";
+
+                // Year line (same for all, always muted)
+                html += "<div style='font-size:8px;color:var(--text-muted);letter-spacing:0.3px;line-height:1.2;'>" + yr + "</div>";
+
+                // Manual entries: delete button below year
+                if (s.is_manual) {
+                    var sid = s.scan_id;
+                    html += "<div onclick='deleteManualSnapshot(\"" + sid + "\")' title='Delete manual entry' " +
+                        "style='cursor:pointer;font-size:10px;color:#ef4444;opacity:0.45;line-height:1;margin-top:2px;padding:1px 3px;border-radius:2px;' " +
+                        "onmouseover='this.style.opacity=1;this.style.background=\"rgba(239,68,68,0.12)\"' " +
+                        "onmouseout='this.style.opacity=0.45;this.style.background=\"transparent\"'>&times;</div>";
+                }
+
+                html += "</div>";
+                html += "</th>";
             });
-            html += "<th style='text-align:center;padding:5px 4px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);'>TREND</th>";
+            html += "<th style='text-align:center;padding:4px 4px;color:var(--text-muted);border-bottom:1px solid var(--glass-border);vertical-align:bottom;font-size:9px;'>TREND</th>";
             html += "</tr></thead><tbody>";
 
             // Category rows
