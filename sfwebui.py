@@ -5001,7 +5001,7 @@ class SpiderFootWebUi:
                 dbh.auditLog(
                     self.currentUser(), "EXT_KEY_CREATE",
                     f"Created external API key for '{client_name}' (id={key_id})",
-                    self.clientIp()
+                    self.clientIP()
                 )
         except Exception as e:
             return {"error": f"DB error: {e}"}
@@ -5033,7 +5033,7 @@ class SpiderFootWebUi:
                 dbh.auditLog(
                     self.currentUser(), "EXT_KEY_REVEAL",
                     f"Admin revealed key {id}",
-                    self.clientIp()
+                    self.clientIP()
                 )
             return {"raw_key": raw_key}
         except ValueError as e:
@@ -5063,7 +5063,7 @@ class SpiderFootWebUi:
                 dbh.auditLog(
                     self.currentUser(), "EXT_KEY_REVOKE",
                     f"Revoked external API key {id}",
-                    self.clientIp()
+                    self.clientIP()
                 )
             return {"ok": True}
         except Exception as e:
