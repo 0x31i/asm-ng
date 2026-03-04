@@ -8020,11 +8020,7 @@ class SpiderFootWebUi:
             if cat_grade not in grade_score_map:
                 return {'success': False, 'message': f'Invalid grade for category "{cat_name}": {cat_grade}'}
             # Look up weight from DEFAULT_GRADE_CATEGORIES
-            weight = 0.0
-            for cat_cfg in DEFAULT_GRADE_CATEGORIES:
-                if cat_cfg.get('name') == cat_name:
-                    weight = cat_cfg.get('weight', 0.0)
-                    break
+            weight = DEFAULT_GRADE_CATEGORIES.get(cat_name, {}).get('weight', 0.0)
             score = grade_score_map[cat_grade]
             cat_scores[cat_name] = {
                 'score': score,
