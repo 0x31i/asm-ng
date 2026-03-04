@@ -1876,8 +1876,15 @@ pre.table-border-bg-inherit {
 .col-data-status  { width: 110px; }
 .col-data-element { width: 30%; min-width: 160px; }
 .col-data-source  { width: 30%; min-width: 140px; }
-.col-data-module  { width: 110px; }
+.col-data-module  { width: 140px; }
 .col-data-tracking{ width: 110px; }
+
+/* Prevent long module names (e.g. sfp_ai_threat_intel) from wrapping */
+td.col-data-module pre {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* Truncate collapsed pre content so long values don't overflow the cell */
 td.pre-expandable.pre-collapsed pre.table-border-bg-inherit {

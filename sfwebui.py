@@ -7831,6 +7831,8 @@ class SpiderFootWebUi:
                         'excluded': s.get('excluded', 0),
                         'scan_name': meta.get('name', ''),
                         'scan_status': meta.get('status', ''),
+                        'is_manual': s['scan_id'].startswith('MANUAL_'),
+                        'snapshot_label': s.get('snapshot_label') or '',
                     })
 
                 # Filter to non-excluded snapshots for delta/trajectory calculation
@@ -7954,6 +7956,122 @@ class SpiderFootWebUi:
                 return {'success': True}
             except Exception as e:
                 self.log.error(f"Error updating snapshot excluded for scan {id}: {e}", exc_info=True)
+                return {'success': False, 'message': str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def snapshotmanual(self: 'SpiderFootWebUi', **kwargs) -> dict:
+        """Create or delete a manual grade snapshot entry.
+
+        POST: create a new manual snapshot
+        GET with delete=1&id=MANUAL_...: delete a manual snapshot
+
+        Returns:
+            dict: success status
+        """
+        method = cherrypy.request.method.upper()
+
+        # DELETE path: GET /snapshotmanual?delete=1&id=MANUAL_...
+        if method == 'GET':
+            delete = kwargs.get('delete', '0')
+            snap_id = kwargs.get('id', '')
+            if delete != '1':
+                return {'success': False, 'message': 'Invalid request'}
+            if not snap_id or not snap_id.startswith('MANUAL_'):
+                return {'success': False, 'message': 'Can only delete manual snapshots via this endpoint'}
+            with SpiderFootDb(self.config) as dbh:
+                try:
+                    dbh.gradeSnapshotDelete(snap_id)
+                    return {'success': True}
+                except Exception as e:
+                    self.log.error(f"Error deleting manual snapshot {snap_id}: {e}", exc_info=True)
+                    return {'success': False, 'message': str(e)}
+
+        # CREATE path: POST /snapshotmanual
+        if method != 'POST':
+            return {'success': False, 'message': 'Method not allowed'}
+
+        try:
+            body = cherrypy.request.body.read()
+            data = json.loads(body)
+        except Exception as e:
+            return {'success': False, 'message': f'Invalid JSON body: {e}'}
+
+        target = (data.get('target') or '').strip()
+        label = (data.get('label') or '').strip()
+        date_str = (data.get('date') or '').strip()
+        overall_grade = (data.get('overall_grade') or '').strip().upper()
+        categories = data.get('categories') or {}
+
+        if not target or not label or not date_str or not overall_grade:
+            return {'success': False, 'message': 'Missing required fields: target, label, date, overall_grade'}
+        if overall_grade not in ('A', 'B', 'C', 'D', 'F'):
+            return {'success': False, 'message': f'Invalid overall_grade: {overall_grade}'}
+
+        try:
+            date_ms = int(dt_datetime.strptime(date_str, '%Y-%m-%d').timestamp() * 1000)
+        except ValueError:
+            return {'success': False, 'message': f'Invalid date format (expected YYYY-MM-DD): {date_str}'}
+
+        # Grade → midpoint score map
+        grade_score_map = {'A': 95.0, 'B': 85.0, 'C': 75.0, 'D': 65.0, 'F': 45.0}
+
+        # Build category_scores dict from grade letters
+        cat_scores = {}
+        for cat_name, cat_grade in categories.items():
+            cat_grade = (cat_grade or '').strip().upper()
+            if cat_grade not in grade_score_map:
+                return {'success': False, 'message': f'Invalid grade for category "{cat_name}": {cat_grade}'}
+            # Look up weight from DEFAULT_GRADE_CATEGORIES
+            weight = 0.0
+            for cat_cfg in DEFAULT_GRADE_CATEGORIES:
+                if cat_cfg.get('name') == cat_name:
+                    weight = cat_cfg.get('weight', 0.0)
+                    break
+            score = grade_score_map[cat_grade]
+            cat_scores[cat_name] = {
+                'score': score,
+                'grade': cat_grade,
+                'weight': weight,
+                'raw_score': score,
+            }
+
+        # Server-side recalculation of overall score/grade for sanity check
+        if cat_scores:
+            weighted_sum = sum(v['score'] * v['weight'] for v in cat_scores.values())
+            total_weight = sum(v['weight'] for v in cat_scores.values())
+            computed_score = round(weighted_sum / total_weight, 1) if total_weight > 0 else 0.0
+            if computed_score >= 90:
+                computed_grade = 'A'
+            elif computed_score >= 80:
+                computed_grade = 'B'
+            elif computed_score >= 70:
+                computed_grade = 'C'
+            elif computed_score >= 60:
+                computed_grade = 'D'
+            else:
+                computed_grade = 'F'
+            overall_score = computed_score
+            overall_grade = computed_grade
+        else:
+            overall_score = grade_score_map[overall_grade]
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                # Uniqueness check: reject duplicate label for same target
+                existing = [s for s in dbh.gradeSnapshotsForTarget(target, include_excluded=True)
+                            if s['scan_id'].startswith('MANUAL_') and s.get('snapshot_label') == label]
+                if existing:
+                    return {'success': False, 'message': f'A manual entry named "{label}" already exists for {target}'}
+
+                scan_id = dbh.gradeSnapshotStoreManual(
+                    target=target, label=label, date_ms=date_ms,
+                    overall_score=overall_score, overall_grade=overall_grade,
+                    category_scores=cat_scores,
+                )
+                return {'success': True, 'scan_id': scan_id}
+            except Exception as e:
+                self.log.error(f"Error creating manual snapshot for {target}: {e}", exc_info=True)
                 return {'success': False, 'message': str(e)}
 
     @cherrypy.expose

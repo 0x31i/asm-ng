@@ -1237,6 +1237,16 @@ class SpiderFootDb:
                 except DatabaseError:
                     pass
 
+            # Migration: Add snapshot_label column to tbl_grade_snapshots
+            try:
+                self.dbh.execute("SELECT snapshot_label FROM tbl_grade_snapshots LIMIT 1")
+            except DatabaseError:
+                try:
+                    self.dbh.execute("ALTER TABLE tbl_grade_snapshots ADD COLUMN snapshot_label TEXT DEFAULT NULL")
+                    self.conn.commit()
+                except DatabaseError:
+                    pass
+
             # Migration: Add GIN trigram index for fast ILIKE substring search
             try:
                 self.dbh.execute("SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm'")
@@ -2963,7 +2973,7 @@ class SpiderFootDb:
     def gradeSnapshotStore(self, scanId: str, target: str, gradeData: dict,
                            totalFindings: int, uniqueFindings: int,
                            correlationCounts: dict, scanStarted: int,
-                           scanEnded: int) -> bool:
+                           scanEnded: int, label: str = None) -> bool:
         """Upsert a grade snapshot row for a completed scan.
 
         Args:
@@ -2975,6 +2985,7 @@ class SpiderFootDb:
             correlationCounts (dict): {CRITICAL: N, HIGH: N, ...} or None
             scanStarted (int): scan start epoch (milliseconds)
             scanEnded (int): scan end epoch (milliseconds)
+            label (str): optional human-readable label (for manual entries)
 
         Returns:
             bool: success
@@ -3014,8 +3025,8 @@ class SpiderFootDb:
         qry = "INSERT OR REPLACE INTO tbl_grade_snapshots " \
               "(scan_instance_id, seed_target, overall_score, overall_grade, " \
               "category_scores, finding_counts, total_findings, unique_findings, " \
-              "correlation_counts, scan_started, scan_ended, created) " \
-              "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+              "correlation_counts, scan_started, scan_ended, created, snapshot_label) " \
+              "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
         qvars = [
             scanId, target,
@@ -3025,7 +3036,8 @@ class SpiderFootDb:
             _json.dumps(finding_counts),
             totalFindings, uniqueFindings,
             _json.dumps(correlationCounts) if correlationCounts else None,
-            scanStarted, scanEnded, now
+            scanStarted, scanEnded, now,
+            label,
         ]
 
         with self.dbhLock:
@@ -3039,7 +3051,7 @@ class SpiderFootDb:
                         "finding_counts=EXCLUDED.finding_counts, total_findings=EXCLUDED.total_findings, " \
                         "unique_findings=EXCLUDED.unique_findings, correlation_counts=EXCLUDED.correlation_counts, " \
                         "scan_started=EXCLUDED.scan_started, scan_ended=EXCLUDED.scan_ended, " \
-                        "created=EXCLUDED.created"
+                        "created=EXCLUDED.created, snapshot_label=EXCLUDED.snapshot_label"
                 self.dbh.execute(qry, qvars)
                 self.conn.commit()
                 _log.info(f"Grade snapshot stored: scan={scanId} grade={gradeData.get('overall_grade', '-')} score={gradeData.get('overall_score', 0)}")
@@ -3047,6 +3059,38 @@ class SpiderFootDb:
                 raise IOError(f"SQL error storing grade snapshot: {e}") from e
 
         return True
+
+    def gradeSnapshotStoreManual(self, target: str, label: str, date_ms: int,
+                                 overall_score: float, overall_grade: str,
+                                 category_scores: dict) -> str:
+        """Insert a manually-entered grade snapshot. Returns generated scan_instance_id.
+
+        Args:
+            target (str): seed target value
+            label (str): human-readable label for this entry
+            date_ms (int): epoch milliseconds for the snapshot date
+            overall_score (float): overall score (0-100)
+            overall_grade (str): overall grade letter (A/B/C/D/F)
+            category_scores (dict): {category_name: {'score': N, 'grade': X, 'weight': W}}
+
+        Returns:
+            str: generated scan_instance_id (MANUAL_...)
+        """
+        import secrets as _secrets
+        scan_id = f"MANUAL_{date_ms}_{_secrets.token_hex(4)}"
+        grade_data = {
+            'overall_score': overall_score,
+            'overall_grade': overall_grade,
+            'categories': {cat: {**v, 'details': []} for cat, v in category_scores.items()},
+        }
+        self.gradeSnapshotStore(
+            scanId=scan_id, target=target, gradeData=grade_data,
+            totalFindings=0, uniqueFindings=0,
+            correlationCounts=None,
+            scanStarted=date_ms, scanEnded=date_ms,
+            label=label,
+        )
+        return scan_id
 
     def gradeSnapshotsForTarget(self, target: str, limit: int = 100, include_excluded: bool = False) -> list:
         """Return all grade snapshots for a target, ordered by scan_started ASC.
@@ -3070,7 +3114,7 @@ class SpiderFootDb:
 
         qry = "SELECT scan_instance_id, seed_target, overall_score, overall_grade, " \
               "category_scores, finding_counts, total_findings, unique_findings, " \
-              "correlation_counts, scan_started, scan_ended, created, snapshot_excluded " \
+              "correlation_counts, scan_started, scan_ended, created, snapshot_excluded, snapshot_label " \
               "FROM tbl_grade_snapshots WHERE seed_target = ? "
         qvars = [target]
 
@@ -3103,6 +3147,7 @@ class SpiderFootDb:
                 'scan_ended': row[10],
                 'created': row[11],
                 'excluded': row[12] if len(row) > 12 else 0,
+                'snapshot_label': row[13] if len(row) > 13 else None,
             }
             try:
                 snap['category_scores'] = _json.loads(row[4]) if row[4] else {}
