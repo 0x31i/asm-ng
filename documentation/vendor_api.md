@@ -21,6 +21,8 @@ The External API (`/v1/ext`) is a read-only, scoped REST interface that exposes 
    - [Known Assets](#known-assets)
    - [Validated Findings](#validated-findings)
    - [Findings Summary](#findings-summary)
+   - [Scan Results](#scan-results)
+   - [Asset Lookup](#asset-lookup)
 7. [Error Reference](#error-reference)
 8. [Timestamps](#timestamps)
 9. [Grade System](#grade-system)
@@ -92,7 +94,7 @@ Each key is configured by the administrator with the following attributes:
 
 | Property | Description |
 |---|---|
-| **Scopes** | One or more of `assets:read`, `grades:read`, `findings:read` |
+| **Scopes** | One or more of `assets:read`, `grades:read`, `findings:read`, `data:read` |
 | **Allowed targets** | Optional whitelist of target names the key may query |
 | **IP allowlist** | Optional CIDR ranges; requests from other IPs are rejected |
 | **Rate limit** | Per-key sliding-window RPM ceiling (default: 60 RPM) |
@@ -121,6 +123,7 @@ Access to each endpoint is gated by one or more scopes. Your administrator assig
 | `assets:read` | `GET /v1/ext/targets`, `GET /v1/ext/targets/{target}/assets` |
 | `grades:read` | `GET /v1/ext/targets/{target}/grade`, `GET /v1/ext/targets/{target}/grade/history` |
 | `findings:read` | `GET /v1/ext/targets/{target}/findings`, `GET /v1/ext/targets/{target}/findings/summary` |
+| `data:read` | `GET /v1/ext/targets/{target}/results`, `GET /v1/ext/targets/{target}/results/lookup` |
 
 Calling an endpoint without the required scope returns `403 Forbidden`.
 
@@ -645,6 +648,201 @@ curl -s \
 
 ---
 
+### Scan Results
+
+```
+GET /v1/ext/targets/{target}/results
+```
+
+Returns all event rows collected during the most recent scan for a target. This is the full raw dataset — every IP address, domain, email, certificate, port, technology fingerprint, breach hit, and other data point discovered by the scan engine. False positives are never returned.
+
+Use this endpoint when you need the complete picture of what was discovered, or to drive downstream enrichment, correlation, or triage workflows.
+
+**Required scope:** `data:read`
+
+**Path parameters:**
+
+| Parameter | Description |
+|---|---|
+| `target` | Target identifier, e.g. `acmecorp.com` |
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `type` | string | (all types) | Filter by event type, e.g. `IP_ADDRESS`, `EMAILADDR`, `TCP_PORT_OPEN` |
+| `limit` | integer | 200 | Maximum rows per page (max: 2000) |
+| `offset` | integer | 0 | Rows to skip (for pagination) |
+
+**Example request — all results:**
+
+```bash
+curl -s \
+  -H "Authorization: Bearer asmng_ext_xK9mPq3r5sT7uV1wX2yZ4aBcDeFgHiJ" \
+  "https://asm.example.com/v1/ext/targets/acmecorp.com/results?limit=10&offset=0"
+```
+
+**Example request — only IP addresses:**
+
+```bash
+curl -s \
+  -H "Authorization: Bearer asmng_ext_xK9mPq3r5sT7uV1wX2yZ4aBcDeFgHiJ" \
+  "https://asm.example.com/v1/ext/targets/acmecorp.com/results?type=IP_ADDRESS"
+```
+
+**Example response:**
+
+```json
+[
+  {
+    "event_type": "IP_ADDRESS",
+    "event_type_label": "IP Address",
+    "data": "198.51.100.42",
+    "source_data": null,
+    "module": "sfp_dnsresolve",
+    "risk": 0,
+    "confidence": 100,
+    "generated": 1735689600000
+  },
+  {
+    "event_type": "TCP_PORT_OPEN",
+    "event_type_label": "Open TCP Port",
+    "data": "198.51.100.42:443",
+    "source_data": "198.51.100.42",
+    "module": "sfp_portscan_basic",
+    "risk": 0,
+    "confidence": 100,
+    "generated": 1735689900000
+  },
+  {
+    "event_type": "EMAILADDR_COMPROMISED",
+    "event_type_label": "Hacked Email Address",
+    "data": "alice@acmecorp.com",
+    "source_data": "LinkedIn breach (2023)",
+    "module": "sfp_haveibeen",
+    "risk": 5,
+    "confidence": 90,
+    "generated": 1735690200000
+  }
+]
+```
+
+**Response fields:**
+
+| Field | Type | Description |
+|---|---|---|
+| `event_type` | string | Machine-readable event type identifier |
+| `event_type_label` | string | Human-readable label for the event type |
+| `data` | string | The discovered data value |
+| `source_data` | string or null | The data point that triggered this discovery (null when same as `data`) |
+| `module` | string | The ASM-NG module that produced this result |
+| `risk` | integer | Risk level: 0 (none), 1 (low), 2 (medium), 3 (high), 4 (critical), 5 (very critical) |
+| `confidence` | integer | Module confidence in this finding (0–100) |
+| `generated` | integer | Unix epoch milliseconds when this result was generated |
+
+**Pagination:** Use `limit` and `offset` to page through large result sets. Scans against broad targets may produce thousands of rows. See the [Code Examples](#code-examples) section for a paginated Python helper.
+
+---
+
+### Asset Lookup
+
+```
+GET /v1/ext/targets/{target}/results/lookup
+```
+
+Returns all scan event rows where the specified value appears as the primary discovered data. This is an **asset-centric view** — given a specific IP, domain, email address, or other artifact, it returns everything the scan engine collected about that specific value.
+
+**Use case:** Your SOC agent flags an alert for a specific IP (`203.0.113.55`). Query this endpoint to instantly retrieve every piece of data ASM-NG has about that IP — open ports, associated hostnames, certificates, vulnerabilities, breach associations, and more — for immediate triage context.
+
+**Required scope:** `data:read`
+
+**Path parameters:**
+
+| Parameter | Description |
+|---|---|
+| `target` | Target identifier, e.g. `acmecorp.com` |
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `value` | string | **required** | The asset value to look up, e.g. `203.0.113.55`, `alice@acmecorp.com`, `dev.acmecorp.com` |
+| `limit` | integer | 200 | Maximum rows to return (max: 2000) |
+
+**Example request:**
+
+```bash
+curl -s \
+  -H "Authorization: Bearer asmng_ext_xK9mPq3r5sT7uV1wX2yZ4aBcDeFgHiJ" \
+  "https://asm.example.com/v1/ext/targets/acmecorp.com/results/lookup?value=198.51.100.42"
+```
+
+**Example response:**
+
+```json
+[
+  {
+    "event_type": "IP_ADDRESS",
+    "event_type_label": "IP Address",
+    "data": "198.51.100.42",
+    "source_data": null,
+    "module": "sfp_dnsresolve",
+    "risk": 0,
+    "confidence": 100,
+    "generated": 1735689600000
+  },
+  {
+    "event_type": "TCP_PORT_OPEN",
+    "event_type_label": "Open TCP Port",
+    "data": "198.51.100.42:443",
+    "source_data": "198.51.100.42",
+    "module": "sfp_portscan_basic",
+    "risk": 0,
+    "confidence": 100,
+    "generated": 1735689900000
+  },
+  {
+    "event_type": "TCP_PORT_OPEN",
+    "event_type_label": "Open TCP Port",
+    "data": "198.51.100.42:8080",
+    "source_data": "198.51.100.42",
+    "module": "sfp_portscan_basic",
+    "risk": 2,
+    "confidence": 100,
+    "generated": 1735689920000
+  },
+  {
+    "event_type": "WEBSERVER_TECHNOLOGY",
+    "event_type_label": "Web Server Technology",
+    "data": "nginx/1.24.0",
+    "source_data": "198.51.100.42",
+    "module": "sfp_webserver",
+    "risk": 0,
+    "confidence": 80,
+    "generated": 1735690100000
+  },
+  {
+    "event_type": "SSL_CERTIFICATE_ISSUED",
+    "event_type_label": "SSL Certificate Issued",
+    "data": "acmecorp.com",
+    "source_data": "198.51.100.42",
+    "module": "sfp_ssl",
+    "risk": 0,
+    "confidence": 100,
+    "generated": 1735690200000
+  }
+]
+```
+
+Response fields are identical to [Scan Results](#scan-results).
+
+**Notes:**
+- Results are deduplicated by internal hash — the same data point discovered by multiple modules appears once.
+- False positives are never returned regardless of FP suppression settings.
+- The lookup matches against the `data` column only. To find all rows *sourced from* a given value (i.e., what was discovered *because of* an asset), use the [Scan Results](#scan-results) endpoint with result processing on your side.
+
+---
+
 ## Error Reference
 
 All error responses use standard HTTP status codes. The response body may contain a `detail` field with additional context.
@@ -922,7 +1120,7 @@ API keys for the External API are issued exclusively by the **ASM-NG administrat
 To request access or modify an existing key, contact your ASM-NG administrator with the following information:
 
 - **Purpose**: Brief description of your integration (e.g., "AI SOC agent — read grades and findings for triage")
-- **Required scopes**: Which of `assets:read`, `grades:read`, `findings:read` you need
+- **Required scopes**: Which of `assets:read`, `grades:read`, `findings:read`, `data:read` you need
 - **Targets**: Which target(s) you need access to
 - **Source IPs**: The IP addresses or CIDR ranges your system will make requests from (for allowlisting)
 - **Expected request volume**: Approximate requests per minute so an appropriate rate limit can be configured

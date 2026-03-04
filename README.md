@@ -382,7 +382,7 @@ Internet → nginx :443 → FastAPI :8001 (127.0.0.1 only)
 | Constant-time compare | `hmac.compare_digest()` | Timing attacks on key check |
 | Key expiry | `expires_at` checked every request | Leaked/forgotten keys auto-expire |
 | IP allowlist | Per-key CIDR list | Stolen key used from wrong network |
-| Scope system | `assets:read`, `grades:read`, `findings:read` | Over-privileged access |
+| Scope system | `assets:read`, `grades:read`, `findings:read`, `data:read` | Over-privileged access |
 | Target ACL | `allowed_targets` per key | Cross-client data leakage |
 | Per-key rate limit | In-app sliding-window token bucket | Key-level abuse |
 | Response whitelist | Pydantic models — explicit fields only | Internal IDs leaking |
@@ -398,6 +398,8 @@ GET /v1/ext/targets/{target}/grade/history?limit=12   → grade trend history
 GET /v1/ext/targets/{target}/assets                   → known asset inventory
 GET /v1/ext/targets/{target}/findings                 → validated findings (FPs never returned)
 GET /v1/ext/targets/{target}/findings/summary         → finding counts by type
+GET /v1/ext/targets/{target}/results                  → all raw scan event rows (data:read scope)
+GET /v1/ext/targets/{target}/results/lookup?value=    → asset-centric lookup (data:read scope)
 ```
 
 **Key management:**
