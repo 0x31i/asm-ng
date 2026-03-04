@@ -8298,8 +8298,8 @@
             // Comparison table
             grid += "<div style='padding:0 15px 15px 15px;'>";
             grid += "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;'>";
-            grid += "<span style='font-family:var(--font-mono);font-size:9px;letter-spacing:1px;color:var(--text-muted);text-transform:uppercase;'>SHOWING</span>";
-            grid += "<div id='snapshot-limit-pills' style='display:flex;gap:4px;font-family:var(--font-mono);font-size:10px;'></div>";
+            grid += "<span style='font-family:var(--font-mono);font-size:9px;letter-spacing:1px;color:var(--text-muted);text-transform:uppercase;'>SHOWING LAST</span>";
+            grid += "<div id='snapshot-limit-stepper' style='display:flex;align-items:center;gap:0;font-family:var(--font-mono);font-size:10px;'></div>";
             grid += "</div>";
             grid += "<div id='snapshot-table-container' style='overflow-x:auto;'></div>";
             grid += "</div>";
@@ -9229,35 +9229,50 @@
         var _lastSnapshotInstanceId = null;
         var _snapshotTableLimit = 12; // default: show 12 scans
 
-        function setSnapshotLimit(n) {
-            _snapshotTableLimit = n;
-            if (_lastSnapshotTrendData) {
-                renderSnapshotTable(_lastSnapshotTrendData, _lastSnapshotInstanceId);
-            }
-        }
+        var SNAPSHOT_LIMIT_MIN = 5;
+        var SNAPSHOT_LIMIT_MAX = 14;
 
-        function renderSnapshotLimitPills(total) {
-            var el = document.getElementById('snapshot-limit-pills');
+        function renderSnapshotLimitStepper() {
+            var el = document.getElementById('snapshot-limit-stepper');
             if (!el) return;
-            var options = [8, 12, 16, 24, 0]; // 0 = ALL
-            el.innerHTML = '';
-            options.forEach(function(n) {
-                var label = n === 0 ? 'ALL' : String(n);
-                var isActive = (n === 0 ? _snapshotTableLimit >= total : _snapshotTableLimit === n);
-                var pill = document.createElement('span');
-                pill.textContent = label;
-                pill.title = n === 0 ? 'Show all scans' : 'Show last ' + n + ' scans';
-                pill.style.cssText = 'cursor:pointer;padding:2px 8px;border-radius:10px;border:1px solid ' +
-                    (isActive ? 'var(--accent-blue,#3b82f6)' : 'var(--glass-border)') + ';' +
-                    'color:' + (isActive ? 'var(--accent-blue,#3b82f6)' : 'var(--text-muted)') + ';' +
-                    'background:' + (isActive ? 'rgba(59,130,246,0.12)' : 'transparent') + ';' +
-                    'transition:all 0.15s;';
-                pill.onclick = function() {
-                    _snapshotTableLimit = n === 0 ? 9999 : n;
+            var btnStyle = 'cursor:pointer;width:22px;height:22px;line-height:20px;text-align:center;' +
+                'border:1px solid var(--glass-border);background:transparent;color:var(--text-secondary);' +
+                'font-family:var(--font-mono);font-size:13px;transition:color 0.15s;user-select:none;';
+            var dec = document.createElement('span');
+            dec.textContent = '\u2212';
+            dec.title = 'Show fewer scans';
+            dec.style.cssText = btnStyle + 'border-radius:3px 0 0 3px;' +
+                (_snapshotTableLimit <= SNAPSHOT_LIMIT_MIN ? 'opacity:0.3;cursor:default;' : '');
+            dec.onclick = function() {
+                if (_snapshotTableLimit > SNAPSHOT_LIMIT_MIN) {
+                    _snapshotTableLimit--;
                     renderSnapshotTable(_lastSnapshotTrendData, _lastSnapshotInstanceId);
-                };
-                el.appendChild(pill);
-            });
+                }
+            };
+
+            var val = document.createElement('span');
+            val.textContent = _snapshotTableLimit;
+            val.title = 'Scans shown';
+            val.style.cssText = 'padding:0 8px;height:22px;line-height:20px;border-top:1px solid var(--glass-border);' +
+                'border-bottom:1px solid var(--glass-border);color:var(--accent-blue,#3b82f6);' +
+                'font-family:var(--font-mono);font-size:11px;font-weight:700;min-width:28px;text-align:center;';
+
+            var inc = document.createElement('span');
+            inc.textContent = '+';
+            inc.title = 'Show more scans';
+            inc.style.cssText = btnStyle + 'border-radius:0 3px 3px 0;' +
+                (_snapshotTableLimit >= SNAPSHOT_LIMIT_MAX ? 'opacity:0.3;cursor:default;' : '');
+            inc.onclick = function() {
+                if (_snapshotTableLimit < SNAPSHOT_LIMIT_MAX) {
+                    _snapshotTableLimit++;
+                    renderSnapshotTable(_lastSnapshotTrendData, _lastSnapshotInstanceId);
+                }
+            };
+
+            el.innerHTML = '';
+            el.appendChild(dec);
+            el.appendChild(val);
+            el.appendChild(inc);
         }
 
         function renderSnapshotTable(trendData, instanceId) {
@@ -9274,8 +9289,8 @@
                 return;
             }
             var limit = _snapshotTableLimit || 12;
-            var displaySnaps = limit >= snaps.length ? snaps : snaps.slice(-limit);
-            renderSnapshotLimitPills(snaps.length);
+            var displaySnaps = snaps.slice(-limit);
+            renderSnapshotLimitStepper();
 
             // Collect all categories with weight > 0
             var categories = [];
