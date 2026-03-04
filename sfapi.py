@@ -10,6 +10,7 @@ import argparse
 import asyncio
 import base64
 import csv
+import hmac
 import html
 import json
 import logging
@@ -226,7 +227,7 @@ async def get_api_key(credentials: HTTPAuthorizationCredentials = Depends(securi
     config = get_app_config()
     api_key = config.get_config().get('__webaddr_apikey')
     
-    if api_key and credentials.credentials != api_key:
+    if api_key and not hmac.compare_digest(credentials.credentials, api_key):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key"
@@ -354,14 +355,27 @@ app = FastAPI(
 )
 
 # Add middleware
+_cors_origins_env = os.environ.get("ASMNG_CORS_ORIGINS", "http://127.0.0.1:5001")
+_cors_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately in production
+    allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# IP-level rate limiting via slowapi
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+except ImportError:
+    logger.warning("slowapi not installed — IP-level rate limiting disabled. Run: pip install slowapi")
 
 # Error handlers
 @app.exception_handler(HTTPException)
@@ -1024,6 +1038,15 @@ app.include_router(workspace_router, prefix="/api", tags=["workspaces"])
 app.include_router(data_router, prefix="/api", tags=["data"])
 app.include_router(config_router, prefix="/api", tags=["configuration"])
 app.include_router(websocket_router, prefix="/ws", tags=["websockets"])
+
+# External API routers (hardened, public-facing via nginx /v1/ext/*)
+try:
+    from spiderfoot.ext_api import ext_router, admin_router
+    app.include_router(ext_router, prefix="/v1/ext", tags=["External API"])
+    app.include_router(admin_router, prefix="/v1/admin", tags=["Admin (localhost-only)"])
+    logger.info("External API routers mounted at /v1/ext and /v1/admin")
+except Exception as _ext_err:
+    logger.warning(f"Could not mount external API routers: {_ext_err}")
 
 # Main function to run the API
 def main():

@@ -2,11 +2,11 @@
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/0x31i/asm-ng/master/LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.9+-green)](https://www.python.org)
-[![Stable Release](https://img.shields.io/badge/version-5.2.9-blue.svg)](https://github.com/0x31i/asm-ng/releases/tag/v5.2.9)
+[![Stable Release](https://img.shields.io/badge/version-5.3.0-blue.svg)](https://github.com/0x31i/asm-ng/releases/tag/v5.3.0)
 [![Last Commit](https://img.shields.io/github/last-commit/0x31i/asm-ng)](https://github.com/0x31i/asm-ng/commits/master)
 ![Active Development](https://img.shields.io/badge/Maintenance%20Level-Actively%20Developed-brightgreen.svg)
 
-**ASM-NG** is a production-ready attack surface management and OSINT platform. Built on a battle-tested scanning engine with 280+ modules, it extends far beyond traditional OSINT with **workspace management**, **security grading**, **dark web exposure monitoring**, **AI/ML infrastructure discovery**, **false positive tracking**, **known asset management**, **external vulnerability tool integration** (Burp Suite Pro, Nessus Pro, Nuclei), **PostgreSQL database backend**, and **multi-layered cross-scan correlation** — making intelligence data truly navigable and actionable.
+**ASM-NG** is a production-ready attack surface management and OSINT platform. Built on a battle-tested scanning engine with 288+ modules, it extends far beyond traditional OSINT with **workspace management**, **security grading**, **dark web exposure monitoring**, **AI/ML infrastructure discovery**, **false positive tracking**, **known asset management**, **external vulnerability tool integration** (Burp Suite Pro, Nessus Pro, Nuclei), **PostgreSQL database backend**, **multi-layered cross-scan correlation**, and a **hardened external API for trusted third-party vendor integrations** — making intelligence data truly navigable, actionable, and shareable.
 
 ASM-NG features an embedded web server with a clean, modern interface and can also be used entirely via the command line. Written in **Python 3** and **MIT-licensed**.
 
@@ -35,6 +35,9 @@ ASM-NG is a ground-up transformation of SpiderFoot into a full attack surface ma
 | **Database** | SQLite only | PostgreSQL with auto-setup, connection pooling, and 64 concurrent connections |
 | **AI/ML Discovery** | None | 3 modules for external AI infrastructure fingerprinting, AI subdomain discovery, and embedded AI detection |
 | **Dark Web Exposure** | None | 11 new modules + 16 enhanced modules for dark web monitoring, breach detection, ransomware leak sites, infostealer logs, brand impersonation, and threat intel feeds |
+| **External Vendor API** | None | Hardened 7-layer external API for trusted third-party integrations (AI SOC agents, SIEMs, automation) |
+| **Manual Grade Entry** | None | Analysts can manually enter historical grade snapshots (score, category breakdown, label, date) |
+| **Analyst Annotations** | None | Per-finding row notes and per-event-type comments that persist across scans |
 | **Modules** | ~200 | 288 modules including AI recon, dark web exposure, security hardening, and threat intel modules |
 | **Correlation Rules** | 37 YAML rules | 56 YAML rules + automated single-scan and cross-scan correlation |
 
@@ -96,6 +99,7 @@ Every scan gets an overall letter grade (A through F) based on a weighted analys
 |---|---|---|
 | Network Security | 1.0 | Open ports, CVEs, internal IP exposure, defacements |
 | Web App Security | 1.0 | Web vulnerabilities, forms, uploads, frameworks |
+| AI Security | 0.9 | Unauthenticated AI endpoints, exposed models, leaked AI API keys |
 | Information Leakage | 0.8 | Exposed credentials, emails, personal data, passwords |
 | General Health | 0.8 | SSL certificates, code repos, coordinates, app stores |
 | External Account Exposure | 0.7 | External accounts, social media, compromised accounts |
@@ -111,6 +115,18 @@ Every scan gets an overall letter grade (A through F) based on a weighted analys
 - `informational` — no penalty, purely informational
 
 **Fully configurable** — override category weights, event type rules, and grade thresholds via JSON settings.
+
+**Manual grade entry** — analysts can manually record a grade snapshot for a target on any date without running a new scan. Useful for entering baseline grades for clients, recording pre-engagement state, or capturing grades from external assessments. Each manual snapshot includes: overall score, per-category breakdown, label/description, and timestamp. Manual snapshots appear in grade history charts alongside scan-derived grades.
+
+---
+
+### Analyst Annotations
+
+Add context to findings that persists across every future scan of the same target.
+
+- **Row Notes** — free-text note on any individual finding (keyed by target + event type + data). Notes survive scan deletion and appear on re-discovery.
+- **Event Type Comments** — analyst commentary at the event type level (e.g., "all EMAILADDR_COMPROMISED for this client are in an old breach — monitoring only"). Visible whenever that event type appears in results.
+- Both annotation types are part of the audit trail and included in exports.
 
 ---
 
@@ -343,6 +359,77 @@ Multi-format, multi-scan export capabilities for professional reporting workflow
 
 ---
 
+### Enterprise External API
+
+Allow trusted third-party vendors — AI SOC agents, SIEMs, automation platforms — to query ASM-NG data without a VPN or Tailscale. The external API is a separate, hardened endpoint with seven stacked security layers.
+
+```
+Internet → nginx :443 → FastAPI :8001 (127.0.0.1 only)
+              │
+              ├─ /v1/ext/*  public (rate-limited, bearer-token auth)
+              └─ /v1/admin/* BLOCKED by nginx (localhost only)
+```
+
+**Seven security layers:**
+
+| Layer | Mechanism | Threat Stopped |
+|---|---|---|
+| TLS termination | nginx TLS 1.2/1.3 + HSTS | MITM, key sniffing |
+| IP rate limit | nginx 30 req/min per IP, burst=10 | DoS, brute-force scanning |
+| Admin block | nginx `deny all` on `/v1/admin/` | External admin access |
+| Key entropy | `asmng_ext_` + 30 urlsafe bytes (~240 bits) | Brute-force guessing |
+| Key hashing | SHA-256 stored; raw never written to DB | DB breach → no usable keys |
+| Constant-time compare | `hmac.compare_digest()` | Timing attacks on key check |
+| Key expiry | `expires_at` checked every request | Leaked/forgotten keys auto-expire |
+| IP allowlist | Per-key CIDR list | Stolen key used from wrong network |
+| Scope system | `assets:read`, `grades:read`, `findings:read` | Over-privileged access |
+| Target ACL | `allowed_targets` per key | Cross-client data leakage |
+| Per-key rate limit | In-app sliding-window token bucket | Key-level abuse |
+| Response whitelist | Pydantic models — explicit fields only | Internal IDs leaking |
+| Audit log | Every request logged with IP + client | Forensics, anomaly detection |
+
+**Available external endpoints:**
+
+```
+GET /v1/ext/health                                    → {"status":"ok"}
+GET /v1/ext/targets                                   → target list + current grade
+GET /v1/ext/targets/{target}/grade                    → latest grade snapshot
+GET /v1/ext/targets/{target}/grade/history?limit=12   → grade trend history
+GET /v1/ext/targets/{target}/assets                   → known asset inventory
+GET /v1/ext/targets/{target}/findings                 → validated findings (FPs never returned)
+GET /v1/ext/targets/{target}/findings/summary         → finding counts by type
+```
+
+**Key management:**
+
+```bash
+# Generate master encryption key (one-time server setup)
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# → Add to environment: ASMNG_EXT_KEY_MASTER=<output>
+
+# Create a vendor key via CLI
+python manage_ext_keys.py create \
+  --name "ACME SOC Agent" \
+  --targets "acmecorp.com,api.acmecorp.com" \
+  --scopes "assets:read,grades:read,findings:read" \
+  --ip-allowlist "203.0.113.0/24" \
+  --rpm 60 \
+  --expires "2027-01-01"
+# → Prints raw key ONCE — give it to the vendor
+
+python manage_ext_keys.py list
+python manage_ext_keys.py revoke --id <key_id>
+python manage_ext_keys.py audit  --id <key_id>
+```
+
+Keys can also be created and revoked from the web UI at **Settings → External API**.
+
+**Kill switch:** administrators can disable all external API access globally via the External API settings page or by setting `__ext_api_enabled=0` in the database config — without deleting any keys. Re-enabling restores all keys instantly.
+
+See the **[Vendor API Guide](documentation/vendor_api.md)** for the full integration reference including curl examples, response schemas, and Python client code.
+
+---
+
 ### Security Hardening
 
 - **Content Security Policy** — comprehensive CSP headers (script-src, style-src, img-src, connect-src, frame-src)
@@ -351,6 +438,9 @@ Multi-format, multi-scan export capabilities for professional reporting workflow
 - **Server header** — generic server identification
 - **Security hardening module** (`sfp__security_hardening`) — built-in security configuration module
 - **Enhanced input validation** — comprehensive sanitization across all endpoints
+- **CORS hardening** — configurable explicit origin list via `ASMNG_CORS_ORIGINS` (replaces the previous wildcard `*`)
+- **Timing attack protection** — internal API key comparisons use `hmac.compare_digest()` throughout
+- **IP-level rate limiting** — `slowapi` middleware enforces 200 req/min per IP on all FastAPI routes
 
 ---
 
@@ -372,7 +462,7 @@ ASM-NG uses **PostgreSQL** as its database backend, providing production-grade p
 3. Auto-probe localhost:5432 for running PostgreSQL
 4. Auto-setup attempt (first launch only, creates sentinel file)
 
-**New tables beyond SpiderFoot v4.0 (17 total):**
+**New tables beyond SpiderFoot v4.0:**
 
 | Table | Purpose |
 |---|---|
@@ -385,9 +475,15 @@ ASM-NG uses **PostgreSQL** as its database backend, providing production-grade p
 | `tbl_audit_log` | Audit trail with username, action, IP, timestamp |
 | `tbl_known_assets` | Known asset inventory (IPs, domains, employees) |
 | `tbl_asset_import_history` | Asset import operation history |
+| `tbl_grade_snapshots` | Per-scan grade snapshots (manual + automated) with per-category scores |
+| `tbl_ext_api_keys` | External vendor API keys (hashed + encrypted; raw key never stored) |
+| `tbl_analyst_type_comments` | Per-event-type analyst commentary, persisted across scans |
+| `tbl_analyst_row_notes` | Per-finding row-level analyst notes, persisted across scans |
+| `tbl_asset_tags` | Tags for asset grouping and filtering |
+| `tbl_saved_searches` | Saved search queries for the results table |
 
 Plus enhancements to existing tables:
-- `tbl_scan_results` — new `imported_from_scan` column for provenance tracking
+- `tbl_scan_results` — new `imported_from_scan` column for provenance tracking; `tracking` column for status
 - Comprehensive indexing on all new tables (25+ indexes) for query performance
 - Incremental auto-migration handles schema upgrades seamlessly
 
@@ -397,11 +493,13 @@ Plus enhancements to existing tables:
 
 ```mermaid
 graph TD;
-    A[User] -->|Web UI| B[ASM-NG Core Engine];
+    A[Analyst] -->|Web UI| B[ASM-NG Core Engine];
     A -->|CLI| B;
-    B --> C[277 Modules];
+    V[Vendor / SOC Agent] -->|External API /v1/ext| P[nginx TLS Termination];
+    P --> B;
+    B --> C[288 Modules];
     B --> D[Database - PostgreSQL];
-    B --> E[REST API];
+    B --> E[Internal REST API /api];
     B --> F[Workspace Manager];
     B --> G[Grading Engine];
     B --> H[Correlation Engine];
@@ -412,6 +510,9 @@ graph TD;
     B --> M[External Tool Import - Burp/Nessus/Nuclei];
     B --> N[Asset Manager];
     B --> O[Auth & Audit];
+    B --> Q[External API Layer];
+    Q --> R[Vendor Key Management];
+    Q --> S[Scope & Target ACL];
 ```
 
 ---
@@ -510,6 +611,13 @@ export ASMNG_PG_AUTO_SETUP=0
 # Tune connection pool (defaults shown)
 export ASMNG_PG_POOL_MAX=64
 export ASMNG_PG_POOL_TIMEOUT=120
+
+# External vendor API — required to use key management
+# Generate once: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+export ASMNG_EXT_KEY_MASTER=<your_fernet_key>
+
+# CORS origins for the FastAPI layer (comma-separated; default is localhost only)
+export ASMNG_CORS_ORIGINS="http://127.0.0.1:5001,https://your-domain.com"
 ```
 
 **Manual setup:**
@@ -594,6 +702,23 @@ You can target the following entities:
 **Admin:**
 - `GET /users` — user management
 - `GET /auditlog` — audit log viewer
+- `GET /extapi` — external API management page (admin only)
+
+**External Vendor API** (`/v1/ext/*` — public, bearer-token auth):
+- `GET /v1/ext/health` — health check
+- `GET /v1/ext/targets` — list authorized targets
+- `GET /v1/ext/targets/{target}/grade` — current grade snapshot
+- `GET /v1/ext/targets/{target}/grade/history` — grade history
+- `GET /v1/ext/targets/{target}/assets` — known asset inventory
+- `GET /v1/ext/targets/{target}/findings` — validated findings
+- `GET /v1/ext/targets/{target}/findings/summary` — finding counts by type
+
+**External API Key Management** (`/v1/admin/*` — localhost only, nginx blocks from internet):
+- `POST /v1/admin/ext-keys` — create vendor key (returns raw key once)
+- `GET /v1/admin/ext-keys` — list all keys
+- `DELETE /v1/admin/ext-keys/{key_id}` — revoke a key
+- `GET /v1/admin/ext-keys/{key_id}/audit` — per-key audit log
+- `GET /v1/admin/ext-keys/{key_id}/reveal` — decrypt key for admin
 
 ---
 
@@ -637,7 +762,8 @@ See the [Correlation Rules Reference](/correlations/README.md) and the [template
 - **[Installation Guide](documentation/installation.md)** — complete setup instructions
 - **[Quick Start Guide](documentation/quickstart.md)** — get scanning quickly
 - **[User Guide](documentation/user_guide.md)** — fundamental concepts and usage
-- **[API Documentation](documentation/api_reference.md)** — REST API reference
+- **[API Reference](documentation/api_reference.md)** — all four API surfaces (REST, External, Admin, Web UI)
+- **[Vendor API Guide](documentation/vendor_api.md)** — external vendor integration guide with curl examples and Python client code
 - **[Module Guide](documentation/modules.md)** — understanding modules
 - **In-app documentation** — accessible from the web UI at `/documentation`
 

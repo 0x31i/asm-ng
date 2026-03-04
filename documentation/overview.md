@@ -21,16 +21,19 @@ ASM-NG is designed for both beginners and advanced users, offering a user-friend
 ## Key Features
 
 - **Automated OSINT Collection:** Schedule and run scans to collect intelligence from a wide range of sources with minimal manual effort. ASM-NG can run unattended, making it ideal for continuous monitoring.
-- **277 Data Gathering Modules:** Integrate with threat feeds, search engines, social media, DNS, WHOIS, breach databases, paste sites, and more. Modules are regularly updated and community contributions are welcome.
+- **288 Data Gathering Modules:** Integrate with threat feeds, search engines, social media, DNS, WHOIS, breach databases, paste sites, and more. Modules are regularly updated and community contributions are welcome.
 - **AI/ML Infrastructure Discovery:** Detect and fingerprint exposed AI inference services (Ollama, Triton, vLLM, TorchServe, MLflow, BentoML, Gradio, and more), discover AI-related subdomains, and find embedded AI SDKs and leaked API keys in web content.
+- **Security Grading:** Every scan produces a letter grade (A–F) computed from a weighted average of 9 security categories (Network Security, Web App Security, AI Security, Information Leakage, General Health, External Account Exposure, DNS Health, IP Reputation, and Information/Reference). Analysts can also manually record historical grade snapshots without running a new scan.
+- **Enterprise External API:** Expose a hardened, publicly-accessible API endpoint for trusted third-party vendors — AI SOC agents, SIEMs, automation pipelines — with seven stacked security layers (TLS, IP rate limiting, per-vendor bearer tokens, key expiry, IP allowlist, scope enforcement, target ACL). False positives are never surfaced through the external API.
 - **Web UI and CLI:** Use the intuitive web interface for interactive investigations, visualization, and reporting, or the command-line interface for automation, scripting, and integration with other tools.
 - **Workspaces and Multi-Target Support:** Organize scans, targets, and results into workspaces for collaborative investigations and large-scale assessments. Workspaces allow you to manage multiple projects and share findings with your team.
+- **Known Asset Management:** Maintain a verified inventory of IPs, domains, and employees. Match scan results against your asset inventory, import in bulk from CSV/XLSX, and sync validated findings back into the asset database automatically.
+- **Analyst Annotations:** Add row-level notes and event-type-level commentary to findings. Annotations persist across scans and appear automatically whenever the same finding recurs.
 - **API for Integration:** Integrate ASM-NG with SIEM, SOAR, and other security tools using the RESTful API. Automate scans, retrieve results, and trigger actions based on findings.
-- **Correlation and Analysis:** Built-in correlation engine to identify relationships, patterns, and risks across collected data. Visualize connections between entities and uncover hidden threats.
+- **Correlation and Analysis:** Built-in three-layer correlation engine to identify relationships, patterns, and risks across collected data (YAML rule-based, single-scan IOC, and cross-scan historical correlation).
 - **Custom Module Support:** Easily extend ASM-NG with your own modules to support new data sources, custom logic, or proprietary integrations. The modular architecture makes development and maintenance straightforward.
-- **Notifications and Alerts:** Receive real-time notifications for critical findings, such as data breaches, exposed credentials, or new assets discovered.
-- **Export and Reporting:** Export scan results in multiple formats (CSV, JSON, HTML) for further analysis or reporting to stakeholders.
-- **Cross-Platform:** Runs on Windows, Linux, and macOS. Docker images are available for easy deployment.
+- **Export and Reporting:** Export scan results in multiple formats (CSV, JSON, XLSX, GEXF) for further analysis or reporting to stakeholders. Includes combined vulnerability exports (Nessus + Burp), findings exports, and known asset exports.
+- **Cross-Platform:** Runs on Linux and macOS. Docker images are available for easy deployment.
 
 ---
 
@@ -57,6 +60,7 @@ ASM-NG consists of the following main components:
 - **Third-party/vendor risk assessment:** Evaluate the security posture of partners, vendors, or acquisition targets by mapping their digital footprint.
 - **Red team and penetration test reconnaissance:** Automate the reconnaissance phase of security assessments, saving time and increasing coverage.
 - **Discovering exposed AI/ML infrastructure:** Identify unauthenticated AI inference endpoints, exposed models, leaked AI API keys, and shadow AI deployments across your external attack surface.
+- **Feeding AI SOC agents and automation platforms:** Grant a trusted third-party SOC agent or SIEM read-only access to asset inventory, security grades, and validated findings via the hardened external API — without VPN or Tailscale.
 - **Continuous monitoring:** Set up scheduled scans to keep track of changes in your attack surface and receive alerts for new findings.
 
 ---
@@ -69,6 +73,7 @@ ASM-NG consists of the following main components:
 - [Configuration](configuration.md): Customize ASM-NG to fit your needs, including API keys, module settings, and scan options.
 - [Modules](modules.md): Browse the full list of available modules and learn how to enable, configure, or develop your own.
 - [API Reference](api_reference.md): Integrate ASM-NG with other tools and automate your workflows using the RESTful API.
+- [Vendor API Guide](vendor_api.md): External API integration guide for trusted third-party vendors.
 - [Advanced Topics](advanced.md): Dive deeper into performance optimization, security, and deployment options.
 - [Developer Guide](developer_guide.md): Contribute to ASM-NG or build custom modules and integrations.
 - [FAQ](faq.md): Find answers to common questions and troubleshooting tips.
@@ -78,4 +83,4 @@ For more information, see the rest of the documentation or visit the [ASM-NG Git
 
 ---
 
-Authored by poppopjmp
+Maintained by 0x31i

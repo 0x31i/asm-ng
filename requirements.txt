@@ -58,3 +58,5 @@ imagehash>=4.3.1
 mmh3>=4.0
 h8mail>=2.5.6
 pymisp>=2.4.170
+slowapi>=0.5.1
+limits>=3.6.0

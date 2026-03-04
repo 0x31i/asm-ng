@@ -1278,6 +1278,34 @@ class SpiderFootDb:
                 except DatabaseError:
                     pass
 
+            # Migration: Create tbl_ext_api_keys table for external vendor API access
+            try:
+                self.dbh.execute("SELECT key_id FROM tbl_ext_api_keys LIMIT 1")
+            except DatabaseError:
+                try:
+                    self.dbh.execute(
+                        "CREATE TABLE IF NOT EXISTS tbl_ext_api_keys ( "
+                        "key_id VARCHAR NOT NULL PRIMARY KEY, "
+                        "key_hash VARCHAR NOT NULL UNIQUE, "
+                        "key_encrypted VARCHAR NOT NULL, "
+                        "client_name VARCHAR NOT NULL, "
+                        "scopes TEXT NOT NULL DEFAULT '[\"assets:read\",\"grades:read\",\"findings:read\"]', "
+                        "allowed_targets TEXT DEFAULT NULL, "
+                        "rate_limit_rpm INT NOT NULL DEFAULT 60, "
+                        "ip_allowlist TEXT DEFAULT NULL, "
+                        "active INT NOT NULL DEFAULT 1, "
+                        "created_at INT NOT NULL, "
+                        "last_used_at INT DEFAULT NULL, "
+                        "last_used_ip VARCHAR DEFAULT NULL, "
+                        "expires_at INT DEFAULT NULL, "
+                        "notes VARCHAR DEFAULT NULL "
+                        ")"
+                    )
+                    self.conn.commit()
+                    _log.info("Created tbl_ext_api_keys table")
+                except DatabaseError as e:
+                    _log.warning(f"Could not create tbl_ext_api_keys: {e}")
+
             # Restore normal transaction mode after migrations
             self.conn.autocommit = False
 
@@ -7815,3 +7843,217 @@ class SpiderFootDb:
                 return self.dbh.fetchall()
             except DatabaseError as e:
                 raise IOError("SQL error fetching full target validated entries") from e
+
+    # -------------------------------------------------------------------
+    # External API Key methods
+    # -------------------------------------------------------------------
+
+    def extApiKeyCreate(self, key_id: str, key_hash: str, key_encrypted: str,
+                        client_name: str, scopes: str, allowed_targets: str,
+                        rate_limit_rpm: int, ip_allowlist: str,
+                        expires_at: int, notes: str) -> None:
+        """Create a new external API key record.
+
+        Args:
+            key_id (str): UUID public identifier
+            key_hash (str): SHA-256 hex digest of raw key
+            key_encrypted (str): Fernet-encrypted raw key (for admin reveal)
+            client_name (str): human-readable vendor/client name
+            scopes (str): JSON array of permitted scopes
+            allowed_targets (str): JSON array of targets or None for all
+            rate_limit_rpm (int): per-minute request limit for this key
+            ip_allowlist (str): JSON CIDR list or None for any IP
+            expires_at (int): epoch ms expiry or None for never
+            notes (str): optional notes
+        """
+        created_at = int(time.time() * 1000)
+        qry = ("INSERT INTO tbl_ext_api_keys "
+               "(key_id, key_hash, key_encrypted, client_name, scopes, "
+               "allowed_targets, rate_limit_rpm, ip_allowlist, active, "
+               "created_at, expires_at, notes) "
+               "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)")
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [key_id, key_hash, key_encrypted,
+                                       client_name, scopes, allowed_targets,
+                                       rate_limit_rpm, ip_allowlist,
+                                       created_at, expires_at, notes])
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error creating external API key") from e
+
+    def extApiKeyLookup(self, raw_key: str) -> dict:
+        """Look up an external API key by the raw key value.
+
+        Hashes the raw key with SHA-256 and performs a constant-time
+        comparison to prevent timing attacks.
+
+        Args:
+            raw_key (str): the raw API key provided by the caller
+
+        Returns:
+            dict: key record (without key_encrypted) or None if not found/invalid
+        """
+        import hashlib
+        import hmac
+        candidate_hash = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+
+        qry = ("SELECT key_id, key_hash, client_name, scopes, allowed_targets, "
+               "rate_limit_rpm, ip_allowlist, active, created_at, "
+               "last_used_at, last_used_ip, expires_at, notes "
+               "FROM tbl_ext_api_keys WHERE key_hash = ?")
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [candidate_hash])
+                row = self.dbh.fetchone()
+            except DatabaseError as e:
+                raise IOError("SQL error looking up external API key") from e
+
+        if not row:
+            return None
+
+        stored_hash = row[1]
+        # Constant-time comparison of hex digests
+        if not hmac.compare_digest(candidate_hash, stored_hash):
+            return None
+
+        return {
+            "key_id": row[0],
+            "key_hash": row[1],
+            "client_name": row[2],
+            "scopes": row[3],
+            "allowed_targets": row[4],
+            "rate_limit_rpm": row[5],
+            "ip_allowlist": row[6],
+            "active": row[7],
+            "created_at": row[8],
+            "last_used_at": row[9],
+            "last_used_ip": row[10],
+            "expires_at": row[11],
+            "notes": row[12],
+        }
+
+    def extApiKeyGetEncrypted(self, key_id: str) -> str:
+        """Fetch only the Fernet-encrypted key blob for admin reveal.
+
+        Kept separate from extApiKeyLookup so that key_encrypted is never
+        returned in the auth hot path.
+
+        Args:
+            key_id (str): the key UUID
+
+        Returns:
+            str: encrypted key blob or None if not found
+        """
+        qry = "SELECT key_encrypted FROM tbl_ext_api_keys WHERE key_id = ?"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [key_id])
+                row = self.dbh.fetchone()
+                return row[0] if row else None
+            except DatabaseError as e:
+                raise IOError("SQL error fetching encrypted external API key") from e
+
+    def extApiKeyUpdateLastUsed(self, key_id: str, ip: str) -> None:
+        """Update last_used_at and last_used_ip for a key.
+
+        Args:
+            key_id (str): the key UUID
+            ip (str): the caller's IP address
+        """
+        now = int(time.time() * 1000)
+        qry = ("UPDATE tbl_ext_api_keys SET last_used_at = ?, last_used_ip = ? "
+               "WHERE key_id = ?")
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [now, ip, key_id])
+                self.conn.commit()
+            except DatabaseError:
+                pass  # Non-critical — don't fail the request
+
+    def extApiKeyList(self) -> list:
+        """List all external API key records (no hash or encrypted fields).
+
+        Returns:
+            list: list of dicts with key metadata
+        """
+        qry = ("SELECT key_id, client_name, scopes, allowed_targets, "
+               "rate_limit_rpm, ip_allowlist, active, created_at, "
+               "last_used_at, last_used_ip, expires_at, notes "
+               "FROM tbl_ext_api_keys ORDER BY created_at DESC")
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry)
+                rows = self.dbh.fetchall()
+            except DatabaseError as e:
+                raise IOError("SQL error listing external API keys") from e
+
+        result = []
+        for row in rows:
+            result.append({
+                "key_id": row[0],
+                "client_name": row[1],
+                "scopes": row[2],
+                "allowed_targets": row[3],
+                "rate_limit_rpm": row[4],
+                "ip_allowlist": row[5],
+                "active": row[6],
+                "created_at": row[7],
+                "last_used_at": row[8],
+                "last_used_ip": row[9],
+                "expires_at": row[10],
+                "notes": row[11],
+            })
+        return result
+
+    def extApiKeyRevoke(self, key_id: str) -> bool:
+        """Soft-delete a key by setting active = 0.
+
+        Args:
+            key_id (str): the key UUID
+
+        Returns:
+            bool: True if a row was affected, False if key not found
+        """
+        qry = "UPDATE tbl_ext_api_keys SET active = 0 WHERE key_id = ?"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [key_id])
+                self.conn.commit()
+                return self.dbh.rowcount > 0
+            except DatabaseError as e:
+                raise IOError("SQL error revoking external API key") from e
+
+    def extApiKeyAuditEntries(self, key_id: str, limit: int = 100) -> list:
+        """Return audit log entries for a specific external API key.
+
+        The key_id is stored in the ``username`` column of tbl_audit_log.
+
+        Args:
+            key_id (str): the key UUID
+            limit (int): max entries to return
+
+        Returns:
+            list: list of dicts with audit log fields
+        """
+        qry = ("SELECT username, action, detail, ip_address, created "
+               "FROM tbl_audit_log WHERE username = ? "
+               "ORDER BY created DESC LIMIT ?")
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [key_id, limit])
+                rows = self.dbh.fetchall()
+            except DatabaseError as e:
+                raise IOError("SQL error fetching ext API key audit entries") from e
+
+        return [
+            {
+                "key_id": row[0],
+                "action": row[1],
+                "detail": row[2],
+                "ip_address": row[3],
+                "created": row[4],
+            }
+            for row in rows
+        ]

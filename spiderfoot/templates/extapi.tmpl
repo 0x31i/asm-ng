@@ -1,0 +1,395 @@
+<%include file="HEADER.tmpl"/>
+<style>
+.extapi-section { margin-bottom: 28px; }
+.extapi-toggle-row { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+.toggle-switch { position: relative; display: inline-block; width: 56px; height: 28px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+    position: absolute; cursor: pointer; inset: 0;
+    background-color: #555; border-radius: 28px;
+    transition: .3s;
+}
+.toggle-slider:before {
+    position: absolute; content: "";
+    height: 22px; width: 22px; left: 3px; bottom: 3px;
+    background-color: white; border-radius: 50%;
+    transition: .3s;
+}
+input:checked + .toggle-slider { background-color: #27ae60; }
+input:checked + .toggle-slider:before { transform: translateX(28px); }
+.key-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.key-table th, .key-table td { padding: 8px 10px; border-bottom: 1px solid #2a2a2a; text-align: left; vertical-align: top; }
+.key-table th { background: #1a1a1a; color: #aaa; font-weight: 600; }
+.key-table tr:hover { background: #1e1e1e; cursor: pointer; }
+.key-masked { color: #666; letter-spacing: 2px; }
+.key-reveal-btn { background: none; border: none; color: #5bc0de; cursor: pointer; padding: 0 4px; font-size: 14px; }
+.badge-scope { display: inline-block; background: #264a7a; color: #7ab3f5; padding: 1px 6px; border-radius: 3px; font-size: 11px; margin: 1px; }
+.badge-active { color: #27ae60; font-weight: bold; }
+.badge-revoked { color: #e74c3c; font-weight: bold; }
+.drawer-row { background: #141414 !important; }
+.drawer-row td { padding: 14px 18px; font-size: 12px; color: #999; }
+.audit-mini { margin-top: 8px; font-family: monospace; font-size: 11px; color: #666; }
+.audit-mini li { list-style: none; padding: 2px 0; }
+#createKeyModal .modal-body label { font-size: 13px; color: #bbb; }
+#createKeyModal .modal-body input, #createKeyModal .modal-body select { background: #1a1a1a; border: 1px solid #333; color: #eee; }
+.raw-key-box {
+    background: #0a1a0a; border: 1px solid #27ae60; border-radius: 6px;
+    padding: 14px; font-family: monospace; font-size: 13px;
+    word-break: break-all; color: #2ecc71; margin-top: 10px;
+}
+.warning-banner { background: #2d1a00; border-left: 4px solid #e67e22; padding: 10px 14px; border-radius: 4px; color: #e67e22; margin-bottom: 10px; font-size: 13px; }
+</style>
+
+<div class="container-fluid">
+<div class="row">
+  <div class="col-md-12">
+
+    <div style="margin-bottom: 18px;">
+      <a href="${docroot}/opts" class="btn btn-default btn-sm"><i class="glyphicon glyphicon-arrow-left"></i> Back to Settings</a>
+      <span style="margin-left: 14px; font-size: 20px; font-weight: 600; color: #eee;">External API</span>
+      <span style="margin-left: 10px; color: #666; font-size: 13px;">Trusted third-party vendor access management</span>
+    </div>
+
+    <!-- MASTER KILL SWITCH -->
+    <div class="panel panel-default extapi-section">
+      <div class="panel-heading"><strong>Master Switch</strong></div>
+      <div class="panel-body">
+        <div class="extapi-toggle-row">
+          <label class="toggle-switch">
+            <input type="checkbox" id="extApiEnabled" ${'' if ext_api_enabled else 'checked'}>
+            <span class="toggle-slider"></span>
+          </label>
+          <span id="toggleLabel" style="font-weight:600; font-size:15px;">
+            ${'ENABLED' if ext_api_enabled else 'DISABLED'}
+          </span>
+        </div>
+        <ul style="color:#888; font-size:12px; margin:8px 0 0 0; padding-left:18px;">
+          <li>When disabled: all <code>/v1/ext/*</code> endpoints return 503</li>
+          <li>Existing API keys remain in DB (not deleted) — re-enabling restores access instantly</li>
+          <li>Admin key management (<code>/v1/admin/*</code>) is unaffected by this switch</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- VENDOR API KEYS TABLE -->
+    <div class="panel panel-default extapi-section">
+      <div class="panel-heading" style="display:flex; justify-content:space-between; align-items:center;">
+        <strong>Vendor API Keys</strong>
+        <button class="btn btn-success btn-sm" data-toggle="modal" data-target="#createKeyModal">
+          <i class="glyphicon glyphicon-plus"></i> Add Key
+        </button>
+      </div>
+      <div class="panel-body" style="padding:0;">
+        % if not keys:
+        <div style="padding:24px; color:#666; text-align:center;">No vendor keys configured yet.</div>
+        % else:
+        <table class="key-table">
+          <thead>
+            <tr>
+              <th>Client Name</th>
+              <th>Scopes</th>
+              <th>Targets</th>
+              <th>Rate (RPM)</th>
+              <th>Expires</th>
+              <th>Status</th>
+              <th>Last Used</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="keyTableBody">
+          % for key in keys:
+          <%
+            import json as _json
+            _scopes = []
+            try: _scopes = _json.loads(key.get('scopes') or '[]')
+            except: pass
+            _targets = None
+            try: _targets = _json.loads(key.get('allowed_targets') or 'null')
+            except: pass
+            _expires = key.get('expires_at')
+            _expires_str = 'Never' if not _expires else str(_expires)
+            _last_used = key.get('last_used_at')
+            _last_used_str = 'Never' if not _last_used else str(_last_used)
+            _active = key.get('active', 0)
+          %>
+          <tr class="key-row" data-keyid="${key['key_id']}" onclick="toggleDrawer('${key['key_id']}')">
+            <td><strong>${key['client_name']}</strong></td>
+            <td>
+              % for s in _scopes:
+              <span class="badge-scope">${s}</span>
+              % endfor
+            </td>
+            <td>${'ALL' if not _targets else (', '.join(_targets[:2]) + ('...' if len(_targets) > 2 else ''))}</td>
+            <td>${key.get('rate_limit_rpm', 60)}</td>
+            <td>${_expires_str}</td>
+            <td>
+              % if _active:
+              <span class="badge-active">Active</span>
+              % else:
+              <span class="badge-revoked">Revoked</span>
+              % endif
+            </td>
+            <td>${_last_used_str}</td>
+            <td>
+              % if _active:
+              <button class="btn btn-xs btn-danger" onclick="event.stopPropagation(); revokeKey('${key['key_id']}', '${key['client_name']}')">×</button>
+              % endif
+            </td>
+          </tr>
+          <tr id="drawer-${key['key_id']}" class="drawer-row" style="display:none;">
+            <td colspan="8">
+              <strong>Key ID:</strong> <code>${key['key_id']}</code><br>
+              <strong>Raw Key:</strong>
+              <span class="key-masked" id="raw-${key['key_id']}">••••••••••••••••••••</span>
+              <button class="key-reveal-btn" title="Reveal key" onclick="revealKey('${key['key_id']}')">👁</button>
+              <br>
+              <strong>Last used IP:</strong> ${key.get('last_used_ip') or 'N/A'}<br>
+              <strong>All scopes:</strong> ${', '.join(_scopes)}<br>
+              <strong>IP Allowlist:</strong>
+              <%
+                _ip = key.get('ip_allowlist')
+                _ip_str = 'Any'
+                try:
+                  _ip_parsed = _json.loads(_ip) if _ip else None
+                  if _ip_parsed: _ip_str = ', '.join(_ip_parsed)
+                except: pass
+              %>
+              ${_ip_str}<br>
+              <div class="audit-mini" id="audit-${key['key_id']}">
+                <em>Click row to expand — audit log loads here</em>
+              </div>
+            </td>
+          </tr>
+          % endfor
+          </tbody>
+        </table>
+        % endif
+      </div>
+    </div>
+
+  </div><!-- col -->
+</div><!-- row -->
+</div><!-- container -->
+
+<!-- CREATE KEY MODAL -->
+<div class="modal fade" id="createKeyModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content" style="background:#1e1e1e; color:#eee; border:1px solid #333;">
+      <div class="modal-header" style="border-bottom:1px solid #333;">
+        <button type="button" class="close" data-dismiss="modal" style="color:#eee;">&times;</button>
+        <h4 class="modal-title">Create Vendor API Key</h4>
+      </div>
+      <div class="modal-body" id="createModalBody">
+        <div id="createForm">
+          <div class="form-group">
+            <label>Vendor / Client Name *</label>
+            <input type="text" class="form-control" id="newClientName" placeholder="ACME SOC">
+          </div>
+          <div class="form-group">
+            <label>Allowed Targets <small>(comma-separated; blank = ALL)</small></label>
+            <input type="text" class="form-control" id="newTargets" placeholder="fhcsd.org, client2.org">
+          </div>
+          <div class="form-group">
+            <label>Scopes</label><br>
+            <label><input type="checkbox" name="scope" value="assets:read" checked> assets:read</label>&nbsp;
+            <label><input type="checkbox" name="scope" value="grades:read" checked> grades:read</label>&nbsp;
+            <label><input type="checkbox" name="scope" value="findings:read" checked> findings:read</label>
+          </div>
+          <div class="form-group">
+            <label>IP Allowlist <small>(CIDR; blank = any IP)</small></label>
+            <input type="text" class="form-control" id="newIpAllowlist" placeholder="203.0.113.0/24">
+          </div>
+          <div class="form-group">
+            <label>Rate Limit (req/min)</label>
+            <input type="number" class="form-control" id="newRpm" value="60" min="1" max="1000">
+          </div>
+          <div class="form-group">
+            <label>Expires <small>(YYYY-MM-DD; blank = never)</small></label>
+            <input type="text" class="form-control" id="newExpires" placeholder="2027-01-01">
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <input type="text" class="form-control" id="newNotes" placeholder="AI SOC integration">
+          </div>
+        </div>
+        <div id="createdKeyBox" style="display:none;">
+          <div class="warning-banner">⚠ <strong>COPY YOUR KEY NOW</strong> — it will never be shown again.</div>
+          <div class="raw-key-box" id="createdRawKey"></div>
+          <button class="btn btn-success btn-sm" style="margin-top:10px;" onclick="copyRawKey()">
+            📋 Copy Key
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid #333;">
+        <button type="button" class="btn btn-default" data-dismiss="modal" id="createCancelBtn">Cancel</button>
+        <button type="button" class="btn btn-success" id="generateKeyBtn" onclick="generateKey()">Generate Key</button>
+        <button type="button" class="btn btn-primary" id="createDoneBtn" style="display:none;" onclick="doneCreating()">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Toggle kill switch
+document.getElementById('extApiEnabled').addEventListener('change', function() {
+  var enabled = this.checked;
+  document.getElementById('toggleLabel').textContent = enabled ? 'ENABLED' : 'DISABLED';
+  fetch('${docroot}/extapisave', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({enabled: enabled ? '1' : '0'})
+  }).then(r => r.json()).then(function(data) {
+    if (!data.ok) {
+      alert('Failed to save kill switch state: ' + (data.error || 'unknown error'));
+    }
+  }).catch(function(e) {
+    alert('Network error saving kill switch: ' + e);
+  });
+});
+
+// Toggle row drawer
+var _drawerAuditLoaded = {};
+function toggleDrawer(keyId) {
+  var drawer = document.getElementById('drawer-' + keyId);
+  if (drawer.style.display === 'none') {
+    drawer.style.display = '';
+    if (!_drawerAuditLoaded[keyId]) {
+      loadAudit(keyId);
+      _drawerAuditLoaded[keyId] = true;
+    }
+  } else {
+    drawer.style.display = 'none';
+  }
+}
+
+function loadAudit(keyId) {
+  var el = document.getElementById('audit-' + keyId);
+  fetch('${docroot}/extapikeyaudit?id=' + encodeURIComponent(keyId) + '&limit=5')
+    .then(r => r.json())
+    .then(function(data) {
+      if (!data || !data.entries || data.entries.length === 0) {
+        el.innerHTML = '<em>No audit entries yet.</em>';
+        return;
+      }
+      var html = '<strong>Recent activity:</strong><ul>';
+      data.entries.forEach(function(e) {
+        html += '<li>' + e.action + ' — ' + (e.ip_address || '?') + ' — ' + new Date(e.created).toLocaleString() + '</li>';
+      });
+      html += '</ul>';
+      el.innerHTML = html;
+    }).catch(function() {
+      el.innerHTML = '<em>Could not load audit log.</em>';
+    });
+}
+
+// Reveal raw key for an existing key
+function revealKey(keyId) {
+  var el = document.getElementById('raw-' + keyId);
+  if (el.dataset.revealed) {
+    el.textContent = '••••••••••••••••••••';
+    delete el.dataset.revealed;
+    return;
+  }
+  fetch('${docroot}/extapikeyreveal?id=' + encodeURIComponent(keyId))
+    .then(r => r.json())
+    .then(function(data) {
+      if (data.raw_key) {
+        el.textContent = data.raw_key;
+        el.dataset.revealed = '1';
+      } else {
+        alert('Could not reveal key: ' + (data.error || 'unknown'));
+      }
+    }).catch(function(e) { alert('Error: ' + e); });
+}
+
+// Generate new key
+function generateKey() {
+  var name = document.getElementById('newClientName').value.trim();
+  if (!name) { alert('Vendor name is required.'); return; }
+
+  var scopes = [];
+  document.querySelectorAll('input[name="scope"]:checked').forEach(function(cb) { scopes.push(cb.value); });
+  if (!scopes.length) { alert('Select at least one scope.'); return; }
+
+  var targetsRaw = document.getElementById('newTargets').value.trim();
+  var targets = targetsRaw ? targetsRaw.split(',').map(s => s.trim()).filter(Boolean) : null;
+
+  var ipRaw = document.getElementById('newIpAllowlist').value.trim();
+  var ipAllowlist = ipRaw ? ipRaw.split(',').map(s => s.trim()).filter(Boolean) : null;
+
+  var expiresStr = document.getElementById('newExpires').value.trim();
+  var expiresAt = null;
+  if (expiresStr) {
+    var d = new Date(expiresStr + 'T00:00:00Z');
+    if (isNaN(d)) { alert('Invalid expires date. Use YYYY-MM-DD.'); return; }
+    expiresAt = d.getTime();
+  }
+
+  document.getElementById('generateKeyBtn').disabled = true;
+  document.getElementById('generateKeyBtn').textContent = 'Creating…';
+
+  fetch('${docroot}/extapicreatekey', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      client_name: name,
+      scopes: scopes,
+      allowed_targets: targets,
+      ip_allowlist: ipAllowlist,
+      rate_limit_rpm: parseInt(document.getElementById('newRpm').value) || 60,
+      expires_at: expiresAt,
+      notes: document.getElementById('newNotes').value.trim() || null
+    })
+  }).then(r => r.json()).then(function(data) {
+    if (data.raw_key) {
+      document.getElementById('createdRawKey').textContent = data.raw_key;
+      document.getElementById('createForm').style.display = 'none';
+      document.getElementById('createdKeyBox').style.display = '';
+      document.getElementById('generateKeyBtn').style.display = 'none';
+      document.getElementById('createCancelBtn').style.display = 'none';
+      document.getElementById('createDoneBtn').style.display = '';
+    } else {
+      alert('Error creating key: ' + (data.error || JSON.stringify(data)));
+      document.getElementById('generateKeyBtn').disabled = false;
+      document.getElementById('generateKeyBtn').textContent = 'Generate Key';
+    }
+  }).catch(function(e) {
+    alert('Network error: ' + e);
+    document.getElementById('generateKeyBtn').disabled = false;
+    document.getElementById('generateKeyBtn').textContent = 'Generate Key';
+  });
+}
+
+function copyRawKey() {
+  var key = document.getElementById('createdRawKey').textContent;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(key).then(function() { alert('Key copied to clipboard!'); });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = key;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    alert('Key copied!');
+  }
+}
+
+function doneCreating() {
+  document.getElementById('createKeyModal').querySelector('[data-dismiss="modal"]').click();
+  location.reload();
+}
+
+// Revoke a key
+function revokeKey(keyId, name) {
+  if (!confirm('Revoke API key for "' + name + '"?\n\nThis will immediately block all requests using this key. The key record is preserved for audit purposes.')) return;
+  fetch('${docroot}/extapirevoke?id=' + encodeURIComponent(keyId))
+    .then(r => r.json())
+    .then(function(data) {
+      if (data.ok) { location.reload(); }
+      else { alert('Failed to revoke: ' + (data.error || 'unknown')); }
+    }).catch(function(e) { alert('Error: ' + e); });
+}
+</script>
+
+<%include file="FOOTER.tmpl"/>
