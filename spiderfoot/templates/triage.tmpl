@@ -456,6 +456,30 @@ import json as _json
     </div>
 </div>
 
+<!-- ── APPLY SUCCESS MODAL ───────────────────────────────────────── -->
+<div class="triage-modal-overlay" id="triage-apply-modal" onclick="if(event.target===this)this.classList.remove('active')">
+    <div class="triage-modal">
+        <div class="triage-modal-hdr">
+            <span class="triage-modal-hdr-label">Triage Applied Successfully</span>
+            <button class="triage-modal-close" onclick="document.getElementById('triage-apply-modal').classList.remove('active');">&times;</button>
+        </div>
+        <div class="triage-modal-body">
+            <div class="step">
+                <span class="step-num" style="background:var(--accent-green);">&#10003;</span>
+                <span class="step-text" id="apply-summary-text"></span>
+            </div>
+            <div style="margin:20px 0; text-align:center;">
+                <a id="apply-scan-link" href="#" class="btn-triage-export" style="display:inline-block; text-decoration:none; padding:12px 28px; font-size:13px;">
+                    <i class="glyphicon glyphicon-arrow-right" style="margin-right:8px;"></i>JUMP TO SCAN RESULTS
+                </a>
+            </div>
+            <div class="step-done">
+                &#10003; Classifications saved — scan results updated
+            </div>
+        </div>
+    </div>
+</div>
+
 <script type="text/javascript">
 (function() {
     "use strict";
@@ -512,6 +536,21 @@ import json as _json
             document.getElementById('triage-cmd-block').classList.remove('copied');
             document.getElementById('triage-export-modal').classList.add('active');
         }, 800);
+    };
+
+    window.triageShowApplySuccess = function(resp) {
+        var fp = resp.applied.fp || 0;
+        var legit = resp.applied.legit || 0;
+        var review = resp.applied.review || 0;
+        var scanId = resp.scan_id || '';
+        var scanName = resp.scan_name || scanId;
+        document.getElementById('apply-summary-text').innerHTML =
+            '<strong>' + fp.toLocaleString() + '</strong> marked as false positive, ' +
+            '<strong>' + legit.toLocaleString() + '</strong> validated, ' +
+            '<strong>' + review.toLocaleString() + '</strong> left for review' +
+            (scanName ? ' on <strong>' + htmlEscape(scanName) + '</strong>' : '');
+        document.getElementById('apply-scan-link').href = docroot + '/scaninfo?id=' + encodeURIComponent(scanId);
+        document.getElementById('triage-apply-modal').classList.add('active');
     };
 
     window.triageCopyCmd = function() {
@@ -658,17 +697,14 @@ import json as _json
             dataType: 'json',
             success: function(resp) {
                 if (resp.success) {
-                    alertify.success(
-                        'Triage applied: ' + (resp.applied.fp || 0) + ' FP, ' +
-                        (resp.applied.legit || 0) + ' validated, ' +
-                        (resp.applied.review || 0) + ' skipped (REVIEW)'
-                    );
                     triageLoadHistory();
                     // Reset import UI
                     _importData = null;
                     document.getElementById('triage-import-preview').style.display = 'none';
                     dz.querySelector('.triage-dropzone-text').textContent = 'Drop triage results file here or click to browse';
                     dz.querySelector('.triage-dropzone-sub').textContent = 'Accepts triage_output_*.json from Claude Code';
+                    // Show success modal with link to scan
+                    triageShowApplySuccess(resp);
                 } else {
                     alertify.error('Triage import failed: ' + (resp.error || 'unknown error'));
                 }
@@ -712,10 +748,13 @@ import json as _json
             var tbody = document.getElementById('triage-history-tbody');
             tbody.innerHTML = '';
             data.history.forEach(function(h) {
+                var scanLink = h.scan_id
+                    ? '<a href="' + docroot + '/scaninfo?id=' + htmlEscape(h.scan_id) + '" style="color:var(--accent-green); text-decoration:none; font-weight:700;">' + htmlEscape(h.scan_name || h.scan_id) + '</a>'
+                    : htmlEscape(h.scan_name || '');
                 tbody.innerHTML +=
                     '<tr>' +
                     '<td>' + htmlEscape(h.date || '') + '</td>' +
-                    '<td>' + htmlEscape(h.scan_name || '') + '</td>' +
+                    '<td>' + scanLink + '</td>' +
                     '<td>' + htmlEscape(h.target || '') + '</td>' +
                     '<td class="cls-fp">' + (h.fp || 0) + '</td>' +
                     '<td class="cls-legit">' + (h.legit || 0) + '</td>' +

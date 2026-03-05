@@ -12232,6 +12232,8 @@ This is a placeholder MCP report. Integration with actual MCP server required.
 
         return {
             'success': True,
+            'scan_id': scan_id,
+            'scan_name': scan_name,
             'applied': applied,
             'errors': parsed.get('errors', []),
         }
@@ -12258,6 +12260,7 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             applied_at = row[8] if len(row) > 8 else 0
             history.append({
                 'date': time.strftime("%Y-%m-%d %H:%M", time.localtime(applied_at / 1000)) if applied_at else '',
+                'scan_id': row[1] or '',
                 'scan_name': row[3] or '',
                 'target': row[2] or '',
                 'fp': row[4] or 0,
