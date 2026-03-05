@@ -126,6 +126,16 @@
         <span class="nav-text">Settings</span>
       </a>
     </li>
+    <li
+% if pageid == "TRIAGE":
+    class="active"
+% endif
+    >
+      <a id="nav-link-triage" href="${docroot}/triage">
+        <i class="glyphicon glyphicon-check nav-icon"></i>
+        <span class="nav-text">Triage</span>
+      </a>
+    </li>
 % endif
   </ul>
 

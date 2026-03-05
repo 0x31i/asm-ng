@@ -66,6 +66,7 @@ from spiderfoot.excel_styles import (
     CATEGORY_TAB_COLORS,
     _safe_str,
 )
+from spiderfoot.triage_prompt import build_triage_export, parse_triage_import
 
 # Use a spawn context for scan subprocesses only, rather than setting it
 # globally.  The global setting forces mp.Queue() (used for logging) to use
@@ -12032,3 +12033,237 @@ This is a placeholder MCP report. Integration with actual MCP server required.
         except Exception as e:
             self.log.error(f"Error getting workspace scan results: {e}")
             return {'success': False, 'error': str(e)}
+
+    # ── AI Triage ──────────────────────────────────────────────────
+
+    @cherrypy.expose
+    def triage(self: 'SpiderFootWebUi') -> str:
+        """Render the AI Triage page.
+
+        Returns:
+            str: triage page HTML
+        """
+        self.requireAuth()
+        self.requireAdmin()
+
+        with SpiderFootDb(self.config) as dbh:
+            scans = dbh.scanInstanceList() or []
+
+        templ = Template(
+            filename='spiderfoot/templates/triage.tmpl',
+            lookup=self.lookup)
+        return templ.render(
+            scans=scans,
+            pageid='TRIAGE',
+            docroot=self.docroot,
+            version=__version__,
+            user_role=self.currentUserRole(),
+        )
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def triagecounts(self: 'SpiderFootWebUi', id: str = None) -> dict:
+        """Get result counts for a scan to display in the triage export panel.
+
+        Args:
+            id: scan instance ID
+
+        Returns:
+            dict: {success, counts: {total, unreviewed, fp, validated, known_assets}}
+        """
+        self.requireAuth()
+        if not id:
+            return {'success': False, 'error': 'Missing scan ID'}
+
+        with SpiderFootDb(self.config) as dbh:
+            fpCounts = dbh.scanResultEventCount(id)
+            # fpCounts = {0: unreviewed, 1: fp, 2: validated}
+            total = sum(fpCounts.values())
+            unreviewed = fpCounts.get(0, 0)
+            fp = fpCounts.get(1, 0)
+            validated = fpCounts.get(2, 0)
+
+            # Get known asset count for the scan target
+            scanInfo = dbh.scanInstanceGet(id)
+            knownCount = 0
+            if scanInfo:
+                target = scanInfo[1]
+                try:
+                    kaCounts = dbh.knownAssetCount(target)
+                    knownCount = kaCounts.get('total', 0)
+                except Exception:
+                    pass
+
+        return {
+            'success': True,
+            'counts': {
+                'total': total,
+                'unreviewed': unreviewed,
+                'fp': fp,
+                'validated': validated,
+                'known_assets': knownCount,
+            }
+        }
+
+    @cherrypy.expose
+    def triageexport(self: 'SpiderFootWebUi', id: str = None,
+                     filter: str = 'unreviewed') -> bytes:
+        """Export a triage package JSON file for Claude Code processing.
+
+        Args:
+            id: scan instance ID
+            filter: 'unreviewed' (fp=0 only) or 'all'
+
+        Returns:
+            bytes: JSON file download
+        """
+        self.requireAuth()
+        self.requireAdmin()
+
+        if not id:
+            raise cherrypy.HTTPError(400, "Missing scan ID")
+
+        with SpiderFootDb(self.config) as dbh:
+            scanInfo = dbh.scanInstanceGet(id)
+            if not scanInfo:
+                raise cherrypy.HTTPError(404, "Scan not found")
+
+            scan_name = scanInfo[0]
+            target = scanInfo[1]
+
+            # Fetch results — filter by FP status if requested
+            filterFp = (filter == 'unreviewed')
+            results = dbh.scanResultEvent(id, 'ALL', filterFp=filterFp)
+
+            # Fetch known assets for this target
+            try:
+                known_assets = dbh.knownAssetValues(target)
+            except Exception:
+                known_assets = {}
+
+            # Build the triage package
+            package = build_triage_export(
+                scan_id=id,
+                scan_name=scan_name,
+                scan_target=target,
+                seed_targets=[target],
+                known_assets=known_assets,
+                results=results,
+            )
+
+        # Return as downloadable JSON file
+        output = json.dumps(package, indent=2, ensure_ascii=False)
+        filename = f"triage_{id[:8]}_{time.strftime('%Y%m%d')}.json"
+
+        cherrypy.response.headers['Content-Type'] = 'application/json'
+        cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return output.encode('utf-8')
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def triageimport(self: 'SpiderFootWebUi') -> dict:
+        """Import triage classifications from Claude Code and apply them.
+
+        Expects POST with JSON body containing triage output.
+
+        Returns:
+            dict: {success, applied: {fp, legit, review}, errors}
+        """
+        self.requireAuth()
+        self.requireAdmin()
+
+        cl = cherrypy.request.headers.get('Content-Length', 0)
+        if not cl:
+            return {'success': False, 'error': 'Empty request body'}
+
+        raw = cherrypy.request.body.read(int(cl))
+        try:
+            parsed = parse_triage_import(raw.decode('utf-8'))
+        except ValueError as e:
+            return {'success': False, 'error': str(e)}
+
+        scan_id = parsed['scan_id']
+        classifications = parsed['classifications']
+        counts = parsed['counts']
+
+        if not classifications:
+            return {'success': False, 'error': 'No valid classifications found'}
+
+        # Separate hashes by classification
+        fp_hashes = [h for h, c in classifications.items() if c['class'] == 'FP']
+        legit_hashes = [h for h, c in classifications.items() if c['class'] == 'LEGIT']
+        # REVIEW items are not touched — left for analysts
+
+        applied = {'fp': 0, 'legit': 0, 'review': counts.get('REVIEW', 0)}
+
+        with SpiderFootDb(self.config) as dbh:
+            # Verify scan exists
+            scanInfo = dbh.scanInstanceGet(scan_id)
+            if not scanInfo:
+                return {'success': False, 'error': f'Scan {scan_id} not found'}
+
+            scan_name = scanInfo[0]
+            target = scanInfo[1]
+
+            # Apply FP classifications (false_positive = 1)
+            if fp_hashes:
+                dbh.scanResultsUpdateFP(scan_id, fp_hashes, 1)
+                applied['fp'] = len(fp_hashes)
+
+            # Apply LEGIT classifications (false_positive = 2 = validated)
+            if legit_hashes:
+                dbh.scanResultsUpdateFP(scan_id, legit_hashes, 2)
+                applied['legit'] = len(legit_hashes)
+
+            # Record in triage history
+            try:
+                dbh.triageHistoryAdd(
+                    scanId=scan_id,
+                    target=target,
+                    scanName=scan_name,
+                    fpCount=applied['fp'],
+                    legitCount=applied['legit'],
+                    reviewCount=applied['review'],
+                    appliedBy=self.currentUser() or 'unknown',
+                    classifications=json.dumps(parsed['counts']),
+                )
+            except Exception as e:
+                self.log.warning(f"Failed to record triage history: {e}")
+
+        return {
+            'success': True,
+            'applied': applied,
+            'errors': parsed.get('errors', []),
+        }
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def triagehistory(self: 'SpiderFootWebUi') -> dict:
+        """Get triage history for the history panel.
+
+        Returns:
+            dict: {history: [{date, scan_name, target, fp, legit, review, applied_by}]}
+        """
+        self.requireAuth()
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                rows = dbh.triageHistoryList(limit=50)
+            except Exception:
+                rows = []
+
+        history = []
+        for row in rows:
+            # row: id, scan_id, target, scan_name, fp, legit, review, applied_by, applied_at
+            applied_at = row[8] if len(row) > 8 else 0
+            history.append({
+                'date': time.strftime("%Y-%m-%d %H:%M", time.localtime(applied_at / 1000)) if applied_at else '',
+                'scan_name': row[3] or '',
+                'target': row[2] or '',
+                'fp': row[4] or 0,
+                'legit': row[5] or 0,
+                'review': row[6] or 0,
+                'applied_by': row[7] or '',
+            })
+
+        return {'history': history}
