@@ -34,6 +34,24 @@ def _fmt_date(ts):
 }
 .xapi-sub { color:var(--text-muted); font-size:12px; margin-left:8px; font-family:var(--font-mono); letter-spacing:.3px; }
 
+/* Back to Settings button */
+.xapi-back-btn {
+    background:linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
+    color:#fff !important; border:none !important; border-radius:0 !important;
+    font-family:var(--font-mono) !important; font-weight:700 !important;
+    font-size:11px !important; letter-spacing:0.5px !important; text-transform:uppercase !important;
+    box-shadow:0 0 12px var(--glow-green);
+}
+.xapi-back-btn .glyphicon,
+.xapi-back-btn i {
+    color:#fff !important;
+}
+.xapi-back-btn:hover,
+.xapi-back-btn:focus {
+    box-shadow:0 0 20px var(--glow-green); transform:translateY(-1px);
+    color:#fff !important;
+}
+
 /* ── Cards: glass panels, sharp corners, subtle glow ── */
 .xapi-card {
     background:var(--glass-bg); border:1px solid var(--glass-border);
@@ -240,8 +258,8 @@ def _fmt_date(ts):
 
   <!-- PAGE HEADER -->
   <div class="xapi-header">
-    <a href="${docroot}/opts" class="btn btn-default btn-sm">
-      <i class="glyphicon glyphicon-arrow-left"></i> Back to Settings
+    <a href="${docroot}/opts" class="btn btn-default btn-sm xapi-back-btn">
+      <i class="glyphicon glyphicon-arrow-left"></i> BACK TO SETTINGS
     </a>
     <div>
       <span class="xapi-title">External API</span>
