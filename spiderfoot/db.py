@@ -387,7 +387,20 @@ class SpiderFootDb:
             scan_ended          INT NOT NULL, \
             created             INT NOT NULL \
         )",
-        "CREATE INDEX idx_grade_snapshots_target ON tbl_grade_snapshots (seed_target, scan_started)"
+        "CREATE INDEX idx_grade_snapshots_target ON tbl_grade_snapshots (seed_target, scan_started)",
+        "CREATE TABLE IF NOT EXISTS tbl_triage_history ( \
+            id              INTEGER PRIMARY KEY AUTOINCREMENT, \
+            scan_instance_id VARCHAR NOT NULL, \
+            seed_target     VARCHAR NOT NULL, \
+            scan_name       VARCHAR, \
+            fp_count        INT NOT NULL DEFAULT 0, \
+            legit_count     INT NOT NULL DEFAULT 0, \
+            review_count    INT NOT NULL DEFAULT 0, \
+            applied_by      VARCHAR, \
+            applied_at      INT NOT NULL, \
+            classifications TEXT \
+        )",
+        "CREATE INDEX idx_triage_history_target ON tbl_triage_history (seed_target)",
     ]
 
     eventDetails = [
@@ -1305,6 +1318,20 @@ class SpiderFootDb:
                     _log.info("Created tbl_ext_api_keys table")
                 except DatabaseError as e:
                     _log.warning(f"Could not create tbl_ext_api_keys: {e}")
+
+            # Migration: Create tbl_triage_history table for AI triage audit trail
+            try:
+                self.dbh.execute("SELECT COUNT(*) FROM tbl_triage_history")
+            except DatabaseError:
+                try:
+                    schema = get_pg_schema_queries(self.createSchemaQueries)
+                    for qry in schema:
+                        if "tbl_triage_history" in qry:
+                            self.dbh.execute(qry)
+                    self.conn.commit()
+                    _log.info("Created tbl_triage_history table")
+                except DatabaseError:
+                    pass
 
             # Restore normal transaction mode after migrations
             self.conn.autocommit = False
@@ -3534,6 +3561,58 @@ class SpiderFootDb:
                 raise IOError("SQL error encountered when committing batch sync") from e
         _log.info(f"FP sync batch: target={target} items={len(items)} total_updated={total}")
         return total
+
+    def triageHistoryAdd(self, scanId: str, target: str, scanName: str,
+                         fpCount: int, legitCount: int, reviewCount: int,
+                         appliedBy: str, classifications: str = None) -> bool:
+        """Record a triage import event for audit trail.
+
+        Args:
+            scanId: scan instance GUID
+            target: seed_target
+            scanName: human scan name
+            fpCount: number of results marked FP
+            legitCount: number of results marked validated
+            reviewCount: number of results left for review
+            appliedBy: username who applied triage
+            classifications: JSON string of all classifications (for audit)
+
+        Returns:
+            bool: success
+        """
+        import time as _time
+        qry = ("INSERT INTO tbl_triage_history "
+               "(scan_instance_id, seed_target, scan_name, fp_count, legit_count, "
+               "review_count, applied_by, applied_at, classifications) "
+               "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (
+                    scanId, target, scanName, fpCount, legitCount,
+                    reviewCount, appliedBy, int(_time.time() * 1000),
+                    classifications,
+                ))
+                self.conn.commit()
+                return True
+            except DatabaseError as e:
+                raise IOError("SQL error recording triage history") from e
+
+    def triageHistoryList(self, limit: int = 50) -> list:
+        """Get recent triage history entries.
+
+        Returns:
+            list: triage history rows (id, scan_id, target, scan_name,
+                  fp_count, legit_count, review_count, applied_by, applied_at)
+        """
+        qry = ("SELECT id, scan_instance_id, seed_target, scan_name, "
+               "fp_count, legit_count, review_count, applied_by, applied_at "
+               "FROM tbl_triage_history ORDER BY applied_at DESC LIMIT ?")
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (limit,))
+                return self.dbh.fetchall()
+            except DatabaseError as e:
+                raise IOError("SQL error fetching triage history") from e
 
     def targetFalsePositiveAdd(self, target: str, eventType: str, eventData: str, sourceData: str = None, notes: str = None) -> bool:
         """Add a target-level false positive entry.
