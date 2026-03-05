@@ -27,17 +27,17 @@ def _fmt_date(ts):
 
 /* Page header */
 .xapi-header { display:flex; align-items:center; gap:14px; margin-bottom:24px; }
-.xapi-title  { font-size:21px; font-weight:700; color:#eee; letter-spacing:-.3px; }
-.xapi-sub    { color:#555; font-size:13px; margin-left:8px; }
+.xapi-title  { font-size:21px; font-weight:700; color:var(--text-primary); letter-spacing:-.3px; }
+.xapi-sub    { color:var(--text-muted); font-size:13px; margin-left:8px; }
 
 /* Cards */
-.xapi-card { background:#181818; border:1px solid #262626; border-radius:8px; margin-bottom:20px; overflow:hidden; }
+.xapi-card { background:var(--bg-secondary); border:1px solid var(--glass-border); border-radius:var(--radius-md); margin-bottom:20px; overflow:hidden; box-shadow:var(--shadow-sm); }
 .xapi-card-hdr {
-    background:#141414; border-bottom:1px solid #222; padding:11px 18px;
+    background:var(--bg-tertiary); border-bottom:1px solid var(--glass-border); padding:11px 18px;
     display:flex; align-items:center; justify-content:space-between;
 }
 .xapi-card-hdr-label {
-    font-size:10px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:#666;
+    font-size:10px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:var(--text-muted);
 }
 .xapi-card-body { padding:20px; }
 
@@ -45,127 +45,128 @@ def _fmt_date(ts):
 .xapi-toggle { position:relative; display:inline-block; width:50px; height:24px; }
 .xapi-toggle input { opacity:0; width:0; height:0; }
 .xapi-toggle-track {
-    position:absolute; cursor:pointer; inset:0; background:#2a2a2a;
-    border-radius:24px; border:1px solid #333; transition:.25s;
+    position:absolute; cursor:pointer; inset:0; background:var(--bg-elevated);
+    border-radius:24px; border:1px solid var(--glass-border); transition:.25s;
 }
 .xapi-toggle-track:before {
     position:absolute; content:""; height:18px; width:18px;
-    left:2px; bottom:2px; background:#555; border-radius:50%; transition:.25s;
+    left:2px; bottom:2px; background:var(--text-muted); border-radius:50%; transition:.25s;
 }
-.xapi-toggle input:checked + .xapi-toggle-track { background:#1c3d24; border-color:#2a5a38; }
-.xapi-toggle input:checked + .xapi-toggle-track:before { background:#27ae60; transform:translateX(26px); }
+.xapi-toggle input:checked + .xapi-toggle-track { background:var(--glow-green); border-color:var(--accent-green); }
+.xapi-toggle input:checked + .xapi-toggle-track:before { background:var(--accent-green); transform:translateX(26px); }
 
 /* Key table */
 .key-table { width:100%; border-collapse:collapse; font-size:13px; }
 .key-table thead th {
-    background:#121212; color:#555; font-size:10px; font-weight:700;
+    background:var(--bg-tertiary); color:var(--text-muted); font-size:10px; font-weight:700;
     letter-spacing:1px; text-transform:uppercase; padding:10px 14px;
-    border-bottom:1px solid #222;
+    border-bottom:1px solid var(--glass-border);
 }
 .key-row td {
-    padding:11px 14px; border-bottom:1px solid #1e1e1e;
+    padding:11px 14px; border-bottom:1px solid var(--glass-border);
     vertical-align:middle; cursor:pointer; transition:background .12s;
+    color:var(--text-primary);
 }
-.key-row:hover td { background:#1b1b1b; }
-.key-row.is-open td { background:#1c1c1c; border-bottom:none; }
+.key-row:hover td { background:var(--bg-tertiary); }
+.key-row.is-open td { background:var(--bg-tertiary); border-bottom:none; }
 
 /* Scope / status badges */
 .badge-scope {
-    display:inline-block; background:#14233a; border:1px solid #1e3a5f;
-    color:#4f8ec9; padding:1px 7px; border-radius:3px;
+    display:inline-block; background:var(--glow-blue); border:1px solid var(--accent-blue);
+    color:var(--accent-blue-light); padding:1px 7px; border-radius:3px;
     font-size:11px; font-family:monospace; margin:1px 2px 1px 0;
 }
-.badge-active  { display:inline-block; background:#162616; border:1px solid #1e3f1e; color:#27ae60; padding:2px 8px; border-radius:3px; font-size:11px; font-weight:700; letter-spacing:.4px; }
-.badge-revoked { display:inline-block; background:#2a1616; border:1px solid #3f1e1e; color:#c0392b; padding:2px 8px; border-radius:3px; font-size:11px; font-weight:700; letter-spacing:.4px; }
+.badge-active  { display:inline-block; background:var(--glow-green); border:1px solid var(--accent-green); color:var(--accent-green); padding:2px 8px; border-radius:3px; font-size:11px; font-weight:700; letter-spacing:.4px; }
+.badge-revoked { display:inline-block; background:var(--glow-red); border:1px solid var(--accent-red); color:var(--accent-red); padding:2px 8px; border-radius:3px; font-size:11px; font-weight:700; letter-spacing:.4px; }
 
 /* Drawer */
-.drawer-row td { padding:0!important; border-bottom:1px solid #222!important; background:#111!important; }
+.drawer-row td { padding:0!important; border-bottom:1px solid var(--glass-border)!important; background:var(--bg-primary)!important; }
 .drawer-inner {
     padding:16px 18px 18px;
     display:grid; grid-template-columns:1fr 1fr; gap:14px;
 }
 .drawer-full  { grid-column:1/-1; }
-.drawer-panel { background:#161616; border:1px solid #222; border-radius:6px; overflow:hidden; }
+.drawer-panel { background:var(--bg-secondary); border:1px solid var(--glass-border); border-radius:6px; overflow:hidden; }
 .drawer-panel-hdr {
-    background:#131313; border-bottom:1px solid #1e1e1e; padding:8px 12px;
+    background:var(--bg-tertiary); border-bottom:1px solid var(--glass-border); padding:8px 12px;
     display:flex; align-items:center; justify-content:space-between;
 }
-.drawer-panel-label { font-size:9px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase; color:#4a4a4a; }
+.drawer-panel-label { font-size:9px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase; color:var(--text-muted); }
 .drawer-panel-body  { padding:13px 14px; }
 
 /* Key-ID box (styled like code) */
 .keyid-code {
-    font-family:monospace; font-size:12px; color:#4f8ec9; background:#0d1824;
-    border:1px solid #1a3050; border-radius:4px; padding:6px 10px;
+    font-family:monospace; font-size:12px; color:var(--accent-blue-light); background:var(--glow-blue);
+    border:1px solid var(--accent-blue); border-radius:4px; padding:6px 10px;
     word-break:break-all; letter-spacing:.5px;
 }
 
 /* Raw key reveal */
 .key-masked-btn {
     display:flex; align-items:center; justify-content:space-between;
-    background:#0d0d0d; border:1px solid #252525; border-radius:5px;
+    background:var(--bg-primary); border:1px solid var(--glass-border); border-radius:5px;
     padding:10px 14px; cursor:pointer; transition:border-color .15s, background .15s;
     width:100%; text-align:left; font-family:monospace;
 }
-.key-masked-btn:hover { border-color:#4f8ec9; background:#111a25; }
-.key-masked-dots { font-size:16px; color:#383838; letter-spacing:4px; flex:1; }
-.key-masked-hint { display:flex; align-items:center; gap:6px; color:#3a3a3a; font-size:11px; white-space:nowrap; }
-.key-masked-hint svg { color:#2a2a2a; }
+.key-masked-btn:hover { border-color:var(--accent-blue-light); background:var(--glow-blue); }
+.key-masked-dots { font-size:16px; color:var(--text-muted); letter-spacing:4px; flex:1; }
+.key-masked-hint { display:flex; align-items:center; gap:6px; color:var(--text-muted); font-size:11px; white-space:nowrap; }
+.key-masked-hint svg { color:var(--text-muted); }
 
 .key-revealed-wrap { display:none; }
 .key-revealed-box {
-    display:block; width:100%; font-family:monospace; font-size:12px; color:#4f8ec9;
-    background:#0d1824; border:1px solid #1a3050; border-radius:5px;
+    display:block; width:100%; font-family:monospace; font-size:12px; color:var(--accent-blue-light);
+    background:var(--glow-blue); border:1px solid var(--accent-blue); border-radius:5px;
     padding:10px 14px; word-break:break-all; cursor:pointer;
     transition:border-color .15s, background .15s; letter-spacing:.5px; position:relative;
 }
-.key-revealed-box:hover { border-color:#27ae60; background:#0d1f14; }
+.key-revealed-box:hover { border-color:var(--accent-green); background:var(--glow-green); }
 .key-revealed-box:hover .copy-hint-badge { opacity:1; }
 .copy-hint-badge {
     opacity:0; transition:opacity .2s;
     position:absolute; top:6px; right:8px;
-    background:#0f2a18; border:1px solid #1a4a28; color:#27ae60;
+    background:var(--glow-green); border:1px solid var(--accent-green); color:var(--accent-green);
     font-size:10px; padding:2px 7px; border-radius:3px; font-family:sans-serif;
     pointer-events:none;
 }
 .key-revealed-actions { display:flex; align-items:center; gap:7px; margin-top:8px; }
-.copy-ok { font-size:11px; color:#27ae60; opacity:0; transition:opacity .3s; }
+.copy-ok { font-size:11px; color:var(--accent-green); opacity:0; transition:opacity .3s; }
 .copy-ok.show { opacity:1; }
 
 /* Icon buttons */
 .icon-btn {
-    background:#1a1a1a; border:1px solid #2a2a2a; border-radius:4px;
-    padding:5px 7px; color:#555; cursor:pointer; line-height:0;
+    background:var(--bg-tertiary); border:1px solid var(--glass-border); border-radius:4px;
+    padding:5px 7px; color:var(--text-muted); cursor:pointer; line-height:0;
     transition:border-color .15s, color .15s;
 }
-.icon-btn:hover { border-color:#4f8ec9; color:#4f8ec9; }
+.icon-btn:hover { border-color:var(--accent-blue-light); color:var(--accent-blue-light); }
 .icon-btn svg { display:block; }
 
 /* Permissions read view */
 .perm-table { width:100%; font-size:12px; }
-.perm-table td { padding:3px 0; vertical-align:top; }
-.perm-table td:first-child { color:#4a4a4a; width:90px; white-space:nowrap; }
+.perm-table td { padding:3px 0; vertical-align:top; color:var(--text-secondary); }
+.perm-table td:first-child { color:var(--text-muted); width:90px; white-space:nowrap; }
 
 /* Inline edit form */
 .edit-field-group { margin-bottom:9px; }
-.edit-field-label { font-size:10px; color:#555; text-transform:uppercase; letter-spacing:.6px; display:block; margin-bottom:3px; }
-.edit-field-label small { text-transform:none; letter-spacing:0; font-size:10px; color:#3a3a3a; }
+.edit-field-label { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.6px; display:block; margin-bottom:3px; }
+.edit-field-label small { text-transform:none; letter-spacing:0; font-size:10px; color:var(--text-muted); }
 .edit-input {
-    width:100%; background:#0e0e0e; border:1px solid #252525; border-radius:4px;
-    color:#ccc; font-size:12px; padding:6px 8px;
+    width:100%; background:var(--bg-primary); border:1px solid var(--glass-border); border-radius:4px;
+    color:var(--text-primary); font-size:12px; padding:6px 8px;
 }
-.edit-input:focus { outline:none; border-color:#4f8ec9; }
+.edit-input:focus { outline:none; border-color:var(--accent-blue-light); }
 .edit-scope-row { display:flex; flex-wrap:wrap; gap:10px; margin-top:3px; }
-.edit-scope-lbl { display:flex; align-items:center; gap:5px; font-size:12px; color:#999; cursor:pointer; }
-.edit-scope-lbl input { accent-color:#4f8ec9; cursor:pointer; }
+.edit-scope-lbl { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--text-secondary); cursor:pointer; }
+.edit-scope-lbl input { accent-color:var(--accent-blue-light); cursor:pointer; }
 
 /* Audit log */
 .audit-line {
     display:flex; align-items:flex-start; gap:7px; padding:3px 0;
-    border-bottom:1px solid #1a1a1a; font-size:11px; color:#555; font-family:monospace;
+    border-bottom:1px solid var(--glass-border); font-size:11px; color:var(--text-muted); font-family:monospace;
 }
 .audit-line:last-child { border-bottom:none; }
-.audit-dot { width:5px; height:5px; background:#2a2a2a; border-radius:50%; flex-shrink:0; margin-top:4px; }
+.audit-dot { width:5px; height:5px; background:var(--text-muted); border-radius:50%; flex-shrink:0; margin-top:4px; }
 
 /* Reinstate bar */
 .reinstate-bar {
@@ -174,37 +175,37 @@ def _fmt_date(ts):
 }
 .btn-reinstate {
     display:inline-flex; align-items:center; gap:6px;
-    background:#162616; border:1px solid #214521; color:#27ae60;
+    background:var(--glow-green); border:1px solid var(--accent-green); color:var(--accent-green);
     border-radius:5px; padding:6px 14px; font-size:12px; cursor:pointer;
     transition:background .15s;
 }
-.btn-reinstate:hover { background:#1c3321; }
+.btn-reinstate:hover { background:var(--accent-green); color:#fff; }
 
 /* Create modal */
-#createKeyModal .modal-content { background:#181818; color:#ddd; border:1px solid #262626; border-radius:8px; }
-#createKeyModal .modal-header { background:#141414; border-bottom:1px solid #222; padding:14px 18px; }
-#createKeyModal .modal-footer { background:#141414; border-top:1px solid #222; }
-#createKeyModal .form-group label { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:#666; margin-bottom:5px; display:block; }
-#createKeyModal .form-group label small { text-transform:none; letter-spacing:0; font-size:10px; color:#3a3a3a; }
+#createKeyModal .modal-content { background:var(--bg-secondary); color:var(--text-primary); border:1px solid var(--glass-border); border-radius:var(--radius-md); }
+#createKeyModal .modal-header { background:var(--bg-tertiary); border-bottom:1px solid var(--glass-border); padding:14px 18px; }
+#createKeyModal .modal-footer { background:var(--bg-tertiary); border-top:1px solid var(--glass-border); }
+#createKeyModal .form-group label { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--text-muted); margin-bottom:5px; display:block; }
+#createKeyModal .form-group label small { text-transform:none; letter-spacing:0; font-size:10px; color:var(--text-muted); }
 #createKeyModal input[type=text],
-#createKeyModal input[type=number] { background:#0e0e0e; border:1px solid #252525; border-radius:4px; color:#ccc; font-size:13px; }
-#createKeyModal input:focus { border-color:#4f8ec9; box-shadow:none; }
+#createKeyModal input[type=number] { background:var(--bg-primary); border:1px solid var(--glass-border); border-radius:4px; color:var(--text-primary); font-size:13px; }
+#createKeyModal input:focus { border-color:var(--accent-blue-light); box-shadow:none; }
 .modal-scope-grid { display:flex; flex-wrap:wrap; gap:10px; margin-top:4px; }
-.modal-scope-lbl { display:flex; align-items:center; gap:5px; font-size:12px; color:#999; cursor:pointer; }
-.modal-scope-lbl input { accent-color:#27ae60; cursor:pointer; }
+.modal-scope-lbl { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--text-secondary); cursor:pointer; }
+.modal-scope-lbl input { accent-color:var(--accent-green); cursor:pointer; }
 
 /* New key display (one-time) */
 .new-key-warn {
-    background:#1f1200; border:1px solid #3a2200; border-left:3px solid #e67e22;
-    border-radius:4px; padding:9px 13px; font-size:12px; color:#e67e22;
+    background:var(--glow-orange); border:1px solid var(--accent-orange); border-left:3px solid var(--accent-orange);
+    border-radius:4px; padding:9px 13px; font-size:12px; color:var(--accent-orange);
     display:flex; align-items:center; gap:8px; margin-bottom:10px;
 }
 .new-key-box {
-    background:#0d1f10; border:1px solid #194a25; border-radius:5px;
-    padding:13px 15px; font-family:monospace; font-size:13px; color:#2ecc71;
+    background:var(--glow-green); border:1px solid var(--accent-green); border-radius:5px;
+    padding:13px 15px; font-family:monospace; font-size:13px; color:var(--accent-green);
     word-break:break-all; cursor:pointer; transition:border-color .15s; position:relative;
 }
-.new-key-box:hover { border-color:#27ae60; }
+.new-key-box:hover { border-color:var(--accent-green-light); }
 .new-key-box:hover .copy-hint-badge { opacity:1; }
 .new-key-actions { display:flex; align-items:center; gap:10px; margin-top:10px; }
 </style>
@@ -235,11 +236,11 @@ def _fmt_date(ts):
           <input type="checkbox" id="extApiEnabled" ${'checked' if ext_api_enabled else ''}>
           <span class="xapi-toggle-track"></span>
         </label>
-        <span id="toggleLabel" style="font-weight:700; font-size:13px; letter-spacing:1.2px; color:#ccc;">
+        <span id="toggleLabel" style="font-weight:700; font-size:13px; letter-spacing:1.2px; color:var(--text-primary);">
           ${'ENABLED' if ext_api_enabled else 'DISABLED'}
         </span>
       </div>
-      <ul style="color:#444; font-size:12px; margin:0; padding-left:16px; line-height:2;">
+      <ul style="color:var(--text-muted); font-size:12px; margin:0; padding-left:16px; line-height:2;">
         <li>When disabled, all <code>/v1/ext/*</code> endpoints return <code>503</code></li>
         <li>Existing keys remain in the database — re-enabling restores access instantly</li>
         <li>Admin key management (<code>/v1/admin/*</code>) is unaffected by this switch</li>
@@ -257,7 +258,7 @@ def _fmt_date(ts):
     </div>
 
     % if not keys:
-    <div style="padding:32px; color:#3a3a3a; text-align:center; font-size:13px;">
+    <div style="padding:32px; color:var(--text-muted); text-align:center; font-size:13px;">
       No vendor keys configured yet.
     </div>
     % else:
@@ -305,17 +306,17 @@ def _fmt_date(ts):
         _ip_edit = ', '.join(_ip_list) if _ip_list else ''
       %>
       <tr class="key-row" id="row-${_kid}" data-keyid="${_kid}" onclick="toggleDrawer('${_kid}')">
-        <td><strong style="color:#ddd;">${key['client_name']}</strong></td>
+        <td><strong style="color:var(--text-primary);">${key['client_name']}</strong></td>
         <td>
           % for s in _scopes:
           <span class="badge-scope">${s}</span>
           % endfor
         </td>
-        <td style="color:#777; font-size:12px;">
+        <td style="color:var(--text-secondary); font-size:12px;">
           ${'ALL' if not _targets else (', '.join(_targets[:2]) + ('…' if len(_targets) > 2 else ''))}
         </td>
-        <td style="color:#777;">${key.get('rate_limit_rpm', 60)}</td>
-        <td style="color:#777;">${_expires_str}</td>
+        <td style="color:var(--text-secondary);">${key.get('rate_limit_rpm', 60)}</td>
+        <td style="color:var(--text-secondary);">${_expires_str}</td>
         <td>
           % if _active:
           <span class="badge-active">Active</span>
@@ -323,7 +324,7 @@ def _fmt_date(ts):
           <span class="badge-revoked">Revoked</span>
           % endif
         </td>
-        <td style="color:#555; font-size:12px;">${_lu_str}</td>
+        <td style="color:var(--text-muted); font-size:12px;">${_lu_str}</td>
         <td onclick="event.stopPropagation();" style="white-space:nowrap;">
           % if _active:
           <button class="btn btn-xs btn-danger" title="Revoke key"
@@ -398,23 +399,23 @@ def _fmt_date(ts):
                       </tr>
                       <tr>
                         <td>Targets</td>
-                        <td style="color:#888;">${'ALL' if not _targets else ', '.join(_targets)}</td>
+                        <td style="color:var(--text-secondary);">${'ALL' if not _targets else ', '.join(_targets)}</td>
                       </tr>
                       <tr>
                         <td>Rate Limit</td>
-                        <td style="color:#888;">${key.get('rate_limit_rpm', 60)} req/min</td>
+                        <td style="color:var(--text-secondary);">${key.get('rate_limit_rpm', 60)} req/min</td>
                       </tr>
                       <tr>
                         <td>IP Allowlist</td>
-                        <td style="color:#888;">${_ip_str}</td>
+                        <td style="color:var(--text-secondary);">${_ip_str}</td>
                       </tr>
                       <tr>
                         <td>Expires</td>
-                        <td style="color:#888;">${_expires_str}</td>
+                        <td style="color:var(--text-secondary);">${_expires_str}</td>
                       </tr>
                       <tr>
                         <td>Notes</td>
-                        <td style="color:#888;">${key.get('notes') or '—'}</td>
+                        <td style="color:var(--text-secondary);">${key.get('notes') or '—'}</td>
                       </tr>
                     </table>
                   </div>
@@ -470,15 +471,15 @@ def _fmt_date(ts):
                   <table class="perm-table" style="margin-bottom:12px;">
                     <tr>
                       <td>Last Used</td>
-                      <td style="color:#888;">${_lu_str}</td>
+                      <td style="color:var(--text-secondary);">${_lu_str}</td>
                     </tr>
                     <tr>
                       <td>Last IP</td>
-                      <td style="color:#888;">${key.get('last_used_ip') or 'N/A'}</td>
+                      <td style="color:var(--text-secondary);">${key.get('last_used_ip') or 'N/A'}</td>
                     </tr>
                   </table>
                   <div class="edit-field-label" style="margin-bottom:6px;">Recent Requests</div>
-                  <div id="audit-${_kid}" style="color:#444; font-size:11px; font-family:monospace;">
+                  <div id="audit-${_kid}" style="color:var(--text-muted); font-size:11px; font-family:monospace;">
                     <em>Loading…</em>
                   </div>
                 </div>
@@ -512,8 +513,8 @@ def _fmt_date(ts):
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" style="color:#aaa;">&times;</button>
-        <h4 class="modal-title" style="font-size:15px; font-weight:700; color:#eee;">Create Vendor API Key</h4>
+        <button type="button" class="close" data-dismiss="modal" style="color:var(--text-secondary);">&times;</button>
+        <h4 class="modal-title" style="font-size:15px; font-weight:700; color:var(--text-primary);">Create Vendor API Key</h4>
       </div>
       <div class="modal-body" id="createModalBody">
         <!-- FORM -->
@@ -534,7 +535,7 @@ def _fmt_date(ts):
               <label class="modal-scope-lbl"><input type="checkbox" name="scope" value="findings:read" checked> findings:read</label>
               <label class="modal-scope-lbl"><input type="checkbox" name="scope" value="data:read"> data:read</label>
             </div>
-            <small style="color:#3a3a3a; font-size:10px; margin-top:5px; display:block;">data:read grants raw scan results access — grant only when needed</small>
+            <small style="color:var(--text-muted); font-size:10px; margin-top:5px; display:block;">data:read grants raw scan results access — grant only when needed</small>
           </div>
           <div class="form-group">
             <label>IP Allowlist <small>(CIDR; blank = any IP)</small></label>
@@ -613,14 +614,14 @@ function loadAudit(kid) {
     .then(r => r.json())
     .then(function(d) {
       if (!d.entries || !d.entries.length) {
-        el.innerHTML = '<em style="color:#3a3a3a;">No activity yet.</em>'; return;
+        el.innerHTML = '<em style="color:var(--text-muted);">No activity yet.</em>'; return;
       }
       el.innerHTML = d.entries.map(function(e) {
         var ts = e.created ? new Date(e.created).toLocaleString() : '?';
         return '<div class="audit-line"><span class="audit-dot"></span>'
           + '<span>' + (e.action || e.detail || '') + ' &mdash; ' + (e.ip_address || '?') + ' &mdash; ' + ts + '</span></div>';
       }).join('');
-    }).catch(function() { el.innerHTML = '<em style="color:#3a3a3a;">Could not load.</em>'; });
+    }).catch(function() { el.innerHTML = '<em style="color:var(--text-muted);">Could not load.</em>'; });
 }
 
 // ── Key reveal / hide ────────────────────────────────────────────────────────
