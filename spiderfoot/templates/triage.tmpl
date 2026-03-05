@@ -162,6 +162,73 @@ import json as _json
     padding:2px 6px; border-radius:0; color:var(--accent-green);
     font-family:var(--font-mono); font-size:11px;
 }
+
+/* ── Export Instructions Modal ── */
+.triage-modal-overlay {
+    display:none; position:fixed; top:0; left:0; right:0; bottom:0;
+    background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);
+    z-index:2000; align-items:center; justify-content:center;
+}
+.triage-modal-overlay.active { display:flex; }
+.triage-modal {
+    background:var(--bg-primary); border:1px solid var(--accent-green);
+    border-radius:0; width:620px; max-width:90vw; max-height:85vh; overflow-y:auto;
+    box-shadow:0 0 30px var(--glow-green), 0 20px 60px rgba(0,0,0,0.5);
+}
+.triage-modal-hdr {
+    background:var(--bg-tertiary); border-bottom:1px solid var(--glass-border);
+    padding:14px 20px; display:flex; align-items:center; justify-content:space-between;
+}
+.triage-modal-hdr-label {
+    font-family:var(--font-mono); font-size:11px; font-weight:700;
+    color:var(--accent-green); letter-spacing:2px; text-transform:uppercase;
+    text-shadow:0 0 6px var(--glow-green);
+}
+.triage-modal-close {
+    background:none; border:none; color:var(--text-muted); font-size:18px;
+    cursor:pointer; padding:0 4px; line-height:1;
+}
+.triage-modal-close:hover { color:var(--accent-red); }
+.triage-modal-body {
+    padding:20px; color:var(--text-primary); font-size:13px; line-height:1.8;
+}
+.triage-modal-body .step-num {
+    display:inline-block; width:22px; height:22px; line-height:22px;
+    text-align:center; background:var(--accent-green); color:#fff;
+    font-family:var(--font-mono); font-size:11px; font-weight:700;
+    margin-right:8px; border-radius:0;
+}
+.triage-modal-body .step-text {
+    font-family:var(--font-sans); color:var(--text-secondary);
+}
+.triage-modal-body .step { margin-bottom:14px; }
+.triage-cmd-block {
+    position:relative; background:var(--bg-tertiary); border:1px solid var(--accent-green);
+    border-radius:0; padding:14px 16px; margin:10px 0 16px 0; cursor:pointer;
+    transition: box-shadow .2s;
+}
+.triage-cmd-block:hover {
+    box-shadow:0 0 15px var(--glow-green);
+}
+.triage-cmd-block code {
+    font-family:var(--font-mono); font-size:13px; font-weight:600;
+    color:var(--accent-green); background:none; border:none; padding:0;
+    user-select:all; -webkit-user-select:all;
+}
+.triage-cmd-copy-hint {
+    position:absolute; top:8px; right:10px;
+    font-family:var(--font-mono); font-size:9px; font-weight:700;
+    color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;
+}
+.triage-cmd-block.copied .triage-cmd-copy-hint {
+    color:var(--accent-green);
+}
+.triage-modal-body .step-done {
+    font-family:var(--font-mono); font-size:11px; font-weight:700;
+    color:var(--accent-green); text-transform:uppercase; letter-spacing:1px;
+    margin-top:16px; padding-top:12px; border-top:1px solid var(--glass-border);
+    text-shadow:0 0 6px var(--glow-green);
+}
 </style>
 
 <div class="triage-header">
@@ -350,6 +417,45 @@ import json as _json
     </div>
 </div>
 
+<!-- ── EXPORT INSTRUCTIONS MODAL ───────────────────────────────── -->
+<div class="triage-modal-overlay" id="triage-export-modal" onclick="if(event.target===this)this.classList.remove('active')">
+    <div class="triage-modal">
+        <div class="triage-modal-hdr">
+            <span class="triage-modal-hdr-label">Export Complete — Next Steps</span>
+            <button class="triage-modal-close" onclick="document.getElementById('triage-export-modal').classList.remove('active');">&times;</button>
+        </div>
+        <div class="triage-modal-body">
+            <div class="step">
+                <span class="step-num">1</span>
+                <span class="step-text">Triage package downloaded to your <code>~/Downloads</code> folder</span>
+            </div>
+            <div class="step">
+                <span class="step-num">2</span>
+                <span class="step-text">Open Claude Code in your terminal</span>
+            </div>
+            <div class="step">
+                <span class="step-num">3</span>
+                <span class="step-text">Paste this command into Claude Code:</span>
+                <div class="triage-cmd-block" id="triage-cmd-block" onclick="triageCopyCmd()">
+                    <code id="triage-cmd-text"></code>
+                    <span class="triage-cmd-copy-hint" id="triage-cmd-hint">CLICK TO COPY</span>
+                </div>
+            </div>
+            <div class="step">
+                <span class="step-num">4</span>
+                <span class="step-text">Claude reads the file, classifies each result, and writes a <code>triage_output_*.json</code> file</span>
+            </div>
+            <div class="step">
+                <span class="step-num">5</span>
+                <span class="step-text">Upload the output file using the <strong>Import Triage Results</strong> section below</span>
+            </div>
+            <div class="step-done">
+                &#10003; Package exported — ready for Claude Code
+            </div>
+        </div>
+    </div>
+</div>
+
 <script type="text/javascript">
 (function() {
     "use strict";
@@ -396,10 +502,28 @@ import json as _json
         window.location.href = docroot + '/triageexport?id=' + encodeURIComponent(scanId) +
             '&filter=' + encodeURIComponent(filter);
 
+        // Show instructions modal with scan-specific command
         setTimeout(function() {
             btn.disabled = false;
             btn.textContent = 'Export Triage Package';
-        }, 2000);
+            var cmd = 'Process the triage file at ~/Downloads/triage_' + scanId + '.json';
+            document.getElementById('triage-cmd-text').textContent = cmd;
+            document.getElementById('triage-cmd-hint').textContent = 'CLICK TO COPY';
+            document.getElementById('triage-cmd-block').classList.remove('copied');
+            document.getElementById('triage-export-modal').classList.add('active');
+        }, 800);
+    };
+
+    window.triageCopyCmd = function() {
+        var text = document.getElementById('triage-cmd-text').textContent;
+        navigator.clipboard.writeText(text).then(function() {
+            document.getElementById('triage-cmd-hint').textContent = 'COPIED!';
+            document.getElementById('triage-cmd-block').classList.add('copied');
+            setTimeout(function() {
+                document.getElementById('triage-cmd-hint').textContent = 'CLICK TO COPY';
+                document.getElementById('triage-cmd-block').classList.remove('copied');
+            }, 3000);
+        });
     };
 
     // ── Drag & Drop ───────────────────────────────────────────────
