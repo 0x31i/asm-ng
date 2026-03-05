@@ -4191,6 +4191,30 @@ label {
   text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
 }
 
+#btn-ext-api {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
+  border: none !important;
+  color: white !important;
+  box-shadow: 0 0 15px var(--glow-green);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 1px 3px rgba(0, 0, 0, 0.4);
+  font-weight: 700;
+  font-family: var(--font-mono) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  border-radius: 0 !important;
+}
+
+#btn-ext-api:hover,
+#btn-ext-api:focus {
+  box-shadow: 0 0 25px var(--glow-green), 0 4px 15px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+#btn-ext-api .glyphicon {
+  color: white !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
+}
+
 /* ============================================
    Settings Page Layout - Flexbox with Sticky Content
    ============================================ */

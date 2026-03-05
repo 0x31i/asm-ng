@@ -1950,18 +1950,35 @@ pre {
   letter-spacing: 0.5px;
   white-space: nowrap;
 }
-.btn-sync {
+.btn-sync,
+#grade-refresh-btn {
   background: #22d3ee !important;
+  background-color: #22d3ee !important;
   color: #fff !important;
   border: none !important;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  box-shadow: 0 0 14px rgba(34, 211, 238, 0.5), 0 0 30px rgba(34, 211, 238, 0.3) !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 0 16px rgba(255, 255, 255, 0.4) !important;
+}
+.btn-sync .glyphicon,
+.btn-sync i,
+#grade-refresh-btn .glyphicon,
+#grade-refresh-btn i {
+  color: #fff !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8) !important;
 }
 .btn-sync:hover,
-.btn-sync:focus {
+.btn-sync:focus,
+#grade-refresh-btn:hover,
+#grade-refresh-btn:focus {
   background: #67e8f9 !important;
+  background-color: #67e8f9 !important;
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.6), 0 0 40px rgba(34, 211, 238, 0.4), 0 4px 15px rgba(0, 0, 0, 0.3) !important;
   color: #fff !important;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 1), 0 0 24px rgba(255, 255, 255, 0.6) !important;
 }
 .stat-label {
   font-family: 'JetBrains Mono', monospace;
@@ -2713,7 +2730,9 @@ td.pre-expandable.pre-expanded .pre-expand-hint {
 .btn-success .glyphicon,
 .btn-warning .glyphicon,
 .btn-danger .glyphicon,
-.btn-info .glyphicon {
+.btn-info .glyphicon,
+.btn-sync .glyphicon,
+#grade-refresh-btn .glyphicon {
   color: #fff !important;
   font-size: 16px;
   vertical-align: middle;
@@ -4027,6 +4046,30 @@ label {
 }
 
 #btn-user-management .glyphicon {
+  color: white !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
+}
+
+#btn-ext-api {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
+  border: none !important;
+  color: white !important;
+  box-shadow: 0 0 15px var(--glow-green);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 1px 3px rgba(0, 0, 0, 0.4);
+  font-weight: 700;
+  font-family: var(--font-mono) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  border-radius: 0 !important;
+}
+
+#btn-ext-api:hover,
+#btn-ext-api:focus {
+  box-shadow: 0 0 25px var(--glow-green), 0 4px 15px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+#btn-ext-api .glyphicon {
   color: white !important;
   text-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
 }
@@ -6375,6 +6418,10 @@ i.glyphicon-white,
   color: #0891b2 !important;
   border: 1px solid rgba(8, 145, 178, 0.3) !important;
 }
+.assets-action-sync .glyphicon,
+.assets-action-sync i {
+  color: #0891b2 !important;
+}
 .assets-action-sync:hover {
   background: rgba(8, 145, 178, 0.18) !important;
 }
@@ -6383,6 +6430,10 @@ i.glyphicon-white,
   background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
   color: white !important;
   border: none !important;
+}
+.assets-action-import .glyphicon,
+.assets-action-import i {
+  color: white !important;
 }
 .assets-action-import:hover {
   box-shadow: 0 2px 8px rgba(34,197,94,0.3);
@@ -6393,6 +6444,10 @@ i.glyphicon-white,
   color: #16a34a !important;
   border: 1px solid rgba(34,197,94,0.3) !important;
 }
+.assets-action-add .glyphicon,
+.assets-action-add i {
+  color: #16a34a !important;
+}
 .assets-action-add:hover {
   background: rgba(34,197,94,0.18) !important;
 }
@@ -6402,8 +6457,16 @@ i.glyphicon-white,
   color: #64748b !important;
   border: 1px solid #e2e8f0 !important;
 }
+.assets-action-export .glyphicon,
+.assets-action-export i {
+  color: #64748b !important;
+}
 .assets-action-export:hover {
   background: #e2e8f0 !important;
+  color: #334155 !important;
+}
+.assets-action-export:hover .glyphicon,
+.assets-action-export:hover i {
   color: #334155 !important;
 }
 
@@ -6411,6 +6474,10 @@ i.glyphicon-white,
   background: rgba(139, 92, 246, 0.1) !important;
   color: #7c3aed !important;
   border: 1px solid rgba(139, 92, 246, 0.3) !important;
+}
+.assets-action-tags .glyphicon,
+.assets-action-tags i {
+  color: #7c3aed !important;
 }
 .assets-action-tags:hover {
   background: rgba(139, 92, 246, 0.18) !important;
@@ -6805,6 +6872,10 @@ i.glyphicon-white,
   padding: 7px 14px;
   border-radius: 4px;
 }
+.assets-known-remove-sel-btn .glyphicon,
+.assets-known-remove-sel-btn i {
+  color: #ef4444 !important;
+}
 .assets-known-remove-sel-btn:hover { background: rgba(239,68,68,0.2) !important; }
 
 /* Known assets compact table */
@@ -6914,6 +6985,10 @@ i.glyphicon-white,
   font-size: 11px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.5px; padding: 7px 14px; border-radius: 4px;
 }
+.assets-known-bulk-fp-btn .glyphicon,
+.assets-known-bulk-fp-btn i {
+  color: #ea580c !important;
+}
 .assets-known-bulk-fp-btn:hover { background: rgba(234,88,12,0.2) !important; }
 .assets-known-bulk-pending-btn {
   background: rgba(100,116,139,0.1) !important;
@@ -6922,6 +6997,10 @@ i.glyphicon-white,
   font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
   font-size: 11px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.5px; padding: 7px 14px; border-radius: 4px;
+}
+.assets-known-bulk-pending-btn .glyphicon,
+.assets-known-bulk-pending-btn i {
+  color: #64748b !important;
 }
 .assets-known-bulk-pending-btn:hover { background: rgba(100,116,139,0.2) !important; }
 
@@ -6934,6 +7013,10 @@ i.glyphicon-white,
   font-size: 11px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.5px; padding: 7px 14px; border-radius: 4px;
 }
+.assets-known-bulk-affinity-btn .glyphicon,
+.assets-known-bulk-affinity-btn i {
+  color: #6366f1 !important;
+}
 .assets-known-bulk-affinity-btn:hover { background: rgba(99,102,241,0.2) !important; }
 
 /* Bulk tag button */
@@ -6944,6 +7027,10 @@ i.glyphicon-white,
   font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
   font-size: 11px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.5px; padding: 7px 14px; border-radius: 4px;
+}
+.assets-known-bulk-tag-btn .glyphicon,
+.assets-known-bulk-tag-btn i {
+  color: #16a34a !important;
 }
 .assets-known-bulk-tag-btn:hover { background: rgba(34,197,94,0.2) !important; }
 
