@@ -884,6 +884,105 @@ Configure API integrations and onboard new deployments.
   </div>
 </div>
 
+<!-- ==================== QUICK START (collapsible) ==================== -->
+<h5 class="ob-section-title ob-collapsible" onclick="$('#ob-quickstart-body').slideToggle(200); $(this).toggleClass('ob-collapsed');">
+  <i class="glyphicon glyphicon-education"></i> QUICK START
+  <span class="ob-chevron"><i class="glyphicon glyphicon-chevron-down"></i></span>
+</h5>
+<div id="ob-quickstart-body" class="ob-collapsible-body" style="display: none;">
+<div class="ob-steps">
+  <div class="ob-step">
+    <div class="ob-step-num">01</div>
+    <div class="ob-step-body">
+      <strong>Download the checklist</strong> above and open it in any text editor or Markdown viewer.
+    </div>
+  </div>
+  <div class="ob-step">
+    <div class="ob-step-num">02</div>
+    <div class="ob-step-body">
+      <strong>Create a dedicated email</strong> for this deployment (e.g., <code>clientname-asm@gmail.com</code>).
+      Use this email for all API signups to keep credentials organized.
+    </div>
+  </div>
+  <div class="ob-step">
+    <div class="ob-step-num">03</div>
+    <div class="ob-step-body">
+      <strong>Work through the tiers in order.</strong> Tier 1 (<code>Shodan</code>, <code>Censys</code>,
+      <code>VirusTotal</code>, <code>SecurityTrails</code>) gives the most recon value.
+      Each entry has a direct signup link.
+    </div>
+  </div>
+  <div class="ob-step">
+    <div class="ob-step-num">04</div>
+    <div class="ob-step-body">
+      <strong>Paste each API key</strong> into the checklist <code>api_key:</code> field as you receive it.
+    </div>
+  </div>
+  <div class="ob-step">
+    <div class="ob-step-num">05</div>
+    <div class="ob-step-body">
+      <strong>Generate your <code>.config</code> file.</strong> Follow the <code>Claude</code> prompt at the
+      bottom of the checklist to auto-generate a config JSON from your collected keys.
+    </div>
+  </div>
+  <div class="ob-step">
+    <div class="ob-step-num">06</div>
+    <div class="ob-step-body">
+      <strong>Import the config.</strong> Use the <code>Import API Keys</code> button at the top of this
+      Settings page to load your <code>.config</code> file.
+    </div>
+  </div>
+  <div class="ob-step">
+    <div class="ob-step-num">07</div>
+    <div class="ob-step-body">
+      <strong>Verify.</strong> Return to this <code>Onboarding</code> tab to confirm the progress bar
+      reflects your newly imported keys.
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ==================== TIPS (collapsible) ==================== -->
+<h5 class="ob-section-title ob-collapsible" onclick="$('#ob-tips-body').slideToggle(200); $(this).toggleClass('ob-collapsed');">
+  <i class="glyphicon glyphicon-info-sign"></i> TIPS
+  <span class="ob-chevron"><i class="glyphicon glyphicon-chevron-down"></i></span>
+</h5>
+<div id="ob-tips-body" class="ob-collapsible-body" style="display: none;">
+<div class="ob-tips">
+  <div class="ob-tip">
+    <div class="ob-tip-icon"><i class="glyphicon glyphicon-time"></i></div>
+    <div class="ob-tip-body">
+      <strong>Time estimate:</strong> ~<code>60-90 min</code> for all free-tier APIs.
+      Tier 1 alone (~<code>10</code> APIs) takes about <code>15 min</code> and covers the most critical modules.
+    </div>
+  </div>
+  <div class="ob-tip">
+    <div class="ob-tip-icon"><i class="glyphicon glyphicon-cloud"></i></div>
+    <div class="ob-tip-body">
+      <strong>Google APIs:</strong> Create <code>1</code> Google Cloud project and enable
+      <code>Custom Search</code>, <code>SafeBrowsing</code>, and <code>Maps Geocoding</code>.
+      The same <code>api_key</code> works for all three.
+    </div>
+  </div>
+  <div class="ob-tip">
+    <div class="ob-tip-icon"><i class="glyphicon glyphicon-link"></i></div>
+    <div class="ob-tip-body">
+      <strong>Blockchain APIs:</strong> <code>Etherscan</code>, <code>BscScan</code>, and <code>Arbiscan</code>
+      are all Etherscan-family sites with identical signup flows.
+    </div>
+  </div>
+  <div class="ob-tip">
+    <div class="ob-tip-icon"><i class="glyphicon glyphicon-export"></i></div>
+    <div class="ob-tip-body">
+      <strong>Backup your keys:</strong> After importing, use <code>Export API Keys</code> to save a backup
+      of your configuration.
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="ob-divider"></div>
+
 <!-- ==================== STATUS CARDS ==================== -->
 <h5 class="ob-section-title"><i class="glyphicon glyphicon-stats"></i> API KEY STATUS</h5>
 <p class="ob-muted">
@@ -946,15 +1045,15 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
 <!-- ==================== MISSING KEYS ==================== -->
 % if _ob_missing:
 <h5 class="ob-section-title ob-section-red"><i class="glyphicon glyphicon-exclamation-sign"></i> MODULES MISSING API KEYS</h5>
-<table class='table table-bordered table-striped table-condensed ob-table'>
-<thead><tr><th>MODULE</th><th>REQUIRED KEY(S)</th><th></th></tr></thead>
+<table class='table table-bordered table-condensed ob-table'>
+<thead><tr><th class="ob-col-module">MODULE</th><th class="ob-col-keys">REQUIRED KEY(S)</th><th class="ob-col-action"></th></tr></thead>
 <tbody>
 % for (_ob_m, _ob_n, _ob_k) in _ob_missing:
 <tr>
   <td><code>${_ob_n}</code></td>
   <td><code>${_ob_k}</code></td>
   <td class="ob-action-cell">
-    <a href="javascript:void(0)" onclick="switchTab('${_ob_m}');" class="btn btn-xs btn-warning">CONFIGURE</a>
+    <a href="javascript:void(0)" onclick="switchTab('${_ob_m}');" class="btn btn-xs ob-btn-configure">CONFIGURE</a>
   </td>
 </tr>
 % endfor
@@ -968,112 +1067,21 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
   <i class="glyphicon glyphicon-ok-circle"></i> CONFIGURED MODULES
   <a href="javascript:void(0)" onclick="$('#ob-configured-table').toggle();" class="ob-toggle-link">[SHOW / HIDE]</a>
 </h5>
-<table class='table table-bordered table-striped table-condensed ob-table' id="ob-configured-table" style="display: none;">
-<thead><tr><th>MODULE</th><th>KEY(S)</th><th></th></tr></thead>
+<table class='table table-bordered table-condensed ob-table' id="ob-configured-table" style="display: none;">
+<thead><tr><th class="ob-col-module">MODULE</th><th class="ob-col-keys">KEY(S)</th><th class="ob-col-action"></th></tr></thead>
 <tbody>
 % for (_ob_m, _ob_n, _ob_k) in _ob_configured:
 <tr>
   <td><code>${_ob_n}</code></td>
   <td><code>${_ob_k}</code></td>
   <td class="ob-action-cell">
-    <a href="javascript:void(0)" onclick="switchTab('${_ob_m}');" class="btn btn-xs btn-default">VIEW</a>
+    <a href="javascript:void(0)" onclick="switchTab('${_ob_m}');" class="btn btn-xs ob-btn-view">VIEW</a>
   </td>
 </tr>
 % endfor
 </tbody>
 </table>
 % endif
-
-<div class="ob-divider"></div>
-
-<!-- ==================== QUICK START ==================== -->
-<h5 class="ob-section-title"><i class="glyphicon glyphicon-education"></i> QUICK START</h5>
-<div class="ob-steps">
-  <div class="ob-step">
-    <div class="ob-step-num">01</div>
-    <div class="ob-step-body">
-      <strong>Download the checklist</strong> above and open it in any text editor or Markdown viewer.
-    </div>
-  </div>
-  <div class="ob-step">
-    <div class="ob-step-num">02</div>
-    <div class="ob-step-body">
-      <strong>Create a dedicated email</strong> for this deployment (e.g., <code>clientname-asm@gmail.com</code>).
-      Use this email for all API signups to keep credentials organized.
-    </div>
-  </div>
-  <div class="ob-step">
-    <div class="ob-step-num">03</div>
-    <div class="ob-step-body">
-      <strong>Work through the tiers in order.</strong> Tier 1 (<code>Shodan</code>, <code>Censys</code>,
-      <code>VirusTotal</code>, <code>SecurityTrails</code>) gives the most recon value.
-      Each entry has a direct signup link.
-    </div>
-  </div>
-  <div class="ob-step">
-    <div class="ob-step-num">04</div>
-    <div class="ob-step-body">
-      <strong>Paste each API key</strong> into the checklist <code>api_key:</code> field as you receive it.
-    </div>
-  </div>
-  <div class="ob-step">
-    <div class="ob-step-num">05</div>
-    <div class="ob-step-body">
-      <strong>Generate your <code>.config</code> file.</strong> Follow the <code>Claude</code> prompt at the
-      bottom of the checklist to auto-generate a config JSON from your collected keys.
-    </div>
-  </div>
-  <div class="ob-step">
-    <div class="ob-step-num">06</div>
-    <div class="ob-step-body">
-      <strong>Import the config.</strong> Use the <code>Import API Keys</code> button at the top of this
-      Settings page to load your <code>.config</code> file.
-    </div>
-  </div>
-  <div class="ob-step">
-    <div class="ob-step-num">07</div>
-    <div class="ob-step-body">
-      <strong>Verify.</strong> Return to this <code>Onboarding</code> tab to confirm the progress bar
-      reflects your newly imported keys.
-    </div>
-  </div>
-</div>
-
-<div class="ob-divider"></div>
-
-<!-- ==================== TIPS ==================== -->
-<h5 class="ob-section-title"><i class="glyphicon glyphicon-info-sign"></i> TIPS</h5>
-<div class="ob-tips">
-  <div class="ob-tip">
-    <div class="ob-tip-icon"><i class="glyphicon glyphicon-time"></i></div>
-    <div class="ob-tip-body">
-      <strong>Time estimate:</strong> ~<code>60-90 min</code> for all free-tier APIs.
-      Tier 1 alone (~<code>10</code> APIs) takes about <code>15 min</code> and covers the most critical modules.
-    </div>
-  </div>
-  <div class="ob-tip">
-    <div class="ob-tip-icon"><i class="glyphicon glyphicon-cloud"></i></div>
-    <div class="ob-tip-body">
-      <strong>Google APIs:</strong> Create <code>1</code> Google Cloud project and enable
-      <code>Custom Search</code>, <code>SafeBrowsing</code>, and <code>Maps Geocoding</code>.
-      The same <code>api_key</code> works for all three.
-    </div>
-  </div>
-  <div class="ob-tip">
-    <div class="ob-tip-icon"><i class="glyphicon glyphicon-link"></i></div>
-    <div class="ob-tip-body">
-      <strong>Blockchain APIs:</strong> <code>Etherscan</code>, <code>BscScan</code>, and <code>Arbiscan</code>
-      are all Etherscan-family sites with identical signup flows.
-    </div>
-  </div>
-  <div class="ob-tip">
-    <div class="ob-tip-icon"><i class="glyphicon glyphicon-export"></i></div>
-    <div class="ob-tip-body">
-      <strong>Backup your keys:</strong> After importing, use <code>Export API Keys</code> to save a backup
-      of your configuration.
-    </div>
-  </div>
-</div>
 
 </div>
 % endif

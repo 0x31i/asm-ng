@@ -11576,11 +11576,46 @@ mark {
   border-color: rgba(34, 197, 94, 0.2);
 }
 
+/* ---- Collapsible Sections ---- */
+.ob-collapsible {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ob-collapsible:hover {
+  color: var(--accent-cyan);
+  text-shadow: 0 0 10px var(--glow-cyan);
+}
+
+.ob-chevron {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.ob-collapsed .ob-chevron {
+  transform: rotate(-90deg);
+}
+
+.ob-collapsible-body {
+  margin-bottom: 16px;
+}
+
 /* ---- Tables ---- */
 .ob-table {
   font-family: var(--font-mono);
   font-size: 12px;
+  table-layout: fixed;
+  width: 100%;
 }
+
+.ob-col-module { width: 40%; }
+.ob-col-keys   { width: 40%; }
+.ob-col-action { width: 20%; }
 
 .ob-table thead th {
   font-family: var(--font-mono) !important;
@@ -11591,15 +11626,68 @@ mark {
   color: var(--text-muted) !important;
 }
 
+.ob-table td {
+  vertical-align: middle !important;
+  word-break: break-word;
+}
+
 .ob-table code {
   font-size: 11px;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .ob-action-cell {
-  width: 100px;
   text-align: center;
   vertical-align: middle !important;
+  white-space: nowrap;
+}
+
+/* Onboarding CONFIGURE button — cyan, works in both themes */
+.ob-btn-configure,
+.ob-btn-configure:visited {
+  background: linear-gradient(135deg, var(--accent-cyan, #22d3ee) 0%, #06b6d4 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.4);
+  font-family: var(--font-mono, monospace) !important;
+  font-weight: 700 !important;
+  font-size: 10px !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  padding: 4px 10px !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+.ob-btn-configure:hover,
+.ob-btn-configure:focus {
+  background: linear-gradient(135deg, #67e8f9 0%, var(--accent-cyan, #22d3ee) 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.6), 0 2px 8px rgba(0, 0, 0, 0.3);
+  text-decoration: none !important;
+}
+
+/* Onboarding VIEW button — subtle default */
+.ob-btn-view,
+.ob-btn-view:visited {
+  background: var(--bg-elevated, #e5e7eb) !important;
+  color: var(--text-secondary, #6b7280) !important;
+  border: 1px solid var(--glass-border, #d1d5db) !important;
+  font-family: var(--font-mono, monospace) !important;
+  font-weight: 600 !important;
+  font-size: 10px !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  padding: 4px 10px !important;
+  box-shadow: none;
+  text-shadow: none !important;
+}
+
+.ob-btn-view:hover,
+.ob-btn-view:focus {
+  background: var(--bg-tertiary, #d1d5db) !important;
+  color: var(--text-primary, #374151) !important;
+  text-decoration: none !important;
 }
 
 /* ---- Steps ---- */
