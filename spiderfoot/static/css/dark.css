@@ -11643,9 +11643,13 @@ mark {
   white-space: nowrap;
 }
 
-/* Onboarding CONFIGURE button — cyan, works in both themes */
-.ob-btn-configure,
-.ob-btn-configure:visited {
+/* Onboarding CONFIGURE button — cyan, nuclear specificity for both themes */
+.ob-table a.btn.ob-btn-configure,
+.ob-table a.btn.ob-btn-configure:visited,
+.ob-table a.btn.ob-btn-configure:link,
+a.btn.ob-btn-configure,
+a.btn.ob-btn-configure:visited,
+a.btn.ob-btn-configure:link {
   background: linear-gradient(135deg, var(--accent-cyan, #22d3ee) 0%, #06b6d4 100%) !important;
   color: #ffffff !important;
   border: none !important;
@@ -11657,37 +11661,49 @@ mark {
   text-transform: uppercase !important;
   padding: 4px 10px !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
-}
-
-.ob-btn-configure:hover,
-.ob-btn-configure:focus {
-  background: linear-gradient(135deg, #67e8f9 0%, var(--accent-cyan, #22d3ee) 100%) !important;
-  color: #ffffff !important;
-  box-shadow: 0 0 20px rgba(34, 211, 238, 0.6), 0 2px 8px rgba(0, 0, 0, 0.3);
   text-decoration: none !important;
 }
 
+.ob-table a.btn.ob-btn-configure:hover,
+.ob-table a.btn.ob-btn-configure:focus,
+a.btn.ob-btn-configure:hover,
+a.btn.ob-btn-configure:focus {
+  background: linear-gradient(135deg, #67e8f9 0%, var(--accent-cyan, #22d3ee) 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.6), 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  text-decoration: none !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
 /* Onboarding VIEW button — subtle default */
-.ob-btn-view,
-.ob-btn-view:visited {
-  background: var(--bg-elevated, #e5e7eb) !important;
-  color: var(--text-secondary, #6b7280) !important;
-  border: 1px solid var(--glass-border, #d1d5db) !important;
+.ob-table a.btn.ob-btn-view,
+.ob-table a.btn.ob-btn-view:visited,
+.ob-table a.btn.ob-btn-view:link,
+a.btn.ob-btn-view,
+a.btn.ob-btn-view:visited,
+a.btn.ob-btn-view:link {
+  background: var(--bg-elevated, #2a2a2a) !important;
+  color: var(--text-secondary, #a3a3a3) !important;
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.1)) !important;
   font-family: var(--font-mono, monospace) !important;
   font-weight: 600 !important;
   font-size: 10px !important;
   letter-spacing: 1px !important;
   text-transform: uppercase !important;
   padding: 4px 10px !important;
-  box-shadow: none;
+  box-shadow: none !important;
   text-shadow: none !important;
+  text-decoration: none !important;
 }
 
-.ob-btn-view:hover,
-.ob-btn-view:focus {
-  background: var(--bg-tertiary, #d1d5db) !important;
-  color: var(--text-primary, #374151) !important;
+.ob-table a.btn.ob-btn-view:hover,
+.ob-table a.btn.ob-btn-view:focus,
+a.btn.ob-btn-view:hover,
+a.btn.ob-btn-view:focus {
+  background: var(--bg-tertiary, #1e1e1e) !important;
+  color: var(--text-primary, #fafafa) !important;
   text-decoration: none !important;
+  text-shadow: none !important;
 }
 
 /* ---- Steps ---- */

@@ -11081,13 +11081,19 @@ mark {
   white-space: nowrap;
 }
 
-/* CONFIGURE button — works in light mode */
-.ob-btn-configure,
-.ob-btn-configure:visited {
+/* CONFIGURE button — nuclear specificity for light mode */
+.ob-table a.btn.ob-btn-configure,
+.ob-table a.btn.ob-btn-configure:visited,
+.ob-table a.btn.ob-btn-configure:link,
+.ob-table a.btn.ob-btn-configure:hover,
+.ob-table a.btn.ob-btn-configure:focus,
+a.btn.ob-btn-configure,
+a.btn.ob-btn-configure:visited,
+a.btn.ob-btn-configure:link {
   background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%) !important;
   color: #ffffff !important;
   border: none !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15) !important;
   font-family: var(--font-mono, 'Consolas', monospace) !important;
   font-weight: 700 !important;
   font-size: 10px !important;
@@ -11095,19 +11101,25 @@ mark {
   text-transform: uppercase !important;
   padding: 4px 10px !important;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2) !important;
-}
-
-.ob-btn-configure:hover,
-.ob-btn-configure:focus {
-  background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%) !important;
-  color: #ffffff !important;
-  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.4);
   text-decoration: none !important;
 }
 
-/* VIEW button */
-.ob-btn-view,
-.ob-btn-view:visited {
+a.btn.ob-btn-configure:hover,
+a.btn.ob-btn-configure:focus {
+  background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.4) !important;
+  text-decoration: none !important;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* VIEW button — light mode */
+.ob-table a.btn.ob-btn-view,
+.ob-table a.btn.ob-btn-view:visited,
+.ob-table a.btn.ob-btn-view:link,
+a.btn.ob-btn-view,
+a.btn.ob-btn-view:visited,
+a.btn.ob-btn-view:link {
   background: #f3f4f6 !important;
   color: #6b7280 !important;
   border: 1px solid #d1d5db !important;
@@ -11117,15 +11129,19 @@ mark {
   letter-spacing: 1px !important;
   text-transform: uppercase !important;
   padding: 4px 10px !important;
-  box-shadow: none;
+  box-shadow: none !important;
   text-shadow: none !important;
+  text-decoration: none !important;
 }
 
-.ob-btn-view:hover,
-.ob-btn-view:focus {
+.ob-table a.btn.ob-btn-view:hover,
+.ob-table a.btn.ob-btn-view:focus,
+a.btn.ob-btn-view:hover,
+a.btn.ob-btn-view:focus {
   background: #e5e7eb !important;
   color: #374151 !important;
   text-decoration: none !important;
+  text-shadow: none !important;
 }
 
 /* Steps */
