@@ -10756,3 +10756,71 @@ mark {
   text-decoration: underline;
   color: #16a34a;
 }
+
+/* ============================================
+   NUCLEAR OVERRIDES — end of file, max specificity
+   These fix light-mode buttons where earlier rules fight back.
+   ============================================ */
+
+/* SYNC button on grade panel — cyan with white icon+text (match dark mode) */
+#mainbody .btn-sync,
+#mainbody #grade-refresh-btn,
+#mainbody .panel-heading .btn-sync,
+#mainbody .panel-heading #grade-refresh-btn {
+  background: #22d3ee !important;
+  background-color: #22d3ee !important;
+  color: #fff !important;
+  border: none !important;
+  box-shadow: 0 0 14px rgba(34,211,238,0.5), 0 0 30px rgba(34,211,238,0.3) !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  text-shadow: 0 0 8px rgba(255,255,255,0.8), 0 0 16px rgba(255,255,255,0.4) !important;
+}
+#mainbody .btn-sync .glyphicon,
+#mainbody .btn-sync i.glyphicon,
+#mainbody #grade-refresh-btn .glyphicon,
+#mainbody #grade-refresh-btn i.glyphicon,
+#mainbody .panel-heading .btn-sync .glyphicon,
+#mainbody .panel-heading #grade-refresh-btn .glyphicon {
+  color: #fff !important;
+  text-shadow: 0 0 8px rgba(255,255,255,0.8) !important;
+}
+#mainbody .btn-sync:hover,
+#mainbody .btn-sync:focus,
+#mainbody #grade-refresh-btn:hover,
+#mainbody #grade-refresh-btn:focus {
+  background: #67e8f9 !important;
+  box-shadow: 0 0 20px rgba(34,211,238,0.6), 0 0 40px rgba(34,211,238,0.4) !important;
+  color: #fff !important;
+}
+
+/* Back to Settings button on External API page */
+#mainbody a.xapi-back-btn,
+#mainbody .xapi-back-btn {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 0 !important;
+  font-family: var(--font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase !important;
+  box-shadow: 0 0 12px var(--glow-green) !important;
+  text-shadow: 0 0 8px rgba(255,255,255,0.6) !important;
+  text-decoration: none !important;
+}
+#mainbody .xapi-back-btn .glyphicon,
+#mainbody .xapi-back-btn i.glyphicon,
+#mainbody a.xapi-back-btn .glyphicon {
+  color: #fff !important;
+  text-shadow: 0 0 8px rgba(255,255,255,0.8) !important;
+}
+#mainbody a.xapi-back-btn:hover,
+#mainbody .xapi-back-btn:hover {
+  box-shadow: 0 0 20px var(--glow-green) !important;
+  color: #fff !important;
+  text-decoration: none !important;
+}
