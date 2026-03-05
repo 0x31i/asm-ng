@@ -40,6 +40,7 @@
 % if user_role == 'admin':
 <li id='tab_tuneresources'><a href='javascript:void(0)' onclick='switchTab("tuneresources");'>Tune Resources</a></li>
 <li id='tab_updates'><a href='javascript:void(0)' onclick='switchTab("updates");'>System Updates</a></li>
+<li id='tab_onboarding'><a href='javascript:void(0)' onclick='switchTab("onboarding");'>Onboarding</a></li>
 % endif
 % for mod in sorted(opts['__modules__'].keys()):
     <% keylist = dict((k, v) for k, v in opts['__modules__'][mod]['opts'].items() if not k.startswith('_')) %>
@@ -858,6 +859,222 @@ function applyUpdate() {
     });
 }
 </script>
+</div>
+
+<div id='optsect_onboarding' class="tab-pane ob-tab" style="display: none">
+<h4 class="ob-title"><i class="glyphicon glyphicon-road"></i> Onboarding</h4>
+<p class="ob-subtitle">
+Configure API integrations and onboard new deployments.
+</p>
+
+<!-- ==================== DOWNLOAD HERO ==================== -->
+<div class="ob-hero">
+  <div class="ob-hero-glow"></div>
+  <div class="ob-hero-content">
+    <div class="ob-hero-text">
+      <div class="ob-hero-label">ONBOARDING CHECKLIST</div>
+      <p class="ob-hero-desc">
+        Full <code>.md</code> guide with <strong>direct signup links</strong> for every free API, organized by tier.
+        Fill in your keys, then use the built-in <code>Claude</code> prompt to auto-generate your <code>.config</code> file.
+      </p>
+    </div>
+    <a href="${docroot}/onboardingchecklist" class="btn btn-primary btn-lg ob-download-btn" target="_blank">
+      <i class="glyphicon glyphicon-download-alt"></i> DOWNLOAD CHECKLIST
+    </a>
+  </div>
+</div>
+
+<!-- ==================== STATUS CARDS ==================== -->
+<h5 class="ob-section-title"><i class="glyphicon glyphicon-stats"></i> API KEY STATUS</h5>
+<p class="ob-muted">
+Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump to a module's settings.
+</p>
+
+<%
+    _ob_configured = []
+    _ob_missing = []
+    for _ob_mod in sorted(opts['__modules__'].keys()):
+        _ob_mopts = opts['__modules__'][_ob_mod].get('opts') or {}
+        _ob_apikeys = {k: v for k, v in _ob_mopts.items() if 'api_key' in k or k in ('client_id', 'client_secret', 'access_token', 'github_token', 'api_email')}
+        if _ob_apikeys:
+            _ob_has_value = any(v and str(v).strip() for v in _ob_apikeys.values())
+            _ob_name = opts['__modules__'][_ob_mod].get('name', _ob_mod)
+            _ob_keys = ', '.join(sorted(_ob_apikeys.keys()))
+            if _ob_has_value:
+                _ob_configured.append((_ob_mod, _ob_name, _ob_keys))
+            else:
+                _ob_missing.append((_ob_mod, _ob_name, _ob_keys))
+%>
+
+<div class="row ob-stat-row">
+  <div class="col-md-4">
+    <div class="ob-stat-card ob-stat-green">
+      <div class="ob-stat-number">${len(_ob_configured)}</div>
+      <div class="ob-stat-label">CONFIGURED</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="ob-stat-card ob-stat-red">
+      <div class="ob-stat-number">${len(_ob_missing)}</div>
+      <div class="ob-stat-label">MISSING KEY</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="ob-stat-card ob-stat-cyan">
+      <div class="ob-stat-number">${len(_ob_configured) + len(_ob_missing)}</div>
+      <div class="ob-stat-label">TOTAL MODULES</div>
+    </div>
+  </div>
+</div>
+
+<!-- Progress bar -->
+<%
+    _ob_total = len(_ob_configured) + len(_ob_missing)
+    _ob_pct = int((len(_ob_configured) / _ob_total * 100)) if _ob_total > 0 else 0
+%>
+<div class="ob-progress-wrap">
+  <div class="ob-progress-bar">
+    <div class="ob-progress-fill" style="width: ${_ob_pct}%;">
+      <span class="ob-progress-text">${_ob_pct}%</span>
+    </div>
+  </div>
+  <div class="ob-progress-legend">
+    <code>${len(_ob_configured)}</code> / <code>${_ob_total}</code> API keys configured
+  </div>
+</div>
+
+<!-- ==================== MISSING KEYS ==================== -->
+% if _ob_missing:
+<h5 class="ob-section-title ob-section-red"><i class="glyphicon glyphicon-exclamation-sign"></i> MODULES MISSING API KEYS</h5>
+<table class='table table-bordered table-striped table-condensed ob-table'>
+<thead><tr><th>MODULE</th><th>REQUIRED KEY(S)</th><th></th></tr></thead>
+<tbody>
+% for (_ob_m, _ob_n, _ob_k) in _ob_missing:
+<tr>
+  <td><code>${_ob_n}</code></td>
+  <td><code>${_ob_k}</code></td>
+  <td class="ob-action-cell">
+    <a href="javascript:void(0)" onclick="switchTab('${_ob_m}');" class="btn btn-xs btn-warning">CONFIGURE</a>
+  </td>
+</tr>
+% endfor
+</tbody>
+</table>
+% endif
+
+<!-- ==================== CONFIGURED KEYS ==================== -->
+% if _ob_configured:
+<h5 class="ob-section-title ob-section-green">
+  <i class="glyphicon glyphicon-ok-circle"></i> CONFIGURED MODULES
+  <a href="javascript:void(0)" onclick="$('#ob-configured-table').toggle();" class="ob-toggle-link">[SHOW / HIDE]</a>
+</h5>
+<table class='table table-bordered table-striped table-condensed ob-table' id="ob-configured-table" style="display: none;">
+<thead><tr><th>MODULE</th><th>KEY(S)</th><th></th></tr></thead>
+<tbody>
+% for (_ob_m, _ob_n, _ob_k) in _ob_configured:
+<tr>
+  <td><code>${_ob_n}</code></td>
+  <td><code>${_ob_k}</code></td>
+  <td class="ob-action-cell">
+    <a href="javascript:void(0)" onclick="switchTab('${_ob_m}');" class="btn btn-xs btn-default">VIEW</a>
+  </td>
+</tr>
+% endfor
+</tbody>
+</table>
+% endif
+
+<div class="ob-divider"></div>
+
+<!-- ==================== QUICK START ==================== -->
+<h5 class="ob-section-title"><i class="glyphicon glyphicon-education"></i> QUICK START</h5>
+<div class="ob-steps">
+  <div class="ob-step">
+    <div class="ob-step-num">01</div>
+    <div class="ob-step-body">
+      <strong>Download the checklist</strong> above and open it in any text editor or Markdown viewer.
+    </div>
+  </div>
+  <div class="ob-step">
+    <div class="ob-step-num">02</div>
+    <div class="ob-step-body">
+      <strong>Create a dedicated email</strong> for this deployment (e.g., <code>clientname-asm@gmail.com</code>).
+      Use this email for all API signups to keep credentials organized.
+    </div>
+  </div>
+  <div class="ob-step">
+    <div class="ob-step-num">03</div>
+    <div class="ob-step-body">
+      <strong>Work through the tiers in order.</strong> Tier 1 (<code>Shodan</code>, <code>Censys</code>,
+      <code>VirusTotal</code>, <code>SecurityTrails</code>) gives the most recon value.
+      Each entry has a direct signup link.
+    </div>
+  </div>
+  <div class="ob-step">
+    <div class="ob-step-num">04</div>
+    <div class="ob-step-body">
+      <strong>Paste each API key</strong> into the checklist <code>api_key:</code> field as you receive it.
+    </div>
+  </div>
+  <div class="ob-step">
+    <div class="ob-step-num">05</div>
+    <div class="ob-step-body">
+      <strong>Generate your <code>.config</code> file.</strong> Follow the <code>Claude</code> prompt at the
+      bottom of the checklist to auto-generate a config JSON from your collected keys.
+    </div>
+  </div>
+  <div class="ob-step">
+    <div class="ob-step-num">06</div>
+    <div class="ob-step-body">
+      <strong>Import the config.</strong> Use the <code>Import API Keys</code> button at the top of this
+      Settings page to load your <code>.config</code> file.
+    </div>
+  </div>
+  <div class="ob-step">
+    <div class="ob-step-num">07</div>
+    <div class="ob-step-body">
+      <strong>Verify.</strong> Return to this <code>Onboarding</code> tab to confirm the progress bar
+      reflects your newly imported keys.
+    </div>
+  </div>
+</div>
+
+<div class="ob-divider"></div>
+
+<!-- ==================== TIPS ==================== -->
+<h5 class="ob-section-title"><i class="glyphicon glyphicon-info-sign"></i> TIPS</h5>
+<div class="ob-tips">
+  <div class="ob-tip">
+    <div class="ob-tip-icon"><i class="glyphicon glyphicon-time"></i></div>
+    <div class="ob-tip-body">
+      <strong>Time estimate:</strong> ~<code>60-90 min</code> for all free-tier APIs.
+      Tier 1 alone (~<code>10</code> APIs) takes about <code>15 min</code> and covers the most critical modules.
+    </div>
+  </div>
+  <div class="ob-tip">
+    <div class="ob-tip-icon"><i class="glyphicon glyphicon-cloud"></i></div>
+    <div class="ob-tip-body">
+      <strong>Google APIs:</strong> Create <code>1</code> Google Cloud project and enable
+      <code>Custom Search</code>, <code>SafeBrowsing</code>, and <code>Maps Geocoding</code>.
+      The same <code>api_key</code> works for all three.
+    </div>
+  </div>
+  <div class="ob-tip">
+    <div class="ob-tip-icon"><i class="glyphicon glyphicon-link"></i></div>
+    <div class="ob-tip-body">
+      <strong>Blockchain APIs:</strong> <code>Etherscan</code>, <code>BscScan</code>, and <code>Arbiscan</code>
+      are all Etherscan-family sites with identical signup flows.
+    </div>
+  </div>
+  <div class="ob-tip">
+    <div class="ob-tip-icon"><i class="glyphicon glyphicon-export"></i></div>
+    <div class="ob-tip-body">
+      <strong>Backup your keys:</strong> After importing, use <code>Export API Keys</code> to save a backup
+      of your configuration.
+    </div>
+  </div>
+</div>
+
 </div>
 % endif
 

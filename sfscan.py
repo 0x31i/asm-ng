@@ -159,6 +159,9 @@ class SpiderFootScanner():
         # Target-level FP suppression sets (populated at scan start)
         self.__targetFps = set()
         self.__targetFpTypeData = set()
+        self.__inheritedFpTypeData = set()  # inherited-only (not in target-level FPs)
+        self.__inheritedFpCount = 0         # counter for audit logging
+        self.__inheritedFpLogCap = 100      # max INHERITED_FP log entries per scan
 
         # Save the config current set for this scan
         self.__config['_modulesenabled'] = self.__moduleList
@@ -466,6 +469,22 @@ class SpiderFootScanner():
             except Exception:
                 pass  # Non-fatal — scan proceeds without suppression
 
+            # Inherit FP knowledge from previous completed scans of the same target
+            try:
+                inheritedFps = self.__dbh.scanFalsePositivesForTarget(
+                    self.__targetValue, excludeScanId=self.__scanId)
+                if inheritedFps:
+                    beforeSize = len(self.__targetFpTypeData)
+                    self.__targetFpTypeData.update(inheritedFps)
+                    # Track which are inherited-only (not already in target-level FPs)
+                    self.__inheritedFpTypeData = inheritedFps - {(et, ed) for (et, ed, _sd) in self.__targetFps}
+                    newCount = len(self.__targetFpTypeData) - beforeSize
+                    self.__sf.status(
+                        f"Loaded {len(inheritedFps)} inherited FP suppressions from previous scans"
+                        f" ({newCount} new).")
+            except Exception:
+                pass  # Non-fatal — scan proceeds without inherited FPs
+
             # Now we are ready to roll..
             self.__setStatus("RUNNING")
 
@@ -545,6 +564,11 @@ class SpiderFootScanner():
                     self._captureGradeSnapshot()
                 except Exception as e:
                     self.__sf.error(f"Scan [{self.__scanId}] grade snapshot failed: {e}")
+
+                if self.__inheritedFpCount:
+                    self.__sf.status(
+                        f"Scan [{self.__scanId}] suppressed {self.__inheritedFpCount} "
+                        f"inherited false positives from previous scans.")
 
                 self.__sf.status(f"Scan [{self.__scanId}] completed.")
             else:
@@ -780,6 +804,15 @@ class SpiderFootScanner():
                 isFp = self._isTargetFalsePositive(sfEvent)
                 if isFp:
                     sfEvent._falsePositive = 1
+                    # Audit log inherited FP matches (capped to avoid flooding)
+                    if (sfEvent.eventType, sfEvent.data) in self.__inheritedFpTypeData:
+                        self.__inheritedFpCount += 1
+                        if self.__inheritedFpCount <= self.__inheritedFpLogCap:
+                            with suppress(Exception):
+                                self.__dbh.scanLogEvent(
+                                    self.__scanId, "INHERITED_FP",
+                                    f"Suppressed inherited FP: {sfEvent.eventType}={sfEvent.data[:80]}"
+                                )
 
                 # for every module
                 for mod in self.__moduleInstances.values():

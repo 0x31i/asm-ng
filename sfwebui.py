@@ -7443,6 +7443,23 @@ class SpiderFootWebUi:
                 return {'status': 'error', 'error': str(e)}
 
     @cherrypy.expose
+    def onboardingchecklist(self):
+        """Serve the API key onboarding checklist as a downloadable Markdown file.
+
+        Returns:
+            bytes: Markdown file content
+        """
+        self.requireAdmin()
+        checklist_path = os.path.join(
+            os.path.dirname(__file__), 'documentation', 'api-key-onboarding.md')
+        if not os.path.isfile(checklist_path):
+            raise cherrypy.HTTPError(404, "Onboarding checklist not found")
+        cherrypy.response.headers['Content-Type'] = 'text/markdown; charset=utf-8'
+        cherrypy.response.headers['Content-Disposition'] = 'attachment; filename="api-key-onboarding.md"'
+        with open(checklist_path, 'r', encoding='utf-8') as f:
+            return f.read().encode('utf-8')
+
+    @cherrypy.expose
     @cherrypy.tools.json_out()
     def dbbackup(self):
         """Create a backup of the database.

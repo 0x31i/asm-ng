@@ -1214,6 +1214,16 @@ class SpiderFootDb:
             except DatabaseError:
                 pass
 
+            # Migration: Covering index for inherited FP lookups (index-only scan)
+            try:
+                self.dbh.execute(
+                    "CREATE INDEX idx_scan_results_fp_cover ON tbl_scan_results "
+                    "(false_positive, scan_instance_id, type, data)"
+                )
+                self.conn.commit()
+            except DatabaseError:
+                pass
+
             # Migration: Create tbl_asset_tags table
             try:
                 self.dbh.execute("SELECT COUNT(*) FROM tbl_asset_tags")
@@ -3813,6 +3823,45 @@ class SpiderFootDb:
                 return {(row[0], row[1], row[2]) for row in self.dbh.fetchall()}
             except DatabaseError as e:
                 raise IOError("SQL error encountered when fetching target false positives") from e
+
+    def scanFalsePositivesForTarget(self, target: str, excludeScanId: str = None) -> set:
+        """Get all DISTINCT (type, data) pairs marked false_positive=1 across
+        all completed scans for the given target.  Used to inherit FP knowledge
+        into new scans so modules don't chase known noise.
+
+        Args:
+            target (str): the seed_target value
+            excludeScanId (str): scan ID to exclude (the current scan)
+
+        Returns:
+            set: set of (event_type, event_data) tuples
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(target, str):
+            raise TypeError(f"target is {type(target)}; expected str()") from None
+
+        qry = (
+            "SELECT DISTINCT r.type, r.data "
+            "FROM tbl_scan_results r "
+            "JOIN tbl_scan_instance s ON s.guid = r.scan_instance_id "
+            "WHERE s.seed_target = ? AND r.false_positive = 1 "
+            "AND s.status = 'FINISHED'"
+        )
+        params = [target]
+
+        if excludeScanId:
+            qry += " AND r.scan_instance_id <> ?"
+            params.append(excludeScanId)
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, params)
+                return {(row[0], row[1]) for row in self.dbh.fetchall()}
+            except DatabaseError as e:
+                raise IOError("SQL error fetching inherited FPs for target") from e
 
     def targetValidatedAdd(self, target: str, eventType: str, eventData: str, sourceData: str = None, notes: str = None) -> bool:
         """Add a target-level validated entry.
