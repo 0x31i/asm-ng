@@ -520,14 +520,29 @@ input[type="password"],
 input[type="email"],
 input[type="number"],
 input[type="search"],
-textarea,
-select {
+textarea {
   background: var(--bg-secondary);
   border: 1px solid var(--glass-border);
   border-radius: 0 !important;
   color: var(--text-primary);
   font-family: var(--font-mono);
   padding: 10px 14px;
+}
+
+select {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 0 !important;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  padding: 6px 14px;
+  line-height: 1.4;
+}
+
+select.form-control {
+  padding: 6px 14px !important;
+  line-height: 1.4 !important;
+  height: auto !important;
 }
 
 input:focus,
