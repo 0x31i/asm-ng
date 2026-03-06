@@ -998,7 +998,7 @@
                     if (isKnownAsset) rowClasses.push("known-asset-row");
 
                     var row = "<tr class='" + rowClasses.join(" ") + "' data-event-idx='" + i + "' data-event-hash='" + allData[i][7] + "' onclick='toggleDataDetail(" + i + ")'>";
-                    row += "<td class='text-center' onclick='event.stopPropagation()'><input type='checkbox' id='cb_" + allData[i][7] + "'></td>";
+                    row += "<td class='text-center' class='cb-cell'><input type='checkbox' id='cb_" + allData[i][7] + "'></td>";
                     row += "<td class='text-center validation-status'>";
                     var importedClass = isImported ? " status-imported-glow" : "";
                     if (allData[i][8] == "1" || allData[i][11] == 1) {
@@ -11959,7 +11959,7 @@
                                 if (isKnownAsset) rowClasses.push("known-asset-row");
                                 table += "<tr class='" + rowClasses.join(" ") + "' data-event-idx='" + i + "' data-event-hash='" + data[i][7] + "' onclick='toggleDataDetail(" + i + ")'>";
                                 // Checkbox column (simple checkbox only, no persistence indicators)
-                                table += "<td class='text-center' onclick='event.stopPropagation()'><input type='checkbox' id='cb_" + data[i][7] + "'></td>";
+                                table += "<td class='text-center' class='cb-cell'><input type='checkbox' id='cb_" + data[i][7] + "'></td>";
 
                                 // Status column with text badges
                                 // Imported entries get a purple glow behind the status badge
@@ -12068,7 +12068,8 @@
 
                             // Delegated handlers — survive tablesorter and load-all DOM rebuilds
                             // Click anywhere in checkbox cell toggles the checkbox
-                            $("#scansummary-content").off('click.cbcell').on('click.cbcell', 'td:first-child', function(e) {
+                            $("#scansummary-content").off('click.cbcell').on('click.cbcell', 'td.cb-cell', function(e) {
+                                e.stopPropagation();
                                 if (e.target.type !== 'checkbox') {
                                     var cb = $(this).find("input[type='checkbox']");
                                     cb.prop('checked', !cb.prop('checked'));
@@ -12367,7 +12368,8 @@
                     });
 
                     // Click anywhere in first cell to toggle checkbox
-                    $("#scansummary-content").off('click.cbcell').on('click.cbcell', 'td:first-child', function(e) {
+                    $("#scansummary-content").off('click.cbcell').on('click.cbcell', 'td.cb-cell', function(e) {
+                        e.stopPropagation();
                         if (e.target.type !== 'checkbox') {
                             var cb = $(this).find("input[type='checkbox']");
                             cb.prop('checked', !cb.prop('checked'));
