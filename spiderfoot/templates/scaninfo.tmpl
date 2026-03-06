@@ -839,14 +839,28 @@
 
         // Build data detail HTML for expanded row
         function buildDataDetailHtml(d) {
-            var noteVal = (d[16] != null && d[16] !== undefined) ? d[16] : '';
+            var rawNote = (d[16] != null && d[16] !== undefined) ? d[16] : '';
             var eventHash = d[7] || '';
             var rowIdx = d._idx !== undefined ? d._idx : '';
+            // Split AI insight from manual note
+            var insightVal = '';
+            var noteVal = rawNote;
+            if (rawNote.indexOf('[AI] ') === 0) {
+                insightVal = rawNote.substring(5);
+                noteVal = '';
+            }
             // Discovery Path section (lazy-loaded on expand)
             var html = "<div class='detail-discovery-path' id='dp-container-" + sf.escapeHtml(eventHash) + "'>";
             html += "<div class='finding-detail-label dp-label'>Discovery Path</div>";
             html += "<div class='dp-path-content' id='dp-content-" + sf.escapeHtml(eventHash) + "'></div>";
             html += "</div>";
+            // Insight section (read-only, only shown when AI enrichment exists)
+            if (insightVal) {
+                html += "<div class='detail-insight'>";
+                html += "<div class='finding-detail-label'>Insight</div>";
+                html += "<div class='insight-content'>" + sf.escapeHtml(insightVal) + "</div>";
+                html += "</div>";
+            }
             // Analyst Note section
             html += "<div class='detail-analyst-note'>";
             html += "<div class='finding-detail-label'>Analyst Note</div>";

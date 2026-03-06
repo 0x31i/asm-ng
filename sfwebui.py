@@ -12696,3 +12696,33 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             'scan_id': scan_id,
             'stats': stats,
         }
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def enrichclear(self: 'SpiderFootWebUi', id: str = None) -> dict:
+        """Clear all AI-generated insight notes for a scan's target.
+
+        Args:
+            id (str): scan ID
+
+        Returns:
+            dict: {success, deleted}
+        """
+        self.requireAuth()
+        self.requireAdmin()
+
+        if not id:
+            return {'success': False, 'error': 'Missing scan id'}
+
+        with SpiderFootDb(self.config) as dbh:
+            scanInfo = dbh.scanInstanceGet(id)
+            if not scanInfo:
+                return {'success': False, 'error': 'Scan not found'}
+
+            target = scanInfo[1]
+            deleted = dbh.rowNotesClearAI(target)
+
+        return {
+            'success': True,
+            'deleted': deleted,
+        }
