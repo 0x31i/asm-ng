@@ -1682,8 +1682,8 @@ pre {
    Scrollbars (Webkit)
    ============================================ */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
 }
 
 ::-webkit-scrollbar-track {
@@ -1691,12 +1691,13 @@ pre {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--bg-elevated);
-  border-radius: 5px;
+  background: #b0b0b0;
+  border-radius: 6px;
+  border: 2px solid var(--bg-secondary);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: #888888;
 }
 
 /* ============================================
@@ -10551,6 +10552,7 @@ mark {
   font-size: 12px;
   display: flex;
   align-items: center;
+  color: #1f2937;
 }
 .search-history-item:hover {
   background: #f3f4f6;
