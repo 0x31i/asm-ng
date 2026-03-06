@@ -876,13 +876,61 @@ Configure API integrations and onboard new deployments.
       <p class="ob-hero-desc">
         Full <code>.md</code> guide with <strong>direct signup links</strong> for every free API, organized by tier.
         Fill in your keys, then use the built-in <code>Claude</code> prompt to auto-generate your <code>.config</code> file.
+        <br><span class="ob-hero-hint">Copy to clipboard and paste directly into <code>Obsidian</code>, or download as a file.</span>
       </p>
     </div>
-    <a href="${docroot}/onboardingchecklist" class="btn btn-primary btn-lg ob-download-btn" target="_blank">
-      <i class="glyphicon glyphicon-download-alt"></i> DOWNLOAD CHECKLIST
-    </a>
+    <div class="ob-hero-buttons">
+      <button type="button" class="btn btn-primary btn-lg ob-download-btn" id="ob-copy-checklist" onclick="obCopyChecklist()">
+        <i class="glyphicon glyphicon-copy"></i> COPY TO CLIPBOARD
+      </button>
+      <a href="${docroot}/onboardingchecklist" class="btn btn-default ob-download-btn-secondary" target="_blank">
+        <i class="glyphicon glyphicon-download-alt"></i> DOWNLOAD .MD
+      </a>
+    </div>
   </div>
 </div>
+<div id="ob-copy-result" style="display:none; margin-top: -18px; margin-bottom: 18px;"></div>
+<script>
+function obCopyChecklist() {
+    var btn = document.getElementById('ob-copy-checklist');
+    var origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="glyphicon glyphicon-refresh"></i> LOADING...';
+    $.ajax({
+        url: docroot + '/onboardingchecklist?mode=raw',
+        type: 'GET',
+        dataType: 'json',
+        success: function(data) {
+            if (data && data.content) {
+                navigator.clipboard.writeText(data.content).then(function() {
+                    btn.innerHTML = '<i class="glyphicon glyphicon-ok"></i> COPIED!';
+                    var el = $('#ob-copy-result');
+                    el.attr('class', 'alert alert-success').html(
+                        '<strong>Copied!</strong> Open <code>Obsidian</code> &rarr; <code>Cmd+N</code> (new note) &rarr; <code>Cmd+V</code> (paste). Done.'
+                    ).show();
+                    setTimeout(function() {
+                        btn.innerHTML = origHtml;
+                        btn.disabled = false;
+                    }, 3000);
+                }).catch(function() {
+                    btn.innerHTML = origHtml;
+                    btn.disabled = false;
+                    $('#ob-copy-result').attr('class', 'alert alert-warning').html(
+                        '<strong>Clipboard blocked.</strong> Your browser denied clipboard access. Use the <strong>Download .md</strong> button instead.'
+                    ).show();
+                });
+            }
+        },
+        error: function() {
+            btn.innerHTML = origHtml;
+            btn.disabled = false;
+            $('#ob-copy-result').attr('class', 'alert alert-danger').html(
+                '<strong>Error:</strong> Failed to fetch checklist content.'
+            ).show();
+        }
+    });
+}
+</script>
 
 <!-- ==================== QUICK START (collapsible) ==================== -->
 <h5 class="ob-section-title ob-collapsible" onclick="$('#ob-quickstart-body').slideToggle(200); $(this).toggleClass('ob-collapsed');">

@@ -11440,12 +11440,20 @@ mark {
   font-size: 12px;
 }
 
-.ob-download-btn {
+.ob-hero-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   flex-shrink: 0;
+  align-items: stretch;
+}
+
+.ob-download-btn {
   padding: 14px 28px !important;
   font-size: 13px !important;
   letter-spacing: 1.5px !important;
   box-shadow: 0 0 20px var(--glow-cyan), 0 0 40px rgba(34, 211, 238, 0.2) !important;
+  white-space: nowrap;
 }
 
 .ob-download-btn:hover {
@@ -11455,6 +11463,29 @@ mark {
 
 .ob-download-btn .glyphicon {
   margin-right: 6px;
+}
+
+.ob-download-btn-secondary {
+  padding: 8px 20px !important;
+  font-size: 11px !important;
+  letter-spacing: 1px !important;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ob-hero-hint {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.3px;
+}
+
+.ob-hero-hint code {
+  color: var(--accent-purple-light);
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.2);
 }
 
 /* ---- Stat Cards ---- */

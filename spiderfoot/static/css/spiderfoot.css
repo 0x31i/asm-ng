@@ -10933,14 +10933,39 @@ mark {
   margin: 0;
 }
 
-.ob-download-btn {
+.ob-hero-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   flex-shrink: 0;
+  align-items: stretch;
+}
+
+.ob-download-btn {
   padding: 14px 28px !important;
   font-size: 13px !important;
   letter-spacing: 1.5px !important;
+  white-space: nowrap;
 }
 
 .ob-download-btn .glyphicon { margin-right: 6px; }
+
+.ob-download-btn-secondary {
+  padding: 8px 20px !important;
+  font-size: 11px !important;
+  letter-spacing: 1px !important;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ob-hero-hint {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted, #9ca3af);
+  font-family: var(--font-mono, 'Consolas', monospace);
+  letter-spacing: 0.3px;
+}
 
 /* Collapsible */
 .ob-collapsible {
