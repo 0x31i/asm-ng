@@ -5046,11 +5046,15 @@ th.th-source-highlight *,
   top: auto !important;
   right: auto !important;
   flex-direction: row !important;
+  max-width: calc(100vw - 40px) !important;
 }
 
 #selection-toolbar.toolbar-bottom .toolbar-content {
   flex-direction: row !important;
   align-items: center !important;
+  min-width: 0 !important;
+  overflow-x: auto !important;
+  flex: 1 1 auto !important;
 }
 
 #selection-toolbar.toolbar-bottom .toolbar-header {
