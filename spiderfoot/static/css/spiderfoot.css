@@ -10552,6 +10552,7 @@ mark {
   font-size: 12px;
   display: flex;
   align-items: center;
+  color: #1f2937;
 }
 .search-history-item:hover {
   background: #f3f4f6;
