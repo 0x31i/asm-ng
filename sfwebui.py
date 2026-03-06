@@ -12418,11 +12418,88 @@ This is a placeholder MCP report. Integration with actual MCP server required.
                 existing_notes = {}
                 existing_count = 0
 
+            # Get correlations
+            try:
+                correlations_raw = dbh.scanCorrelationList(id)
+            except Exception:
+                correlations_raw = []
+
+            # Get grade snapshots (current + historical)
+            try:
+                grade_snapshots = dbh.gradeSnapshotsForTarget(target)
+            except Exception:
+                grade_snapshots = []
+
+            # Get false positives and validated findings
+            try:
+                false_positives = dbh.targetFalsePositivesForTarget(target)
+            except Exception:
+                false_positives = set()
+
+            try:
+                validated = dbh.targetValidatedForTarget(target)
+            except Exception:
+                validated = set()
+
+            # Get analyst type comments
+            try:
+                type_comments_raw = dbh.typeCommentsForTarget(target)
+            except Exception:
+                type_comments_raw = []
+
+            # Build discovery paths for high-risk findings (risk >= 2)
+            discovery_paths = {}
+            for row in results:
+                if row[4] == 'ROOT':
+                    continue
+                risk = row[7] if row[7] is not None else 0
+                if risk >= 2 and row[8]:
+                    try:
+                        path = dbh.scanElementPath(id, row[8])
+                        if path and len(path) > 1:
+                            discovery_paths[row[8]] = [
+                                {"type": n['type'], "data": n['data'][:200], "module": n.get('module', '')}
+                                for n in path
+                            ]
+                    except Exception:
+                        pass
+
         # Serialize known assets
         known_serial = {}
         for atype, values in known_assets.items():
             if values:
                 known_serial[atype] = sorted(values)
+
+        # Serialize correlations
+        correlations_serial = []
+        for c in correlations_raw:
+            correlations_serial.append({
+                "title": c[1],
+                "risk": c[3],
+                "rule_name": c[4],
+                "description": c[5],
+                "logic": c[6],
+                "event_count": c[7],
+                "event_types": c[8],
+            })
+
+        # Serialize type comments
+        type_comments = {}
+        for tc in type_comments_raw:
+            type_comments[tc[0]] = tc[1]
+
+        # Serialize FP/validated as lists for JSON
+        fp_set = {(t, d) for t, d, _ in false_positives}
+        val_set = {(t, d) for t, d, _ in validated}
+
+        # Find the current scan's grade snapshot
+        current_grade = None
+        prior_grades = []
+        for snap in grade_snapshots:
+            if snap['scan_id'] == id:
+                current_grade = snap
+            else:
+                prior_grades.append(snap)
 
         # Build findings grouped by type
         findings_by_type = {}
@@ -12433,18 +12510,29 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             if event_type == 'ROOT':
                 continue
 
+            event_data = row[1]
+            event_hash = row[8]
+            is_fp = (event_type, event_data) in fp_set
+            is_validated = (event_type, event_data) in val_set
+
             finding = {
                 "type": event_type,
                 "type_name": row[10] if len(row) > 10 else event_type,
-                "data": row[1],
+                "data": event_data,
                 "source": row[2],
                 "module": row[3],
                 "confidence": row[5],
                 "visibility": row[6],
                 "risk": row[7],
                 "fp_status": row[13],
-                "has_existing_note": (event_type, row[1], row[2]) in existing_notes,
+                "is_false_positive": is_fp,
+                "is_validated": is_validated,
+                "has_existing_note": (event_type, event_data, row[2]) in existing_notes,
             }
+
+            # Attach discovery path if available
+            if event_hash in discovery_paths:
+                finding["discovery_path"] = discovery_paths[event_hash]
 
             if event_type not in findings_by_type:
                 findings_by_type[event_type] = {
@@ -12470,11 +12558,31 @@ This is a placeholder MCP report. Integration with actual MCP server required.
                 t: {"type_name": g["type_name"], "count": g["count"]}
                 for t, g in sorted(findings_by_type.items(), key=lambda x: -x[1]["count"])
             },
+            "correlations": correlations_serial,
+            "analyst_type_comments": type_comments,
+            "grade": {
+                "current": {
+                    "overall_score": current_grade['overall_score'],
+                    "overall_grade": current_grade['overall_grade'],
+                    "categories": current_grade['category_scores'],
+                    "correlation_counts": current_grade.get('correlation_counts'),
+                } if current_grade else None,
+                "history": [
+                    {
+                        "scan_id": s['scan_id'],
+                        "overall_grade": s['overall_grade'],
+                        "overall_score": s['overall_score'],
+                        "scan_started": s['scan_started'],
+                        "label": s.get('snapshot_label'),
+                    }
+                    for s in prior_grades[-5:]  # last 5 historical scans
+                ],
+            },
         }
 
         # Build prompt.md
         prompt = self._enrichBuildPrompt(id, scan_name, target, total_findings,
-                                         known_serial, findings_by_type)
+                                         known_serial, findings_by_type, context)
 
         # Build README.md
         readme = self._enrichBuildReadme(id, scan_name, target, exported_at)
@@ -12495,29 +12603,51 @@ This is a placeholder MCP report. Integration with actual MCP server required.
         return buf.getvalue()
 
     def _enrichBuildPrompt(self, scan_id, scan_name, target, total_findings,
-                           known_serial, findings_by_type):
+                           known_serial, findings_by_type, context):
         """Build the enrichment prompt.md content."""
         lines = []
         lines.append("# ASM-NG Finding Enrichment\n")
         lines.append("You are a senior attack surface management analyst enriching OSINT scan findings")
-        lines.append("with security context. For each finding, write a concise analyst note that helps")
-        lines.append("a junior analyst or client understand:\n")
+        lines.append("with deep security insight. You have access to the full scan context: correlations,")
+        lines.append("security grades, discovery paths, validated/FP status, and analyst comments.")
+        lines.append("For each finding, write an insight that helps a junior analyst or client understand:\n")
         lines.append("1. **What it is** — plain-English explanation of the finding")
         lines.append("2. **Why it matters** — security implications specific to THIS target")
-        lines.append("3. **Context** — how it relates to other findings in the same scan")
-        lines.append("4. **Risk assessment** — realistic severity (not everything is critical)")
-        lines.append("5. **Remediation** — concrete, actionable fix (not generic advice)\n")
+        lines.append("3. **Attack chain context** — how this finding connects to others (use discovery paths and correlations)")
+        lines.append("4. **Risk assessment** — realistic severity, referencing the scan's grade categories where relevant")
+        lines.append("5. **Remediation** — concrete, actionable fix (not generic advice)")
+        lines.append("6. **Trend** — if historical grades exist, note whether the target's posture is improving or degrading\n")
+        lines.append("## Context Files\n")
+        lines.append("Read ALL files before writing insights:\n")
+        lines.append("- `findings.json` — All findings with per-finding metadata:")
+        lines.append("  - `discovery_path` — how the finding was discovered (root → intermediate → finding)")
+        lines.append("  - `is_validated` — analyst-confirmed true positive")
+        lines.append("  - `is_false_positive` — analyst-marked false positive (skip or note as FP)")
+        lines.append("  - `confidence`, `visibility`, `risk` — engine-assigned scores (0-100)")
+        lines.append("- `context.json` — Rich scan context:")
+        lines.append("  - `correlations` — cross-finding patterns the engine detected (attack chains, exposure clusters)")
+        lines.append("  - `grade` — current security grade (A-F) with per-category breakdown + history")
+        lines.append("  - `analyst_type_comments` — existing human analyst notes on event types")
+        lines.append("  - `known_assets` — confirmed client infrastructure\n")
         lines.append("## Rules\n")
-        lines.append("- Be concise. 2-4 sentences per finding. No filler.")
-        lines.append("- Reference other findings when relevant (\"This host also exposes port 27017...\")")
-        lines.append("- For informational findings (DNS records, WHOIS data, etc.), keep it to 1 sentence")
-        lines.append("- For critical findings (open ports, leaked creds, unauth endpoints), be thorough")
-        lines.append("- Use the known_assets to distinguish client infrastructure from third-party")
-        lines.append("- If a finding is almost certainly noise/FP, say so (\"Likely FP: shared hosting IP\")")
-        lines.append("- Write in second person (\"Your staging server...\" not \"The target's staging server...\")\n")
+        lines.append("- **Use correlations heavily.** If a finding participates in a correlation, explain the")
+        lines.append("  attack chain (\"This open port is part of a 5-finding database exposure cluster that also")
+        lines.append("  includes leaked credentials and an unauth MongoDB endpoint\").")
+        lines.append("- **Reference discovery paths.** Explain how the finding was reached (\"Discovered via")
+        lines.append("  DNS lookup → CNAME → subdomain → open port scan\").")
+        lines.append("- **Respect analyst judgments.** Findings marked `is_validated: true` are confirmed real —")
+        lines.append("  treat them with higher urgency. Findings marked `is_false_positive: true` should be")
+        lines.append("  skipped or noted briefly as \"Marked FP by analyst.\"")
+        lines.append("- **Reference grades.** If the target has a D in Infrastructure Security, frame")
+        lines.append("  infrastructure findings in that context (\"Contributing to your D grade in Infrastructure\").")
+        lines.append("- **Note trends.** If historical grades show degradation, mention it.")
+        lines.append("- **Honor existing analyst comments.** If there's a type comment for an event type,")
+        lines.append("  incorporate or complement it — don't contradict human analyst judgment.")
+        lines.append("- Be concise. 2-5 sentences per finding. More for critical/correlated findings.")
+        lines.append("- For informational findings (DNS records, WHOIS data, etc.), keep it to 1 sentence.")
+        lines.append("- Write in second person (\"Your staging server...\" not \"The target's staging server...\").\n")
         lines.append("## Output Format\n")
-        lines.append("Read `findings.json` and `context.json` from this directory.\n")
-        lines.append("Write your output to `enrichments.json` in this directory with this exact structure:\n")
+        lines.append("Write your output to `enrichments.json` with this exact structure:\n")
         lines.append("```json")
         lines.append('{')
         lines.append('  "enrichment_version": "1.0",')
@@ -12527,7 +12657,7 @@ This is a placeholder MCP report. Integration with actual MCP server required.
         lines.append('      "type": "EVENT_TYPE",')
         lines.append('      "data": "the exact event data value",')
         lines.append('      "source": "the exact source data value",')
-        lines.append('      "note": "Your enrichment note here"')
+        lines.append('      "note": "Your insight here"')
         lines.append('    }')
         lines.append('  ]')
         lines.append('}')
@@ -12537,7 +12667,7 @@ This is a placeholder MCP report. Integration with actual MCP server required.
         lines.append("## Batching\n")
         lines.append("If there are too many findings to process at once, process them in batches.")
         lines.append("Write ALL enrichments to a single `enrichments.json` file when done.")
-        lines.append("It's fine to skip truly trivial findings (ROOT events, basic DNS lookups)")
+        lines.append("Skip findings marked `is_false_positive: true` and truly trivial findings,")
         lines.append("but err on the side of including rather than skipping.\n")
         lines.append("---\n")
         lines.append(f"## Scan Details\n")
@@ -12545,6 +12675,44 @@ This is a placeholder MCP report. Integration with actual MCP server required.
         lines.append(f"- **Scan Name:** {scan_name}")
         lines.append(f"- **Scan ID:** `{scan_id}`")
         lines.append(f"- **Total Findings:** {total_findings}\n")
+
+        # Grade summary
+        grade_data = context.get('grade', {})
+        current = grade_data.get('current')
+        if current:
+            lines.append("## Security Grade\n")
+            lines.append(f"**Overall: {current['overall_grade']}** (score: {current['overall_score']})\n")
+            cats = current.get('categories', {})
+            if cats:
+                lines.append("| Category | Grade | Score |")
+                lines.append("|----------|-------|-------|")
+                for cat_name, cat_data in sorted(cats.items()):
+                    lines.append(f"| {cat_name} | {cat_data.get('grade', '-')} | {cat_data.get('score', 0)} |")
+                lines.append("")
+            history = grade_data.get('history', [])
+            if history:
+                grades_str = ' → '.join(f"{s['overall_grade']}" for s in history)
+                lines.append(f"**Grade history (oldest → newest):** {grades_str} → **{current['overall_grade']}** (current)\n")
+
+        # Correlations summary
+        corrs = context.get('correlations', [])
+        if corrs:
+            lines.append("## Correlations Detected\n")
+            lines.append("These are cross-finding patterns the engine identified. Use them to connect related findings:\n")
+            lines.append("| Risk | Title | Events | Types |")
+            lines.append("|------|-------|--------|-------|")
+            for c in sorted(corrs, key=lambda x: {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'INFO': 4}.get(x.get('risk', 'INFO'), 5)):
+                lines.append(f"| {c['risk']} | {c['title']} | {c['event_count']} | {c.get('event_types', '')} |")
+            lines.append("")
+
+        # Analyst type comments
+        type_cmts = context.get('analyst_type_comments', {})
+        if type_cmts:
+            lines.append("## Analyst Type Comments\n")
+            lines.append("Existing human analyst notes on event types — incorporate these into your insights:\n")
+            for etype, comment in sorted(type_cmts.items()):
+                lines.append(f"- **{etype}:** {comment}")
+            lines.append("")
 
         if known_serial:
             lines.append("## Known Assets (Ground Truth)\n")
@@ -12563,12 +12731,12 @@ This is a placeholder MCP report. Integration with actual MCP server required.
         lines.append("")
 
         lines.append("## Files in This Directory\n")
-        lines.append("- `findings.json` — All findings to enrich (read this)")
-        lines.append("- `context.json` — Scan metadata + known assets (read this)")
+        lines.append("- `findings.json` — All findings with discovery paths + validated/FP status")
+        lines.append("- `context.json` — Correlations, grades, analyst comments, known assets")
         lines.append("- `enrichments.json` — **Write your output here**\n")
         lines.append("## Start\n")
         lines.append("Read `findings.json` and `context.json`, then process all findings.")
-        lines.append("Write the enrichment notes to `enrichments.json` using the format above.\n")
+        lines.append("Write the enrichment insights to `enrichments.json` using the format above.\n")
 
         return '\n'.join(lines)
 
@@ -12591,14 +12759,15 @@ This is a placeholder MCP report. Integration with actual MCP server required.
         lines.append("```")
         lines.append("Read prompt.md and enrich all findings. Write output to enrichments.json")
         lines.append("```\n")
-        lines.append("Claude reads findings.json + context.json and writes enrichments.json.\n")
+        lines.append("Claude reads findings.json (with discovery paths, validated/FP status)")
+        lines.append("and context.json (correlations, grades, analyst comments) to produce deep insights.\n")
         lines.append("### Step 4: Import the enrichments\n")
         lines.append("Upload `enrichments.json` on the **Enrich Data** page in ASM-NG,")
         lines.append("or use the CLI:\n")
         lines.append("```bash")
         lines.append(f"python3 tools/enrich_import.py --scan-id {scan_id} --dir ~/Downloads/enrich")
         lines.append("```\n")
-        lines.append("Notes appear as `[AI]` row notes in DATA/TYPE views immediately.\n")
+        lines.append("Insights appear in the Insight panel when expanding findings in DATA/TYPE views.\n")
 
         return '\n'.join(lines)
 
