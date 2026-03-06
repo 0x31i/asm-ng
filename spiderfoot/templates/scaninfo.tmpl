@@ -1033,7 +1033,7 @@
                     applyClientSideFilters();
                 }
 
-                // Re-bind shift-click
+                // Re-bind shift-click (direct binding needed for index tracking)
                 lastChecked = null;
                 var chkboxes = $('input[id*=cb_]');
                 chkboxes.click(function(e) {
@@ -1042,6 +1042,7 @@
                         var start = chkboxes.index(this);
                         var end = chkboxes.index(lastChecked);
                         chkboxes.slice(Math.min(start, end), Math.max(start, end) + 1).prop('checked', lastChecked.checked);
+                        updateSelectionToolbar();
                     }
                     lastChecked = this;
                 });
@@ -12058,31 +12059,30 @@
                                 if(e.shiftKey) {
                                     var start = chkboxes.index(this);
                                     var end = chkboxes.index(lastChecked);
-
                                     chkboxes.slice(Math.min(start,end), Math.max(start,end)+ 1).prop('checked', lastChecked.checked);
-
+                                    updateSelectionToolbar();
                                 }
 
                                 lastChecked = this;
                             });
 
-                            // Make clicking anywhere in first cell toggle checkbox
-                            $("#scansummary-content td:first-child").click(function(e) {
-                                // Only toggle if not clicking directly on checkbox
+                            // Delegated handlers — survive tablesorter and load-all DOM rebuilds
+                            // Click anywhere in checkbox cell toggles the checkbox
+                            $("#scansummary-content").off('click.cbcell').on('click.cbcell', 'td:first-child', function(e) {
                                 if (e.target.type !== 'checkbox') {
                                     var cb = $(this).find("input[type='checkbox']");
                                     cb.prop('checked', !cb.prop('checked'));
-                                    updateSelectionToolbar();
                                 }
+                                updateSelectionToolbar();
                             });
 
-                            // Update toolbar when any checkbox changes
-                            $("input[id*=cb_]").change(function() {
+                            // Update toolbar on any checkbox change (direct click on checkbox)
+                            $("#scansummary-content").off('change.cb').on('change.cb', "input[id*=cb_]", function() {
                                 updateSelectionToolbar();
                             });
 
                             // Update toolbar when "select all" checkbox changes
-                            $("#checkall").change(function() {
+                            $("#scansummary-content").off('change.chkall').on('change.chkall', '#checkall', function() {
                                 updateSelectionToolbar();
                             });
 
@@ -12367,16 +12367,15 @@
                     });
 
                     // Click anywhere in first cell to toggle checkbox
-                    $("#scansummary-content td:first-child").click(function(e) {
+                    $("#scansummary-content").off('click.cbcell').on('click.cbcell', 'td:first-child', function(e) {
                         if (e.target.type !== 'checkbox') {
                             var cb = $(this).find("input[type='checkbox']");
                             cb.prop('checked', !cb.prop('checked'));
-                            updateSelectionToolbar();
                         }
+                        updateSelectionToolbar();
                     });
-
-                    $("input[id*=cb_]").change(function() { updateSelectionToolbar(); });
-                    $("#checkall").change(function() { updateSelectionToolbar(); });
+                    $("#scansummary-content").off('change.cb').on('change.cb', "input[id*=cb_]", function() { updateSelectionToolbar(); });
+                    $("#scansummary-content").off('change.chkall').on('change.chkall', '#checkall', function() { updateSelectionToolbar(); });
                 }
 
                 // Fetch full view data (for ordering and FP status)
