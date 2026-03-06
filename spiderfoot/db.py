@@ -7823,10 +7823,10 @@ class SpiderFootDb:
         Returns:
             int: number of rows deleted
         """
-        qry = "DELETE FROM tbl_analyst_row_notes WHERE target = ? AND note_text LIKE '[AI] %'"
+        qry = "DELETE FROM tbl_analyst_row_notes WHERE target = ? AND note_text LIKE ?"
         with self.dbhLock:
             try:
-                self.dbh.execute(qry, (target,))
+                self.dbh.execute(qry, (target, '[AI] %'))
                 count = self.dbh.rowcount
                 self.conn.commit()
                 return count
