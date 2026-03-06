@@ -11440,12 +11440,20 @@ mark {
   font-size: 12px;
 }
 
-.ob-download-btn {
+.ob-hero-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   flex-shrink: 0;
+  align-items: stretch;
+}
+
+.ob-download-btn {
   padding: 14px 28px !important;
   font-size: 13px !important;
   letter-spacing: 1.5px !important;
   box-shadow: 0 0 20px var(--glow-cyan), 0 0 40px rgba(34, 211, 238, 0.2) !important;
+  white-space: nowrap;
 }
 
 .ob-download-btn:hover {
@@ -11455,6 +11463,29 @@ mark {
 
 .ob-download-btn .glyphicon {
   margin-right: 6px;
+}
+
+.ob-download-btn-secondary {
+  padding: 8px 20px !important;
+  font-size: 11px !important;
+  letter-spacing: 1px !important;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ob-hero-hint {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.3px;
+}
+
+.ob-hero-hint code {
+  color: var(--accent-purple-light);
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.2);
 }
 
 /* ---- Stat Cards ---- */
@@ -11576,11 +11607,46 @@ mark {
   border-color: rgba(34, 197, 94, 0.2);
 }
 
+/* ---- Collapsible Sections ---- */
+.ob-collapsible {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ob-collapsible:hover {
+  color: var(--accent-cyan);
+  text-shadow: 0 0 10px var(--glow-cyan);
+}
+
+.ob-chevron {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.ob-collapsed .ob-chevron {
+  transform: rotate(-90deg);
+}
+
+.ob-collapsible-body {
+  margin-bottom: 16px;
+}
+
 /* ---- Tables ---- */
 .ob-table {
   font-family: var(--font-mono);
   font-size: 12px;
+  table-layout: fixed;
+  width: 100%;
 }
+
+.ob-col-module { width: 40%; }
+.ob-col-keys   { width: 40%; }
+.ob-col-action { width: 20%; }
 
 .ob-table thead th {
   font-family: var(--font-mono) !important;
@@ -11591,15 +11657,84 @@ mark {
   color: var(--text-muted) !important;
 }
 
+.ob-table td {
+  vertical-align: middle !important;
+  word-break: break-word;
+}
+
 .ob-table code {
   font-size: 11px;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .ob-action-cell {
-  width: 100px;
   text-align: center;
   vertical-align: middle !important;
+  white-space: nowrap;
+}
+
+/* Onboarding CONFIGURE button — cyan, nuclear specificity for both themes */
+.ob-table a.btn.ob-btn-configure,
+.ob-table a.btn.ob-btn-configure:visited,
+.ob-table a.btn.ob-btn-configure:link,
+a.btn.ob-btn-configure,
+a.btn.ob-btn-configure:visited,
+a.btn.ob-btn-configure:link {
+  background: linear-gradient(135deg, var(--accent-cyan, #22d3ee) 0%, #06b6d4 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.4);
+  font-family: var(--font-mono, monospace) !important;
+  font-weight: 700 !important;
+  font-size: 10px !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  padding: 4px 10px !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+  text-decoration: none !important;
+}
+
+.ob-table a.btn.ob-btn-configure:hover,
+.ob-table a.btn.ob-btn-configure:focus,
+a.btn.ob-btn-configure:hover,
+a.btn.ob-btn-configure:focus {
+  background: linear-gradient(135deg, #67e8f9 0%, var(--accent-cyan, #22d3ee) 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.6), 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  text-decoration: none !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Onboarding VIEW button — subtle default */
+.ob-table a.btn.ob-btn-view,
+.ob-table a.btn.ob-btn-view:visited,
+.ob-table a.btn.ob-btn-view:link,
+a.btn.ob-btn-view,
+a.btn.ob-btn-view:visited,
+a.btn.ob-btn-view:link {
+  background: var(--bg-elevated, #2a2a2a) !important;
+  color: var(--text-secondary, #a3a3a3) !important;
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.1)) !important;
+  font-family: var(--font-mono, monospace) !important;
+  font-weight: 600 !important;
+  font-size: 10px !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  padding: 4px 10px !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  text-decoration: none !important;
+}
+
+.ob-table a.btn.ob-btn-view:hover,
+.ob-table a.btn.ob-btn-view:focus,
+a.btn.ob-btn-view:hover,
+a.btn.ob-btn-view:focus {
+  background: var(--bg-tertiary, #1e1e1e) !important;
+  color: var(--text-primary, #fafafa) !important;
+  text-decoration: none !important;
+  text-shadow: none !important;
 }
 
 /* ---- Steps ---- */
