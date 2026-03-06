@@ -12614,7 +12614,6 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             dict: {success, scan_id, stats: {written, overwritten, skipped, errors}}
         """
         self.requireAuth()
-        self.requireAdmin()
 
         AI_NOTE_PREFIX = "[AI] "
 
@@ -12709,7 +12708,6 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             dict: {success, deleted}
         """
         self.requireAuth()
-        self.requireAdmin()
 
         if not id:
             return {'success': False, 'error': 'Missing scan id'}
