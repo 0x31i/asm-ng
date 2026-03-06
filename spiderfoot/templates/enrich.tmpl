@@ -1,0 +1,644 @@
+<%include file="HEADER.tmpl"/>
+<%
+import json as _json
+%>
+<style>
+/* ──────────────────────────────────────────────────────────────────
+   AI ENRICH PAGE — sharp modern hacker aesthetic
+   Mirrors triage.tmpl design system
+────────────────────────────────────────────────────────────────── */
+
+/* Page title — mono font, uppercase, glow */
+.enrich-header { display:flex; align-items:center; gap:14px; margin-bottom:24px; }
+.enrich-title  {
+    font-family:var(--font-mono); font-size:22px; font-weight:700;
+    color:var(--text-primary); letter-spacing:2px; text-transform:uppercase;
+    text-shadow: 0 0 10px var(--glow-cyan), 0 0 20px var(--glow-cyan);
+}
+.enrich-sub { color:var(--text-muted); font-size:12px; margin-left:8px; font-family:var(--font-mono); letter-spacing:.3px; }
+
+/* ── Cards: glass panels, sharp corners, glow borders ── */
+.enrich-card {
+    background:var(--glass-bg); border:1px solid var(--glass-border);
+    border-radius:0; margin-bottom:20px; overflow:hidden;
+    box-shadow: var(--shadow-md), 0 0 1px var(--glow-cyan);
+}
+.enrich-card-hdr {
+    background:var(--bg-tertiary); border-bottom:1px solid var(--glass-border);
+    padding:10px 18px; display:flex; align-items:center; justify-content:space-between;
+}
+.enrich-card-hdr-label {
+    font-family:var(--font-mono); font-size:10px; font-weight:700;
+    letter-spacing:2px; text-transform:uppercase; color:var(--accent-cyan, #22d3ee);
+    text-shadow: 0 0 6px var(--glow-cyan);
+}
+.enrich-card-body { padding:20px; }
+
+/* ── Export form ── */
+.enrich-export-form { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; }
+.enrich-export-form .form-group { margin-bottom:0; min-width:220px; }
+.enrich-export-form label {
+    font-family:var(--font-mono); font-size:10px; font-weight:700;
+    color:var(--text-secondary); text-transform:uppercase; letter-spacing:1.5px;
+    display:block; margin-bottom:5px;
+}
+.enrich-export-form select,
+.enrich-export-form input {
+    background:var(--bg-secondary); border:1px solid var(--glass-border);
+    color:var(--text-primary); border-radius:0; padding:8px 12px; width:100%;
+    font-family:var(--font-mono); font-size:13px;
+    transition: border-color .15s, box-shadow .15s;
+}
+.enrich-export-form select:focus,
+.enrich-export-form input:focus {
+    border-color:var(--accent-cyan, #22d3ee); box-shadow:0 0 8px var(--glow-cyan); outline:none;
+}
+
+/* ── Stat counters ── */
+.enrich-stats { display:flex; gap:12px; margin:18px 0; flex-wrap:wrap; }
+.enrich-stat {
+    background:var(--bg-secondary); border:1px solid var(--glass-border);
+    border-radius:0; padding:14px 20px; min-width:110px; text-align:center;
+    transition: border-color .2s, box-shadow .2s;
+}
+.enrich-stat:hover { border-color:var(--accent-cyan, #22d3ee); box-shadow:0 0 12px var(--glow-cyan); }
+.enrich-stat-val {
+    font-family:var(--font-mono); font-size:24px; font-weight:700;
+    color:var(--accent-cyan, #22d3ee); text-shadow:0 0 8px var(--glow-cyan);
+}
+.enrich-stat-val.types { color:var(--accent-purple, #a78bfa); text-shadow:0 0 8px var(--glow-purple); }
+.enrich-stat-val.notes { color:var(--accent-green); text-shadow:0 0 8px var(--glow-green); }
+.enrich-stat-label {
+    font-family:var(--font-mono); font-size:9px; font-weight:600;
+    color:var(--text-muted); text-transform:uppercase; letter-spacing:1.5px; margin-top:4px;
+}
+
+/* ── Buttons ── */
+.btn-enrich-export {
+    font-family:var(--font-mono) !important; font-size:12px !important; font-weight:700 !important;
+    text-transform:uppercase !important; letter-spacing:2px !important;
+    background:linear-gradient(135deg, var(--accent-cyan, #22d3ee) 0%, #06b6d4 100%) !important;
+    color:#000 !important; border:none !important; border-radius:0 !important;
+    padding:10px 24px !important; cursor:pointer !important;
+    transition: box-shadow .2s, transform .1s !important;
+    box-shadow: 0 0 10px var(--glow-cyan), 0 2px 8px rgba(0,0,0,0.3) !important;
+}
+.btn-enrich-export:hover:not(:disabled) {
+    box-shadow: 0 0 25px var(--glow-cyan), 0 4px 15px rgba(0,0,0,0.4) !important;
+    transform: translateY(-1px) !important;
+}
+.btn-enrich-export:disabled {
+    opacity:0.4 !important; cursor:not-allowed !important;
+    box-shadow: none !important;
+}
+
+/* ── Upload drop zone ── */
+.enrich-dropzone {
+    border:2px dashed var(--glass-border); border-radius:0; padding:40px; text-align:center;
+    color:var(--text-muted); cursor:pointer;
+    transition: border-color .2s, background .2s, box-shadow .2s;
+}
+.enrich-dropzone:hover,
+.enrich-dropzone.dragover {
+    border-color:var(--accent-cyan, #22d3ee); border-style:solid;
+    box-shadow:0 0 20px var(--glow-cyan), inset 0 0 30px var(--glow-cyan);
+}
+.enrich-dropzone-text { font-family:var(--font-mono); font-size:13px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px; }
+.enrich-dropzone-sub { font-size:11px; color:var(--text-muted); margin-top:6px; font-family:var(--font-mono); }
+
+/* ── Info block ── */
+.enrich-info {
+    font-size:12px; color:var(--text-secondary); margin-top:16px;
+    padding:12px 16px; background:var(--bg-secondary); border:1px solid var(--glass-border);
+    line-height:1.8;
+}
+.enrich-info code {
+    font-family:var(--font-mono); font-size:11px; color:var(--accent-cyan, #22d3ee);
+    background:var(--bg-tertiary); padding:2px 6px;
+}
+
+/* ── Modal overlays ── */
+.enrich-modal-overlay {
+    display:none; position:fixed; inset:0; z-index:9999;
+    background:rgba(0,0,0,0.85); backdrop-filter:blur(6px);
+    justify-content:center; align-items:center;
+}
+.enrich-modal-overlay.active { display:flex; }
+.enrich-modal {
+    background:var(--bg-primary); border:1px solid var(--accent-cyan, #22d3ee);
+    border-radius:0; width:90%; max-width:640px;
+    box-shadow:0 0 40px var(--glow-cyan), 0 0 80px rgba(34,211,238,0.1);
+}
+.enrich-modal-hdr {
+    background:var(--bg-tertiary); border-bottom:1px solid var(--glass-border);
+    padding:14px 20px; display:flex; align-items:center; justify-content:space-between;
+}
+.enrich-modal-hdr-label {
+    font-family:var(--font-mono); font-size:11px; font-weight:700;
+    color:var(--accent-cyan, #22d3ee); text-transform:uppercase; letter-spacing:2px;
+    text-shadow:0 0 6px var(--glow-cyan);
+}
+.enrich-modal-close {
+    background:none; border:none; color:var(--text-muted); font-size:22px;
+    cursor:pointer; line-height:1;
+}
+.enrich-modal-close:hover { color:var(--text-primary); }
+.enrich-modal-body { padding:24px; }
+.enrich-modal-body .step { display:flex; align-items:flex-start; gap:12px; margin-bottom:14px; }
+.enrich-modal-body .step-num {
+    flex:0 0 28px; height:28px; display:flex; align-items:center; justify-content:center;
+    background:var(--accent-cyan, #22d3ee); color:#000; font-family:var(--font-mono);
+    font-size:12px; font-weight:700; border-radius:0;
+    box-shadow:0 0 8px var(--glow-cyan);
+}
+.enrich-modal-body .step-text {
+    font-family:var(--font-sans); color:var(--text-secondary);
+}
+.enrich-cmd-block {
+    position:relative; background:var(--bg-tertiary); border:1px solid var(--accent-cyan, #22d3ee);
+    border-radius:0; padding:14px 16px; margin:10px 0 16px 0; cursor:pointer;
+    transition: box-shadow .2s;
+}
+.enrich-cmd-block:hover {
+    box-shadow:0 0 15px var(--glow-cyan);
+}
+.enrich-cmd-block code {
+    font-family:var(--font-mono); font-size:13px; font-weight:600;
+    color:var(--accent-cyan, #22d3ee); background:none; border:none; padding:0;
+    user-select:all; -webkit-user-select:all;
+}
+.enrich-cmd-copy-hint {
+    position:absolute; top:8px; right:10px;
+    font-family:var(--font-mono); font-size:9px; font-weight:700;
+    color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;
+}
+.enrich-cmd-block.copied .enrich-cmd-copy-hint {
+    color:var(--accent-cyan, #22d3ee);
+}
+.enrich-modal-body .step-done {
+    font-family:var(--font-mono); font-size:11px; font-weight:700;
+    color:var(--accent-cyan, #22d3ee); text-transform:uppercase; letter-spacing:1px;
+    margin-top:16px; padding-top:12px; border-top:1px solid var(--glass-border);
+    text-shadow:0 0 6px var(--glow-cyan);
+}
+
+/* ── Import preview ── */
+.enrich-preview { max-height:300px; overflow-y:auto; margin-top:16px; }
+.enrich-preview table { width:100%; font-size:12px; border-collapse:collapse; }
+.enrich-preview th {
+    position:sticky; top:0; background:var(--bg-tertiary);
+    font-family:var(--font-mono); font-size:10px; font-weight:700;
+    color:var(--text-muted); text-transform:uppercase; letter-spacing:1.5px;
+    padding:8px 10px; border-bottom:1px solid var(--glass-border); text-align:left;
+}
+.enrich-preview td {
+    padding:6px 10px; border-bottom:1px solid var(--glass-border);
+    color:var(--text-primary); font-family:var(--font-mono); font-size:11px;
+    word-break:break-all;
+}
+.enrich-preview td.note-cell {
+    color:var(--text-secondary); font-family:var(--font-sans); font-size:12px;
+    word-break:normal;
+}
+
+/* ── Apply button ── */
+.btn-enrich-apply {
+    font-family:var(--font-mono) !important; font-size:12px !important; font-weight:700 !important;
+    text-transform:uppercase !important; letter-spacing:2px !important;
+    background:linear-gradient(135deg, var(--accent-green) 0%, #059669 100%) !important;
+    color:#000 !important; border:none !important; border-radius:0 !important;
+    padding:10px 24px !important; cursor:pointer !important;
+    transition: box-shadow .2s, transform .1s !important;
+    box-shadow: 0 0 10px var(--glow-green), 0 2px 8px rgba(0,0,0,0.3) !important;
+}
+.btn-enrich-apply:hover:not(:disabled) {
+    box-shadow: 0 0 25px var(--glow-green), 0 4px 15px rgba(0,0,0,0.4) !important;
+    transform: translateY(-1px) !important;
+}
+.btn-enrich-apply:disabled {
+    opacity:0.4 !important; cursor:not-allowed !important;
+    box-shadow: none !important;
+}
+</style>
+
+<div class="enrich-header">
+    <span class="enrich-title">Enrich Data</span>
+    <span class="enrich-sub">Export findings for Claude Code enrichment, then import AI-generated analyst notes</span>
+</div>
+
+<!-- ── EXPORT SECTION ──────────────────────────────────────────── -->
+<div class="enrich-card">
+    <div class="enrich-card-hdr">
+        <span class="enrich-card-hdr-label">Export Enrichment Package</span>
+        <span id="enrich-result-count" style="color:var(--text-muted); font-size:12px;"></span>
+    </div>
+    <div class="enrich-card-body">
+        <div class="enrich-export-form">
+            <div class="form-group">
+                <label>Scan</label>
+                <select id="enrich-scan-select">
+                    <option value="">-- Select a scan --</option>
+                    % for scan in scans:
+                    <option value="${scan[0]}" data-target="${scan[2]}" data-name="${scan[1]}" data-status="${scan[6]}">${scan[1]} (${scan[2]}) - ${scan[6]}</option>
+                    % endfor
+                </select>
+            </div>
+            <div class="form-group">
+                <button class="btn-enrich-export" id="btn-enrich-export" onclick="enrichExport()" disabled>
+                    Export Enrichment Package
+                </button>
+            </div>
+        </div>
+
+        <div id="enrich-export-stats" class="enrich-stats" style="display:none;">
+            <div class="enrich-stat">
+                <div class="enrich-stat-val" id="estat-total">0</div>
+                <div class="enrich-stat-label">Total Findings</div>
+            </div>
+            <div class="enrich-stat">
+                <div class="enrich-stat-val types" id="estat-types">0</div>
+                <div class="enrich-stat-label">Event Types</div>
+            </div>
+            <div class="enrich-stat">
+                <div class="enrich-stat-val notes" id="estat-notes">0</div>
+                <div class="enrich-stat-label">Existing Notes</div>
+            </div>
+        </div>
+
+        <div class="enrich-info">
+            <strong>How it works:</strong><br>
+            1. Select a completed scan and click <code>Export Enrichment Package</code><br>
+            2. A ZIP downloads containing <code>prompt.md</code>, <code>findings.json</code>, and <code>context.json</code><br>
+            3. Open Claude Code in the export directory and reference <code>prompt.md</code><br>
+            4. Claude reads the findings, writes <code>enrichments.json</code> with analyst notes for every finding<br>
+            5. Upload <code>enrichments.json</code> below &mdash; notes appear as <code>[AI]</code> row notes in DATA/TYPE views
+        </div>
+    </div>
+</div>
+
+<!-- ── IMPORT SECTION ──────────────────────────────────────────── -->
+<div class="enrich-card">
+    <div class="enrich-card-hdr">
+        <span class="enrich-card-hdr-label">Import Enrichment Notes</span>
+    </div>
+    <div class="enrich-card-body">
+        <div class="enrich-dropzone" id="enrich-dropzone" onclick="document.getElementById('enrich-file-input').click();">
+            <div class="enrich-dropzone-text">Drop enrichments.json here or click to browse</div>
+            <div class="enrich-dropzone-sub">Accepts enrichments.json from Claude Code</div>
+        </div>
+        <input type="file" id="enrich-file-input" accept=".json" style="display:none;" onchange="enrichFileSelected(this)">
+
+        <!-- Preview area (hidden until file loaded) -->
+        <div id="enrich-import-preview" style="display:none;">
+            <div id="enrich-import-scan-info" style="margin-bottom:12px; padding:10px 14px; background:rgba(34,211,238,0.05); border:1px solid var(--accent-cyan, #22d3ee); font-size:12px; color:var(--text-secondary);">
+                Target scan: <strong id="enrich-import-scan-id" style="color:var(--text-primary);"></strong>
+            </div>
+            <div class="enrich-stats">
+                <div class="enrich-stat">
+                    <div class="enrich-stat-val" id="import-enrich-total">0</div>
+                    <div class="enrich-stat-label">Total Notes</div>
+                </div>
+                <div class="enrich-stat">
+                    <div class="enrich-stat-val types" id="import-enrich-types">0</div>
+                    <div class="enrich-stat-label">Event Types</div>
+                </div>
+            </div>
+
+            <div id="enrich-import-errors" style="display:none; color:var(--accent-red); font-size:12px; margin:10px 0; padding:8px; background:rgba(239,68,68,0.05); border:1px solid var(--accent-red); border-radius:0;"></div>
+
+            <div class="enrich-preview" id="enrich-preview-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:20%;">Type</th>
+                            <th style="width:30%;">Data</th>
+                            <th style="width:50%;">Note Preview</th>
+                        </tr>
+                    </thead>
+                    <tbody id="enrich-preview-tbody">
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="margin-top:16px; display:flex; gap:12px; align-items:center;">
+                <button class="btn-enrich-apply" id="btn-enrich-apply" onclick="enrichApply()" disabled>
+                    Apply Enrichment Notes
+                </button>
+                <label style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted); cursor:pointer;">
+                    <input type="checkbox" id="enrich-overwrite" style="margin-right:6px;">
+                    Overwrite existing manual notes
+                </label>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── EXPORT INSTRUCTIONS MODAL ───────────────────────────────── -->
+<div class="enrich-modal-overlay" id="enrich-export-modal" onclick="if(event.target===this)this.classList.remove('active')">
+    <div class="enrich-modal">
+        <div class="enrich-modal-hdr">
+            <span class="enrich-modal-hdr-label">Export Complete &mdash; Next Steps</span>
+            <button class="enrich-modal-close" onclick="document.getElementById('enrich-export-modal').classList.remove('active');">&times;</button>
+        </div>
+        <div class="enrich-modal-body">
+            <div class="step">
+                <span class="step-num">1</span>
+                <span class="step-text">Enrichment package downloaded to <code>~/Downloads/enrich/</code></span>
+            </div>
+            <div class="step">
+                <span class="step-num">2</span>
+                <span class="step-text">Open Claude Code in that directory:</span>
+                <div class="enrich-cmd-block" id="enrich-cmd-cd" onclick="enrichCopyCmd('enrich-cmd-cd')">
+                    <code>cd ~/Downloads/enrich &amp;&amp; claude</code>
+                    <span class="enrich-cmd-copy-hint">CLICK TO COPY</span>
+                </div>
+            </div>
+            <div class="step">
+                <span class="step-num">3</span>
+                <span class="step-text">Tell Claude to process the prompt:</span>
+                <div class="enrich-cmd-block" id="enrich-cmd-prompt" onclick="enrichCopyCmd('enrich-cmd-prompt')">
+                    <code>Read prompt.md and enrich all findings. Write output to enrichments.json</code>
+                    <span class="enrich-cmd-copy-hint">CLICK TO COPY</span>
+                </div>
+            </div>
+            <div class="step">
+                <span class="step-num">4</span>
+                <span class="step-text">Claude reads findings.json + context.json, analyzes every finding, and writes <code>enrichments.json</code></span>
+            </div>
+            <div class="step">
+                <span class="step-num">5</span>
+                <span class="step-text">Upload <code>enrichments.json</code> using the <strong>Import Enrichment Notes</strong> section below</span>
+            </div>
+            <div class="step-done">
+                &#10003; Package exported &mdash; ready for Claude Code
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── APPLY SUCCESS MODAL ─────────────────────────────────────── -->
+<div class="enrich-modal-overlay" id="enrich-apply-modal" onclick="if(event.target===this)this.classList.remove('active')">
+    <div class="enrich-modal">
+        <div class="enrich-modal-hdr">
+            <span class="enrich-modal-hdr-label">Enrichment Applied Successfully</span>
+            <button class="enrich-modal-close" onclick="document.getElementById('enrich-apply-modal').classList.remove('active');">&times;</button>
+        </div>
+        <div class="enrich-modal-body">
+            <div class="step">
+                <span class="step-num" style="background:var(--accent-green);">&#10003;</span>
+                <span class="step-text" id="enrich-apply-summary"></span>
+            </div>
+            <div style="margin:20px 0; text-align:center;">
+                <a id="enrich-scan-link" href="#" class="btn-enrich-export" style="display:inline-block; text-decoration:none; padding:12px 28px; font-size:13px;">
+                    <i class="glyphicon glyphicon-arrow-right" style="margin-right:8px;"></i>VIEW SCAN RESULTS
+                </a>
+            </div>
+            <div class="step-done">
+                &#10003; Notes saved &mdash; visible in DATA/TYPE views as [AI] row notes
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+(function() {
+    "use strict";
+
+    var _importData = null;
+    var _selectedScanId = null;
+    var _selectedTarget = null;
+
+    function htmlEscape(s) {
+        if (!s) return '';
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(s));
+        return div.innerHTML;
+    }
+
+    // ── Scan selection: fetch counts ──────────────────────────────
+    document.getElementById('enrich-scan-select').addEventListener('change', function() {
+        var scanId = this.value;
+        var btn = document.getElementById('btn-enrich-export');
+        var opt = this.options[this.selectedIndex];
+
+        if (!scanId) {
+            btn.disabled = true;
+            _selectedScanId = null;
+            _selectedTarget = null;
+            document.getElementById('enrich-export-stats').style.display = 'none';
+            return;
+        }
+
+        _selectedScanId = scanId;
+        _selectedTarget = opt.getAttribute('data-target');
+        btn.disabled = false;
+
+        // Fetch stats for this scan
+        $.getJSON(docroot + '/enrichcounts?id=' + encodeURIComponent(scanId), function(data) {
+            if (data && data.success) {
+                document.getElementById('estat-total').textContent = (data.counts.total || 0).toLocaleString();
+                document.getElementById('estat-types').textContent = (data.counts.types || 0).toLocaleString();
+                document.getElementById('estat-notes').textContent = (data.counts.existing_notes || 0).toLocaleString();
+                document.getElementById('enrich-export-stats').style.display = 'flex';
+                document.getElementById('enrich-result-count').textContent =
+                    (data.counts.total || 0).toLocaleString() + ' findings to enrich';
+            }
+        });
+    });
+
+    // ── Export ─────────────────────────────────────────────────────
+    window.enrichExport = function() {
+        if (!_selectedScanId) { alertify.warning('Select a scan first'); return; }
+
+        var btn = document.getElementById('btn-enrich-export');
+        btn.disabled = true;
+        btn.textContent = 'Exporting...';
+
+        window.location.href = docroot + '/enrichexport?id=' + encodeURIComponent(_selectedScanId);
+
+        setTimeout(function() {
+            btn.disabled = false;
+            btn.textContent = 'Export Enrichment Package';
+            document.getElementById('enrich-export-modal').classList.add('active');
+        }, 800);
+    };
+
+    // ── Copy command ──────────────────────────────────────────────
+    window.enrichCopyCmd = function(blockId) {
+        var block = document.getElementById(blockId);
+        var text = block.querySelector('code').textContent;
+        navigator.clipboard.writeText(text).then(function() {
+            var hint = block.querySelector('.enrich-cmd-copy-hint');
+            hint.textContent = 'COPIED!';
+            block.classList.add('copied');
+            setTimeout(function() {
+                hint.textContent = 'CLICK TO COPY';
+                block.classList.remove('copied');
+            }, 3000);
+        });
+    };
+
+    // ── Drag & Drop ───────────────────────────────────────────────
+    var dz = document.getElementById('enrich-dropzone');
+    dz.addEventListener('dragover', function(e) { e.preventDefault(); this.classList.add('dragover'); });
+    dz.addEventListener('dragleave', function() { this.classList.remove('dragover'); });
+    dz.addEventListener('drop', function(e) {
+        e.preventDefault();
+        this.classList.remove('dragover');
+        if (e.dataTransfer.files.length) {
+            enrichReadFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    window.enrichFileSelected = function(input) {
+        if (input.files.length) {
+            enrichReadFile(input.files[0]);
+        }
+    };
+
+    function enrichReadFile(file) {
+        if (!file.name.endsWith('.json')) {
+            alertify.error('Please upload a .json file');
+            return;
+        }
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                var data = JSON.parse(e.target.result);
+                enrichPreview(data);
+            } catch (ex) {
+                alertify.error('Invalid JSON file: ' + ex.message);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // ── Preview enrichments ───────────────────────────────────────
+    function enrichPreview(data) {
+        if (!data.enrichment_version || !data.enrichments) {
+            alertify.error('Invalid enrichments file: missing enrichment_version or enrichments array');
+            return;
+        }
+
+        _importData = data;
+
+        // Show scan info
+        document.getElementById('enrich-import-scan-id').textContent = data.scan_id || 'Unknown';
+
+        var enrichments = data.enrichments || [];
+        var typeSet = {};
+        var errors = [];
+        var valid = [];
+
+        enrichments.forEach(function(entry, i) {
+            if (!entry.type || !entry.data) {
+                errors.push('Entry ' + i + ': missing type or data');
+                return;
+            }
+            if (!entry.note || !entry.note.trim()) {
+                return; // skip empty notes
+            }
+            typeSet[entry.type] = (typeSet[entry.type] || 0) + 1;
+            valid.push(entry);
+        });
+
+        var totalNotes = valid.length;
+        var totalTypes = Object.keys(typeSet).length;
+
+        document.getElementById('import-enrich-total').textContent = totalNotes.toLocaleString();
+        document.getElementById('import-enrich-types').textContent = totalTypes.toLocaleString();
+
+        // Build preview table (show first 20)
+        var tbody = document.getElementById('enrich-preview-tbody');
+        tbody.innerHTML = '';
+
+        valid.slice(0, 20).forEach(function(entry) {
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td>' + htmlEscape(entry.type) + '</td>' +
+                '<td>' + htmlEscape((entry.data || '').substring(0, 60)) + (entry.data.length > 60 ? '...' : '') + '</td>' +
+                '<td class="note-cell">' + htmlEscape((entry.note || '').substring(0, 120)) + (entry.note.length > 120 ? '...' : '') + '</td>';
+            tbody.appendChild(tr);
+        });
+
+        if (valid.length > 20) {
+            var tr = document.createElement('tr');
+            tr.innerHTML = '<td colspan="3" style="text-align:center; color:var(--text-muted); font-style:italic;">... and ' +
+                (valid.length - 20).toLocaleString() + ' more enrichments</td>';
+            tbody.appendChild(tr);
+        }
+
+        // Show errors
+        var errDiv = document.getElementById('enrich-import-errors');
+        if (errors.length > 0) {
+            errDiv.style.display = 'block';
+            errDiv.textContent = errors.length + ' error(s): ' + errors.slice(0, 5).join('; ');
+        } else {
+            errDiv.style.display = 'none';
+        }
+
+        document.getElementById('enrich-import-preview').style.display = 'block';
+        document.getElementById('btn-enrich-apply').disabled = (totalNotes === 0);
+
+        // Update dropzone
+        dz.querySelector('.enrich-dropzone-text').textContent = 'File loaded: ' + totalNotes.toLocaleString() + ' enrichment notes';
+        dz.querySelector('.enrich-dropzone-sub').textContent = 'Click to load a different file';
+    }
+
+    // ── Apply enrichments ─────────────────────────────────────────
+    window.enrichApply = function() {
+        if (!_importData || !_importData.enrichments) {
+            alertify.error('No enrichment data loaded');
+            return;
+        }
+
+        var btn = document.getElementById('btn-enrich-apply');
+        btn.disabled = true;
+        btn.textContent = 'Applying...';
+
+        var overwrite = document.getElementById('enrich-overwrite').checked;
+
+        $.ajax({
+            url: docroot + '/enrichimport',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                enrichments: _importData,
+                scan_id: _importData.scan_id,
+                overwrite: overwrite
+            }),
+            dataType: 'json',
+            success: function(resp) {
+                if (resp.success) {
+                    // Reset import UI
+                    _importData = null;
+                    document.getElementById('enrich-import-preview').style.display = 'none';
+                    dz.querySelector('.enrich-dropzone-text').textContent = 'Drop enrichments.json here or click to browse';
+                    dz.querySelector('.enrich-dropzone-sub').textContent = 'Accepts enrichments.json from Claude Code';
+
+                    // Show success
+                    document.getElementById('enrich-apply-summary').innerHTML =
+                        '<strong>' + (resp.stats.written || 0).toLocaleString() + '</strong> notes written, ' +
+                        '<strong>' + (resp.stats.overwritten || 0).toLocaleString() + '</strong> updated, ' +
+                        '<strong>' + (resp.stats.skipped || 0).toLocaleString() + '</strong> skipped (existing manual notes)';
+                    document.getElementById('enrich-scan-link').href =
+                        docroot + '/scaninfo?id=' + encodeURIComponent(resp.scan_id || _importData.scan_id || '');
+                    document.getElementById('enrich-apply-modal').classList.add('active');
+                } else {
+                    alertify.error('Import failed: ' + (resp.error || 'unknown error'));
+                }
+                btn.disabled = false;
+                btn.textContent = 'Apply Enrichment Notes';
+            },
+            error: function(xhr) {
+                alertify.error('Request failed: ' + xhr.statusText);
+                btn.disabled = false;
+                btn.textContent = 'Apply Enrichment Notes';
+            }
+        });
+    };
+
+})();
+</script>
+
+<%include file="FOOTER.tmpl"/>

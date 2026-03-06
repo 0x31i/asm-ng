@@ -12294,3 +12294,405 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             })
 
         return {'history': history}
+
+    # ==================================================================
+    # AI ENRICHMENT
+    # ==================================================================
+
+    @cherrypy.expose
+    def enrich(self: 'SpiderFootWebUi') -> str:
+        """Render the AI Enrichment page.
+
+        Returns:
+            str: enrichment page HTML
+        """
+        self.requireAuth()
+        self.requireAdmin()
+
+        with SpiderFootDb(self.config) as dbh:
+            scans = dbh.scanInstanceList() or []
+
+        templ = Template(
+            filename='spiderfoot/templates/enrich.tmpl',
+            lookup=self.lookup)
+        return templ.render(
+            scans=scans,
+            pageid='ENRICH',
+            docroot=self.docroot,
+            version=__version__,
+            user_role=self.currentUserRole(),
+        )
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def enrichcounts(self: 'SpiderFootWebUi', id: str = None) -> dict:
+        """Get finding counts for the enrichment export panel.
+
+        Args:
+            id: scan instance ID
+
+        Returns:
+            dict: {success, counts: {total, types, existing_notes}}
+        """
+        self.requireAuth()
+        if not id:
+            return {'success': False, 'error': 'Missing scan ID'}
+
+        with SpiderFootDb(self.config) as dbh:
+            fpCounts = dbh.scanResultEventCount(id)
+            total = sum(fpCounts.values())
+
+            # Count distinct event types
+            try:
+                unique = dbh.scanResultEventUnique(id)
+                types_count = len(unique) if unique else 0
+            except Exception:
+                types_count = 0
+
+            # Count existing row notes
+            scanInfo = dbh.scanInstanceGet(id)
+            notes_count = 0
+            if scanInfo:
+                target = scanInfo[1]
+                try:
+                    existing = dbh.rowNotesForTarget(target)
+                    notes_count = len(existing)
+                except Exception:
+                    pass
+
+        return {
+            'success': True,
+            'counts': {
+                'total': total,
+                'types': types_count,
+                'existing_notes': notes_count,
+            }
+        }
+
+    @cherrypy.expose
+    def enrichexport(self: 'SpiderFootWebUi', id: str = None) -> bytes:
+        """Export an enrichment package ZIP for Claude Code processing.
+
+        Creates a ZIP containing prompt.md, findings.json, context.json,
+        and README.md ready for Claude Code to process.
+
+        Args:
+            id: scan instance ID
+
+        Returns:
+            bytes: ZIP file download
+        """
+        import zipfile
+
+        self.requireAuth()
+        self.requireAdmin()
+
+        if not id:
+            raise cherrypy.HTTPError(400, "Missing scan ID")
+
+        with SpiderFootDb(self.config) as dbh:
+            scanInfo = dbh.scanInstanceGet(id)
+            if not scanInfo:
+                raise cherrypy.HTTPError(404, "Scan not found")
+
+            scan_name = scanInfo[0]
+            target = scanInfo[1]
+            scan_status = scanInfo[5]
+
+            # Get all results
+            results = dbh.scanResultEvent(id, 'ALL')
+            if not results:
+                raise cherrypy.HTTPError(404, "No results found for this scan")
+
+            # Get known assets
+            try:
+                known_assets = dbh.knownAssetValues(target)
+            except Exception:
+                known_assets = {}
+
+            # Get existing notes count
+            try:
+                existing_notes = dbh.rowNotesForTarget(target)
+                existing_count = len(existing_notes)
+            except Exception:
+                existing_notes = {}
+                existing_count = 0
+
+        # Serialize known assets
+        known_serial = {}
+        for atype, values in known_assets.items():
+            if values:
+                known_serial[atype] = sorted(values)
+
+        # Build findings grouped by type
+        findings_by_type = {}
+        all_findings = []
+
+        for row in results:
+            event_type = row[4]
+            if event_type == 'ROOT':
+                continue
+
+            finding = {
+                "type": event_type,
+                "type_name": row[10] if len(row) > 10 else event_type,
+                "data": row[1],
+                "source": row[2],
+                "module": row[3],
+                "confidence": row[5],
+                "visibility": row[6],
+                "risk": row[7],
+                "fp_status": row[13],
+                "has_existing_note": (event_type, row[1], row[2]) in existing_notes,
+            }
+
+            if event_type not in findings_by_type:
+                findings_by_type[event_type] = {
+                    "type_name": finding["type_name"],
+                    "count": 0,
+                }
+            findings_by_type[event_type]["count"] += 1
+            all_findings.append(finding)
+
+        total_findings = len(all_findings)
+        exported_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+        # Build context.json
+        context = {
+            "scan_id": id,
+            "scan_name": scan_name,
+            "scan_target": target,
+            "scan_status": scan_status,
+            "exported_at": exported_at,
+            "known_assets": known_serial,
+            "total_findings": total_findings,
+            "type_summary": {
+                t: {"type_name": g["type_name"], "count": g["count"]}
+                for t, g in sorted(findings_by_type.items(), key=lambda x: -x[1]["count"])
+            },
+        }
+
+        # Build prompt.md
+        prompt = self._enrichBuildPrompt(id, scan_name, target, total_findings,
+                                         known_serial, findings_by_type)
+
+        # Build README.md
+        readme = self._enrichBuildReadme(id, scan_name, target, exported_at)
+
+        # Create ZIP
+        buf = BytesIO()
+        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr('prompt.md', prompt)
+            zf.writestr('findings.json', json.dumps(all_findings, indent=2, ensure_ascii=False))
+            zf.writestr('context.json', json.dumps(context, indent=2, ensure_ascii=False))
+            zf.writestr('README.md', readme)
+
+        buf.seek(0)
+        filename = f"enrich_{id[:8]}_{time.strftime('%Y%m%d')}.zip"
+
+        cherrypy.response.headers['Content-Type'] = 'application/zip'
+        cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return buf.getvalue()
+
+    def _enrichBuildPrompt(self, scan_id, scan_name, target, total_findings,
+                           known_serial, findings_by_type):
+        """Build the enrichment prompt.md content."""
+        lines = []
+        lines.append("# ASM-NG Finding Enrichment\n")
+        lines.append("You are a senior attack surface management analyst enriching OSINT scan findings")
+        lines.append("with security context. For each finding, write a concise analyst note that helps")
+        lines.append("a junior analyst or client understand:\n")
+        lines.append("1. **What it is** — plain-English explanation of the finding")
+        lines.append("2. **Why it matters** — security implications specific to THIS target")
+        lines.append("3. **Context** — how it relates to other findings in the same scan")
+        lines.append("4. **Risk assessment** — realistic severity (not everything is critical)")
+        lines.append("5. **Remediation** — concrete, actionable fix (not generic advice)\n")
+        lines.append("## Rules\n")
+        lines.append("- Be concise. 2-4 sentences per finding. No filler.")
+        lines.append("- Reference other findings when relevant (\"This host also exposes port 27017...\")")
+        lines.append("- For informational findings (DNS records, WHOIS data, etc.), keep it to 1 sentence")
+        lines.append("- For critical findings (open ports, leaked creds, unauth endpoints), be thorough")
+        lines.append("- Use the known_assets to distinguish client infrastructure from third-party")
+        lines.append("- If a finding is almost certainly noise/FP, say so (\"Likely FP: shared hosting IP\")")
+        lines.append("- Write in second person (\"Your staging server...\" not \"The target's staging server...\")\n")
+        lines.append("## Output Format\n")
+        lines.append("Read `findings.json` and `context.json` from this directory.\n")
+        lines.append("Write your output to `enrichments.json` in this directory with this exact structure:\n")
+        lines.append("```json")
+        lines.append('{')
+        lines.append('  "enrichment_version": "1.0",')
+        lines.append(f'  "scan_id": "{scan_id}",')
+        lines.append('  "enrichments": [')
+        lines.append('    {')
+        lines.append('      "type": "EVENT_TYPE",')
+        lines.append('      "data": "the exact event data value",')
+        lines.append('      "source": "the exact source data value",')
+        lines.append('      "note": "Your enrichment note here"')
+        lines.append('    }')
+        lines.append('  ]')
+        lines.append('}')
+        lines.append("```\n")
+        lines.append("**IMPORTANT**: The `type`, `data`, and `source` fields must match the finding EXACTLY")
+        lines.append("(they are used as keys to store the note). Copy them verbatim from findings.json.\n")
+        lines.append("## Batching\n")
+        lines.append("If there are too many findings to process at once, process them in batches.")
+        lines.append("Write ALL enrichments to a single `enrichments.json` file when done.")
+        lines.append("It's fine to skip truly trivial findings (ROOT events, basic DNS lookups)")
+        lines.append("but err on the side of including rather than skipping.\n")
+        lines.append("---\n")
+        lines.append(f"## Scan Details\n")
+        lines.append(f"- **Target:** `{target}`")
+        lines.append(f"- **Scan Name:** {scan_name}")
+        lines.append(f"- **Scan ID:** `{scan_id}`")
+        lines.append(f"- **Total Findings:** {total_findings}\n")
+
+        if known_serial:
+            lines.append("## Known Assets (Ground Truth)\n")
+            for atype, values in sorted(known_serial.items()):
+                display = ', '.join(values[:20])
+                if len(values) > 20:
+                    display += f" ... and {len(values) - 20} more"
+                lines.append(f"**{atype}:** {display}")
+            lines.append("")
+
+        lines.append("## Finding Summary by Type\n")
+        lines.append("| Type | Count | Description |")
+        lines.append("|------|-------|-------------|")
+        for etype, group in sorted(findings_by_type.items(), key=lambda x: -x[1]["count"]):
+            lines.append(f"| `{etype}` | {group['count']} | {group['type_name']} |")
+        lines.append("")
+
+        lines.append("## Files in This Directory\n")
+        lines.append("- `findings.json` — All findings to enrich (read this)")
+        lines.append("- `context.json` — Scan metadata + known assets (read this)")
+        lines.append("- `enrichments.json` — **Write your output here**\n")
+        lines.append("## Start\n")
+        lines.append("Read `findings.json` and `context.json`, then process all findings.")
+        lines.append("Write the enrichment notes to `enrichments.json` using the format above.\n")
+
+        return '\n'.join(lines)
+
+    def _enrichBuildReadme(self, scan_id, scan_name, target, exported_at):
+        """Build the README.md content."""
+        lines = []
+        lines.append("# Enrichment Export\n")
+        lines.append(f"**Target:** {target}")
+        lines.append(f"**Scan:** {scan_name}")
+        lines.append(f"**Exported:** {exported_at}\n")
+        lines.append("## How to Use\n")
+        lines.append("### Step 1: Extract this ZIP\n")
+        lines.append("Extract to `~/Downloads/enrich/` (or any directory).\n")
+        lines.append("### Step 2: Open Claude Code\n")
+        lines.append("```bash")
+        lines.append("cd ~/Downloads/enrich")
+        lines.append("claude")
+        lines.append("```\n")
+        lines.append("### Step 3: Give Claude the prompt\n")
+        lines.append("```")
+        lines.append("Read prompt.md and enrich all findings. Write output to enrichments.json")
+        lines.append("```\n")
+        lines.append("Claude reads findings.json + context.json and writes enrichments.json.\n")
+        lines.append("### Step 4: Import the enrichments\n")
+        lines.append("Upload `enrichments.json` on the **Enrich Data** page in ASM-NG,")
+        lines.append("or use the CLI:\n")
+        lines.append("```bash")
+        lines.append(f"python3 tools/enrich_import.py --scan-id {scan_id} --dir ~/Downloads/enrich")
+        lines.append("```\n")
+        lines.append("Notes appear as `[AI]` row notes in DATA/TYPE views immediately.\n")
+
+        return '\n'.join(lines)
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def enrichimport(self: 'SpiderFootWebUi') -> dict:
+        """Import Claude-generated enrichment notes as row notes.
+
+        Expects POST with JSON body containing:
+            {scan_id, enrichments: {enrichment_version, scan_id, enrichments: [...]}, overwrite}
+
+        Returns:
+            dict: {success, scan_id, stats: {written, overwritten, skipped, errors}}
+        """
+        self.requireAuth()
+        self.requireAdmin()
+
+        AI_NOTE_PREFIX = "[AI] "
+
+        cl = cherrypy.request.headers.get('Content-Length', 0)
+        if not cl:
+            return {'success': False, 'error': 'Empty request body'}
+
+        raw = cherrypy.request.body.read(int(cl))
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as e:
+            return {'success': False, 'error': f'Invalid JSON: {e}'}
+
+        scan_id = payload.get('scan_id', '')
+        overwrite = payload.get('overwrite', False)
+        enrich_data = payload.get('enrichments', {})
+
+        if not enrich_data or not isinstance(enrich_data.get('enrichments'), list):
+            return {'success': False, 'error': 'Missing enrichments array'}
+
+        if not scan_id:
+            scan_id = enrich_data.get('scan_id', '')
+
+        with SpiderFootDb(self.config) as dbh:
+            # Verify scan exists and get target
+            scanInfo = dbh.scanInstanceGet(scan_id) if scan_id else None
+            if not scanInfo:
+                return {'success': False, 'error': 'Scan not found'}
+
+            target = scanInfo[1]
+
+            # Load existing notes
+            existing_notes = dbh.rowNotesForTarget(target)
+
+            stats = {
+                'written': 0,
+                'overwritten': 0,
+                'skipped': 0,
+                'errors': 0,
+            }
+
+            for entry in enrich_data['enrichments']:
+                event_type = entry.get('type', '')
+                event_data = entry.get('data', '')
+                source_data = entry.get('source', '')
+                note = (entry.get('note') or '').strip()
+
+                if not note or not event_type or not event_data:
+                    stats['errors'] += 1
+                    continue
+
+                key = (event_type, event_data, source_data if source_data else None)
+                has_existing = key in existing_notes
+
+                if has_existing and not overwrite:
+                    existing_text = existing_notes[key]
+                    # Allow overwriting previous AI notes
+                    if not existing_text.startswith(AI_NOTE_PREFIX):
+                        stats['skipped'] += 1
+                        continue
+
+                note_text = AI_NOTE_PREFIX + note
+
+                try:
+                    dbh.rowNoteSet(
+                        target, event_type, event_data,
+                        source_data if source_data else None,
+                        note_text
+                    )
+                    if has_existing:
+                        stats['overwritten'] += 1
+                    else:
+                        stats['written'] += 1
+                except Exception:
+                    stats['errors'] += 1
+
+        return {
+            'success': True,
+            'scan_id': scan_id,
+            'stats': stats,
+        }
