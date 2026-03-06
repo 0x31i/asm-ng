@@ -223,7 +223,7 @@ import json as _json
 
 <div class="enrich-header">
     <span class="enrich-title">Enrich Data</span>
-    <span class="enrich-sub">Export findings for Claude Code enrichment, then import AI-generated analyst notes</span>
+    <span class="enrich-sub">Export findings with full scan context for Claude Code enrichment, then import insights</span>
 </div>
 
 <!-- ── EXPORT SECTION ──────────────────────────────────────────── -->
@@ -270,8 +270,8 @@ import json as _json
             1. Select a completed scan and click <code>Export Enrichment Package</code><br>
             2. A ZIP downloads containing <code>prompt.md</code>, <code>findings.json</code>, and <code>context.json</code><br>
             3. Open Claude Code in the export directory and reference <code>prompt.md</code><br>
-            4. Claude reads the findings, writes <code>enrichments.json</code> with analyst notes for every finding<br>
-            5. Upload <code>enrichments.json</code> below &mdash; notes appear as <code>[AI]</code> row notes in DATA/TYPE views
+            4. Claude reads findings + full context (correlations, grades, discovery paths, analyst comments) and writes <code>enrichments.json</code><br>
+            5. Upload <code>enrichments.json</code> below &mdash; insights appear in the Insight panel when expanding findings
         </div>
     </div>
 </div>
