@@ -279,7 +279,7 @@ import json as _json
 <!-- ── IMPORT SECTION ──────────────────────────────────────────── -->
 <div class="enrich-card">
     <div class="enrich-card-hdr">
-        <span class="enrich-card-hdr-label">Import Enrichment Notes</span>
+        <span class="enrich-card-hdr-label">Import Insights</span>
     </div>
     <div class="enrich-card-body">
         <div class="enrich-dropzone" id="enrich-dropzone" onclick="document.getElementById('enrich-file-input').click();">
@@ -320,16 +320,33 @@ import json as _json
                 </table>
             </div>
 
-            <div style="margin-top:16px; display:flex; gap:12px; align-items:center;">
+            <div style="margin-top:16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
                 <button class="btn-enrich-apply" id="btn-enrich-apply" onclick="enrichApply()" disabled>
-                    Apply Enrichment Notes
+                    Apply Insights
                 </button>
                 <label style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted); cursor:pointer;">
                     <input type="checkbox" id="enrich-overwrite" style="margin-right:6px;">
-                    Overwrite existing manual notes
+                    Overwrite existing analyst notes
                 </label>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- ── CLEAR INSIGHTS ─────────────────────────────────────────── -->
+<div class="enrich-card" style="border-color:rgba(239,68,68,0.3);">
+    <div class="enrich-card-hdr">
+        <span class="enrich-card-hdr-label">Clear Insights</span>
+    </div>
+    <div class="enrich-card-body" style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+        <span style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted);">
+            Remove all AI-generated insights for the selected scan's target. Analyst notes are not affected.
+        </span>
+        <button class="btn-enrich-apply" id="btn-enrich-clear" onclick="enrichClearInsights()" disabled
+                style="background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.4); color:#fca5a5; white-space:nowrap;">
+            Clear Insights
+        </button>
+        <span id="enrich-clear-status" style="font-family:var(--font-mono); font-size:11px; color:var(--accent-green); display:none;"></span>
     </div>
 </div>
 
@@ -367,7 +384,7 @@ import json as _json
             </div>
             <div class="step">
                 <span class="step-num">5</span>
-                <span class="step-text">Upload <code>enrichments.json</code> using the <strong>Import Enrichment Notes</strong> section below</span>
+                <span class="step-text">Upload <code>enrichments.json</code> using the <strong>Import Insights</strong> section below</span>
             </div>
             <div class="step-done">
                 &#10003; Package exported &mdash; ready for Claude Code
@@ -394,7 +411,7 @@ import json as _json
                 </a>
             </div>
             <div class="step-done">
-                &#10003; Notes saved &mdash; visible in DATA/TYPE views as [AI] row notes
+                &#10003; Insights saved &mdash; visible in the Insight panel when expanding findings
             </div>
         </div>
     </div>
@@ -426,12 +443,16 @@ import json as _json
             _selectedScanId = null;
             _selectedTarget = null;
             document.getElementById('enrich-export-stats').style.display = 'none';
+            var clearBtn = document.getElementById('btn-enrich-clear');
+            if (clearBtn) clearBtn.disabled = true;
             return;
         }
 
         _selectedScanId = scanId;
         _selectedTarget = opt.getAttribute('data-target');
         btn.disabled = false;
+        var clearBtn = document.getElementById('btn-enrich-clear');
+        if (clearBtn) clearBtn.disabled = false;
 
         // Fetch stats for this scan
         $.getJSON(docroot + '/enrichcounts?id=' + encodeURIComponent(scanId), function(data) {
@@ -620,7 +641,7 @@ import json as _json
                     document.getElementById('enrich-apply-summary').innerHTML =
                         '<strong>' + (resp.stats.written || 0).toLocaleString() + '</strong> notes written, ' +
                         '<strong>' + (resp.stats.overwritten || 0).toLocaleString() + '</strong> updated, ' +
-                        '<strong>' + (resp.stats.skipped || 0).toLocaleString() + '</strong> skipped (existing manual notes)';
+                        '<strong>' + (resp.stats.skipped || 0).toLocaleString() + '</strong> skipped (existing analyst notes)';
                     document.getElementById('enrich-scan-link').href =
                         docroot + '/scaninfo?id=' + encodeURIComponent(resp.scan_id || _importData.scan_id || '');
                     document.getElementById('enrich-apply-modal').classList.add('active');
@@ -628,14 +649,51 @@ import json as _json
                     alertify.error('Import failed: ' + (resp.error || 'unknown error'));
                 }
                 btn.disabled = false;
-                btn.textContent = 'Apply Enrichment Notes';
+                btn.textContent = 'Apply Insights';
             },
             error: function(xhr) {
                 alertify.error('Request failed: ' + xhr.statusText);
                 btn.disabled = false;
-                btn.textContent = 'Apply Enrichment Notes';
+                btn.textContent = 'Apply Insights';
             }
         });
+    };
+
+    // ── Clear AI insights ──────────────────────────────────────────
+    window.enrichClearInsights = function() {
+        if (!_selectedScanId) { alertify.warning('Select a scan first'); return; }
+
+        alertify.confirm('Clear all insights for this scan target? Analyst notes will not be affected.',
+            function() {
+                var btn = document.getElementById('btn-enrich-clear');
+                var status = document.getElementById('enrich-clear-status');
+                btn.disabled = true;
+                btn.textContent = 'Clearing...';
+
+                $.getJSON(docroot + '/enrichclear?id=' + encodeURIComponent(_selectedScanId), function(resp) {
+                    if (resp.success) {
+                        status.textContent = resp.deleted + ' insight(s) cleared';
+                        status.style.display = 'inline';
+                        // Refresh existing notes count
+                        $.getJSON(docroot + '/enrichcounts?id=' + encodeURIComponent(_selectedScanId), function(data) {
+                            if (data && data.success) {
+                                document.getElementById('estat-notes').textContent = (data.counts.existing_notes || 0).toLocaleString();
+                            }
+                        });
+                    } else {
+                        alertify.error('Clear failed: ' + (resp.error || 'unknown error'));
+                    }
+                    btn.disabled = false;
+                    btn.textContent = 'Clear Insights';
+                    setTimeout(function() { status.style.display = 'none'; }, 4000);
+                }).fail(function() {
+                    alertify.error('Request failed');
+                    btn.disabled = false;
+                    btn.textContent = 'Clear Insights';
+                });
+            },
+            function() { /* cancelled */ }
+        );
     };
 
 })();

@@ -7814,6 +7814,25 @@ class SpiderFootDb:
 
         return True
 
+    def rowNotesClearAI(self, target: str) -> int:
+        """Delete all AI-generated row notes (prefixed with '[AI] ') for a target.
+
+        Args:
+            target (str): the seed_target value
+
+        Returns:
+            int: number of rows deleted
+        """
+        qry = "DELETE FROM tbl_analyst_row_notes WHERE target = ? AND note_text LIKE '[AI] %'"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target,))
+                count = self.dbh.rowcount
+                self.conn.commit()
+                return count
+            except DatabaseError as e:
+                raise IOError("SQL error clearing AI row notes") from e
+
     def rowNotesForTarget(self, target: str, eventType: str = None) -> dict:
         """Bulk load all analyst row notes for a target, optionally filtered by event type.
 

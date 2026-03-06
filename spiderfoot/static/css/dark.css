@@ -10440,6 +10440,34 @@ a.data-type-btn:hover {
   text-shadow: 0 0 6px rgba(248, 113, 113, 0.4);
 }
 
+/* Per-row insight panel (AI enrichment, read-only) */
+.detail-insight {
+  grid-column: 1 / -1;
+  padding: 10px 0 4px 0;
+  margin-top: 8px;
+  border-top: 1px solid var(--glass-border);
+  border-left: 3px solid rgba(168, 85, 247, 0.5);
+  padding-left: 12px;
+}
+
+.detail-insight .finding-detail-label {
+  color: #c4b5fd;
+  margin-bottom: 6px;
+}
+
+.insight-content {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 6px 10px;
+  background: rgba(168, 85, 247, 0.06);
+  border: 1px solid rgba(168, 85, 247, 0.15);
+  border-radius: 4px;
+}
+
 /* Per-row analyst note in detail section */
 .detail-analyst-note {
   grid-column: 1 / -1;
