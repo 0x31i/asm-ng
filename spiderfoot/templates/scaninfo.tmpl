@@ -1053,6 +1053,12 @@
                         setTimeout(function() { scrollAndHighlight(targetRow); }, 200);
                     }
                     _pendingScrollToHash = null;
+                } else {
+                    // Scroll to top of results so user sees them
+                    var statsBar = document.getElementById('stats-bar');
+                    if (statsBar) {
+                        statsBar.scrollIntoView({behavior: 'smooth'});
+                    }
                 }
             });
         }
@@ -11999,10 +12005,10 @@
                             // Add "Load All" button if results were paginated
                             var loadAllHtml = "";
                             if (isPaginated) {
-                                loadAllHtml = "<div id='load-all-bar' style='text-align:center; padding:12px; background:#1a1a2e; border:1px solid #333; margin-top:-1px;'>" +
-                                    "<span style='color:#aaa; margin-right:10px;'>Showing first " + PAGE_SIZE + " results.</span>" +
-                                    "<button id='btn-load-all' class='btn btn-sm btn-outline-info' onclick='loadAllResults()'>Load All Results</button>" +
-                                    "<span id='load-all-spinner' style='display:none; margin-left:10px; color:#aaa;'><i class='fas fa-spinner fa-spin'></i> Loading...</span>" +
+                                loadAllHtml = "<div id='load-all-bar' style='text-align:center; padding:14px 16px; background:rgba(34,211,238,0.06); border:1px solid rgba(34,211,238,0.25); margin-top:-1px;'>" +
+                                    "<span style='color:var(--text-secondary, #94a3b8); margin-right:12px; font-family:var(--font-mono, monospace); font-size:12px;'>Showing first " + PAGE_SIZE + " results.</span>" +
+                                    "<button id='btn-load-all' onclick='loadAllResults()' style='background:rgba(34,211,238,0.12); border:1px solid rgba(34,211,238,0.4); color:#67e8f9; padding:6px 18px; font-family:var(--font-mono, monospace); font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; cursor:pointer; border-radius:2px;'>Load All Results</button>" +
+                                    "<span id='load-all-spinner' style='display:none; margin-left:10px; color:#67e8f9; font-family:var(--font-mono, monospace); font-size:11px;'>Loading...</span>" +
                                     "</div>";
                             }
 
