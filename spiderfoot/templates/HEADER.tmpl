@@ -136,6 +136,16 @@
         <span class="nav-text">Triage</span>
       </a>
     </li>
+    <li
+% if pageid == "ENRICH":
+    class="active"
+% endif
+    >
+      <a id="nav-link-enrich" href="${docroot}/enrich">
+        <i class="glyphicon glyphicon-flash nav-icon"></i>
+        <span class="nav-text">Enrich</span>
+      </a>
+    </li>
 % endif
   </ul>
 
