@@ -159,6 +159,26 @@ import json as _json
     color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;
 }
 .analysis-cmd-block.copied .analysis-cmd-copy-hint { color:#a855f7; }
+
+/* ── Upload drop zone ── */
+.analysis-dropzone {
+    border:2px dashed var(--glass-border); border-radius:0; padding:40px; text-align:center;
+    color:var(--text-muted); cursor:pointer;
+    transition: border-color .2s, background .2s, box-shadow .2s;
+}
+.analysis-dropzone:hover,
+.analysis-dropzone.dragover {
+    border-color:#a855f7; border-style:solid;
+    box-shadow:0 0 20px rgba(168,85,247,0.3), inset 0 0 30px rgba(168,85,247,0.05);
+}
+.analysis-dropzone-text { font-family:var(--font-mono); font-size:13px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px; }
+.analysis-dropzone-sub { font-size:11px; color:var(--text-muted); margin-top:6px; font-family:var(--font-mono); }
+.analysis-import-result {
+    padding:14px 18px; margin-top:12px; font-family:var(--font-mono); font-size:13px;
+    border:1px solid var(--glass-border); border-radius:0;
+}
+.analysis-import-result.success { border-color:#a855f7; color:#c4b5fd; background:rgba(168,85,247,0.05); }
+.analysis-import-result.error { border-color:var(--accent-red); color:var(--accent-red); background:rgba(239,68,68,0.05); }
 </style>
 
 <a href="${docroot}/ai" class="ai-back-link">
@@ -246,6 +266,30 @@ import json as _json
     </div>
 </div>
 
+<!-- ── IMPORT FINDINGS ──────────────────────────────────────────── -->
+<div class="analysis-card">
+    <div class="analysis-card-hdr">
+        <span class="analysis-card-hdr-label">Import Findings</span>
+    </div>
+    <div class="analysis-card-body">
+        <div id="analysis-import-placeholder">
+            <div class="analysis-dropzone" id="analysis-dropzone" onclick="document.getElementById('analysis-file-input').click();">
+                <div class="analysis-dropzone-text">Drop findings .xlsx here or click to browse</div>
+                <div class="analysis-dropzone-sub">Upload the Excel output from the analysis pipeline (Priority, Category, Tab, Item, Description, Recommendation columns)</div>
+            </div>
+            <input type="file" id="analysis-file-input" accept=".xlsx,.xls" style="display:none;" onchange="handleAnalysisImport(this)">
+        </div>
+
+        <div id="analysis-import-status" style="display:none;"></div>
+
+        <div class="analysis-info" style="margin-top:16px;">
+            <strong>How it works:</strong><br>
+            After running the analysis pipeline, the output includes a structured findings Excel file.
+            Upload it here to import findings into the selected scan. This populates the Findings tab on the scan results page.
+        </div>
+    </div>
+</div>
+
 <!-- ── INSTRUCTIONS MODAL ──────────────────────────────────────── -->
 <div class="analysis-modal-overlay" id="analysis-instructions-modal">
     <div class="analysis-modal">
@@ -259,7 +303,7 @@ import json as _json
                 <span class="step-text">Extract the downloaded ZIP to a working directory</span>
             </div>
             <div class="analysis-cmd-block" onclick="copyCmd(this)">
-                <code>unzip ANALYSIS-PKG*.zip -d analysis-workspace && cd analysis-workspace</code>
+                <code id="cmd-extract"></code>
                 <span class="analysis-cmd-copy-hint">click to copy</span>
             </div>
 
@@ -268,7 +312,7 @@ import json as _json
                 <span class="step-text">Obfuscate client-sensitive data (recommended for external AI processing)</span>
             </div>
             <div class="analysis-cmd-block" onclick="copyCmd(this)">
-                <code>python scripts/obfuscate-asm-data.py --input data/scan_results.csv --output data/scan_results_obfuscated.csv</code>
+                <code id="cmd-obfuscate"></code>
                 <span class="analysis-cmd-copy-hint">click to copy</span>
             </div>
 
@@ -277,7 +321,7 @@ import json as _json
                 <span class="step-text">If you have original Nessus (.nessus) or Burp (.html) files, drop them into the <code>data/</code> folder for richer analysis. Then inject them:</span>
             </div>
             <div class="analysis-cmd-block" onclick="copyCmd(this)">
-                <code>python scripts/inject_nessus_burp.py --data-dir data/</code>
+                <code id="cmd-inject"></code>
                 <span class="analysis-cmd-copy-hint">click to copy</span>
             </div>
 
@@ -286,7 +330,7 @@ import json as _json
                 <span class="step-text">Run the full analysis pipeline (all 7 groups + final consolidation)</span>
             </div>
             <div class="analysis-cmd-block" onclick="copyCmd(this)">
-                <code>python scripts/run_all_groups.py --prompts-dir prompts/ --data-dir data/ --output-dir output/</code>
+                <code id="cmd-run"></code>
                 <span class="analysis-cmd-copy-hint">click to copy</span>
             </div>
 
@@ -300,7 +344,7 @@ import json as _json
             </div>
 
             <div style="font-family:var(--font-mono); font-size:11px; font-weight:700; color:#a855f7; text-transform:uppercase; letter-spacing:1px; margin-top:16px; padding-top:12px; border-top:1px solid var(--glass-border); text-shadow:0 0 6px rgba(168,85,247,0.4);">
-                Analysis output is standalone &mdash; no import back to ASM-NG required
+                When complete, upload the findings .xlsx back on this page to import into ASM-NG
             </div>
         </div>
     </div>
@@ -312,6 +356,32 @@ import json as _json
     var scanSelect = document.getElementById('analysis-scan-select');
     var exportBtn = document.getElementById('btn-analysis-export');
     var statsDiv = document.getElementById('analysis-export-stats');
+
+    // Mirror _export_filename() logic from sfwebui.py
+    function buildExportFilename(scanName) {
+        var safe = (scanName || 'Export').replace(/[^\w\-.]/g, '_').replace(/^_+|_+$/g, '') || 'Export';
+        return safe + '-ANALYSIS-PKG.zip';
+    }
+
+    // Get selected scan name
+    function getSelectedScanName() {
+        var opt = scanSelect.options[scanSelect.selectedIndex];
+        return opt ? (opt.getAttribute('data-name') || '') : '';
+    }
+
+    // Populate modal commands with exact filename and ~/Downloads path
+    function updateModalCommands() {
+        var fname = buildExportFilename(getSelectedScanName());
+        var dir = fname.replace('.zip', '');
+        document.getElementById('cmd-extract').textContent =
+            'cd ~/Downloads && unzip "' + fname + '" -d ' + dir + ' && cd ' + dir;
+        document.getElementById('cmd-obfuscate').textContent =
+            'python scripts/obfuscate-asm-data.py --input data/scan_results.csv --output data/scan_results_obfuscated.csv';
+        document.getElementById('cmd-inject').textContent =
+            'python scripts/inject_nessus_burp.py --data-dir data/';
+        document.getElementById('cmd-run').textContent =
+            'python scripts/run_all_groups.py --prompts-dir prompts/ --data-dir data/ --output-dir output/';
+    }
 
     scanSelect.addEventListener('change', function() {
         var id = this.value;
@@ -336,11 +406,12 @@ import json as _json
         });
     });
 
+    // ── Export ──
     window.analysisExport = function() {
         var id = scanSelect.value;
         if (!id) return;
+        updateModalCommands();
         window.location.href = docroot + '/analysisexport?id=' + encodeURIComponent(id);
-        // Show instructions modal after a brief delay
         setTimeout(function() {
             document.getElementById('analysis-instructions-modal').classList.add('active');
         }, 1000);
@@ -350,12 +421,10 @@ import json as _json
         document.getElementById('analysis-instructions-modal').classList.remove('active');
     };
 
-    // Close modal on overlay click
     document.getElementById('analysis-instructions-modal').addEventListener('click', function(e) {
         if (e.target === this) closeAnalysisModal();
     });
 
-    // Close modal on Escape
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') closeAnalysisModal();
     });
@@ -373,6 +442,79 @@ import json as _json
             }, 2000);
         });
     };
+
+    // ── Import Findings (.xlsx) ──
+    var dropzone = document.getElementById('analysis-dropzone');
+    var statusDiv = document.getElementById('analysis-import-status');
+
+    // Drag-drop support
+    ['dragenter', 'dragover'].forEach(function(ev) {
+        dropzone.addEventListener(ev, function(e) {
+            e.preventDefault(); e.stopPropagation();
+            dropzone.classList.add('dragover');
+        });
+    });
+    ['dragleave', 'drop'].forEach(function(ev) {
+        dropzone.addEventListener(ev, function(e) {
+            e.preventDefault(); e.stopPropagation();
+            dropzone.classList.remove('dragover');
+        });
+    });
+    dropzone.addEventListener('drop', function(e) {
+        var files = e.dataTransfer.files;
+        if (files.length > 0) uploadFindingsFile(files[0]);
+    });
+
+    window.handleAnalysisImport = function(input) {
+        if (!input.files || !input.files[0]) return;
+        uploadFindingsFile(input.files[0]);
+        input.value = '';
+    };
+
+    function uploadFindingsFile(file) {
+        var id = scanSelect.value;
+        if (!id) {
+            showImportStatus('error', 'Select a scan first before importing findings.');
+            return;
+        }
+
+        var fname = file.name.toLowerCase();
+        if (!fname.endsWith('.xlsx') && !fname.endsWith('.xls')) {
+            showImportStatus('error', 'Please select an Excel file (.xlsx)');
+            return;
+        }
+
+        // Show uploading state
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'analysis-import-result';
+        statusDiv.innerHTML = '<i class="glyphicon glyphicon-refresh" style="animation:spin 1s linear infinite;"></i> Importing findings...';
+
+        var formData = new FormData();
+        formData.append('importfile', file);
+        formData.append('id', id);
+
+        fetch(docroot + '/importfindings', {
+            method: 'POST',
+            body: formData
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                showImportStatus('success', data.message);
+            } else {
+                showImportStatus('error', data.message || 'Import failed.');
+            }
+        })
+        .catch(function(err) {
+            showImportStatus('error', 'Upload failed: ' + err);
+        });
+    }
+
+    function showImportStatus(type, msg) {
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'analysis-import-result ' + type;
+        statusDiv.textContent = msg;
+    }
 })();
 </script>
 
