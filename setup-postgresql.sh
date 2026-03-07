@@ -198,6 +198,12 @@ $PG_SUDO psql -d postgres -tc "SELECT 1 FROM pg_roles WHERE rolname='${PG_USER}'
 }
 
 info "Creating database '${PG_DATABASE}'..."
+
+# Fix collation version mismatch (common after OS/glibc upgrades)
+# Without this, CREATE DATABASE fails because template1 has stale collation info.
+$PG_SUDO psql -d postgres -c "ALTER DATABASE template1 REFRESH COLLATION VERSION;" 2>/dev/null || true
+$PG_SUDO psql -d postgres -c "ALTER DATABASE postgres REFRESH COLLATION VERSION;" 2>/dev/null || true
+
 $PG_SUDO psql -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='${PG_DATABASE}'" 2>/dev/null | grep -q 1 && \
     info "Database '${PG_DATABASE}' already exists." || {
     $PG_SUDO psql -d postgres -c "CREATE DATABASE ${PG_DATABASE} OWNER ${PG_USER};" || \
