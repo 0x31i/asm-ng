@@ -188,14 +188,28 @@ else
 fi
 
 info "Creating database user '${PG_USER}'..."
-$PG_SUDO psql -d postgres -c "CREATE USER ${PG_USER} WITH PASSWORD '${PG_PASSWORD}';" 2>/dev/null || \
-    warn "User '${PG_USER}' may already exist (this is OK)."
+$PG_SUDO psql -d postgres -tc "SELECT 1 FROM pg_roles WHERE rolname='${PG_USER}'" 2>/dev/null | grep -q 1 && \
+    info "User '${PG_USER}' already exists." || {
+    $PG_SUDO psql -d postgres -c "CREATE USER ${PG_USER} WITH PASSWORD '${PG_PASSWORD}';" || {
+        error "Failed to create user '${PG_USER}'."
+        exit 1
+    }
+    info "User '${PG_USER}' created."
+}
 
 info "Creating database '${PG_DATABASE}'..."
-$PG_SUDO psql -d postgres -c "CREATE DATABASE ${PG_DATABASE} OWNER ${PG_USER};" 2>/dev/null || \
-    warn "Database '${PG_DATABASE}' may already exist (this is OK)."
+$PG_SUDO psql -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='${PG_DATABASE}'" 2>/dev/null | grep -q 1 && \
+    info "Database '${PG_DATABASE}' already exists." || {
+    $PG_SUDO psql -d postgres -c "CREATE DATABASE ${PG_DATABASE} OWNER ${PG_USER};" || \
+    $PG_SUDO psql -d postgres -c "CREATE DATABASE ${PG_DATABASE};" || {
+        error "Failed to create database '${PG_DATABASE}'. Check PostgreSQL logs."
+        exit 1
+    }
+    info "Database '${PG_DATABASE}' created."
+}
 
-# Grant privileges
+# Grant privileges and ensure ownership
+$PG_SUDO psql -d postgres -c "ALTER DATABASE ${PG_DATABASE} OWNER TO ${PG_USER};" 2>/dev/null || true
 $PG_SUDO psql -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE ${PG_DATABASE} TO ${PG_USER};" 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
@@ -215,9 +229,13 @@ local   ${PG_DATABASE}   ${PG_USER}                           scram-sha-256
             sed -i '' "/^host.*all.*all.*127/i\\
 host    ${PG_DATABASE}   ${PG_USER}   127.0.0.1/32          scram-sha-256
 " "$PG_HBA" 2>/dev/null || true
+            sed -i '' "/^host.*all.*all.*::1/i\\
+host    ${PG_DATABASE}   ${PG_USER}   ::1/128               scram-sha-256
+" "$PG_HBA" 2>/dev/null || true
         else
             sed -i "/^local.*all.*all/i local   ${PG_DATABASE}   ${PG_USER}                           scram-sha-256" "$PG_HBA"
             sed -i "/^host.*all.*all.*127/i host    ${PG_DATABASE}   ${PG_USER}   127.0.0.1/32          scram-sha-256" "$PG_HBA"
+            sed -i "/^host.*all.*all.*::1/i host    ${PG_DATABASE}   ${PG_USER}   ::1/128               scram-sha-256" "$PG_HBA"
         fi
 
         # Reload PostgreSQL to apply pg_hba.conf changes
