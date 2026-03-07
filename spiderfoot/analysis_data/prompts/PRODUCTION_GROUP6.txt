@@ -1,0 +1,789 @@
+PRODUCTION ANALYSIS - GROUP 6: DNS Health
+==========================================
+ASM-NG Grade Category: DNS Health | Weight: 0.7 | Priority: P3
+==========================================
+
+CONFIGURATION:
+- CSV: Auto-detect (only .csv file in ./obfuscated/) -- ASM-NG export
+- Format: Auto-detect 7-col (standard) or 10-col (full_scored with CVR scores)
+- Mode: PRODUCTION (analyze ALL rows)
+- Output: ./output/
+- Data: TOKENIZED/OBFUSCATED (IPs, domains, hosts are token identifiers)
+
+CONSOLIDATION RULES (MANDATORY):
+The goal is a concise, executive-readable report. Minimize finding count through
+aggressive consolidation while preserving detail in supporting CSVs.
+- NEVER create one finding per individual port, IP, domain, URL, or asset instance.
+- Group related findings by EVENT TYPE + SEVERITY TIER.
+- The consolidation phase groups by (Category, Vuln_Type, Priority) so multiple
+  instances of the same event type at the same severity merge into a single finding
+  with instance count and asset list.
+- Detail CSVs capture every individual instance for drill-down.
+- Target: under 20 consolidated findings per group. If consolidation produces more
+  than 20, review Vuln_Type keys for over-granularity.
+
+SETUP - IMPORT AND HELPER FUNCTIONS:
+```python
+import csv
+import os
+import glob
+import sys as _sys
+_sys.path.insert(0, './scripts')
+try:
+    from finding_enrichment import enrich_or_default as _enrich
+    print("finding_enrichment library loaded OK")
+except ImportError:
+    def _enrich(tab, lead, default_desc, default_rec):
+        return default_desc, default_rec
+    print("WARNING: finding_enrichment.py not found - using generic descriptions")
+
+import re
+from collections import defaultdict
+
+# ============================================================================
+# DYNAMIC FILE DETECTION
+# ============================================================================
+
+print("=== Dynamic File Detection ===")
+
+# Find CSV file in obfuscated folder
+csv_files = glob.glob('./obfuscated/*.csv')
+if not csv_files:
+    raise FileNotFoundError("No .csv file found in ./obfuscated/ folder")
+elif len(csv_files) > 1:
+    print(f"WARNING: Multiple .csv files found: {csv_files}")
+    print(f"Using first file: {csv_files[0]}")
+
+CSV_FILE = csv_files[0]
+print(f"CSV file detected: {CSV_FILE}")
+
+# Auto-detect CSV format (7-col standard or 10-col full_scored)
+def detect_csv_format(csv_file):
+    with open(csv_file, 'r') as f:
+        reader = csv.reader(f)
+        headers = next(reader)
+        headers_lower = [h.strip().lower() for h in headers]
+        if 'confidence' in headers_lower:
+            return 'full_scored', headers
+        else:
+            return 'standard', headers
+
+CSV_FORMAT, CSV_HEADERS = detect_csv_format(CSV_FILE)
+print(f"CSV format: {CSV_FORMAT} ({len(CSV_HEADERS)} columns)")
+
+# Load and group by event type
+def load_csv_by_event_type(csv_file):
+    rows_by_type = {}
+    with open(csv_file, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            etype = row['Type']
+            rows_by_type.setdefault(etype, []).append(row)
+    return rows_by_type
+
+ROWS_BY_TYPE = load_csv_by_event_type(CSV_FILE)
+print(f"Event types found: {len(ROWS_BY_TYPE)}")
+for etype, rows in sorted(ROWS_BY_TYPE.items(), key=lambda x: -len(x[1]))[:10]:
+    print(f"  {etype}: {len(rows)} rows")
+
+print("=" * 70)
+print("OBFUSCATED DATA MODE - Internal Processing")
+print("=" * 70)
+print("INTERNAL: Processing obfuscated data where:")
+print("  Infrastructure identifiers obfuscated for security")
+print("  Format: IP_ADDRESS_TOKEN_####, DOMAIN_TOKEN_####, HOSTNAME_TOKEN_####, etc.")
+print("=" * 70)
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def normalize_priority(severity, default='Medium'):
+    """Normalize severity to standard format"""
+    if not severity or str(severity).lower().strip() in ['nan', '', 'none']:
+        return default
+    severity = str(severity).strip().lower()
+    if severity in ['critical', 'crit', '4']:
+        return 'Critical'
+    elif severity in ['high', 'hi', '3']:
+        return 'High'
+    elif severity in ['medium', 'med', '2']:
+        return 'Medium'
+    elif severity in ['low', 'lo', '1']:
+        return 'Low'
+    elif severity in ['info', 'informational', '0']:
+        return 'Info'
+    return default
+
+def get_cvr_scores(row):
+    """Extract CVR scores from a row (10-col format only)."""
+    if CSV_FORMAT != 'full_scored':
+        return None, None, None
+    try:
+        confidence = int(row.get('Confidence', 0) or 0)
+        visibility = int(row.get('Visibility', 0) or 0)
+        risk = int(row.get('Risk', 0) or 0)
+        return confidence, visibility, risk
+    except (ValueError, TypeError):
+        return 0, 0, 0
+
+def get_tracking(row):
+    """Extract tracking status from row."""
+    return str(row.get('Tracking', 'OPEN')).strip().upper() or 'OPEN'
+
+def get_fp(row):
+    """Extract FP value. Returns int: 0=unverified, 1=false positive, 2=verified."""
+    try:
+        return int(row.get('F/P', 0) or 0)
+    except (ValueError, TypeError):
+        return 0
+
+def parse_severity_from_data(data_field, default='Medium'):
+    """Parse severity level from the Data field text."""
+    data_lower = str(data_field).lower()
+    if 'critical' in data_lower:
+        return 'Critical'
+    elif 'high' in data_lower:
+        return 'High'
+    elif 'medium' in data_lower or 'med' in data_lower:
+        return 'Medium'
+    elif 'low' in data_lower:
+        return 'Low'
+    elif 'info' in data_lower or 'informational' in data_lower:
+        return 'Info'
+    return default
+
+print("=" * 70)
+```
+
+CONFIDENCE/VISIBILITY/RISK SCORING (when available):
+- Use Risk score to prioritize within same severity tier
+- Flag Confidence <50 for manual verification
+- Highlight Visibility >75 as externally exposed
+- Include avg CVR in group statistics
+- If 7-col format: skip CVR, note "CVR scores not available"
+
+TRACKING STATUS:
+- Annotate each finding with OPEN/CLOSED/TICKETED from the Tracking column
+- Report status breakdown in group summary
+- Flag OPEN findings as requiring attention
+
+ASM-NG GRADE SCORING REFERENCE (from grade_config.py):
+Category: DNS Health | Weight: 0.7
+Score Formula: Score = max(0, 100 + (raw_score * 0.7))
+Grade Thresholds: A=90+, B=80+, C=70+, D=60+, F=<60
+
+EVENT TYPE SCORING:
+| Event Type | Rank | Points | Logic |
+|------------|------|--------|-------|
+| DNS_SPF | 2 | -10 | zero_entries_fail (fail_points: -50) |
+| DNS_TEXT | 2 | -10 | zero_entries_fail (fail_points: -50) |
+| DNS_SRV | 3 | 0 | informational |
+| DOMAIN_IMPERSONATION | 5 | 0 | informational |
+| DOMAIN_NAME | 3 | -5 | unverified_exists |
+| DOMAIN_NAME_PARENT | 4 | -1 | unverified_exists |
+| DOMAIN_REGISTRAR | 3 | -5 | unverified_exists |
+| DOMAIN_WHOIS | 4 | -1 | unverified_exists |
+| RAW_DNS_RECORDS | 5 | 0 | informational |
+| NETBLOCK_WHOIS | 4 | -1 | unverified_exists |
+
+IMPORTANT - zero_entries_fail LOGIC:
+- DNS_SPF and DNS_TEXT use zero_entries_fail scoring
+- If NO rows found for DNS_SPF -> Critical finding (SPF not configured, -50pts)
+- If rows found for DNS_SPF -> analyze the SPF records for misconfiguration (Medium)
+- Same logic for DNS_TEXT
+- This is DIFFERENT from all other event types!
+
+GROUP 6 EVENT TYPES TO ANALYZE (10 total):
+1. DNS_SPF (with zero_entries_fail check)
+2. DNS_TEXT (with zero_entries_fail check)
+3. DOMAIN_IMPERSONATION
+4. DOMAIN_NAME
+5. DOMAIN_NAME_PARENT
+6. DOMAIN_REGISTRAR
+7. DOMAIN_WHOIS
+8. DNS_SRV (informational)
+9. RAW_DNS_RECORDS (informational)
+10. NETBLOCK_WHOIS
+
+INITIALIZE OUTPUT:
+```python
+all_findings = []
+all_info_findings = []
+group_stats = {
+    'total_rows': 0,
+    'fp_excluded': 0,
+    'info_excluded': 0,
+    'findings_extracted': 0,
+    'zero_entries_fail_triggered': 0,
+    'tracking': {'OPEN': 0, 'CLOSED': 0, 'TICKETED': 0},
+    'cvr_scores': []
+}
+```
+
+EVENT TYPE BLOCK 1: DNS SECURITY RECORDS (DNS_SPF, DNS_TEXT) - zero_entries_fail
+=================================================================================
+```python
+print("\n=== Processing DNS Security Records (zero_entries_fail logic) ===")
+
+for dns_type, record_name, fail_description in [
+    ('DNS_SPF', 'SPF (Sender Policy Framework)', 'SPF record not configured - email spoofing protection missing'),
+    ('DNS_TEXT', 'TXT (DNS Text Records)', 'DNS TXT records not configured - missing email authentication and domain verification'),
+]:
+    rows = ROWS_BY_TYPE.get(dns_type, [])
+    print(f"\n  Processing {dns_type} ({len(rows)} rows)")
+
+    tab_findings = []
+
+    # ZERO ENTRIES FAIL CHECK: If no rows exist, this is a Critical finding
+    if not rows:
+        print(f"  ZERO_ENTRIES_FAIL TRIGGERED: No {dns_type} rows found!")
+        group_stats['zero_entries_fail_triggered'] += 1
+
+        severity = 'Critical'
+
+        if dns_type == 'DNS_SPF':
+            description = f"No SPF (Sender Policy Framework) records were found for any domain in the attack surface. "
+            description += "SPF records are essential email authentication mechanisms that specify which mail servers are authorized to send email on behalf of a domain. "
+            description += "Without SPF, attackers can freely spoof emails from the organization's domain, enabling phishing, business email compromise, and social engineering attacks. "
+            description += "The absence of SPF records is a critical email security gap that directly enables domain spoofing and should be remediated immediately. "
+            description += "This finding carries a penalty of -50 points due to the zero_entries_fail scoring logic."
+
+            recommendation = "Immediately configure SPF records for all organizational domains by publishing TXT records in DNS specifying authorized sending IP addresses and mail servers. "
+            recommendation += "Start with a monitoring policy (v=spf1 ... ~all) and transition to a strict enforcement policy (v=spf1 ... -all) after verifying all legitimate senders. "
+            recommendation += "Complement SPF with DKIM and DMARC records to establish comprehensive email authentication. "
+            recommendation += "Monitor SPF alignment reports to identify unauthorized senders and refine the policy. "
+            recommendation += "Priority: Critical - configure within 7 days to prevent email spoofing attacks."
+        else:
+            description = f"No DNS TXT records were found for any domain in the attack surface. "
+            description += "DNS TXT records serve critical security functions including SPF email authentication, DKIM key publication, DMARC policy distribution, and domain ownership verification. "
+            description += "The complete absence of TXT records indicates that no email authentication, domain verification, or security policies are published in DNS. "
+            description += "Without TXT records, the organization cannot implement email spoofing protections, verify domain ownership for third-party services, or publish security contact information. "
+            description += "This finding carries a penalty of -50 points due to the zero_entries_fail scoring logic."
+
+            recommendation = "Configure DNS TXT records for all organizational domains, prioritizing SPF, DKIM, and DMARC records for email security. "
+            recommendation += "Publish domain verification records required by cloud services and third-party platforms. "
+            recommendation += "Consider adding security.txt and CAA records to enhance the overall DNS security posture. "
+            recommendation += "Implement DNS monitoring to detect unauthorized TXT record changes or deletions. "
+            recommendation += "Priority: Critical - configure core email authentication TXT records within 7 days."
+
+        finding = {
+            'Category': 'DNS Health',
+            'Tab': dns_type,
+            'Priority': severity,
+            'Item': f"MISSING {dns_type} - {fail_description}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': f'{dns_type}_MISSING',
+            'Asset': 'All domains',
+            'Plugin_Name': f'{dns_type} Zero Entries Check',
+            'Tracking_Status': 'OPEN',
+            'FP_Status': 'Verified'
+        }
+        tab_findings.append(finding)
+        group_stats['findings_extracted'] += 1
+        all_findings.extend(tab_findings)
+        print(f"  {dns_type}: 1 CRITICAL finding (zero_entries_fail)")
+        continue
+
+    # ROWS EXIST: Analyze the records for misconfiguration
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        severity = 'Medium'
+
+        # Check for specific misconfigurations in SPF/TXT records
+        data_lower = data_field.lower()
+        if dns_type == 'DNS_SPF':
+            if '+all' in data_lower:
+                severity = 'Critical'
+                misconfig = 'SPF record uses +all (permits all senders)'
+            elif '~all' in data_lower:
+                severity = 'Medium'
+                misconfig = 'SPF record uses ~all (softfail - not enforcing)'
+            elif '?all' in data_lower:
+                severity = 'High'
+                misconfig = 'SPF record uses ?all (neutral - no protection)'
+            elif 'include' in data_lower and data_lower.count('include') > 10:
+                severity = 'Medium'
+                misconfig = 'SPF record has excessive includes (DNS lookup limit risk)'
+            else:
+                misconfig = 'SPF record present - review for completeness'
+                severity = 'Low'
+
+            description = f"{record_name} record analyzed for {source}: {misconfig}. "
+            description += f"SPF record content: {data_field[:400]}. "
+            description += "SPF records control which servers are authorized to send email for the domain and are fundamental to preventing email spoofing. "
+            description += "Misconfigured SPF records can either fail to prevent spoofing or break legitimate email delivery. "
+            if confidence is not None and confidence < 50:
+                description += f"Note: Confidence score is {confidence}/100 - manual verification of SPF configuration recommended."
+            else:
+                description += "Regular SPF record audits should be conducted as authorized senders change over time."
+        else:
+            description = f"{record_name} record analyzed for {source}. "
+            description += f"TXT record content: {data_field[:400]}. "
+            description += "DNS TXT records serve multiple security functions including email authentication, domain verification, and security policy publication. "
+            description += "Each TXT record should be reviewed to ensure it serves a current purpose and does not expose sensitive information. "
+            description += "Stale or misconfigured TXT records can reveal infrastructure details or create security gaps."
+
+        recommendation = f"Review the {dns_type} record configuration for {source} to ensure it accurately reflects current infrastructure and security requirements. "
+        recommendation += "Validate that email authentication records (SPF/DKIM/DMARC) are correctly configured and enforcing policy. "
+        recommendation += "Remove stale or unnecessary TXT records that may expose internal information. "
+        recommendation += "Implement DNS change monitoring to detect unauthorized modifications to security-critical records. "
+        recommendation += f"Priority: {severity} - address according to organizational DNS management SLAs."
+
+        finding = {
+            'Category': 'DNS Health',
+            'Tab': dns_type,
+            'Priority': severity,
+            'Item': f"{dns_type} Record - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': dns_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings)
+    print(f"  {dns_type}: {len(tab_findings)} findings")
+```
+
+EVENT TYPE BLOCK 2: DOMAIN IMPERSONATION (DOMAIN_IMPERSONATION)
+================================================================
+```python
+print("\n=== Processing DOMAIN_IMPERSONATION ===")
+
+rows = ROWS_BY_TYPE.get('DOMAIN_IMPERSONATION', [])
+print(f"Rows found: {len(rows)}")
+
+tab_findings = []
+
+for idx, row in enumerate(rows):
+    group_stats['total_rows'] += 1
+    fp = get_fp(row)
+    if fp == 1:
+        group_stats['fp_excluded'] += 1
+        continue
+
+    tracking = get_tracking(row)
+    group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+    confidence, visibility, risk = get_cvr_scores(row)
+    if confidence is not None:
+        group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+    data_field = str(row.get('Data', '')).strip()
+    source = str(row.get('Source', '')).strip()
+    module = str(row.get('Module', '')).strip()
+
+    severity = 'High'
+
+    description = f"A domain impersonation attempt was detected targeting {source} via {module}. "
+    description += f"Impersonation details: {data_field[:500]}. "
+    description += "Domain impersonation involves registering domains that are visually similar to the organization's legitimate domains through techniques such as typosquatting, homograph attacks, or subdomain abuse. "
+    description += "These impersonating domains are commonly used for phishing campaigns, credential harvesting, malware distribution, and brand abuse targeting the organization's customers and employees. "
+    description += "Prompt investigation and takedown of impersonating domains is essential to protect users and brand reputation."
+
+    recommendation = f"Investigate the impersonating domain identified near {source} to determine if it is actively being used for malicious purposes. "
+    recommendation += "Initiate domain takedown procedures through the registrar, ICANN dispute resolution, or legal channels as appropriate. "
+    recommendation += "Implement proactive domain monitoring to detect new impersonation registrations using homoglyphs, typos, and brand keywords. "
+    recommendation += "Consider defensive domain registration of common typosquatting variants of organizational domains. "
+    recommendation += "Alert users and security teams about the impersonating domain and monitor for associated phishing campaigns."
+
+    finding = {
+        'Category': 'DNS Health',
+        'Tab': 'DOMAIN_IMPERSONATION',
+        'Priority': severity,
+        'Item': f"Domain Impersonation - {source} - {data_field[:60]}",
+        'Description': description,
+        'Recommendation': recommendation,
+        'Vuln_Type': 'DOMAIN_IMPERSONATION',
+        'Asset': source,
+        'Plugin_Name': module,
+        'Tracking_Status': tracking,
+        'FP_Status': "Verified" if fp == 2 else "Unverified"
+    }
+    if risk is not None:
+        finding['Avg_Risk'] = risk
+    tab_findings.append(finding)
+    group_stats['findings_extracted'] += 1
+
+all_findings.extend(tab_findings)
+print(f"DOMAIN_IMPERSONATION: {len(tab_findings)} findings")
+```
+
+EVENT TYPE BLOCK 3: DOMAIN REGISTRATION (DOMAIN_NAME, DOMAIN_NAME_PARENT, DOMAIN_REGISTRAR, DOMAIN_WHOIS)
+==========================================================================================================
+```python
+print("\n=== Processing Domain Registration ===")
+
+for domain_type, default_sev, context in [
+    ('DOMAIN_NAME', 'Low', 'domain name discovered in organizational attack surface'),
+    ('DOMAIN_NAME_PARENT', 'Low', 'parent domain of organizational infrastructure identified'),
+    ('DOMAIN_REGISTRAR', 'Low', 'domain registrar information discovered'),
+    ('DOMAIN_WHOIS', 'Low', 'WHOIS registration data for organizational domain exposed'),
+]:
+    rows = ROWS_BY_TYPE.get(domain_type, [])
+    if not rows:
+        print(f"  {domain_type}: No data")
+        continue
+
+    print(f"\n  Processing {domain_type} ({len(rows)} rows)")
+    tab_findings = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        severity = default_sev
+
+        if domain_type == 'DOMAIN_NAME':
+            description = f"Domain name {data_field[:200]} was {context}, discovered via {source}. "
+            description += "Each domain in the organizational attack surface should be tracked in a centralized inventory and subject to regular security assessments. "
+            description += "Untracked domains may lack proper security controls, DNS hardening, or certificate management. "
+            description += "Domain inventory is foundational to attack surface management and ensures comprehensive security coverage. "
+            description += "All discovered domains should be validated as organizationally owned and properly secured."
+        elif domain_type == 'DOMAIN_NAME_PARENT':
+            description = f"Parent domain {data_field[:200]} was identified as {context}, discovered via {source}. "
+            description += "Parent domains define the organizational domain hierarchy and DNS delegation structure. "
+            description += "Security of parent domains is critical as compromise could affect all subdomains and associated services. "
+            description += "Parent domain registration, DNS hosting, and access controls should be reviewed for proper security. "
+            description += "Ensure DNSSEC is enabled on parent domains to prevent DNS cache poisoning attacks."
+        elif domain_type == 'DOMAIN_REGISTRAR':
+            description = f"Domain registrar information was {context}: {data_field[:400]}. "
+            description += "Registrar details reveal where domains are managed and which entity controls DNS delegation. "
+            description += "Registrar account security is critical as compromise enables domain hijacking, DNS redirection, and complete service takeover. "
+            description += "Ensure registrar accounts use strong authentication, domain locking, and authorized contact verification. "
+            description += "Registrar diversity across the organization should be documented for consistent security policy enforcement."
+        else:
+            description = f"WHOIS registration data was {context} for {source}: {data_field[:400]}. "
+            description += "WHOIS data may expose organizational contact information, registration dates, and administrative details useful for social engineering. "
+            description += "Registration expiration dates should be monitored to prevent domain lapse and subsequent hijacking. "
+            description += "Consider WHOIS privacy protection services to limit exposure of organizational contact details. "
+            description += "WHOIS information assists attackers in identifying domain ownership, registrar accounts, and potential social engineering targets."
+
+        recommendation = f"Verify that {domain_type.replace('_', ' ').lower()} information for {source} is accurate and current in the organizational domain inventory. "
+        recommendation += "Ensure registrar accounts are secured with multi-factor authentication, domain locking, and authorized contact verification. "
+        recommendation += "Monitor domain registration expiration dates and enable auto-renewal to prevent accidental lapse. "
+        recommendation += "Implement WHOIS privacy protection where appropriate to limit exposure of organizational contact details. "
+        recommendation += f"Priority: {severity} - review as part of regular domain governance and inventory management."
+
+        finding = {
+            'Category': 'DNS Health',
+            'Tab': domain_type,
+            'Priority': severity,
+            'Item': f"{domain_type.replace('_', ' ').title()} - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': domain_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings)
+    print(f"  {domain_type}: {len(tab_findings)} findings")
+```
+
+EVENT TYPE BLOCK 4: DNS INFRASTRUCTURE (DNS_SRV, RAW_DNS_RECORDS) - Informational
+===================================================================================
+```python
+print("\n=== Processing DNS Infrastructure (Informational) ===")
+
+for info_type in ['DNS_SRV', 'RAW_DNS_RECORDS']:
+    rows = ROWS_BY_TYPE.get(info_type, [])
+    if not rows:
+        print(f"  {info_type}: No data")
+        continue
+
+    print(f"\n  {info_type}: {len(rows)} informational rows (analyzed for patterns)")
+    for row in rows:
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        all_info_findings.append(row)
+        group_stats['info_excluded'] += 1
+
+    print(f"  {info_type}: {len(rows)} rows cataloged as informational")
+```
+
+EVENT TYPE BLOCK 5: NETWORK BLOCKS (NETBLOCK_WHOIS)
+=====================================================
+```python
+print("\n=== Processing NETBLOCK_WHOIS ===")
+
+rows = ROWS_BY_TYPE.get('NETBLOCK_WHOIS', [])
+print(f"Rows found: {len(rows)}")
+
+tab_findings = []
+
+for idx, row in enumerate(rows):
+    group_stats['total_rows'] += 1
+    fp = get_fp(row)
+    if fp == 1:
+        group_stats['fp_excluded'] += 1
+        continue
+
+    tracking = get_tracking(row)
+    group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+    confidence, visibility, risk = get_cvr_scores(row)
+    if confidence is not None:
+        group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+    data_field = str(row.get('Data', '')).strip()
+    source = str(row.get('Source', '')).strip()
+    module = str(row.get('Module', '')).strip()
+
+    severity = 'Low'
+
+    description = f"Network block WHOIS information discovered for {source} via {module}. "
+    description += f"WHOIS details: {data_field[:400]}. "
+    description += "Netblock WHOIS data reveals the organization and contact information associated with IP address ranges used by the organization. "
+    description += "This information helps map the organizational network footprint and can be used by attackers for reconnaissance and targeted attacks. "
+    description += "All organizational netblocks should be documented in the asset inventory and monitored for unauthorized usage."
+
+    recommendation = f"Verify that the netblock information for {source} is accurate and reflects current organizational ownership and contact details. "
+    recommendation += "Ensure all IP ranges within the netblock are included in vulnerability scanning and security monitoring scope. "
+    recommendation += "Update WHOIS contact information to use organizational security contacts rather than individual employee details. "
+    recommendation += "Monitor for unauthorized IP address announcements or BGP hijacking attempts targeting organizational netblocks. "
+    recommendation += "Priority: Low - review as part of regular infrastructure inventory and network governance."
+
+    finding = {
+        'Category': 'DNS Health',
+        'Tab': 'NETBLOCK_WHOIS',
+        'Priority': severity,
+        'Item': f"Netblock Whois - {source} - {data_field[:60]}",
+        'Description': description,
+        'Recommendation': recommendation,
+        'Vuln_Type': 'NETBLOCK_WHOIS',
+        'Asset': source,
+        'Plugin_Name': module,
+        'Tracking_Status': tracking,
+        'FP_Status': "Verified" if fp == 2 else "Unverified"
+    }
+    if risk is not None:
+        finding['Avg_Risk'] = risk
+    tab_findings.append(finding)
+    group_stats['findings_extracted'] += 1
+
+all_findings.extend(tab_findings)
+print(f"NETBLOCK_WHOIS: {len(tab_findings)} findings")
+```
+
+CONSOLIDATION PHASE
+===================
+```python
+print("\n=== CONSOLIDATION PHASE ===")
+
+groups = defaultdict(list)
+for f in all_findings:
+    key = (f['Category'], f['Vuln_Type'], f['Priority'])
+    groups[key].append(f)
+
+print(f"Consolidation groups: {len(groups)}")
+for key, findings in groups.items():
+    if len(findings) > 1:
+        print(f"  {key}: {len(findings)} findings")
+
+consolidated_findings = []
+os.makedirs('./output/findings_details', exist_ok=True)
+
+for key, group_findings in groups.items():
+    if len(group_findings) == 1:
+        consolidated_findings.append(group_findings[0])
+    else:
+        category, vuln_type, priority = key
+        assets = [f['Asset'] for f in group_findings]
+        unique_assets = list(set([a for a in assets if a and a.lower() not in ['nan', 'none']]))
+        asset_count = len(unique_assets)
+        instance_count = len(group_findings)
+
+        asset_list = ", ".join([f"({i+1}) {unique_assets[i]}" for i in range(min(5, len(unique_assets)))])
+        if len(unique_assets) > 5:
+            asset_list += f", and {len(unique_assets)-5} more"
+
+        tracking_counts = defaultdict(int)
+        for f in group_findings:
+            tracking_counts[f.get('Tracking_Status', 'OPEN')] += 1
+        tracking_summary = ", ".join([f"{k}: {v}" for k, v in tracking_counts.items()])
+
+        avg_risk = None
+        risk_scores = [f.get('Avg_Risk') for f in group_findings if f.get('Avg_Risk') is not None]
+        if risk_scores:
+            avg_risk = sum(risk_scores) / len(risk_scores)
+
+        vuln_name = vuln_type.replace('_', ' ').title()
+        _lead = f"{vuln_name} was identified on {instance_count} instances across {asset_count} assets: {asset_list}."
+        _default_desc = (
+            _lead + " This represents a systematic security issue affecting multiple systems "
+            "requiring coordinated remediation. The widespread nature indicates common "
+            "misconfiguration, shared vulnerable components, or consistent security control gaps."
+        )
+        _default_rec = (
+            f"Implement systematic remediation across all {instance_count} affected instances. "
+            "Deploy consistent security controls and monitoring across all affected assets. "
+            f"Prioritize remediation based on asset criticality and verify each of the "
+            f"{asset_count} affected assets through targeted testing."
+        )
+        description, recommendation = _enrich(vuln_type, _lead, _default_desc, _default_rec)
+
+        consolidated = {
+            'Category': category,
+            'Tab': group_findings[0]['Tab'],
+            'Priority': priority,
+            'Item': f"{vuln_name} - {instance_count} instances across {asset_count} assets",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': vuln_type,
+            'Asset': ", ".join(unique_assets[:5]) if unique_assets else '',
+            'Plugin_Name': group_findings[0].get('Plugin_Name', ''),
+            'Tracking_Status': max(tracking_counts, key=tracking_counts.get),
+        }
+        if avg_risk is not None:
+            consolidated['Avg_Risk'] = round(avg_risk, 1)
+        consolidated_findings.append(consolidated)
+
+        # Create detail file
+        import csv as csv_mod
+        detail_data = [{'Instance': i+1, 'Asset': f['Asset'],
+                        'Details': f['Item'], 'Description': f['Description'][:500],
+                        'Tracking_Status': f.get('Tracking_Status', 'OPEN'),
+                        'FP_Status': f.get('FP_Status', 'Unverified')}
+                       for i, f in enumerate(group_findings)]
+        detail_file = f'./output/findings_details/findings_detail_{vuln_type}.csv'
+        with open(detail_file, 'w', newline='') as csvf:
+            writer = csv_mod.DictWriter(csvf, fieldnames=detail_data[0].keys())
+            writer.writeheader()
+            writer.writerows(detail_data)
+        print(f"  Created: {detail_file}")
+
+print(f"\nConsolidation complete: {len(all_findings)} -> {len(consolidated_findings)} findings")
+```
+
+SAVE OUTPUTS
+============
+```python
+import csv as csv_mod
+
+fieldnames = ['Category', 'Tab', 'Priority', 'Item', 'Description', 'Recommendation',
+              'Tracking_Status', 'Avg_Risk']
+with open('./output/findings_GROUP6_FULL_CONSOLIDATED.csv', 'w', newline='') as csvf:
+    writer = csv_mod.DictWriter(csvf, fieldnames=fieldnames, extrasaction='ignore')
+    writer.writeheader()
+    writer.writerows(consolidated_findings)
+print(f"\nSaved: ./output/findings_GROUP6_FULL_CONSOLIDATED.csv ({len(consolidated_findings)} findings)")
+
+# Statistics
+print("\n" + "=" * 70)
+print("GROUP 6: DNS HEALTH - STATISTICS")
+print("=" * 70)
+print(f"Total rows processed: {group_stats['total_rows']}")
+print(f"False positives excluded: {group_stats['fp_excluded']}")
+print(f"Info severity excluded: {group_stats['info_excluded']}")
+print(f"Findings extracted: {group_stats['findings_extracted']}")
+print(f"Consolidated findings: {len(consolidated_findings)}")
+print(f"\nZERO ENTRIES FAIL:")
+print(f"  Triggered: {group_stats['zero_entries_fail_triggered']} event types")
+print(f"\nTRACKING STATUS:")
+for status, count in group_stats['tracking'].items():
+    print(f"  {status}: {count}")
+
+if group_stats['cvr_scores']:
+    avg_c = sum(s[0] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    avg_v = sum(s[1] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    avg_r = sum(s[2] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    print(f"\nCVR SCORE AVERAGES:")
+    print(f"  Avg Confidence: {avg_c:.1f}")
+    print(f"  Avg Visibility: {avg_v:.1f}")
+    print(f"  Avg Risk: {avg_r:.1f}")
+else:
+    print(f"\nCVR scores: Not available (7-col format)")
+
+print("=" * 70)
+
+# Update progress tracker
+tracker_path = './output/analysis_progress_tracker.md'
+tracker_exists = os.path.exists(tracker_path)
+
+with open(tracker_path, 'a' if tracker_exists else 'w') as f:
+    if not tracker_exists:
+        f.write("# Security Analysis Progress Tracker\n\n")
+    f.write("## GROUP 6: DNS Health (Weight 0.7) - COMPLETED\n\n")
+    f.write(f"**Findings:** {len(consolidated_findings)}\n")
+    f.write(f"**Rows Processed:** {group_stats['total_rows']}\n")
+    f.write(f"**FP Excluded:** {group_stats['fp_excluded']}\n")
+    f.write(f"**Info Excluded:** {group_stats['info_excluded']}\n")
+    f.write(f"**Zero Entries Fail Triggered:** {group_stats['zero_entries_fail_triggered']}\n\n")
+    f.write("### Tracking Status\n")
+    for status, count in group_stats['tracking'].items():
+        f.write(f"- {status}: {count}\n")
+    f.write("\n---\n\n")
+
+print("\nGROUP 6 COMPLETE - DNS Health analysis saved")
+```
+
+QUALITY VERIFICATION CHECKLIST:
+- [ ] All descriptions are 3-5 sentences / full paragraphs
+- [ ] All recommendations are 3-5 sentences / full paragraphs
+- [ ] No 'nan' appears in any field
+- [ ] Severities normalized (Critical/High/Medium/Low)
+- [ ] Consolidated findings show instance counts
+- [ ] Detail files created for multi-instance findings
+- [ ] Progress tracker updated
+- [ ] Tracking status (OPEN/CLOSED/TICKETED) annotated on all findings
+- [ ] CVR scores extracted and averaged (10-col format) or noted as unavailable
+- [ ] All 10 DNS Health event types processed
+- [ ] Grade weights referenced: DNS Health = 0.7
+- [ ] zero_entries_fail logic implemented for DNS_SPF and DNS_TEXT
+- [ ] DNS_SPF misconfiguration analysis (check +all, ~all, ?all, excessive includes)
+- [ ] Domain impersonation flagged as High severity
+- [ ] Informational types (DNS_SRV, RAW_DNS_RECORDS) cataloged but not scored
+- [ ] No Nessus/Burp enrichment (not applicable to this group)

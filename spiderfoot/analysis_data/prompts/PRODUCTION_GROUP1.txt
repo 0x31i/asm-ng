@@ -1,0 +1,1230 @@
+PRODUCTION ANALYSIS - GROUP 1: Network Security
+=================================================
+ASM-NG Grade Category: Network Security | Weight: 1.0 | Priority: P1
+=================================================
+
+CONFIGURATION:
+- CSV: Auto-detect (only .csv file in ./obfuscated/) -- ASM-NG export
+- Format: Auto-detect 7-col (standard) or 10-col (full_scored with CVR scores)
+- Nessus File: Auto-detect (only .nessus file in ./obfuscated/) - for EXTERNAL_VULNERABILITIES enrichment
+- Mode: PRODUCTION (analyze ALL rows)
+- Output: ./output/
+- Data: TOKENIZED/OBFUSCATED (IPs, domains, hosts are token identifiers)
+
+CONSOLIDATION RULES (MANDATORY):
+The goal is a concise, executive-readable report. Minimize finding count through
+aggressive consolidation while preserving detail in supporting CSVs.
+- NEVER create one finding per individual port, IP, domain, or asset instance.
+- Group related findings by EVENT TYPE + SEVERITY TIER (or risk tier for ports).
+- Open ports MUST be consolidated into at most 3 findings (Critical-Risk, High-Risk,
+  Standard) regardless of how many unique ports exist. Detail CSVs list every port/host.
+- For all other event types, the consolidation phase groups by (Category, Vuln_Type,
+  Priority) so multiple instances of the same event type at the same severity merge
+  into a single finding with instance count and asset list.
+- Target: under 20 consolidated findings for this group. If consolidation produces
+  more than 20, review Vuln_Type keys for over-granularity.
+
+SETUP - IMPORT AND HELPER FUNCTIONS:
+```python
+import csv
+import os
+import glob
+import sys as _sys
+_sys.path.insert(0, './scripts')
+try:
+    from finding_enrichment import enrich_or_default as _enrich
+    print("finding_enrichment library loaded OK")
+except ImportError:
+    def _enrich(tab, lead, default_desc, default_rec):
+        return default_desc, default_rec
+    print("WARNING: finding_enrichment.py not found - using generic descriptions")
+
+import xml.etree.ElementTree as ET
+from collections import defaultdict
+
+# ============================================================================
+# DYNAMIC FILE DETECTION
+# ============================================================================
+
+print("=== Dynamic File Detection ===")
+
+# Find CSV file in obfuscated folder
+csv_files = glob.glob('./obfuscated/*.csv')
+if not csv_files:
+    raise FileNotFoundError("No .csv file found in ./obfuscated/ folder")
+elif len(csv_files) > 1:
+    print(f"WARNING: Multiple .csv files found: {csv_files}")
+    print(f"Using first file: {csv_files[0]}")
+
+CSV_FILE = csv_files[0]
+print(f"CSV file detected: {CSV_FILE}")
+
+# Auto-detect CSV format (7-col standard or 10-col full_scored)
+def detect_csv_format(csv_file):
+    with open(csv_file, 'r') as f:
+        reader = csv.reader(f)
+        headers = next(reader)
+        headers_lower = [h.strip().lower() for h in headers]
+        if 'confidence' in headers_lower:
+            return 'full_scored', headers
+        else:
+            return 'standard', headers
+
+CSV_FORMAT, CSV_HEADERS = detect_csv_format(CSV_FILE)
+print(f"CSV format: {CSV_FORMAT} ({len(CSV_HEADERS)} columns)")
+
+# Load and group by event type
+def load_csv_by_event_type(csv_file):
+    rows_by_type = {}
+    with open(csv_file, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            etype = row['Type']
+            rows_by_type.setdefault(etype, []).append(row)
+    return rows_by_type
+
+ROWS_BY_TYPE = load_csv_by_event_type(CSV_FILE)
+print(f"Event types found: {len(ROWS_BY_TYPE)}")
+for etype, rows in sorted(ROWS_BY_TYPE.items(), key=lambda x: -len(x[1]))[:10]:
+    print(f"  {etype}: {len(rows)} rows")
+
+# Find Nessus file (for EXTERNAL_VULNERABILITIES enrichment)
+nessus_files = glob.glob('./obfuscated/*.nessus')
+if nessus_files:
+    if len(nessus_files) > 1:
+        print(f"WARNING: Multiple .nessus files found: {nessus_files}")
+        print(f"Using first file: {nessus_files[0]}")
+    NESSUS_FILE = nessus_files[0]
+    print(f"Nessus file detected: {NESSUS_FILE}")
+else:
+    NESSUS_FILE = None
+    print("WARNING: No .nessus file found - EXTERNAL_VULNERABILITIES will use generic descriptions")
+
+print("=" * 70)
+print("OBFUSCATED DATA MODE - Internal Processing")
+print("=" * 70)
+print("INTERNAL: Processing obfuscated data where:")
+print("  Infrastructure identifiers obfuscated for security")
+print("  Format: IP_ADDRESS_TOKEN_####, DOMAIN_TOKEN_####, HOSTNAME_TOKEN_####, etc.")
+print("=" * 70)
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def normalize_priority(severity, default='Medium'):
+    """Normalize severity to standard format"""
+    if not severity or str(severity).lower().strip() in ['nan', '', 'none']:
+        return default
+    severity = str(severity).strip().lower()
+    if severity in ['critical', 'crit', '4']:
+        return 'Critical'
+    elif severity in ['high', 'hi', '3']:
+        return 'High'
+    elif severity in ['medium', 'med', '2']:
+        return 'Medium'
+    elif severity in ['low', 'lo', '1']:
+        return 'Low'
+    elif severity in ['info', 'informational', '0']:
+        return 'Info'
+    return default
+
+def get_cvr_scores(row):
+    """Extract CVR scores from a row (10-col format only)."""
+    if CSV_FORMAT != 'full_scored':
+        return None, None, None
+    try:
+        confidence = int(row.get('Confidence', 0) or 0)
+        visibility = int(row.get('Visibility', 0) or 0)
+        risk = int(row.get('Risk', 0) or 0)
+        return confidence, visibility, risk
+    except (ValueError, TypeError):
+        return 0, 0, 0
+
+def get_tracking(row):
+    """Extract tracking status from row."""
+    return str(row.get('Tracking', 'OPEN')).strip().upper() or 'OPEN'
+
+def get_fp(row):
+    """Extract FP value. Returns int: 0=unverified, 1=false positive, 2=verified."""
+    try:
+        return int(row.get('F/P', 0) or 0)
+    except (ValueError, TypeError):
+        return 0
+
+def parse_severity_from_data(data_field, default='Medium'):
+    """Parse severity level from the Data field text."""
+    data_lower = str(data_field).lower()
+    if 'critical' in data_lower:
+        return 'Critical'
+    elif 'high' in data_lower:
+        return 'High'
+    elif 'medium' in data_lower or 'med' in data_lower:
+        return 'Medium'
+    elif 'low' in data_lower:
+        return 'Low'
+    elif 'info' in data_lower or 'informational' in data_lower:
+        return 'Info'
+    return default
+
+
+# ============================================================================
+# NESSUS FILE PARSER - For EXTERNAL_VULNERABILITIES Enrichment
+# ============================================================================
+
+def load_nessus_data(nessus_file_path):
+    """Parse .nessus XML file and build lookup dictionary for enrichment."""
+    print(f"\n=== Loading Nessus Data ===")
+    print(f"Parsing: {nessus_file_path}")
+
+    nessus_data = {}
+    plugin_info = {}
+
+    try:
+        tree = ET.parse(nessus_file_path)
+        root = tree.getroot()
+        hosts_processed = 0
+        findings_indexed = 0
+
+        for report_host in root.findall('.//ReportHost'):
+            host_name = report_host.get('name', '')
+            hosts_processed += 1
+            hostname = None
+            host_ip = host_name
+
+            for tag in report_host.findall('.//HostProperties/tag'):
+                tag_name = tag.get('name', '')
+                if tag_name == 'hostname':
+                    hostname = tag.text
+                elif tag_name == 'host-ip':
+                    host_ip = tag.text
+
+            for item in report_host.findall('.//ReportItem'):
+                plugin_id = item.get('pluginID', '')
+                plugin_name = item.get('pluginName', '')
+                port = item.get('port', '0')
+                protocol = item.get('protocol', 'tcp')
+                severity = item.get('severity', '0')
+                description = item.findtext('description', '').strip()
+                solution = item.findtext('solution', '').strip()
+                risk_factor = item.findtext('risk_factor', '').strip()
+                cvss_score = item.findtext('cvss3_base_score', '')
+                if not cvss_score:
+                    cvss_score = item.findtext('cvss_base_score', '')
+                cves = [cve.text for cve in item.findall('cve') if cve.text]
+                cve_string = ', '.join(cves) if cves else ''
+                plugin_output = item.findtext('plugin_output', '').strip()
+                see_also = item.findtext('see_also', '').strip()
+
+                enrichment = {
+                    'plugin_id': plugin_id, 'plugin_name': plugin_name,
+                    'host': host_ip, 'hostname': hostname,
+                    'port': port, 'protocol': protocol, 'severity': severity,
+                    'description': description, 'solution': solution,
+                    'risk_factor': risk_factor, 'cvss_score': cvss_score,
+                    'cve': cve_string, 'plugin_output': plugin_output,
+                    'see_also': see_also
+                }
+
+                if plugin_id and plugin_id not in plugin_info:
+                    plugin_info[plugin_id] = {
+                        'description': description, 'solution': solution,
+                        'plugin_name': plugin_name, 'risk_factor': risk_factor
+                    }
+
+                nessus_data[f"{host_ip}:{port}:{plugin_id}"] = enrichment
+                if hostname:
+                    nessus_data[f"{hostname}:{port}:{plugin_id}"] = enrichment
+                if f"{host_ip}:{plugin_id}" not in nessus_data:
+                    nessus_data[f"{host_ip}:{plugin_id}"] = enrichment
+                nessus_data[f"{host_ip}:{port}:{plugin_name.lower().replace(' ', '_')}"] = enrichment
+                findings_indexed += 1
+
+        print(f"Hosts processed: {hosts_processed}")
+        print(f"Findings indexed: {findings_indexed}")
+        print(f"Unique plugins: {len(plugin_info)}")
+        print(f"Lookup keys created: {len(nessus_data)}")
+        nessus_data['_plugin_info'] = plugin_info
+        return nessus_data
+
+    except Exception as e:
+        print(f"ERROR: Failed to load Nessus file: {e}")
+        return {}
+
+
+def get_nessus_enrichment(nessus_data, host, port, plugin_id, plugin_name):
+    """Look up Nessus enrichment data using multiple fallback strategies."""
+    if not nessus_data:
+        return None
+    host = str(host).strip()
+    port = str(port).strip() if port else '0'
+    plugin_id = str(plugin_id).strip() if plugin_id else ''
+    plugin_name = str(plugin_name).strip() if plugin_name else ''
+
+    for key in [f"{host}:{port}:{plugin_id}", f"{host}:{plugin_id}",
+                f"{host}:{port}:{plugin_name.lower().replace(' ', '_')}"]:
+        if key in nessus_data:
+            return nessus_data[key]
+
+    if plugin_id and '_plugin_info' in nessus_data:
+        if plugin_id in nessus_data['_plugin_info']:
+            pi = nessus_data['_plugin_info'][plugin_id]
+            return {'description': pi['description'], 'solution': pi['solution'],
+                    'plugin_name': pi['plugin_name'], 'risk_factor': pi['risk_factor'],
+                    'plugin_output': '', 'cve': '', 'cvss_score': ''}
+    return None
+
+
+def format_nessus_description(enrichment, host, port, plugin_name, severity):
+    """Format Nessus description for output. Ensures 3-5 sentences."""
+    if not enrichment or not enrichment.get('description'):
+        return None
+    raw = ' '.join(enrichment['description'].split())
+    desc = f"A {severity.lower()} severity vulnerability '{plugin_name}' was identified on {host}"
+    if port and port not in ['0', 'nan', '']:
+        desc += f" port {port}"
+    desc += ". "
+    if len(raw) > 800:
+        raw = raw[:800]
+        lp = raw.rfind('.')
+        raw = raw[:lp+1] if lp > 400 else raw + "..."
+    desc += raw + " "
+    cve = enrichment.get('cve', '')
+    cvss = enrichment.get('cvss_score', '')
+    if cve and cve not in ['nan', '']:
+        desc += f"This vulnerability is tracked as {cve}. "
+    if cvss and cvss not in ['nan', '']:
+        desc += f"CVSS Score: {cvss}. "
+    return desc
+
+
+def format_nessus_recommendation(enrichment, host, severity):
+    """Format Nessus solution/recommendation. Ensures 3-5 sentences."""
+    if not enrichment or not enrichment.get('solution'):
+        return None
+    raw = ' '.join(enrichment['solution'].split())
+    if len(raw) > 600:
+        raw = raw[:600]
+        lp = raw.rfind('.')
+        raw = raw[:lp+1] if lp > 300 else raw + "..."
+    rec = raw + " "
+    rec += "Verify remediation by re-scanning with vulnerability assessment tools. "
+    rec += f"Priority: {severity} - address according to organizational vulnerability management SLAs. "
+    see_also = enrichment.get('see_also', '')
+    if see_also and see_also not in ['nan', ''] and len(see_also) < 200:
+        rec += f"Reference: {see_also.split()[0] if ' ' in see_also else see_also}"
+    return rec
+
+
+# ============================================================================
+# LOAD ENRICHMENT DATA
+# ============================================================================
+
+NESSUS_DATA = {}
+if NESSUS_FILE:
+    NESSUS_DATA = load_nessus_data(NESSUS_FILE)
+    if NESSUS_DATA:
+        print(f"Nessus enrichment ready - {len(NESSUS_DATA)} lookup keys available")
+    else:
+        print("WARNING: Nessus file loaded but no data extracted")
+else:
+    print("No Nessus file - EXTERNAL_VULNERABILITIES will use generic descriptions")
+
+print("=" * 70)
+```
+
+CONFIDENCE/VISIBILITY/RISK SCORING (when available):
+- Use Risk score to prioritize within same severity tier
+- Flag Confidence <50 for manual verification
+- Highlight Visibility >75 as externally exposed
+- Include avg CVR in group statistics
+- If 7-col format: skip CVR, note "CVR scores not available"
+
+TRACKING STATUS:
+- Annotate each finding with OPEN/CLOSED/TICKETED from the Tracking column
+- Report status breakdown in group summary
+- Flag OPEN findings as requiring attention
+
+ASM-NG GRADE SCORING REFERENCE (from grade_config.py):
+Category: Network Security | Weight: 1.0
+Score Formula: Score = max(0, 100 + (raw_score * 1.0))
+Grade Thresholds: A=90+, B=80+, C=70+, D=60+, F=<60
+
+EVENT TYPE SCORING:
+| Event Type | Rank | Points | Logic |
+|------------|------|--------|-------|
+| EXTERNAL_VULNERABILITIES | 1 | crit=-20, high=-10, med=-5 | crit_high_med |
+| VULNERABILITY_CVE_CRITICAL | 1 | -20 | unverified_exists |
+| VULNERABILITY_CVE_HIGH | 1 | -15 | unverified_exists |
+| VULNERABILITY_CVE_MEDIUM | 2 | -10 | unverified_exists |
+| VULNERABILITY_CVE_LOW | 3 | -5 | unverified_exists |
+| VULNERABILITY_GENERAL | 2 | -10 | unverified_exists |
+| INTERNAL_IP_ADDRESS | 1 | -20 | unverified_exists |
+| IP_ADDRESS | 3 | -5 | unverified_exists |
+| IPV6_ADDRESS | 3 | -5 | unverified_exists |
+| TCP_PORT_OPEN | 2 | -10 | unverified_exists |
+| TCP_PORT_OPEN_BANNER | 5 | 0 | informational |
+| UDP_PORT_OPEN | 2 | -10 | unverified_exists |
+| UDP_PORT_OPEN_INFO | 5 | 0 | informational |
+| DEFACED_INTERNET_NAME | 1 | -20 | unverified_exists |
+| DEFACED_IPADDR | 1 | -20 | unverified_exists |
+| DEFACED_AFFILIATE_INTERNET_NAME | 2 | -10 | unverified_exists |
+| DEFACED_COHOST | 2 | -10 | unverified_exists |
+| DEFACED_AFFILIATE_IPADDR | 2 | -10 | unverified_exists |
+| PROXY_HOST | 3 | -5 | unverified_exists |
+| VPN_HOST | 3 | -5 | unverified_exists |
+| TOR_EXIT_NODE | 3 | -5 | unverified_exists |
+| AI_ENDPOINT_UNAUTHENTICATED | 1 | -20 | unverified_exists |
+| AI_MODEL_EXPOSED | 2 | -10 | unverified_exists |
+
+GROUP 1 EVENT TYPES TO ANALYZE (23 total):
+1. EXTERNAL_VULNERABILITIES (Nessus scan - WITH .NESSUS FILE ENRICHMENT, exclude Info severity)
+2. VULNERABILITY_CVE_CRITICAL
+3. VULNERABILITY_CVE_HIGH
+4. VULNERABILITY_CVE_MEDIUM
+5. VULNERABILITY_CVE_LOW
+6. VULNERABILITY_GENERAL
+7. INTERNAL_IP_ADDRESS
+8. IP_ADDRESS
+9. IPV6_ADDRESS
+10. TCP_PORT_OPEN
+11. TCP_PORT_OPEN_BANNER (informational - analyze for patterns only)
+12. UDP_PORT_OPEN
+13. UDP_PORT_OPEN_INFO (informational - analyze for patterns only)
+14. DEFACED_INTERNET_NAME
+15. DEFACED_IPADDR
+16. DEFACED_AFFILIATE_INTERNET_NAME
+17. DEFACED_COHOST
+18. DEFACED_AFFILIATE_IPADDR
+19. PROXY_HOST
+20. VPN_HOST
+21. TOR_EXIT_NODE
+22. AI_ENDPOINT_UNAUTHENTICATED
+23. AI_MODEL_EXPOSED
+
+INITIALIZE OUTPUT:
+```python
+all_findings = []
+all_info_findings = []
+group_stats = {
+    'total_rows': 0,
+    'fp_excluded': 0,
+    'info_excluded': 0,
+    'findings_extracted': 0,
+    'nessus_enriched': 0,
+    'nessus_fallback': 0,
+    'tracking': {'OPEN': 0, 'CLOSED': 0, 'TICKETED': 0},
+    'cvr_scores': []
+}
+
+# High-risk ports for severity escalation
+HIGH_RISK_PORTS = {
+    '21': ('FTP', 'High'), '22': ('SSH', 'Medium'), '23': ('Telnet', 'Critical'),
+    '25': ('SMTP', 'High'), '53': ('DNS', 'Medium'), '110': ('POP3', 'High'),
+    '135': ('RPC', 'High'), '137': ('NetBIOS', 'High'), '138': ('NetBIOS', 'High'),
+    '139': ('NetBIOS/SMB', 'High'), '143': ('IMAP', 'Medium'),
+    '161': ('SNMP', 'High'), '389': ('LDAP', 'High'), '445': ('SMB', 'Critical'),
+    '1433': ('MSSQL', 'Critical'), '1434': ('MSSQL-UDP', 'Critical'),
+    '1521': ('Oracle', 'Critical'), '2049': ('NFS', 'High'),
+    '3306': ('MySQL', 'Critical'), '3389': ('RDP', 'Critical'),
+    '5432': ('PostgreSQL', 'Critical'), '5900': ('VNC', 'Critical'),
+    '5985': ('WinRM', 'High'), '5986': ('WinRM-S', 'High'),
+    '6379': ('Redis', 'Critical'), '8080': ('HTTP-Alt', 'Medium'),
+    '8443': ('HTTPS-Alt', 'Low'), '9200': ('Elasticsearch', 'High'),
+    '11211': ('Memcached', 'High'), '27017': ('MongoDB', 'Critical'),
+}
+```
+
+EVENT TYPE BLOCK 1: EXTERNAL_VULNERABILITIES (Nessus Enrichment)
+================================================================
+```python
+print("\n=== Processing EXTERNAL_VULNERABILITIES ===")
+
+rows = ROWS_BY_TYPE.get('EXTERNAL_VULNERABILITIES', [])
+print(f"Rows found: {len(rows)}")
+
+tab_findings = []
+tab_info = []
+
+for idx, row in enumerate(rows):
+    group_stats['total_rows'] += 1
+    fp = get_fp(row)
+    if fp == 1:
+        group_stats['fp_excluded'] += 1
+        continue
+
+    tracking = get_tracking(row)
+    group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+    confidence, visibility, risk = get_cvr_scores(row)
+    if confidence is not None:
+        group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+    data_field = str(row.get('Data', '')).strip()
+    source = str(row.get('Source', '')).strip()
+    module = str(row.get('Module', '')).strip()
+
+    severity = parse_severity_from_data(data_field, 'Medium')
+    if severity == 'Info':
+        tab_info.append(row)
+        group_stats['info_excluded'] += 1
+        continue
+
+    # Try Nessus enrichment
+    nessus_enrichment = None
+    if NESSUS_DATA:
+        nessus_enrichment = get_nessus_enrichment(NESSUS_DATA, source, '', '', data_field[:100])
+
+    if nessus_enrichment:
+        description = format_nessus_description(nessus_enrichment, source, '', data_field[:100], severity)
+        recommendation = format_nessus_recommendation(nessus_enrichment, source, severity)
+        group_stats['nessus_enriched'] += 1
+    else:
+        group_stats['nessus_fallback'] += 1
+        description = f"A {severity.lower()} severity network vulnerability was detected on {source} via {module}. "
+        description += f"Finding details: {data_field[:500]}. "
+        description += "Network vulnerabilities of this type can be exploited to gain unauthorized access, exfiltrate data, or disrupt services. "
+        description += "The specific impact depends on the vulnerability nature and the asset's role in the environment. "
+        description += "Consult the Nessus plugin documentation for detailed technical information."
+
+        recommendation = f"Apply vendor-recommended patches or configuration changes to remediate the vulnerability on {source}. "
+        recommendation += "Implement network segmentation and firewall rules as defense-in-depth measures. "
+        recommendation += "Verify remediation by re-scanning with vulnerability assessment tools. "
+        recommendation += f"Priority: {severity} - address according to organizational vulnerability management SLAs. "
+        recommendation += "Subscribe to vendor security advisories for proactive patch management."
+
+    finding = {
+        'Category': 'Network Security',
+        'Tab': 'EXTERNAL_VULNERABILITIES',
+        'Priority': severity,
+        'Item': f"External Vulnerability - {source} - {data_field[:80]}",
+        'Description': description,
+        'Recommendation': recommendation,
+        'Vuln_Type': 'EXTERNAL_VULNERABILITIES',
+        'Asset': source,
+        'Plugin_Name': module,
+        'Tracking_Status': tracking,
+        'FP_Status': "Verified" if fp == 2 else "Unverified"
+    }
+    if risk is not None:
+        finding['Avg_Risk'] = risk
+    tab_findings.append(finding)
+    group_stats['findings_extracted'] += 1
+
+all_findings.extend(tab_findings)
+all_info_findings.extend(tab_info)
+print(f"EXTERNAL_VULNERABILITIES: {len(tab_findings)} findings, {len(tab_info)} info excluded")
+print(f"  Nessus-enriched: {group_stats['nessus_enriched']}, Fallback: {group_stats['nessus_fallback']}")
+```
+
+EVENT TYPE BLOCK 2: VULNERABILITY_CVE_* and VULNERABILITY_GENERAL
+=================================================================
+```python
+print("\n=== Processing VULNERABILITY_CVE_* and VULNERABILITY_GENERAL ===")
+
+for vuln_type_name, default_severity, grade_points in [
+    ('VULNERABILITY_CVE_CRITICAL', 'Critical', -20),
+    ('VULNERABILITY_CVE_HIGH', 'High', -15),
+    ('VULNERABILITY_CVE_MEDIUM', 'Medium', -10),
+    ('VULNERABILITY_CVE_LOW', 'Low', -5),
+    ('VULNERABILITY_GENERAL', 'Medium', -10),
+]:
+    rows = ROWS_BY_TYPE.get(vuln_type_name, [])
+    if not rows:
+        print(f"  {vuln_type_name}: No data")
+        continue
+
+    print(f"\n  Processing {vuln_type_name} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        description = f"A {default_severity.lower()} severity vulnerability was identified on {source}. "
+        description += f"Details: {data_field[:500]}. "
+        description += "This vulnerability requires assessment and remediation based on its severity and the affected asset's criticality. "
+        description += "Exploitation could lead to unauthorized access, data exposure, or service disruption. "
+        if confidence is not None and confidence < 50:
+            description += f"Note: Confidence score is {confidence}/100 - manual verification recommended."
+        else:
+            description += "Immediate remediation planning should be initiated for this finding."
+
+        recommendation = f"Apply vendor patches or configuration changes to address the vulnerability on {source}. "
+        recommendation += "Implement compensating controls if patches are not immediately available. "
+        recommendation += "Verify remediation through re-scanning after applying fixes. "
+        recommendation += f"Priority: {default_severity} - follow organizational SLAs for {default_severity.lower()} findings. "
+        recommendation += "Monitor for active exploitation attempts targeting this vulnerability."
+
+        finding = {
+            'Category': 'Network Security',
+            'Tab': vuln_type_name,
+            'Priority': default_severity,
+            'Item': f"{vuln_type_name.replace('_', ' ').title()} - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': vuln_type_name,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {vuln_type_name}: {len(tab_findings_local)} findings")
+```
+
+EVENT TYPE BLOCK 3: PORT EXPOSURE (TCP_PORT_OPEN, UDP_PORT_OPEN, banners)
+=========================================================================
+IMPORTANT: Consolidate open ports by RISK TIER, not per-port.
+Create at most 3 findings (Critical-Risk, High-Risk, Standard) with detail CSVs
+listing every port/host combination. Do NOT create one finding per port.
+
+```python
+print("\n=== Processing Port Exposure (consolidated by risk tier) ===")
+
+import re
+
+# Collect all port data into risk tiers
+port_tiers = {'Critical': [], 'High': [], 'Medium': []}
+
+for port_type, default_sev in [
+    ('TCP_PORT_OPEN', 'Medium'),
+    ('UDP_PORT_OPEN', 'Medium'),
+]:
+    proto = port_type.split('_')[0]  # TCP or UDP
+    rows = ROWS_BY_TYPE.get(port_type, [])
+    if not rows:
+        print(f"  {port_type}: No data")
+        continue
+
+    print(f"\n  Processing {port_type} ({len(rows)} rows)")
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        port_match = re.search(r'(\d+)', data_field)
+        port_num = port_match.group(1) if port_match else ''
+
+        severity = default_sev
+        svc = ''
+        if port_num in HIGH_RISK_PORTS:
+            svc, severity = HIGH_RISK_PORTS[port_num]
+
+        port_tiers[severity].append({
+            'port': port_num, 'svc': svc, 'host': source,
+            'proto': proto, 'tracking': tracking,
+            'risk': risk, 'data': data_field[:200], 'module': module,
+        })
+
+# Emit ONE consolidated finding per non-empty risk tier
+for tier_sev in ['Critical', 'High', 'Medium']:
+    entries = port_tiers[tier_sev]
+    if not entries:
+        continue
+
+    unique_ports = sorted(set(e['port'] for e in entries if e['port']),
+                          key=lambda x: int(x) if x.isdigit() else 0)
+    unique_hosts = sorted(set(e['host'] for e in entries if e['host']))
+    tracking_counts = {}
+    for e in entries:
+        t = e['tracking']
+        tracking_counts[t] = tracking_counts.get(t, 0) + 1
+
+    # Build port summary with service names
+    port_details = []
+    for p in unique_ports:
+        if p in HIGH_RISK_PORTS:
+            port_details.append(f"{p}/{HIGH_RISK_PORTS[p][0]}")
+        else:
+            port_details.append(p)
+
+    if len(port_details) <= 20:
+        port_list_str = ", ".join(port_details)
+    else:
+        port_list_str = ", ".join(port_details[:20]) + f", and {len(port_details) - 20} more"
+
+    host_list_str = ", ".join(unique_hosts[:5])
+    if len(unique_hosts) > 5:
+        host_list_str += f", and {len(unique_hosts) - 5} more"
+
+    tier_label = {'Critical': 'Critical-Risk', 'High': 'High-Risk', 'Medium': 'Standard'}[tier_sev]
+
+    description = (f"{len(unique_ports)} {tier_label.lower()} open ports detected across "
+                   f"{len(unique_hosts)} hosts ({len(entries)} total port/host instances). "
+                   f"Ports: {port_list_str}. Hosts: {host_list_str}. ")
+    if tier_sev == 'Critical':
+        description += ("These include database, remote access, and administrative services "
+                       "that pose severe risk when internet-exposed. Immediate remediation required.")
+    elif tier_sev == 'High':
+        description += ("These include sensitive services that should not be directly accessible "
+                       "from the internet without strong access controls.")
+    else:
+        description += ("Each exposed port increases attack surface. Review to ensure only "
+                       "necessary services are externally accessible.")
+
+    recommendation = (f"Review all {len(unique_ports)} exposed ports across {len(unique_hosts)} hosts "
+                     "and close any not required for business operations. "
+                     "For required services, apply security hardening and restrict access via firewall rules. "
+                     "Place administrative services behind VPN or zero-trust access solutions. "
+                     "Implement network-level monitoring for all externally exposed services. "
+                     "See detail CSV for complete port/host inventory.")
+
+    finding = {
+        'Category': 'Network Security',
+        'Tab': 'TCP_PORT_OPEN',
+        'Priority': tier_sev,
+        'Item': f"{tier_label} Open Ports - {len(unique_ports)} ports across {len(unique_hosts)} hosts",
+        'Description': description,
+        'Recommendation': recommendation,
+        'Vuln_Type': f"OPEN_PORTS_{tier_sev.upper()}",
+        'Asset': ", ".join(unique_hosts[:3]),
+        'Plugin_Name': entries[0].get('module', ''),
+        'Tracking_Status': max(tracking_counts, key=tracking_counts.get),
+        'FP_Status': 'Unverified',
+    }
+    all_findings.append(finding)
+    group_stats['findings_extracted'] += len(entries)
+    print(f"  {tier_label} tier: {len(unique_ports)} ports, {len(unique_hosts)} hosts, {len(entries)} instances -> 1 finding")
+
+    # Write detail CSV for this tier
+    detail_rows = sorted(entries, key=lambda x: (int(x['port']) if x['port'].isdigit() else 0))
+    detail_file = os.path.join(DETAILS_DIR, f'findings_detail_OPEN_PORTS_{tier_sev.upper()}.csv')
+    with open(detail_file, 'w', newline='') as csvf:
+        fieldnames = ['Instance', 'Port', 'Protocol', 'Service', 'Host', 'Risk_Tier', 'Tracking_Status', 'Raw_Data']
+        w = csv.DictWriter(csvf, fieldnames=fieldnames)
+        w.writeheader()
+        for i, e in enumerate(detail_rows):
+            w.writerow({
+                'Instance': i + 1, 'Port': e['port'], 'Protocol': e['proto'],
+                'Service': HIGH_RISK_PORTS.get(e['port'], ('',))[0] if e['port'] in HIGH_RISK_PORTS else '',
+                'Host': e['host'], 'Risk_Tier': tier_sev,
+                'Tracking_Status': e['tracking'], 'Raw_Data': e['data'],
+            })
+
+# Process informational banner/info types for pattern analysis
+for info_type in ['TCP_PORT_OPEN_BANNER', 'UDP_PORT_OPEN_INFO']:
+    rows = ROWS_BY_TYPE.get(info_type, [])
+    if rows:
+        print(f"\n  {info_type}: {len(rows)} informational rows (analyzed for patterns)")
+        for row in rows:
+            group_stats['total_rows'] += 1
+            fp = get_fp(row)
+            if fp == 1:
+                group_stats['fp_excluded'] += 1
+                continue
+            all_info_findings.append(row)
+            group_stats['info_excluded'] += 1
+```
+
+EVENT TYPE BLOCK 4: IP EXPOSURE (IP_ADDRESS, IPV6_ADDRESS, INTERNAL_IP_ADDRESS)
+================================================================================
+```python
+print("\n=== Processing IP Exposure ===")
+
+for ip_type, default_sev, desc_context in [
+    ('INTERNAL_IP_ADDRESS', 'High', 'Internal IP address leaked externally'),
+    ('IP_ADDRESS', 'Low', 'External IP address discovered in attack surface'),
+    ('IPV6_ADDRESS', 'Low', 'IPv6 address discovered in attack surface'),
+]:
+    rows = ROWS_BY_TYPE.get(ip_type, [])
+    if not rows:
+        print(f"  {ip_type}: No data")
+        continue
+
+    print(f"\n  Processing {ip_type} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = default_sev
+        # Internal IPs are always High severity (architecture disclosure)
+        if ip_type == 'INTERNAL_IP_ADDRESS':
+            description = f"Internal IP address {data_field[:200]} was discovered via {source} through {module}. "
+            description += "Leaking internal IP addresses reveals network architecture details to potential attackers. "
+            description += "This information can be used for reconnaissance, targeted attacks, and network mapping. "
+            description += "Internal addressing should never be exposed in external-facing content, headers, or DNS records. "
+            description += "This finding indicates a configuration issue that should be remediated promptly."
+
+            recommendation = f"Identify and remediate the source of internal IP disclosure on {source}. "
+            recommendation += "Common causes: HTTP headers (X-Forwarded-For, Via), DNS records, error pages, JavaScript, HTML comments. "
+            recommendation += "Configure reverse proxies and load balancers to strip internal IP headers before external responses. "
+            recommendation += "Review and sanitize all external-facing content that may contain internal network information. "
+            recommendation += "Implement egress filtering to prevent internal IP leakage through application responses."
+        else:
+            description = f"{desc_context}: {data_field[:300]} discovered via {source}. "
+            description += f"This {ip_type.replace('_', ' ').lower()} is part of the organization's external attack surface. "
+            description += "Each discoverable IP address represents a potential entry point for attackers. "
+            description += "All exposed IP addresses should have appropriate security controls and monitoring in place. "
+            description += "Regular attack surface inventory helps track and secure all external-facing assets."
+
+            recommendation = f"Ensure {data_field[:100]} on {source} has appropriate security controls including firewall rules, intrusion detection, and regular vulnerability scanning. "
+            recommendation += "Verify that only necessary services are exposed on this IP address. "
+            recommendation += "Implement network monitoring and alerting for suspicious activity. "
+            recommendation += "Include this asset in regular vulnerability scanning and penetration testing scope. "
+            recommendation += "Review whether this IP needs to be externally accessible."
+
+        finding = {
+            'Category': 'Network Security',
+            'Tab': ip_type,
+            'Priority': severity,
+            'Item': f"{ip_type.replace('_', ' ').title()} - {data_field[:80]} via {source}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': ip_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {ip_type}: {len(tab_findings_local)} findings")
+```
+
+EVENT TYPE BLOCK 5: DEFACEMENT DETECTION (DEFACED_*)
+=====================================================
+```python
+print("\n=== Processing Defacement Detection ===")
+
+for defaced_type, default_sev in [
+    ('DEFACED_INTERNET_NAME', 'Critical'),
+    ('DEFACED_IPADDR', 'Critical'),
+    ('DEFACED_AFFILIATE_INTERNET_NAME', 'High'),
+    ('DEFACED_COHOST', 'High'),
+    ('DEFACED_AFFILIATE_IPADDR', 'High'),
+]:
+    rows = ROWS_BY_TYPE.get(defaced_type, [])
+    if not rows:
+        print(f"  {defaced_type}: No data")
+        continue
+
+    print(f"\n  Processing {defaced_type} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        is_direct = 'AFFILIATE' not in defaced_type and 'COHOST' not in defaced_type
+
+        description = f"{'Direct' if is_direct else 'Affiliate/co-hosted'} website defacement detected on {source}. "
+        description += f"Defacement details: {data_field[:400]}. "
+        if is_direct:
+            description += "Website defacement indicates that an attacker has gained unauthorized write access to the web server or application. "
+            description += "This represents a critical security breach requiring immediate incident response and forensic investigation. "
+            description += "The compromised system may have been used as a pivot point for further attacks."
+        else:
+            description += "Defacement of an affiliate or co-hosted site may indicate shared infrastructure compromise. "
+            description += "While not a direct breach, this indicates potential risk to shared hosting environments. "
+            description += "The organization should assess whether shared resources are affected."
+
+        recommendation = f"Immediately investigate the defacement on {source} and initiate incident response procedures. "
+        recommendation += "Restore the site from a known-good backup after forensic evidence has been collected. "
+        recommendation += "Identify and remediate the attack vector (common causes: CMS vulnerabilities, compromised credentials, SQL injection). "
+        recommendation += "Review and harden web server configurations, update all software, and implement file integrity monitoring. "
+        recommendation += "Conduct a thorough security audit of the affected infrastructure."
+
+        finding = {
+            'Category': 'Network Security',
+            'Tab': defaced_type,
+            'Priority': default_sev,
+            'Item': f"Defacement Detected - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': defaced_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {defaced_type}: {len(tab_findings_local)} findings")
+```
+
+EVENT TYPE BLOCK 6: ANONYMIZATION INFRASTRUCTURE (PROXY, VPN, TOR)
+===================================================================
+```python
+print("\n=== Processing Anonymization Infrastructure ===")
+
+for anon_type, label, desc_detail in [
+    ('PROXY_HOST', 'Proxy', 'identified as a proxy server'),
+    ('VPN_HOST', 'VPN', 'identified as a VPN endpoint'),
+    ('TOR_EXIT_NODE', 'Tor Exit Node', 'identified as a Tor exit node'),
+]:
+    rows = ROWS_BY_TYPE.get(anon_type, [])
+    if not rows:
+        print(f"  {anon_type}: No data")
+        continue
+
+    print(f"\n  Processing {anon_type} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = 'Medium' if anon_type != 'TOR_EXIT_NODE' else 'High'
+
+        description = f"Asset {source} was {desc_detail} in the attack surface. "
+        description += f"Detection details: {data_field[:400]}. "
+        description += f"{label} infrastructure in the attack surface can indicate anonymization of malicious traffic or misconfigured network equipment. "
+        description += "Attackers may route traffic through these services to obscure their origin. "
+        description += "This finding should be investigated to determine if the asset is intentionally configured this way."
+
+        recommendation = f"Investigate whether the {label.lower()} configuration on {source} is intentional and authorized. "
+        recommendation += f"If unauthorized, immediately isolate the system and investigate for compromise. "
+        recommendation += "Review network architecture to ensure traffic routing is as expected. "
+        recommendation += f"Implement monitoring for suspicious traffic patterns through {label.lower()} infrastructure. "
+        recommendation += "Document authorized proxy/VPN/anonymization services in the network inventory."
+
+        finding = {
+            'Category': 'Network Security',
+            'Tab': anon_type,
+            'Priority': severity,
+            'Item': f"{label} Detected - {source}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': anon_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {anon_type}: {len(tab_findings_local)} findings")
+```
+
+EVENT TYPE BLOCK 7: AI INFRASTRUCTURE (AI_ENDPOINT_UNAUTHENTICATED, AI_MODEL_EXPOSED)
+=======================================================================================
+```python
+print("\n=== Processing AI Infrastructure Exposure ===")
+
+for ai_type, default_sev, context in [
+    ('AI_ENDPOINT_UNAUTHENTICATED', 'Critical', 'unauthenticated AI/ML endpoint'),
+    ('AI_MODEL_EXPOSED', 'High', 'exposed AI/ML model'),
+]:
+    rows = ROWS_BY_TYPE.get(ai_type, [])
+    if not rows:
+        print(f"  {ai_type}: No data")
+        continue
+
+    print(f"\n  Processing {ai_type} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        description = f"An {context} was discovered on {source}. "
+        description += f"Details: {data_field[:400]}. "
+        description += "Exposed AI/ML infrastructure can be exploited for unauthorized inference, model theft, data poisoning, or prompt injection attacks. "
+        description += "Unauthenticated AI endpoints pose significant risk as they may expose sensitive training data or allow adversarial manipulation. "
+        description += "This finding requires immediate security review and access control implementation."
+
+        recommendation = f"Immediately implement authentication and authorization controls on the AI endpoint at {source}. "
+        recommendation += "Apply rate limiting, input validation, and output filtering to prevent abuse. "
+        recommendation += "Review whether the AI model or endpoint should be externally accessible at all. "
+        recommendation += "Implement monitoring for adversarial inputs and unusual query patterns. "
+        recommendation += "Ensure AI infrastructure follows organizational security policies and compliance requirements."
+
+        finding = {
+            'Category': 'Network Security',
+            'Tab': ai_type,
+            'Priority': default_sev,
+            'Item': f"AI Infrastructure Exposure - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': ai_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {ai_type}: {len(tab_findings_local)} findings")
+```
+
+CONSOLIDATION PHASE
+===================
+```python
+print("\n=== CONSOLIDATION PHASE ===")
+
+groups = defaultdict(list)
+for f in all_findings:
+    key = (f['Category'], f['Vuln_Type'], f['Priority'])
+    groups[key].append(f)
+
+print(f"Consolidation groups: {len(groups)}")
+for key, findings in groups.items():
+    if len(findings) > 1:
+        print(f"  {key}: {len(findings)} findings")
+
+consolidated_findings = []
+os.makedirs('./output/findings_details', exist_ok=True)
+
+for key, group_findings in groups.items():
+    if len(group_findings) == 1:
+        consolidated_findings.append(group_findings[0])
+    else:
+        category, vuln_type, priority = key
+        assets = [f['Asset'] for f in group_findings]
+        unique_assets = list(set([a for a in assets if a and a.lower() not in ['nan', 'none']]))
+        asset_count = len(unique_assets)
+        instance_count = len(group_findings)
+
+        asset_list = ", ".join([f"({i+1}) {unique_assets[i]}" for i in range(min(5, len(unique_assets)))])
+        if len(unique_assets) > 5:
+            asset_list += f", and {len(unique_assets)-5} more"
+
+        tracking_counts = defaultdict(int)
+        for f in group_findings:
+            tracking_counts[f.get('Tracking_Status', 'OPEN')] += 1
+        tracking_summary = ", ".join([f"{k}: {v}" for k, v in tracking_counts.items()])
+
+        avg_risk = None
+        risk_scores = [f.get('Avg_Risk') for f in group_findings if f.get('Avg_Risk') is not None]
+        if risk_scores:
+            avg_risk = sum(risk_scores) / len(risk_scores)
+
+        vuln_name = vuln_type.replace('_', ' ').title()
+        _lead = f"{vuln_name} was identified on {instance_count} instances across {asset_count} assets: {asset_list}."
+        _default_desc = (
+            _lead + " This represents a systematic security issue affecting multiple systems "
+            "requiring coordinated remediation. The widespread nature indicates common "
+            "misconfiguration, shared vulnerable components, or consistent security control gaps."
+        )
+        _default_rec = (
+            f"Implement systematic remediation across all {instance_count} affected instances. "
+            "Deploy consistent security controls and monitoring across all affected assets. "
+            f"Prioritize remediation based on asset criticality and verify each of the "
+            f"{asset_count} affected assets through targeted testing."
+        )
+        description, recommendation = _enrich(vuln_type, _lead, _default_desc, _default_rec)
+
+        consolidated = {
+            'Category': category,
+            'Tab': group_findings[0]['Tab'],
+            'Priority': priority,
+            'Item': f"{vuln_name} - {instance_count} instances across {asset_count} assets",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': vuln_type,
+            'Asset': ", ".join(unique_assets[:5]) if unique_assets else '',
+            'Plugin_Name': group_findings[0].get('Plugin_Name', ''),
+            'Tracking_Status': max(tracking_counts, key=tracking_counts.get),
+        }
+        if avg_risk is not None:
+            consolidated['Avg_Risk'] = round(avg_risk, 1)
+        consolidated_findings.append(consolidated)
+
+        # Create detail file
+        import csv as csv_mod
+        detail_data = [{'Instance': i+1, 'Asset': f['Asset'],
+                        'Details': f['Item'], 'Description': f['Description'][:500],
+                        'Tracking_Status': f.get('Tracking_Status', 'OPEN'),
+                        'FP_Status': f.get('FP_Status', 'Unverified')}
+                       for i, f in enumerate(group_findings)]
+        detail_file = f'./output/findings_details/findings_detail_{vuln_type}.csv'
+        with open(detail_file, 'w', newline='') as csvf:
+            writer = csv_mod.DictWriter(csvf, fieldnames=detail_data[0].keys())
+            writer.writeheader()
+            writer.writerows(detail_data)
+        print(f"  Created: {detail_file}")
+
+print(f"\nConsolidation complete: {len(all_findings)} -> {len(consolidated_findings)} findings")
+```
+
+SAVE OUTPUTS
+============
+```python
+import csv as csv_mod
+
+fieldnames = ['Category', 'Tab', 'Priority', 'Item', 'Description', 'Recommendation',
+              'Tracking_Status', 'Avg_Risk']
+with open('./output/findings_GROUP1_FULL_CONSOLIDATED.csv', 'w', newline='') as csvf:
+    writer = csv_mod.DictWriter(csvf, fieldnames=fieldnames, extrasaction='ignore')
+    writer.writeheader()
+    writer.writerows(consolidated_findings)
+print(f"\nSaved: ./output/findings_GROUP1_FULL_CONSOLIDATED.csv ({len(consolidated_findings)} findings)")
+
+# Statistics
+print("\n" + "=" * 70)
+print("GROUP 1: NETWORK SECURITY - STATISTICS")
+print("=" * 70)
+print(f"Total rows processed: {group_stats['total_rows']}")
+print(f"False positives excluded: {group_stats['fp_excluded']}")
+print(f"Info severity excluded: {group_stats['info_excluded']}")
+print(f"Findings extracted: {group_stats['findings_extracted']}")
+print(f"Consolidated findings: {len(consolidated_findings)}")
+print(f"\nNESSUS ENRICHMENT:")
+print(f"  Enriched from .nessus: {group_stats['nessus_enriched']}")
+print(f"  Generic fallback: {group_stats['nessus_fallback']}")
+if group_stats['nessus_enriched'] + group_stats['nessus_fallback'] > 0:
+    rate = group_stats['nessus_enriched'] / (group_stats['nessus_enriched'] + group_stats['nessus_fallback']) * 100
+    print(f"  Enrichment success rate: {rate:.1f}%")
+print(f"\nTRACKING STATUS:")
+for status, count in group_stats['tracking'].items():
+    print(f"  {status}: {count}")
+
+if group_stats['cvr_scores']:
+    avg_c = sum(s[0] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    avg_v = sum(s[1] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    avg_r = sum(s[2] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    print(f"\nCVR SCORE AVERAGES:")
+    print(f"  Avg Confidence: {avg_c:.1f}")
+    print(f"  Avg Visibility: {avg_v:.1f}")
+    print(f"  Avg Risk: {avg_r:.1f}")
+else:
+    print(f"\nCVR scores: Not available (7-col format)")
+
+print("=" * 70)
+
+# Update progress tracker
+tracker_path = './output/analysis_progress_tracker.md'
+tracker_exists = os.path.exists(tracker_path)
+
+with open(tracker_path, 'a' if tracker_exists else 'w') as f:
+    if not tracker_exists:
+        f.write("# Security Analysis Progress Tracker\n\n")
+    f.write("## GROUP 1: Network Security (Weight 1.0) - COMPLETED\n\n")
+    f.write(f"**Findings:** {len(consolidated_findings)}\n")
+    f.write(f"**Rows Processed:** {group_stats['total_rows']}\n")
+    f.write(f"**FP Excluded:** {group_stats['fp_excluded']}\n")
+    f.write(f"**Info Excluded:** {group_stats['info_excluded']}\n\n")
+    f.write("### Nessus Enrichment\n")
+    f.write(f"- Enriched from .nessus: {group_stats['nessus_enriched']}\n")
+    f.write(f"- Generic fallback: {group_stats['nessus_fallback']}\n\n")
+    f.write("### Tracking Status\n")
+    for status, count in group_stats['tracking'].items():
+        f.write(f"- {status}: {count}\n")
+    f.write("\n---\n\n")
+
+print("\nGROUP 1 COMPLETE - Network Security analysis saved")
+```
+
+QUALITY VERIFICATION CHECKLIST:
+- [ ] All descriptions are 3-5 sentences / full paragraphs
+- [ ] All recommendations are 3-5 sentences / full paragraphs
+- [ ] No 'nan' appears in any field
+- [ ] Severities normalized (Critical/High/Medium/Low)
+- [ ] Consolidated findings show instance counts
+- [ ] Detail files created for multi-instance findings
+- [ ] Nessus .nessus enrichment for EXTERNAL_VULNERABILITIES
+- [ ] Progress tracker updated
+- [ ] Tracking status (OPEN/CLOSED/TICKETED) annotated on all findings
+- [ ] CVR scores extracted and averaged (10-col format) or noted as unavailable
+- [ ] All 23 Network Security event types processed
+- [ ] Grade weights referenced: Network Security = 1.0
+- [ ] High-risk ports escalated to appropriate severity
+- [ ] AI infrastructure findings included

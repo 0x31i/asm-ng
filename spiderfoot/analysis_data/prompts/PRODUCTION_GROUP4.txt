@@ -1,0 +1,939 @@
+PRODUCTION ANALYSIS - GROUP 4: General Health
+=================================================
+ASM-NG Grade Category: General Health | Weight: 0.8 | Priority: P2
+=================================================
+
+CONFIGURATION:
+- CSV: Auto-detect (only .csv file in ./obfuscated/) -- ASM-NG export
+- Format: Auto-detect 7-col (standard) or 10-col (full_scored with CVR scores)
+- Mode: PRODUCTION (analyze ALL rows)
+- Output: ./output/
+- Data: TOKENIZED/OBFUSCATED (IPs, domains, hosts are token identifiers)
+
+CONSOLIDATION RULES (MANDATORY):
+The goal is a concise, executive-readable report. Minimize finding count through
+aggressive consolidation while preserving detail in supporting CSVs.
+- NEVER create one finding per individual port, IP, domain, URL, or asset instance.
+- Group related findings by EVENT TYPE + SEVERITY TIER.
+- The consolidation phase groups by (Category, Vuln_Type, Priority) so multiple
+  instances of the same event type at the same severity merge into a single finding
+  with instance count and asset list.
+- Detail CSVs capture every individual instance for drill-down.
+- Target: under 20 consolidated findings per group. If consolidation produces more
+  than 20, review Vuln_Type keys for over-granularity.
+
+SETUP - IMPORT AND HELPER FUNCTIONS:
+```python
+import csv
+import os
+import glob
+import sys as _sys
+_sys.path.insert(0, './scripts')
+try:
+    from finding_enrichment import enrich_or_default as _enrich
+    print("finding_enrichment library loaded OK")
+except ImportError:
+    def _enrich(tab, lead, default_desc, default_rec):
+        return default_desc, default_rec
+    print("WARNING: finding_enrichment.py not found - using generic descriptions")
+
+from collections import defaultdict
+
+# ============================================================================
+# DYNAMIC FILE DETECTION
+# ============================================================================
+
+print("=== Dynamic File Detection ===")
+
+# Find CSV file in obfuscated folder
+csv_files = glob.glob('./obfuscated/*.csv')
+if not csv_files:
+    raise FileNotFoundError("No .csv file found in ./obfuscated/ folder")
+elif len(csv_files) > 1:
+    print(f"WARNING: Multiple .csv files found: {csv_files}")
+    print(f"Using first file: {csv_files[0]}")
+
+CSV_FILE = csv_files[0]
+print(f"CSV file detected: {CSV_FILE}")
+
+# Auto-detect CSV format (7-col standard or 10-col full_scored)
+def detect_csv_format(csv_file):
+    with open(csv_file, 'r') as f:
+        reader = csv.reader(f)
+        headers = next(reader)
+        headers_lower = [h.strip().lower() for h in headers]
+        if 'confidence' in headers_lower:
+            return 'full_scored', headers
+        else:
+            return 'standard', headers
+
+CSV_FORMAT, CSV_HEADERS = detect_csv_format(CSV_FILE)
+print(f"CSV format: {CSV_FORMAT} ({len(CSV_HEADERS)} columns)")
+
+# Load and group by event type
+def load_csv_by_event_type(csv_file):
+    rows_by_type = {}
+    with open(csv_file, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            etype = row['Type']
+            rows_by_type.setdefault(etype, []).append(row)
+    return rows_by_type
+
+ROWS_BY_TYPE = load_csv_by_event_type(CSV_FILE)
+print(f"Event types found: {len(ROWS_BY_TYPE)}")
+for etype, rows in sorted(ROWS_BY_TYPE.items(), key=lambda x: -len(x[1]))[:10]:
+    print(f"  {etype}: {len(rows)} rows")
+
+print("=" * 70)
+print("OBFUSCATED DATA MODE - Internal Processing")
+print("=" * 70)
+print("INTERNAL: Processing obfuscated data where:")
+print("  Infrastructure identifiers obfuscated for security")
+print("  Format: IP_ADDRESS_TOKEN_####, DOMAIN_TOKEN_####, HOSTNAME_TOKEN_####, etc.")
+print("=" * 70)
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def normalize_priority(severity, default='Medium'):
+    """Normalize severity to standard format"""
+    if not severity or str(severity).lower().strip() in ['nan', '', 'none']:
+        return default
+    severity = str(severity).strip().lower()
+    if severity in ['critical', 'crit', '4']:
+        return 'Critical'
+    elif severity in ['high', 'hi', '3']:
+        return 'High'
+    elif severity in ['medium', 'med', '2']:
+        return 'Medium'
+    elif severity in ['low', 'lo', '1']:
+        return 'Low'
+    elif severity in ['info', 'informational', '0']:
+        return 'Info'
+    return default
+
+def get_cvr_scores(row):
+    """Extract CVR scores from a row (10-col format only)."""
+    if CSV_FORMAT != 'full_scored':
+        return None, None, None
+    try:
+        confidence = int(row.get('Confidence', 0) or 0)
+        visibility = int(row.get('Visibility', 0) or 0)
+        risk = int(row.get('Risk', 0) or 0)
+        return confidence, visibility, risk
+    except (ValueError, TypeError):
+        return 0, 0, 0
+
+def get_tracking(row):
+    """Extract tracking status from row."""
+    return str(row.get('Tracking', 'OPEN')).strip().upper() or 'OPEN'
+
+def get_fp(row):
+    """Extract FP value. Returns int: 0=unverified, 1=false positive, 2=verified."""
+    try:
+        return int(row.get('F/P', 0) or 0)
+    except (ValueError, TypeError):
+        return 0
+
+print("=" * 70)
+```
+
+CONFIDENCE/VISIBILITY/RISK SCORING (when available):
+- Use Risk score to prioritize within same severity tier
+- Flag Confidence <50 for manual verification
+- Highlight Visibility >75 as externally exposed
+- Include avg CVR in group statistics
+- If 7-col format: skip CVR, note "CVR scores not available"
+
+TRACKING STATUS:
+- Annotate each finding with OPEN/CLOSED/TICKETED from the Tracking column
+- Report status breakdown in group summary
+- Flag OPEN findings as requiring attention
+
+ASM-NG GRADE SCORING REFERENCE (from grade_config.py):
+Category: General Health | Weight: 0.8
+Score Formula: Score = max(0, 100 + (raw_score * 0.8))
+Grade Thresholds: A=90+, B=80+, C=70+, D=60+, F=<60
+
+EVENT TYPE SCORING:
+| Event Type | Rank | Points | Logic |
+|------------|------|--------|-------|
+| APPSTORE_ENTRY | 3 | -5 | unverified_exists |
+| BLACKLISTED_AFFILIATE_INTERNET_NAME | 5 | 0 | informational |
+| BLACKLISTED_AFFILIATE_IPADDR | 5 | 0 | informational |
+| COUNTRY_NAME | 3 | -5 | unverified_exists |
+| GEOINFO | 3 | -5 | unverified_exists |
+| PHYSICAL_COORDINATES | 3 | -5 | unverified_exists |
+| PUBLIC_CODE_REPO | 2 | -10 | unverified_exists |
+| SSL_CERTIFICATE_EXPIRING | 2 | -10 | unverified_exists |
+| SSL_CERTIFICATE_EXPIRED | 2 | -10 | unverified_exists |
+| SSL_CERTIFICATE_ISSUED | 4 | -1 | unverified_exists |
+| SSL_CERTIFICATE_ISSUER | 4 | -1 | unverified_exists |
+| SSL_CERTIFICATE_MISMATCH | 2 | -10 | unverified_exists |
+| SSL_CERTIFICATE_RAW | 5 | 0 | informational |
+| VULNERABILITY_DISCLOSURE | 1 | -20 | unverified_exists |
+
+GROUP 4 EVENT TYPES TO ANALYZE (14 total):
+1. VULNERABILITY_DISCLOSURE
+2. SSL_CERTIFICATE_EXPIRED
+3. SSL_CERTIFICATE_EXPIRING
+4. SSL_CERTIFICATE_MISMATCH
+5. SSL_CERTIFICATE_ISSUED
+6. SSL_CERTIFICATE_ISSUER
+7. SSL_CERTIFICATE_RAW (informational - analyze for patterns only)
+8. PUBLIC_CODE_REPO
+9. APPSTORE_ENTRY
+10. COUNTRY_NAME
+11. GEOINFO
+12. PHYSICAL_COORDINATES
+13. BLACKLISTED_AFFILIATE_INTERNET_NAME (informational - analyze for patterns only)
+14. BLACKLISTED_AFFILIATE_IPADDR (informational - analyze for patterns only)
+
+INITIALIZE OUTPUT:
+```python
+all_findings = []
+all_info_findings = []
+group_stats = {
+    'total_rows': 0,
+    'fp_excluded': 0,
+    'info_excluded': 0,
+    'findings_extracted': 0,
+    'tracking': {'OPEN': 0, 'CLOSED': 0, 'TICKETED': 0},
+    'cvr_scores': []
+}
+```
+
+EVENT TYPE BLOCK 1: VULNERABILITY_DISCLOSURE (Rank 1, -20pts)
+=============================================================
+```python
+print("\n=== Processing VULNERABILITY_DISCLOSURE ===")
+
+rows = ROWS_BY_TYPE.get('VULNERABILITY_DISCLOSURE', [])
+print(f"Rows found: {len(rows)}")
+
+tab_findings = []
+
+for idx, row in enumerate(rows):
+    group_stats['total_rows'] += 1
+    fp = get_fp(row)
+    if fp == 1:
+        group_stats['fp_excluded'] += 1
+        continue
+
+    tracking = get_tracking(row)
+    group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+    confidence, visibility, risk = get_cvr_scores(row)
+    if confidence is not None:
+        group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+    data_field = str(row.get('Data', '')).strip()
+    source = str(row.get('Source', '')).strip()
+    module = str(row.get('Module', '')).strip()
+
+    severity = 'High'
+
+    description = f"A public vulnerability disclosure was identified affecting {source} via {module}. "
+    description += f"Disclosure details: {data_field[:500]}. "
+    description += "Public vulnerability disclosures indicate that security weaknesses have been documented in publicly accessible databases or advisory channels. "
+    description += "Attackers actively monitor disclosure feeds to identify exploitable targets before patches are applied. "
+    description += "The presence of a public disclosure significantly increases the likelihood of targeted exploitation."
+
+    recommendation = f"Immediately assess the disclosed vulnerability affecting {source} and determine applicability to the environment. "
+    recommendation += "Apply vendor-supplied patches or implement compensating controls as an interim measure if no patch is available. "
+    recommendation += "Monitor threat intelligence sources for active exploitation campaigns targeting this disclosure. "
+    recommendation += "Validate remediation through targeted vulnerability scanning after applying fixes. "
+    recommendation += "Priority: High - public disclosures carry elevated risk due to broad attacker awareness."
+
+    finding = {
+        'Category': 'General Health',
+        'Tab': 'VULNERABILITY_DISCLOSURE',
+        'Priority': severity,
+        'Item': f"Vulnerability Disclosure - {source} - {data_field[:80]}",
+        'Description': description,
+        'Recommendation': recommendation,
+        'Vuln_Type': 'VULNERABILITY_DISCLOSURE',
+        'Asset': source,
+        'Plugin_Name': module,
+        'Tracking_Status': tracking,
+        'FP_Status': "Verified" if fp == 2 else "Unverified"
+    }
+    if risk is not None:
+        finding['Avg_Risk'] = risk
+    tab_findings.append(finding)
+    group_stats['findings_extracted'] += 1
+
+all_findings.extend(tab_findings)
+print(f"VULNERABILITY_DISCLOSURE: {len(tab_findings)} findings")
+```
+
+EVENT TYPE BLOCK 2: SSL CERTIFICATE ISSUES (EXPIRED, EXPIRING, MISMATCH) - Rank 2, -10pts
+===========================================================================================
+```python
+print("\n=== Processing SSL Certificate Issues ===")
+
+for ssl_type, default_sev, desc_context, rec_context in [
+    ('SSL_CERTIFICATE_EXPIRED', 'High',
+     'has an expired SSL/TLS certificate',
+     'Renew the expired SSL/TLS certificate'),
+    ('SSL_CERTIFICATE_EXPIRING', 'Medium',
+     'has an SSL/TLS certificate approaching its expiration date',
+     'Renew the SSL/TLS certificate before it expires'),
+    ('SSL_CERTIFICATE_MISMATCH', 'High',
+     'has an SSL/TLS certificate with a hostname mismatch',
+     'Obtain and install a certificate that matches the hostname'),
+]:
+    rows = ROWS_BY_TYPE.get(ssl_type, [])
+    if not rows:
+        print(f"  {ssl_type}: No data")
+        continue
+
+    print(f"\n  Processing {ssl_type} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = default_sev
+
+        if ssl_type == 'SSL_CERTIFICATE_EXPIRED':
+            description = f"The SSL/TLS certificate on {source} {desc_context}. "
+            description += f"Certificate details: {data_field[:400]}. "
+            description += "An expired certificate breaks the chain of trust and causes browsers to display security warnings to users, eroding confidence in the organization's digital presence. "
+            description += "Expired certificates also prevent secure communications, potentially exposing data in transit to interception. "
+            description += "Services relying on certificate validation may fail, causing operational disruptions."
+
+            recommendation = f"{rec_context} on {source} immediately to restore the trust chain. "
+            recommendation += "Implement automated certificate lifecycle management to prevent future expirations. "
+            recommendation += "Configure monitoring alerts that trigger at 30, 14, and 7 days before certificate expiration. "
+            recommendation += "Review all certificates across the organization's infrastructure for similar expiration issues. "
+            recommendation += "Consider using automated certificate authorities (e.g., Let's Encrypt with auto-renewal) for non-EV certificates."
+
+        elif ssl_type == 'SSL_CERTIFICATE_EXPIRING':
+            description = f"The SSL/TLS certificate on {source} {desc_context}. "
+            description += f"Expiration details: {data_field[:400]}. "
+            description += "Certificates nearing expiration require proactive renewal to avoid service disruptions and trust chain breaks. "
+            description += "Failure to renew before expiration will result in browser security warnings and potential loss of encrypted communications. "
+            description += "This finding indicates a gap in certificate lifecycle management processes."
+
+            recommendation = f"{rec_context} on {source} to maintain uninterrupted secure communications. "
+            recommendation += "Schedule the renewal process to complete well before the expiration date. "
+            recommendation += "Implement certificate monitoring and automated renewal pipelines to prevent future near-expiration events. "
+            recommendation += "Verify that certificate renewal processes are documented and assigned to responsible teams. "
+            recommendation += "Test the new certificate in a staging environment before deploying to production."
+
+        else:  # SSL_CERTIFICATE_MISMATCH
+            description = f"The SSL/TLS certificate on {source} {desc_context}. "
+            description += f"Mismatch details: {data_field[:400]}. "
+            description += "A hostname mismatch means the certificate was not issued for the domain or IP address presenting it, which breaks TLS validation and triggers browser warnings. "
+            description += "This typically indicates a misconfigured web server, load balancer, or CDN that is serving an incorrect certificate. "
+            description += "Users connecting to this service cannot verify the server's identity, creating an opportunity for man-in-the-middle attacks."
+
+            recommendation = f"{rec_context} on {source} to eliminate the mismatch condition. "
+            recommendation += "Verify that the certificate's Subject Alternative Names (SANs) include all domains and subdomains served by this host. "
+            recommendation += "Review reverse proxy, load balancer, and CDN configurations to ensure correct certificate binding. "
+            recommendation += "Use wildcard certificates or multi-SAN certificates where a single host serves multiple domains. "
+            recommendation += "Implement automated TLS configuration testing as part of deployment pipelines."
+
+        finding = {
+            'Category': 'General Health',
+            'Tab': ssl_type,
+            'Priority': severity,
+            'Item': f"SSL Certificate Issue - {ssl_type.replace('SSL_CERTIFICATE_', '')} - {source}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': ssl_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {ssl_type}: {len(tab_findings_local)} findings")
+```
+
+EVENT TYPE BLOCK 3: SSL CERTIFICATE INFO (ISSUED, ISSUER) - Rank 4, -1pt
+=========================================================================
+```python
+print("\n=== Processing SSL Certificate Info ===")
+
+for ssl_info_type, label in [
+    ('SSL_CERTIFICATE_ISSUED', 'Issued Date'),
+    ('SSL_CERTIFICATE_ISSUER', 'Issuer'),
+]:
+    rows = ROWS_BY_TYPE.get(ssl_info_type, [])
+    if not rows:
+        print(f"  {ssl_info_type}: No data")
+        continue
+
+    print(f"\n  Processing {ssl_info_type} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = 'Low'
+
+        if ssl_info_type == 'SSL_CERTIFICATE_ISSUED':
+            description = f"SSL/TLS certificate issuance information was collected for {source}. "
+            description += f"Issuance details: {data_field[:400]}. "
+            description += "Certificate issuance metadata provides insight into the organization's certificate management practices and validity periods. "
+            description += "Certificates with unusually long validity periods or recent re-issuance may warrant review for compliance with organizational policies. "
+            description += "This information contributes to the overall certificate inventory and lifecycle tracking."
+
+            recommendation = f"Review the certificate issuance details for {source} to ensure alignment with organizational certificate management policies. "
+            recommendation += "Verify that certificate validity periods comply with industry standards (maximum 398 days for public certificates). "
+            recommendation += "Maintain an up-to-date certificate inventory that tracks issuance dates, expiration dates, and responsible owners. "
+            recommendation += "Implement certificate transparency log monitoring to detect unauthorized certificate issuance for organizational domains."
+
+        else:  # SSL_CERTIFICATE_ISSUER
+            description = f"The SSL/TLS certificate issuer (Certificate Authority) was identified for {source}. "
+            description += f"Issuer details: {data_field[:400]}. "
+            description += "Certificate issuer information reveals which Certificate Authorities the organization relies on for its PKI infrastructure. "
+            description += "Using untrusted, deprecated, or non-standard CAs can introduce trust chain vulnerabilities. "
+            description += "Consistent CA usage across the organization simplifies management and reduces the risk of rogue certificate issuance."
+
+            recommendation = f"Verify that the certificate issuer for {source} is an approved Certificate Authority per organizational policy. "
+            recommendation += "Maintain a list of approved CAs and enforce their use through certificate management tooling and policies. "
+            recommendation += "Implement Certificate Authority Authorization (CAA) DNS records to restrict which CAs can issue certificates for organizational domains. "
+            recommendation += "Monitor certificate transparency logs to detect certificates issued by unauthorized CAs."
+
+        finding = {
+            'Category': 'General Health',
+            'Tab': ssl_info_type,
+            'Priority': severity,
+            'Item': f"SSL Certificate {label} - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': ssl_info_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {ssl_info_type}: {len(tab_findings_local)} findings")
+```
+
+EVENT TYPE BLOCK 4: SSL CERTIFICATE RAW (Informational, Rank 5, 0pts)
+======================================================================
+```python
+print("\n=== Processing SSL_CERTIFICATE_RAW (Informational) ===")
+
+rows = ROWS_BY_TYPE.get('SSL_CERTIFICATE_RAW', [])
+if rows:
+    print(f"SSL_CERTIFICATE_RAW: {len(rows)} informational rows (analyzed for patterns)")
+    for row in rows:
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+        all_info_findings.append(row)
+        group_stats['info_excluded'] += 1
+else:
+    print("  SSL_CERTIFICATE_RAW: No data")
+
+# Pattern analysis on raw certificates
+if all_info_findings:
+    raw_cert_rows = [r for r in all_info_findings if r.get('Type') == 'SSL_CERTIFICATE_RAW']
+    if raw_cert_rows:
+        issuers_seen = defaultdict(int)
+        for r in raw_cert_rows:
+            data = str(r.get('Data', ''))
+            # Extract issuer patterns from raw cert data
+            if 'issuer' in data.lower():
+                issuers_seen[data[:100]] += 1
+        print(f"  Raw certificate patterns: {len(issuers_seen)} unique issuer patterns detected")
+        for pattern, count in sorted(issuers_seen.items(), key=lambda x: -x[1])[:5]:
+            print(f"    [{count}x] {pattern[:80]}...")
+```
+
+EVENT TYPE BLOCK 5: PUBLIC_CODE_REPO (Rank 2, -10pts)
+======================================================
+```python
+print("\n=== Processing PUBLIC_CODE_REPO ===")
+
+rows = ROWS_BY_TYPE.get('PUBLIC_CODE_REPO', [])
+print(f"Rows found: {len(rows)}")
+
+tab_findings = []
+
+for idx, row in enumerate(rows):
+    group_stats['total_rows'] += 1
+    fp = get_fp(row)
+    if fp == 1:
+        group_stats['fp_excluded'] += 1
+        continue
+
+    tracking = get_tracking(row)
+    group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+    confidence, visibility, risk = get_cvr_scores(row)
+    if confidence is not None:
+        group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+    data_field = str(row.get('Data', '')).strip()
+    source = str(row.get('Source', '')).strip()
+    module = str(row.get('Module', '')).strip()
+
+    severity = 'High'
+
+    description = f"A public code repository associated with {source} was discovered via {module}. "
+    description += f"Repository details: {data_field[:500]}. "
+    description += "Public code repositories may inadvertently expose source code, configuration files, API keys, credentials, or internal infrastructure details. "
+    description += "Attackers routinely scan public repositories for sensitive data that can be leveraged to compromise organizational systems. "
+    description += "Even repositories intended to be public should be reviewed to ensure no sensitive information has been committed."
+
+    recommendation = f"Review the public code repository associated with {source} for any exposed secrets, credentials, API keys, or sensitive configuration data. "
+    recommendation += "Implement secret scanning tools (e.g., GitHub secret scanning, git-secrets, truffleHog) to detect and prevent accidental credential commits. "
+    recommendation += "Establish and enforce a code review policy that includes security checks before code is pushed to public repositories. "
+    recommendation += "If sensitive data is found, immediately rotate all exposed credentials and scrub the repository history using tools like BFG Repo-Cleaner. "
+    recommendation += "Consider whether the repository needs to be public, and restrict access if it contains proprietary or security-sensitive code."
+
+    finding = {
+        'Category': 'General Health',
+        'Tab': 'PUBLIC_CODE_REPO',
+        'Priority': severity,
+        'Item': f"Public Code Repository - {source} - {data_field[:80]}",
+        'Description': description,
+        'Recommendation': recommendation,
+        'Vuln_Type': 'PUBLIC_CODE_REPO',
+        'Asset': source,
+        'Plugin_Name': module,
+        'Tracking_Status': tracking,
+        'FP_Status': "Verified" if fp == 2 else "Unverified"
+    }
+    if risk is not None:
+        finding['Avg_Risk'] = risk
+    tab_findings.append(finding)
+    group_stats['findings_extracted'] += 1
+
+all_findings.extend(tab_findings)
+print(f"PUBLIC_CODE_REPO: {len(tab_findings)} findings")
+```
+
+EVENT TYPE BLOCK 6: APPSTORE_ENTRY (Rank 3, -5pts)
+====================================================
+```python
+print("\n=== Processing APPSTORE_ENTRY ===")
+
+rows = ROWS_BY_TYPE.get('APPSTORE_ENTRY', [])
+print(f"Rows found: {len(rows)}")
+
+tab_findings = []
+
+for idx, row in enumerate(rows):
+    group_stats['total_rows'] += 1
+    fp = get_fp(row)
+    if fp == 1:
+        group_stats['fp_excluded'] += 1
+        continue
+
+    tracking = get_tracking(row)
+    group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+    confidence, visibility, risk = get_cvr_scores(row)
+    if confidence is not None:
+        group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+    data_field = str(row.get('Data', '')).strip()
+    source = str(row.get('Source', '')).strip()
+    module = str(row.get('Module', '')).strip()
+
+    severity = 'Medium'
+
+    description = f"A mobile application store entry associated with {source} was discovered via {module}. "
+    description += f"App store details: {data_field[:500]}. "
+    description += "Mobile applications represent a significant component of the organization's attack surface, providing endpoints that interact with backend APIs and services. "
+    description += "App store listings reveal application names, versions, update frequency, and developer information that can be leveraged for reconnaissance. "
+    description += "Unauthorized or outdated mobile applications linked to the organization may introduce security risks including insecure data storage, weak authentication, or unpatched vulnerabilities."
+
+    recommendation = f"Verify that the app store entry associated with {source} represents an authorized organizational application. "
+    recommendation += "Review the application for adherence to secure mobile development practices (OWASP Mobile Top 10). "
+    recommendation += "Ensure the application is regularly updated and does not expose sensitive API endpoints or hardcoded credentials. "
+    recommendation += "Conduct periodic mobile application security assessments including static and dynamic analysis. "
+    recommendation += "Monitor app stores for unauthorized applications impersonating the organization's brand."
+
+    finding = {
+        'Category': 'General Health',
+        'Tab': 'APPSTORE_ENTRY',
+        'Priority': severity,
+        'Item': f"App Store Entry - {source} - {data_field[:80]}",
+        'Description': description,
+        'Recommendation': recommendation,
+        'Vuln_Type': 'APPSTORE_ENTRY',
+        'Asset': source,
+        'Plugin_Name': module,
+        'Tracking_Status': tracking,
+        'FP_Status': "Verified" if fp == 2 else "Unverified"
+    }
+    if risk is not None:
+        finding['Avg_Risk'] = risk
+    tab_findings.append(finding)
+    group_stats['findings_extracted'] += 1
+
+all_findings.extend(tab_findings)
+print(f"APPSTORE_ENTRY: {len(tab_findings)} findings")
+```
+
+EVENT TYPE BLOCK 7: GEOLOCATION (COUNTRY_NAME, GEOINFO, PHYSICAL_COORDINATES) - Rank 3, -5pts
+==============================================================================================
+```python
+print("\n=== Processing Geolocation Data ===")
+
+for geo_type, label, desc_detail in [
+    ('COUNTRY_NAME', 'Country', 'country-level geolocation information was identified'),
+    ('GEOINFO', 'Geolocation Info', 'geographic metadata was identified'),
+    ('PHYSICAL_COORDINATES', 'Physical Coordinates', 'physical coordinate data was identified'),
+]:
+    rows = ROWS_BY_TYPE.get(geo_type, [])
+    if not rows:
+        print(f"  {geo_type}: No data")
+        continue
+
+    print(f"\n  Processing {geo_type} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = 'Low'
+
+        if geo_type == 'COUNTRY_NAME':
+            description = f"For asset {source}, {desc_detail} via {module}. "
+            description += f"Country data: {data_field[:400]}. "
+            description += "Country-level geolocation reveals the jurisdictions in which organizational assets are hosted or operated, which has implications for data sovereignty and regulatory compliance. "
+            description += "Assets hosted in certain jurisdictions may be subject to different legal frameworks, data protection regulations, or government surveillance programs. "
+            description += "This information helps maintain an accurate inventory of where organizational data and services reside geographically."
+
+            recommendation = f"Review the geographic location of {source} to ensure compliance with organizational data residency policies and applicable regulations (GDPR, CCPA, etc.). "
+            recommendation += "Verify that hosting locations align with contractual and regulatory requirements for data sovereignty. "
+            recommendation += "Maintain a geographic asset inventory to support compliance auditing and incident response planning. "
+            recommendation += "Assess whether assets in specific jurisdictions require additional security controls or access restrictions."
+
+        elif geo_type == 'GEOINFO':
+            description = f"For asset {source}, {desc_detail} via {module}. "
+            description += f"Geolocation data: {data_field[:400]}. "
+            description += "Geographic metadata associated with organizational assets can reveal hosting providers, data center locations, and network topology details useful for reconnaissance. "
+            description += "Attackers use geolocation data to map infrastructure distribution and identify potential single points of failure. "
+            description += "This information supports attack surface inventory management and geographic risk assessment."
+
+            recommendation = f"Incorporate the geolocation data for {source} into the organization's asset inventory and geographic risk profile. "
+            recommendation += "Evaluate whether the geographic distribution of assets provides adequate redundancy and disaster recovery coverage. "
+            recommendation += "Assess geopolitical risks associated with asset locations and implement appropriate security controls. "
+            recommendation += "Use geographic data to inform network segmentation and access control decisions."
+
+        else:  # PHYSICAL_COORDINATES
+            description = f"For asset {source}, {desc_detail} via {module}. "
+            description += f"Coordinates: {data_field[:400]}. "
+            description += "Physical coordinate data pinpoints the location of infrastructure assets, which can reveal data center locations, office sites, or hosting facility addresses. "
+            description += "Precise location data could be leveraged by attackers for physical security reconnaissance or social engineering targeting specific facilities. "
+            description += "This level of geographic detail should be reviewed to ensure it does not inadvertently expose sensitive facility locations."
+
+            recommendation = f"Review whether the physical coordinate exposure for {source} reveals sensitive facility locations that should be obscured. "
+            recommendation += "Evaluate whether geolocation services or metadata are unnecessarily disclosing precise infrastructure locations. "
+            recommendation += "Consider implementing geographic obfuscation for assets where precise location disclosure poses a risk. "
+            recommendation += "Incorporate physical location data into the organization's physical security risk assessment."
+
+        finding = {
+            'Category': 'General Health',
+            'Tab': geo_type,
+            'Priority': severity,
+            'Item': f"Geolocation {label} - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': geo_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {geo_type}: {len(tab_findings_local)} findings")
+```
+
+EVENT TYPE BLOCK 8: AFFILIATE BLACKLIST INFO (Informational, Rank 5, 0pts)
+===========================================================================
+```python
+print("\n=== Processing Affiliate Blacklist Info (Informational) ===")
+
+for bl_type, label in [
+    ('BLACKLISTED_AFFILIATE_INTERNET_NAME', 'Affiliate Domain Blacklist'),
+    ('BLACKLISTED_AFFILIATE_IPADDR', 'Affiliate IP Blacklist'),
+]:
+    rows = ROWS_BY_TYPE.get(bl_type, [])
+    if not rows:
+        print(f"  {bl_type}: No data")
+        continue
+
+    print(f"  {bl_type}: {len(rows)} informational rows (analyzed for patterns)")
+
+    # Track patterns for summary analysis
+    blacklist_sources = defaultdict(int)
+
+    for row in rows:
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+
+        # Track which blacklists appear most frequently
+        blacklist_sources[data_field[:100]] += 1
+
+        all_info_findings.append(row)
+        group_stats['info_excluded'] += 1
+
+    # Print pattern summary
+    if blacklist_sources:
+        print(f"    Unique blacklist patterns: {len(blacklist_sources)}")
+        for pattern, count in sorted(blacklist_sources.items(), key=lambda x: -x[1])[:5]:
+            print(f"      [{count}x] {pattern[:80]}...")
+```
+
+CONSOLIDATION PHASE
+===================
+```python
+print("\n=== CONSOLIDATION PHASE ===")
+
+groups = defaultdict(list)
+for f in all_findings:
+    key = (f['Category'], f['Vuln_Type'], f['Priority'])
+    groups[key].append(f)
+
+print(f"Consolidation groups: {len(groups)}")
+for key, findings in groups.items():
+    if len(findings) > 1:
+        print(f"  {key}: {len(findings)} findings")
+
+consolidated_findings = []
+os.makedirs('./output/findings_details', exist_ok=True)
+
+for key, group_findings in groups.items():
+    if len(group_findings) == 1:
+        consolidated_findings.append(group_findings[0])
+    else:
+        category, vuln_type, priority = key
+        assets = [f['Asset'] for f in group_findings]
+        unique_assets = list(set([a for a in assets if a and a.lower() not in ['nan', 'none']]))
+        asset_count = len(unique_assets)
+        instance_count = len(group_findings)
+
+        asset_list = ", ".join([f"({i+1}) {unique_assets[i]}" for i in range(min(5, len(unique_assets)))])
+        if len(unique_assets) > 5:
+            asset_list += f", and {len(unique_assets)-5} more"
+
+        tracking_counts = defaultdict(int)
+        for f in group_findings:
+            tracking_counts[f.get('Tracking_Status', 'OPEN')] += 1
+        tracking_summary = ", ".join([f"{k}: {v}" for k, v in tracking_counts.items()])
+
+        avg_risk = None
+        risk_scores = [f.get('Avg_Risk') for f in group_findings if f.get('Avg_Risk') is not None]
+        if risk_scores:
+            avg_risk = sum(risk_scores) / len(risk_scores)
+
+        vuln_name = vuln_type.replace('_', ' ').title()
+        _lead = f"{vuln_name} was identified on {instance_count} instances across {asset_count} assets: {asset_list}."
+        _default_desc = (
+            _lead + " This represents a systematic security issue affecting multiple systems "
+            "requiring coordinated remediation. The widespread nature indicates common "
+            "misconfiguration, shared vulnerable components, or consistent security control gaps."
+        )
+        _default_rec = (
+            f"Implement systematic remediation across all {instance_count} affected instances. "
+            "Deploy consistent security controls and monitoring across all affected assets. "
+            f"Prioritize remediation based on asset criticality and verify each of the "
+            f"{asset_count} affected assets through targeted testing."
+        )
+        description, recommendation = _enrich(vuln_type, _lead, _default_desc, _default_rec)
+
+        consolidated = {
+            'Category': category,
+            'Tab': group_findings[0]['Tab'],
+            'Priority': priority,
+            'Item': f"{vuln_name} - {instance_count} instances across {asset_count} assets",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': vuln_type,
+            'Asset': ", ".join(unique_assets[:5]) if unique_assets else '',
+            'Plugin_Name': group_findings[0].get('Plugin_Name', ''),
+            'Tracking_Status': max(tracking_counts, key=tracking_counts.get),
+        }
+        if avg_risk is not None:
+            consolidated['Avg_Risk'] = round(avg_risk, 1)
+        consolidated_findings.append(consolidated)
+
+        # Create detail file
+        import csv as csv_mod
+        detail_data = [{'Instance': i+1, 'Asset': f['Asset'],
+                        'Details': f['Item'], 'Description': f['Description'][:500],
+                        'Tracking_Status': f.get('Tracking_Status', 'OPEN'),
+                        'FP_Status': f.get('FP_Status', 'Unverified')}
+                       for i, f in enumerate(group_findings)]
+        detail_file = f'./output/findings_details/findings_detail_{vuln_type}.csv'
+        with open(detail_file, 'w', newline='') as csvf:
+            writer = csv_mod.DictWriter(csvf, fieldnames=detail_data[0].keys())
+            writer.writeheader()
+            writer.writerows(detail_data)
+        print(f"  Created: {detail_file}")
+
+print(f"\nConsolidation complete: {len(all_findings)} -> {len(consolidated_findings)} findings")
+```
+
+SAVE OUTPUTS
+============
+```python
+import csv as csv_mod
+
+fieldnames = ['Category', 'Tab', 'Priority', 'Item', 'Description', 'Recommendation',
+              'Tracking_Status', 'Avg_Risk']
+with open('./output/findings_GROUP4_FULL_CONSOLIDATED.csv', 'w', newline='') as csvf:
+    writer = csv_mod.DictWriter(csvf, fieldnames=fieldnames, extrasaction='ignore')
+    writer.writeheader()
+    writer.writerows(consolidated_findings)
+print(f"\nSaved: ./output/findings_GROUP4_FULL_CONSOLIDATED.csv ({len(consolidated_findings)} findings)")
+
+# Statistics
+print("\n" + "=" * 70)
+print("GROUP 4: GENERAL HEALTH - STATISTICS")
+print("=" * 70)
+print(f"Total rows processed: {group_stats['total_rows']}")
+print(f"False positives excluded: {group_stats['fp_excluded']}")
+print(f"Info severity excluded: {group_stats['info_excluded']}")
+print(f"Findings extracted: {group_stats['findings_extracted']}")
+print(f"Consolidated findings: {len(consolidated_findings)}")
+print(f"\nTRACKING STATUS:")
+for status, count in group_stats['tracking'].items():
+    print(f"  {status}: {count}")
+
+if group_stats['cvr_scores']:
+    avg_c = sum(s[0] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    avg_v = sum(s[1] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    avg_r = sum(s[2] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    print(f"\nCVR SCORE AVERAGES:")
+    print(f"  Avg Confidence: {avg_c:.1f}")
+    print(f"  Avg Visibility: {avg_v:.1f}")
+    print(f"  Avg Risk: {avg_r:.1f}")
+else:
+    print(f"\nCVR scores: Not available (7-col format)")
+
+print("=" * 70)
+
+# Update progress tracker
+tracker_path = './output/analysis_progress_tracker.md'
+tracker_exists = os.path.exists(tracker_path)
+
+with open(tracker_path, 'a' if tracker_exists else 'w') as f:
+    if not tracker_exists:
+        f.write("# Security Analysis Progress Tracker\n\n")
+    f.write("## GROUP 4: General Health (Weight 0.8) - COMPLETED\n\n")
+    f.write(f"**Findings:** {len(consolidated_findings)}\n")
+    f.write(f"**Rows Processed:** {group_stats['total_rows']}\n")
+    f.write(f"**FP Excluded:** {group_stats['fp_excluded']}\n")
+    f.write(f"**Info Excluded:** {group_stats['info_excluded']}\n\n")
+    f.write("### Event Types Processed\n")
+    f.write("- VULNERABILITY_DISCLOSURE (Rank 1, -20pts)\n")
+    f.write("- SSL_CERTIFICATE_EXPIRED (Rank 2, -10pts)\n")
+    f.write("- SSL_CERTIFICATE_EXPIRING (Rank 2, -10pts)\n")
+    f.write("- SSL_CERTIFICATE_MISMATCH (Rank 2, -10pts)\n")
+    f.write("- SSL_CERTIFICATE_ISSUED (Rank 4, -1pt)\n")
+    f.write("- SSL_CERTIFICATE_ISSUER (Rank 4, -1pt)\n")
+    f.write("- SSL_CERTIFICATE_RAW (Rank 5, informational)\n")
+    f.write("- PUBLIC_CODE_REPO (Rank 2, -10pts)\n")
+    f.write("- APPSTORE_ENTRY (Rank 3, -5pts)\n")
+    f.write("- COUNTRY_NAME (Rank 3, -5pts)\n")
+    f.write("- GEOINFO (Rank 3, -5pts)\n")
+    f.write("- PHYSICAL_COORDINATES (Rank 3, -5pts)\n")
+    f.write("- BLACKLISTED_AFFILIATE_INTERNET_NAME (Rank 5, informational)\n")
+    f.write("- BLACKLISTED_AFFILIATE_IPADDR (Rank 5, informational)\n\n")
+    f.write("### Tracking Status\n")
+    for status, count in group_stats['tracking'].items():
+        f.write(f"- {status}: {count}\n")
+    f.write("\n---\n\n")
+
+print("\nGROUP 4 COMPLETE - General Health analysis saved")
+```
+
+QUALITY VERIFICATION CHECKLIST:
+- [ ] All descriptions are 3-5 sentences / full paragraphs
+- [ ] All recommendations are 3-5 sentences / full paragraphs
+- [ ] No 'nan' appears in any field
+- [ ] Severities normalized (Critical/High/Medium/Low)
+- [ ] Consolidated findings show instance counts
+- [ ] Detail files created for multi-instance findings
+- [ ] No Nessus or Burp enrichment required (not applicable to this group)
+- [ ] Progress tracker updated
+- [ ] Tracking status (OPEN/CLOSED/TICKETED) annotated on all findings
+- [ ] CVR scores extracted and averaged (10-col format) or noted as unavailable
+- [ ] All 14 General Health event types processed
+- [ ] Grade weights referenced: General Health = 0.8
+- [ ] Informational types (SSL_CERTIFICATE_RAW, BLACKLISTED_AFFILIATE_*) analyzed for patterns only
+- [ ] Vulnerability disclosures flagged as High severity (rank 1, -20pts)
+- [ ] SSL certificate issues properly differentiated by severity (expired=High, expiring=Medium, mismatch=High)
+- [ ] Public code repos flagged as High severity (potential secrets/code exposure)
+- [ ] Geolocation types assessed as Low severity (reconnaissance data)

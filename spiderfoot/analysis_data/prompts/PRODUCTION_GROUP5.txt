@@ -1,0 +1,676 @@
+PRODUCTION ANALYSIS - GROUP 5: External Account Exposure
+=========================================================
+ASM-NG Grade Category: External Account Exposure | Weight: 0.7 | Priority: P3
+=========================================================
+
+CONFIGURATION:
+- CSV: Auto-detect (only .csv file in ./obfuscated/) -- ASM-NG export
+- Format: Auto-detect 7-col (standard) or 10-col (full_scored with CVR scores)
+- Mode: PRODUCTION (analyze ALL rows)
+- Output: ./output/
+- Data: TOKENIZED/OBFUSCATED (IPs, domains, hosts are token identifiers)
+
+CONSOLIDATION RULES (MANDATORY):
+The goal is a concise, executive-readable report. Minimize finding count through
+aggressive consolidation while preserving detail in supporting CSVs.
+- NEVER create one finding per individual port, IP, domain, URL, or asset instance.
+- Group related findings by EVENT TYPE + SEVERITY TIER.
+- The consolidation phase groups by (Category, Vuln_Type, Priority) so multiple
+  instances of the same event type at the same severity merge into a single finding
+  with instance count and asset list.
+- Detail CSVs capture every individual instance for drill-down.
+- Target: under 20 consolidated findings per group. If consolidation produces more
+  than 20, review Vuln_Type keys for over-granularity.
+
+SETUP - IMPORT AND HELPER FUNCTIONS:
+```python
+import csv
+import os
+import glob
+import sys as _sys
+_sys.path.insert(0, './scripts')
+try:
+    from finding_enrichment import enrich_or_default as _enrich
+    print("finding_enrichment library loaded OK")
+except ImportError:
+    def _enrich(tab, lead, default_desc, default_rec):
+        return default_desc, default_rec
+    print("WARNING: finding_enrichment.py not found - using generic descriptions")
+
+import re
+from collections import defaultdict
+
+# ============================================================================
+# DYNAMIC FILE DETECTION
+# ============================================================================
+
+print("=== Dynamic File Detection ===")
+
+# Find CSV file in obfuscated folder
+csv_files = glob.glob('./obfuscated/*.csv')
+if not csv_files:
+    raise FileNotFoundError("No .csv file found in ./obfuscated/ folder")
+elif len(csv_files) > 1:
+    print(f"WARNING: Multiple .csv files found: {csv_files}")
+    print(f"Using first file: {csv_files[0]}")
+
+CSV_FILE = csv_files[0]
+print(f"CSV file detected: {CSV_FILE}")
+
+# Auto-detect CSV format (7-col standard or 10-col full_scored)
+def detect_csv_format(csv_file):
+    with open(csv_file, 'r') as f:
+        reader = csv.reader(f)
+        headers = next(reader)
+        headers_lower = [h.strip().lower() for h in headers]
+        if 'confidence' in headers_lower:
+            return 'full_scored', headers
+        else:
+            return 'standard', headers
+
+CSV_FORMAT, CSV_HEADERS = detect_csv_format(CSV_FILE)
+print(f"CSV format: {CSV_FORMAT} ({len(CSV_HEADERS)} columns)")
+
+# Load and group by event type
+def load_csv_by_event_type(csv_file):
+    rows_by_type = {}
+    with open(csv_file, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            etype = row['Type']
+            rows_by_type.setdefault(etype, []).append(row)
+    return rows_by_type
+
+ROWS_BY_TYPE = load_csv_by_event_type(CSV_FILE)
+print(f"Event types found: {len(ROWS_BY_TYPE)}")
+for etype, rows in sorted(ROWS_BY_TYPE.items(), key=lambda x: -len(x[1]))[:10]:
+    print(f"  {etype}: {len(rows)} rows")
+
+print("=" * 70)
+print("OBFUSCATED DATA MODE - Internal Processing")
+print("=" * 70)
+print("INTERNAL: Processing obfuscated data where:")
+print("  Infrastructure identifiers obfuscated for security")
+print("  Format: IP_ADDRESS_TOKEN_####, DOMAIN_TOKEN_####, HOSTNAME_TOKEN_####, etc.")
+print("=" * 70)
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def normalize_priority(severity, default='Medium'):
+    """Normalize severity to standard format"""
+    if not severity or str(severity).lower().strip() in ['nan', '', 'none']:
+        return default
+    severity = str(severity).strip().lower()
+    if severity in ['critical', 'crit', '4']:
+        return 'Critical'
+    elif severity in ['high', 'hi', '3']:
+        return 'High'
+    elif severity in ['medium', 'med', '2']:
+        return 'Medium'
+    elif severity in ['low', 'lo', '1']:
+        return 'Low'
+    elif severity in ['info', 'informational', '0']:
+        return 'Info'
+    return default
+
+def get_cvr_scores(row):
+    """Extract CVR scores from a row (10-col format only)."""
+    if CSV_FORMAT != 'full_scored':
+        return None, None, None
+    try:
+        confidence = int(row.get('Confidence', 0) or 0)
+        visibility = int(row.get('Visibility', 0) or 0)
+        risk = int(row.get('Risk', 0) or 0)
+        return confidence, visibility, risk
+    except (ValueError, TypeError):
+        return 0, 0, 0
+
+def get_tracking(row):
+    """Extract tracking status from row."""
+    return str(row.get('Tracking', 'OPEN')).strip().upper() or 'OPEN'
+
+def get_fp(row):
+    """Extract FP value. Returns int: 0=unverified, 1=false positive, 2=verified."""
+    try:
+        return int(row.get('F/P', 0) or 0)
+    except (ValueError, TypeError):
+        return 0
+
+def parse_severity_from_data(data_field, default='Medium'):
+    """Parse severity level from the Data field text."""
+    data_lower = str(data_field).lower()
+    if 'critical' in data_lower:
+        return 'Critical'
+    elif 'high' in data_lower:
+        return 'High'
+    elif 'medium' in data_lower or 'med' in data_lower:
+        return 'Medium'
+    elif 'low' in data_lower:
+        return 'Low'
+    elif 'info' in data_lower or 'informational' in data_lower:
+        return 'Info'
+    return default
+
+print("=" * 70)
+```
+
+CONFIDENCE/VISIBILITY/RISK SCORING (when available):
+- Use Risk score to prioritize within same severity tier
+- Flag Confidence <50 for manual verification
+- Highlight Visibility >75 as externally exposed
+- Include avg CVR in group statistics
+- If 7-col format: skip CVR, note "CVR scores not available"
+
+TRACKING STATUS:
+- Annotate each finding with OPEN/CLOSED/TICKETED from the Tracking column
+- Report status breakdown in group summary
+- Flag OPEN findings as requiring attention
+
+ASM-NG GRADE SCORING REFERENCE (from grade_config.py):
+Category: External Account Exposure | Weight: 0.7
+Score Formula: Score = max(0, 100 + (raw_score * 0.7))
+Grade Thresholds: A=90+, B=80+, C=70+, D=60+, F=<60
+
+EVENT TYPE SCORING:
+| Event Type | Rank | Points | Logic |
+|------------|------|--------|-------|
+| ACCOUNT_EXTERNAL_OWNED | 3 | -5 | unverified_exists |
+| ACCOUNT_EXTERNAL_OWNED_COMPROMISED | 1 | -20 | unverified_exists |
+| ACCOUNT_EXTERNAL_USER_SHARED_COMPROMISED | 1 | -20 | unverified_exists |
+| SIMILAR_ACCOUNT_EXTERNAL | 3 | -5 | unverified_exists |
+| SOCIAL_MEDIA | 3 | -5 | unverified_exists |
+| TARGET_ACCOUNTS | 2 | -10 | unverified_exists |
+
+SPECIAL HANDLING - ACCOUNT_EXTERNAL_OWNED:
+- ONLY analyze FP=2 (validated true positives) for actionable findings
+- Count and note FP=0 entries as "Needing Validation"
+- Track validation_needed count in stats
+
+GROUP 5 EVENT TYPES TO ANALYZE (6 total):
+1. ACCOUNT_EXTERNAL_OWNED_COMPROMISED
+2. ACCOUNT_EXTERNAL_USER_SHARED_COMPROMISED
+3. TARGET_ACCOUNTS
+4. ACCOUNT_EXTERNAL_OWNED (with FP=2 filter)
+5. SIMILAR_ACCOUNT_EXTERNAL
+6. SOCIAL_MEDIA
+
+INITIALIZE OUTPUT:
+```python
+all_findings = []
+all_info_findings = []
+group_stats = {
+    'total_rows': 0,
+    'fp_excluded': 0,
+    'info_excluded': 0,
+    'findings_extracted': 0,
+    'validation_needed': 0,
+    'tracking': {'OPEN': 0, 'CLOSED': 0, 'TICKETED': 0},
+    'cvr_scores': []
+}
+```
+
+EVENT TYPE BLOCK 1: COMPROMISED ACCOUNTS (ACCOUNT_EXTERNAL_OWNED_COMPROMISED, ACCOUNT_EXTERNAL_USER_SHARED_COMPROMISED)
+========================================================================================================================
+```python
+print("\n=== Processing Compromised External Accounts ===")
+
+for compromised_type, context in [
+    ('ACCOUNT_EXTERNAL_OWNED_COMPROMISED', 'organization-owned external account confirmed compromised'),
+    ('ACCOUNT_EXTERNAL_USER_SHARED_COMPROMISED', 'user-shared external account confirmed compromised'),
+]:
+    rows = ROWS_BY_TYPE.get(compromised_type, [])
+    if not rows:
+        print(f"  {compromised_type}: No data")
+        continue
+
+    print(f"\n  Processing {compromised_type} ({len(rows)} rows)")
+    tab_findings = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        severity = 'Critical'
+
+        description = f"A {context} was detected on {source} via {module}. "
+        description += f"Account details: {data_field[:500]}. "
+        description += "Compromised external accounts represent a critical security incident as they provide attackers with authenticated access to third-party platforms associated with the organization. "
+        description += "Attackers may leverage compromised accounts for credential stuffing against other organizational services, phishing campaigns, or social engineering attacks. "
+        description += "Immediate credential rotation and account recovery procedures are required to contain the breach."
+
+        recommendation = f"Immediately reset credentials and revoke all active sessions for the compromised account on {source}. "
+        recommendation += "Enable multi-factor authentication if not already configured on the affected platform. "
+        recommendation += "Audit the compromised account for unauthorized changes, data access, or exfiltration activity. "
+        recommendation += "Check for credential reuse across other organizational platforms and rotate any shared passwords. "
+        recommendation += "Notify affected users and implement monitoring for suspicious authentication attempts across all linked services."
+
+        finding = {
+            'Category': 'External Account Exposure',
+            'Tab': compromised_type,
+            'Priority': severity,
+            'Item': f"Compromised Account - {source} - {data_field[:80]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': compromised_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings)
+    print(f"  {compromised_type}: {len(tab_findings)} findings")
+```
+
+EVENT TYPE BLOCK 2: TARGET ACCOUNTS (TARGET_ACCOUNTS)
+======================================================
+```python
+print("\n=== Processing TARGET_ACCOUNTS ===")
+
+rows = ROWS_BY_TYPE.get('TARGET_ACCOUNTS', [])
+print(f"Rows found: {len(rows)}")
+
+tab_findings = []
+
+for idx, row in enumerate(rows):
+    group_stats['total_rows'] += 1
+    fp = get_fp(row)
+    if fp == 1:
+        group_stats['fp_excluded'] += 1
+        continue
+
+    tracking = get_tracking(row)
+    group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+    confidence, visibility, risk = get_cvr_scores(row)
+    if confidence is not None:
+        group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+    data_field = str(row.get('Data', '')).strip()
+    source = str(row.get('Source', '')).strip()
+    module = str(row.get('Module', '')).strip()
+
+    severity = 'High'
+
+    description = f"An external account on a platform of interest to attackers was discovered for {source}. "
+    description += f"Account details: {data_field[:500]}. "
+    description += "Target accounts represent platforms that are commonly exploited by threat actors for reconnaissance, credential harvesting, or social engineering campaigns against organizations. "
+    description += "The presence of organizational accounts on these platforms increases the risk of targeted attacks such as spear-phishing, account takeover, and impersonation. "
+    description += "These accounts should be monitored for unauthorized access and verified as intentionally maintained by the organization."
+
+    recommendation = f"Verify that the account on {source} is authorized and maintained by the organization's IT or security team. "
+    recommendation += "Ensure strong authentication controls including multi-factor authentication are enabled on this platform. "
+    recommendation += "Monitor for unauthorized login attempts, profile changes, or suspicious activity on the account. "
+    recommendation += "Educate account holders about platform-specific phishing and social engineering risks. "
+    recommendation += "Include this account in regular access reviews and credential rotation schedules."
+
+    finding = {
+        'Category': 'External Account Exposure',
+        'Tab': 'TARGET_ACCOUNTS',
+        'Priority': severity,
+        'Item': f"Target Account - {source} - {data_field[:80]}",
+        'Description': description,
+        'Recommendation': recommendation,
+        'Vuln_Type': 'TARGET_ACCOUNTS',
+        'Asset': source,
+        'Plugin_Name': module,
+        'Tracking_Status': tracking,
+        'FP_Status': "Verified" if fp == 2 else "Unverified"
+    }
+    if risk is not None:
+        finding['Avg_Risk'] = risk
+    tab_findings.append(finding)
+    group_stats['findings_extracted'] += 1
+
+all_findings.extend(tab_findings)
+print(f"TARGET_ACCOUNTS: {len(tab_findings)} findings")
+```
+
+EVENT TYPE BLOCK 3: OWNED ACCOUNTS (ACCOUNT_EXTERNAL_OWNED) - FP=2 Filter
+===========================================================================
+```python
+print("\n=== Processing ACCOUNT_EXTERNAL_OWNED (FP=2 validated only) ===")
+
+rows = ROWS_BY_TYPE.get('ACCOUNT_EXTERNAL_OWNED', [])
+print(f"Rows found: {len(rows)}")
+
+tab_findings = []
+fp0_count = 0
+fp2_count = 0
+
+for idx, row in enumerate(rows):
+    group_stats['total_rows'] += 1
+    fp = get_fp(row)
+    if fp == 1:
+        group_stats['fp_excluded'] += 1
+        continue
+
+    tracking = get_tracking(row)
+    group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+    confidence, visibility, risk = get_cvr_scores(row)
+    if confidence is not None:
+        group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+    data_field = str(row.get('Data', '')).strip()
+    source = str(row.get('Source', '')).strip()
+    module = str(row.get('Module', '')).strip()
+
+    # SPECIAL HANDLING: Only analyze FP=2 (validated true positives)
+    # FP=0 entries are tracked as needing validation
+    if fp == 0:
+        fp0_count += 1
+        group_stats['validation_needed'] += 1
+        continue
+
+    # FP=2: Validated true positive - create finding
+    fp2_count += 1
+    severity = 'Medium'
+
+    description = f"A validated external account owned by the organization was discovered on {source} via {module}. "
+    description += f"Account details: {data_field[:500]}. "
+    description += "External accounts expand the organization's digital footprint and represent potential attack vectors if not properly secured and monitored. "
+    description += "Each external account should be inventoried, assigned an owner, and subject to regular security reviews. "
+    if confidence is not None and confidence < 50:
+        description += f"Note: Confidence score is {confidence}/100 - additional manual verification is recommended despite FP=2 status."
+    else:
+        description += "This account has been validated as a true positive and should be included in the organization's external account inventory."
+
+    recommendation = f"Ensure the external account on {source} is included in the organization's identity and access management inventory. "
+    recommendation += "Enable multi-factor authentication and enforce strong password policies on this platform. "
+    recommendation += "Assign an account owner responsible for monitoring and maintaining the account security posture. "
+    recommendation += "Implement monitoring for unauthorized access, credential leaks, and suspicious login patterns. "
+    recommendation += "Include this account in regular security reviews and credential rotation schedules."
+
+    finding = {
+        'Category': 'External Account Exposure',
+        'Tab': 'ACCOUNT_EXTERNAL_OWNED',
+        'Priority': severity,
+        'Item': f"Owned External Account (Validated) - {source} - {data_field[:60]}",
+        'Description': description,
+        'Recommendation': recommendation,
+        'Vuln_Type': 'ACCOUNT_EXTERNAL_OWNED',
+        'Asset': source,
+        'Plugin_Name': module,
+        'Tracking_Status': tracking,
+        'FP_Status': "Verified"
+    }
+    if risk is not None:
+        finding['Avg_Risk'] = risk
+    tab_findings.append(finding)
+    group_stats['findings_extracted'] += 1
+
+all_findings.extend(tab_findings)
+print(f"ACCOUNT_EXTERNAL_OWNED: {fp2_count} validated findings (FP=2)")
+print(f"  FP=0 needing validation: {fp0_count}")
+print(f"  Total validation_needed tracked: {group_stats['validation_needed']}")
+```
+
+EVENT TYPE BLOCK 4: SIMILAR AND SOCIAL (SIMILAR_ACCOUNT_EXTERNAL, SOCIAL_MEDIA)
+=================================================================================
+```python
+print("\n=== Processing Similar Accounts and Social Media ===")
+
+for account_type, default_sev, context in [
+    ('SIMILAR_ACCOUNT_EXTERNAL', 'Low', 'similar external account matching organizational naming patterns'),
+    ('SOCIAL_MEDIA', 'Low', 'social media presence associated with the organization'),
+]:
+    rows = ROWS_BY_TYPE.get(account_type, [])
+    if not rows:
+        print(f"  {account_type}: No data")
+        continue
+
+    print(f"\n  Processing {account_type} ({len(rows)} rows)")
+    tab_findings = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        severity = default_sev
+
+        if account_type == 'SIMILAR_ACCOUNT_EXTERNAL':
+            description = f"A {context} was discovered on {source} via {module}. "
+            description += f"Account details: {data_field[:500]}. "
+            description += "Similar accounts may represent legitimate organizational accounts, employee personal accounts using corporate naming conventions, or impersonation attempts by malicious actors. "
+            description += "Accounts with names similar to the organization's branding can be used for phishing, social engineering, or brand impersonation attacks. "
+            description += "These accounts should be reviewed to determine ownership and intent."
+
+            recommendation = f"Investigate the similar account on {source} to determine if it is owned by the organization, an employee, or a third party. "
+            recommendation += "If the account is an impersonation attempt, report it to the platform for takedown and document for threat intelligence. "
+            recommendation += "If it is a legitimate employee account, ensure it follows corporate social media policies. "
+            recommendation += "Monitor for brand impersonation and typosquatting on external platforms. "
+            recommendation += "Consider enrolling in platform brand protection programs where available."
+        else:
+            description = f"A {context} was discovered on {source} via {module}. "
+            description += f"Social media details: {data_field[:500]}. "
+            description += "Social media accounts associated with the organization expand the digital footprint and may expose information useful for social engineering attacks. "
+            description += "Attackers frequently use corporate social media profiles to gather intelligence about employees, organizational structure, and technology stacks. "
+            description += "All social media accounts should be inventoried and monitored for unauthorized posts or account compromise."
+
+            recommendation = f"Verify that the social media account on {source} is officially managed by the organization's communications or marketing team. "
+            recommendation += "Ensure the account has strong authentication controls including multi-factor authentication enabled. "
+            recommendation += "Review posted content for accidental disclosure of sensitive information such as internal systems, employee details, or security configurations. "
+            recommendation += "Implement social media monitoring for brand impersonation, unauthorized accounts, and data leakage. "
+            recommendation += "Establish and enforce a social media security policy covering authorized accounts and posting guidelines."
+
+        finding = {
+            'Category': 'External Account Exposure',
+            'Tab': account_type,
+            'Priority': severity,
+            'Item': f"{account_type.replace('_', ' ').title()} - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': account_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings)
+    print(f"  {account_type}: {len(tab_findings)} findings")
+```
+
+CONSOLIDATION PHASE
+===================
+```python
+print("\n=== CONSOLIDATION PHASE ===")
+
+groups = defaultdict(list)
+for f in all_findings:
+    key = (f['Category'], f['Vuln_Type'], f['Priority'])
+    groups[key].append(f)
+
+print(f"Consolidation groups: {len(groups)}")
+for key, findings in groups.items():
+    if len(findings) > 1:
+        print(f"  {key}: {len(findings)} findings")
+
+consolidated_findings = []
+os.makedirs('./output/findings_details', exist_ok=True)
+
+for key, group_findings in groups.items():
+    if len(group_findings) == 1:
+        consolidated_findings.append(group_findings[0])
+    else:
+        category, vuln_type, priority = key
+        assets = [f['Asset'] for f in group_findings]
+        unique_assets = list(set([a for a in assets if a and a.lower() not in ['nan', 'none']]))
+        asset_count = len(unique_assets)
+        instance_count = len(group_findings)
+
+        asset_list = ", ".join([f"({i+1}) {unique_assets[i]}" for i in range(min(5, len(unique_assets)))])
+        if len(unique_assets) > 5:
+            asset_list += f", and {len(unique_assets)-5} more"
+
+        tracking_counts = defaultdict(int)
+        for f in group_findings:
+            tracking_counts[f.get('Tracking_Status', 'OPEN')] += 1
+        tracking_summary = ", ".join([f"{k}: {v}" for k, v in tracking_counts.items()])
+
+        avg_risk = None
+        risk_scores = [f.get('Avg_Risk') for f in group_findings if f.get('Avg_Risk') is not None]
+        if risk_scores:
+            avg_risk = sum(risk_scores) / len(risk_scores)
+
+        vuln_name = vuln_type.replace('_', ' ').title()
+        _lead = f"{vuln_name} was identified on {instance_count} instances across {asset_count} assets: {asset_list}."
+        _default_desc = (
+            _lead + " This represents a systematic security issue affecting multiple systems "
+            "requiring coordinated remediation. The widespread nature indicates common "
+            "misconfiguration, shared vulnerable components, or consistent security control gaps."
+        )
+        _default_rec = (
+            f"Implement systematic remediation across all {instance_count} affected instances. "
+            "Deploy consistent security controls and monitoring across all affected assets. "
+            f"Prioritize remediation based on asset criticality and verify each of the "
+            f"{asset_count} affected assets through targeted testing."
+        )
+        description, recommendation = _enrich(vuln_type, _lead, _default_desc, _default_rec)
+
+        consolidated = {
+            'Category': category,
+            'Tab': group_findings[0]['Tab'],
+            'Priority': priority,
+            'Item': f"{vuln_name} - {instance_count} instances across {asset_count} assets",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': vuln_type,
+            'Asset': ", ".join(unique_assets[:5]) if unique_assets else '',
+            'Plugin_Name': group_findings[0].get('Plugin_Name', ''),
+            'Tracking_Status': max(tracking_counts, key=tracking_counts.get),
+        }
+        if avg_risk is not None:
+            consolidated['Avg_Risk'] = round(avg_risk, 1)
+        consolidated_findings.append(consolidated)
+
+        # Create detail file
+        import csv as csv_mod
+        detail_data = [{'Instance': i+1, 'Asset': f['Asset'],
+                        'Details': f['Item'], 'Description': f['Description'][:500],
+                        'Tracking_Status': f.get('Tracking_Status', 'OPEN'),
+                        'FP_Status': f.get('FP_Status', 'Unverified')}
+                       for i, f in enumerate(group_findings)]
+        detail_file = f'./output/findings_details/findings_detail_{vuln_type}.csv'
+        with open(detail_file, 'w', newline='') as csvf:
+            writer = csv_mod.DictWriter(csvf, fieldnames=detail_data[0].keys())
+            writer.writeheader()
+            writer.writerows(detail_data)
+        print(f"  Created: {detail_file}")
+
+print(f"\nConsolidation complete: {len(all_findings)} -> {len(consolidated_findings)} findings")
+```
+
+SAVE OUTPUTS
+============
+```python
+import csv as csv_mod
+
+fieldnames = ['Category', 'Tab', 'Priority', 'Item', 'Description', 'Recommendation',
+              'Tracking_Status', 'Avg_Risk']
+with open('./output/findings_GROUP5_FULL_CONSOLIDATED.csv', 'w', newline='') as csvf:
+    writer = csv_mod.DictWriter(csvf, fieldnames=fieldnames, extrasaction='ignore')
+    writer.writeheader()
+    writer.writerows(consolidated_findings)
+print(f"\nSaved: ./output/findings_GROUP5_FULL_CONSOLIDATED.csv ({len(consolidated_findings)} findings)")
+
+# Statistics
+print("\n" + "=" * 70)
+print("GROUP 5: EXTERNAL ACCOUNT EXPOSURE - STATISTICS")
+print("=" * 70)
+print(f"Total rows processed: {group_stats['total_rows']}")
+print(f"False positives excluded: {group_stats['fp_excluded']}")
+print(f"Info severity excluded: {group_stats['info_excluded']}")
+print(f"Findings extracted: {group_stats['findings_extracted']}")
+print(f"Consolidated findings: {len(consolidated_findings)}")
+print(f"\nACCOUNT VALIDATION:")
+print(f"  ACCOUNT_EXTERNAL_OWNED needing validation (FP=0): {group_stats['validation_needed']}")
+print(f"\nTRACKING STATUS:")
+for status, count in group_stats['tracking'].items():
+    print(f"  {status}: {count}")
+
+if group_stats['cvr_scores']:
+    avg_c = sum(s[0] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    avg_v = sum(s[1] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    avg_r = sum(s[2] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    print(f"\nCVR SCORE AVERAGES:")
+    print(f"  Avg Confidence: {avg_c:.1f}")
+    print(f"  Avg Visibility: {avg_v:.1f}")
+    print(f"  Avg Risk: {avg_r:.1f}")
+else:
+    print(f"\nCVR scores: Not available (7-col format)")
+
+print("=" * 70)
+
+# Update progress tracker
+tracker_path = './output/analysis_progress_tracker.md'
+tracker_exists = os.path.exists(tracker_path)
+
+with open(tracker_path, 'a' if tracker_exists else 'w') as f:
+    if not tracker_exists:
+        f.write("# Security Analysis Progress Tracker\n\n")
+    f.write("## GROUP 5: External Account Exposure (Weight 0.7) - COMPLETED\n\n")
+    f.write(f"**Findings:** {len(consolidated_findings)}\n")
+    f.write(f"**Rows Processed:** {group_stats['total_rows']}\n")
+    f.write(f"**FP Excluded:** {group_stats['fp_excluded']}\n")
+    f.write(f"**Info Excluded:** {group_stats['info_excluded']}\n")
+    f.write(f"**Validation Needed (ACCOUNT_EXTERNAL_OWNED FP=0):** {group_stats['validation_needed']}\n\n")
+    f.write("### Tracking Status\n")
+    for status, count in group_stats['tracking'].items():
+        f.write(f"- {status}: {count}\n")
+    f.write("\n---\n\n")
+
+print("\nGROUP 5 COMPLETE - External Account Exposure analysis saved")
+```
+
+QUALITY VERIFICATION CHECKLIST:
+- [ ] All descriptions are 3-5 sentences / full paragraphs
+- [ ] All recommendations are 3-5 sentences / full paragraphs
+- [ ] No 'nan' appears in any field
+- [ ] Severities normalized (Critical/High/Medium/Low)
+- [ ] Consolidated findings show instance counts
+- [ ] Detail files created for multi-instance findings
+- [ ] Progress tracker updated
+- [ ] Tracking status (OPEN/CLOSED/TICKETED) annotated on all findings
+- [ ] CVR scores extracted and averaged (10-col format) or noted as unavailable
+- [ ] All 6 External Account Exposure event types processed
+- [ ] Grade weights referenced: External Account Exposure = 0.7
+- [ ] ACCOUNT_EXTERNAL_OWNED filtered to FP=2 only with FP=0 validation tracking
+- [ ] Compromised accounts flagged as Critical severity
+- [ ] No Nessus/Burp enrichment (not applicable to this group)

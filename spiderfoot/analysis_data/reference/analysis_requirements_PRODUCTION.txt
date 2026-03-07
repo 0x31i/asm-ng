@@ -1,0 +1,490 @@
+SECURITY ANALYSIS REQUIREMENTS - PRODUCTION VERSION (CSV Pipeline)
+===================================================================
+
+PRIMARY OBJECTIVES:
+1. Analyze ALL security data by GROUPS to manage token usage
+2. Identify Critical, High, Medium, Low security findings
+3. Use Burp HTML report for detailed WEBAPP_VULNERABILITIES enrichment
+4. Use Nessus .nessus file for EXTERNAL_VULNERABILITIES enrichment
+5. Consolidate duplicate findings while preserving all detail
+6. Analyze informational findings for vulnerability patterns
+7. Correlate findings across groups
+8. Generate executive-ready comprehensive assessment
+9. Leverage CVR scores (Confidence/Visibility/Risk) when available
+10. Annotate tracking status (OPEN/CLOSED/TICKETED) in output
+
+REFERENCE FILES:
+- data_structure_reference.csv: Event types, categories, weights, and grading metadata
+- analysis_progress_tracker_TEMPLATE.md: Progress tracking
+- *-ASM-BURP-YYYY_MM.html: Burp Suite detailed report (monthly/bimonthly)
+- *.nessus: Nessus scan results for vulnerability enrichment
+- analysis_requirements_PRODUCTION.txt: This file
+
+======================================================================
+CSV FORMAT AUTO-DETECTION
+======================================================================
+
+ASM-NG exports two CSV formats. Auto-detect by checking headers:
+
+10-COLUMN FORMAT (Full Report CSV / REST API):
+  Updated | Type | Module | Source | F/P | Tracking | Confidence | Visibility | Risk | Data
+
+7-COLUMN FORMAT (Legacy Web UI CSV):
+  Updated | Type | Module | Source | F/P | Tracking | Data
+
+Implementation:
+```python
+import csv
+
+def detect_csv_format(csv_file):
+    """Auto-detect 7-col (Web UI) or 10-col (Full Report) CSV format."""
+    with open(csv_file, 'r') as f:
+        reader = csv.reader(f)
+        headers = next(reader)
+        headers_lower = [h.strip().lower() for h in headers]
+
+        if 'confidence' in headers_lower:
+            return 'full_scored', headers
+        else:
+            return 'standard', headers
+
+def load_csv_by_event_type(csv_file):
+    """Load CSV and group rows by Event Type (Type column)."""
+    fmt, headers = detect_csv_format(csv_file)
+
+    rows_by_type = {}
+    with open(csv_file, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            etype = row['Type']
+            rows_by_type.setdefault(etype, []).append(row)
+
+    return rows_by_type, fmt
+```
+
+======================================================================
+DYNAMIC FILE DETECTION
+======================================================================
+
+```python
+import csv
+import os
+import glob
+
+print("=== Dynamic File Detection ===")
+
+# Find CSV file in obfuscated folder (primary input)
+csv_files = glob.glob('./obfuscated/*.csv')
+if not csv_files:
+    raise FileNotFoundError("No .csv file found in ./obfuscated/ folder")
+elif len(csv_files) > 1:
+    print(f"WARNING: Multiple .csv files found: {csv_files}")
+    print(f"Using first file: {csv_files[0]}")
+
+CSV_FILE = csv_files[0]
+print(f"✓ CSV file detected: {CSV_FILE}")
+
+# Detect format
+CSV_FORMAT, CSV_HEADERS = detect_csv_format(CSV_FILE)
+print(f"✓ CSV format: {CSV_FORMAT} ({len(CSV_HEADERS)} columns)")
+print(f"  Headers: {CSV_HEADERS}")
+
+# Load and group by event type
+ROWS_BY_TYPE, _ = load_csv_by_event_type(CSV_FILE)
+print(f"✓ Event types found: {len(ROWS_BY_TYPE)}")
+for etype, rows in sorted(ROWS_BY_TYPE.items(), key=lambda x: -len(x[1]))[:10]:
+    print(f"  {etype}: {len(rows)} rows")
+
+# Find Burp HTML file (for WEBAPP_VULNERABILITIES enrichment)
+burp_files = glob.glob('./obfuscated/*.html')
+BURP_HTML_FILE = burp_files[0] if burp_files else None
+
+# Find Nessus file (for EXTERNAL_VULNERABILITIES enrichment)
+nessus_files = glob.glob('./obfuscated/*.nessus')
+NESSUS_FILE = nessus_files[0] if nessus_files else None
+```
+
+======================================================================
+DATA COLUMN REFERENCE
+======================================================================
+
+The CSV has fixed column names (no case-insensitive guessing needed):
+
+| Column     | Description                                              |
+|------------|----------------------------------------------------------|
+| Updated    | Timestamp when event was last seen (YYYY-MM-DD HH:MM:SS)|
+| Type       | Event type code (e.g., TCP_PORT_OPEN, EMAILADDR)         |
+| Module     | ASM-NG module that produced the finding                  |
+| Source     | Source entity (host, IP, domain that triggered the event)|
+| F/P        | False positive flag: 0=unverified, 1=FP, 2=verified TP  |
+| Tracking   | Status: OPEN, CLOSED, or TICKETED                        |
+| Confidence | (10-col only) Certainty score 0-100                      |
+| Visibility | (10-col only) External exposure score 0-100              |
+| Risk       | (10-col only) Combined risk score 0-100                  |
+| Data       | Raw event data (IP, URL, vuln text, credential, etc.)    |
+
+The Data field contains the raw finding content. The Source field contains
+the parent entity. The Module field identifies which scanner produced it.
+
+To access specific event types for a group:
+```python
+webapp_rows = ROWS_BY_TYPE.get('WEBAPP_VULNERABILITIES', [])
+for row in webapp_rows:
+    data_field = row['Data']
+    source = row['Source']
+    module = row['Module']
+    fp = int(row['F/P'])
+    tracking = row['Tracking']
+    # 10-col only:
+    if CSV_FORMAT == 'full_scored':
+        confidence = int(row['Confidence']) if row['Confidence'] else 0
+        visibility = int(row['Visibility']) if row['Visibility'] else 0
+        risk = int(row['Risk']) if row['Risk'] else 0
+```
+
+======================================================================
+FALSE POSITIVE FILTERING
+======================================================================
+
+When using the "analysis" export mode, FP=1 rows are already excluded
+from the CSV (only FP=0 and FP=2 are present).
+
+When using the "full" or "full_scored" export mode, all rows are present.
+Filter manually:
+- FP=0: Unverified finding (include in analysis, annotate as unverified)
+- FP=1: Confirmed false positive (EXCLUDE from analysis)
+- FP=2: Verified true positive (include, annotate as verified)
+
+Annotate verification status in output findings.
+
+SPECIAL TAB-SPECIFIC LOGIC:
+
+1. ACCOUNT_EXTERNAL_OWNED:
+   - DO NOT analyze FP=0 (too many unconfirmed)
+   - ONLY analyze FP=2 (validated true positives)
+   - Count FP=0 for validation note
+
+2. WEBAPP_VULNERABILITIES (Burp) - WITH HTML ENRICHMENT:
+   - Cross-reference Data field with Burp HTML for detailed enrichment
+   - Extract: description, technical details, remediation, CWE, references
+
+3. EXTERNAL_VULNERABILITIES (Nessus) - WITH .NESSUS ENRICHMENT:
+   - Cross-reference Data field with Nessus XML for enrichment
+   - Match by parsing Data field content against Nessus plugin names/hosts
+
+======================================================================
+CVR SCORING (Confidence / Visibility / Risk)
+======================================================================
+
+When Confidence/Visibility/Risk columns are available (10-col format):
+
+- Confidence (0-100): Certainty of finding. Flag <50 for manual verification.
+- Visibility (0-100): External exposure level. Higher = more urgent.
+- Risk (0-100): Combined risk score. Use to break ties within same severity.
+
+Usage in analysis:
+- Include average CVR scores in group summary statistics
+- Use Risk score to prioritize within same severity tier
+- Flag Confidence <50 for manual verification in output
+- Highlight Visibility >75 as externally exposed
+- When not available (7-col format): omit CVR from output, note "CVR scores not available"
+
+======================================================================
+TRACKING STATUS
+======================================================================
+
+Each row has Tracking: OPEN, CLOSED, or TICKETED.
+
+- Include ALL statuses in analysis
+- Annotate each output finding with its tracking status
+- Report status breakdown in group summary:
+  - OPEN: Requires attention (no remediation started)
+  - CLOSED: Previously remediated (verify closure)
+  - TICKETED: Remediation in progress (track ticket)
+- Flag OPEN findings as requiring attention
+
+======================================================================
+ASM-NG GRADE WEIGHTS (from grade_config.py)
+======================================================================
+
+Category weights determine contribution to overall security grade:
+
+| Category                   | Weight | Description                                      |
+|----------------------------|--------|--------------------------------------------------|
+| Network Security           | 1.0    | Open ports, vulnerabilities, internal IP exposure |
+| Web App Security           | 1.0    | Web app vulns, forms, uploads, frameworks         |
+| Information Leakage        | 0.8    | Exposed credentials, emails, personal data, files |
+| General Health             | 0.8    | SSL certs, code repos, coordinates, app stores    |
+| External Account Exposure  | 0.7    | External accounts, social media, target accounts  |
+| DNS Health                 | 0.7    | DNS records, SPF, domain registration, WHOIS      |
+| IP Reputation              | 0.6    | Blacklisted IPs, malicious IPs/subnets            |
+| Information / Reference    | 0.0    | Informational only (not counted in overall grade) |
+
+Grade thresholds: A=90+, B=80+, C=70+, D=60+, F=<60
+
+Scoring logic types:
+- unverified_exists: If findings found, apply points once
+- zero_entries_fail: If count=0 AND type expected, apply fail_points
+- crit_high_med: Tiered points for vulnerability severity levels
+- informational: No penalty (0 points)
+- count_scaled: Points multiplied by unique count (capped)
+
+======================================================================
+SEVERITY NORMALIZATION (Apply BEFORE Consolidation)
+======================================================================
+
+Normalization rules:
+* Empty/NaN/blank/None → Default based on event type (usually 'Medium')
+* 'critical'/'crit'/'CRITICAL' → 'Critical'
+* 'high'/'hi'/'HIGH' → 'High'
+* 'medium'/'med'/'MEDIUM' → 'Medium'
+* 'low'/'lo'/'LOW' → 'Low'
+* 'info'/'informational'/'INFO' → 'Info'
+
+```python
+def normalize_priority(severity, default='Medium'):
+    """Normalize severity to standard format"""
+    if not severity or str(severity).lower().strip() in ['nan', '', 'none']:
+        return default
+    severity = str(severity).strip().lower()
+    if severity in ['critical', 'crit', '4']:
+        return 'Critical'
+    elif severity in ['high', 'hi', '3']:
+        return 'High'
+    elif severity in ['medium', 'med', '2']:
+        return 'Medium'
+    elif severity in ['low', 'lo', '1']:
+        return 'Low'
+    elif severity in ['info', 'informational', '0']:
+        return 'Info'
+    return default
+```
+
+======================================================================
+ASSET FIELD CLEANUP
+======================================================================
+
+The Data and Source fields in CSV contain the actual asset identifiers.
+After obfuscation, these are token identifiers (IP_ADDRESS_TOKEN_####, etc.).
+
+```python
+def clean_asset(asset_value, asset_type='Host', index=1):
+    """Clean asset field, remove 'nan' strings"""
+    asset = str(asset_value).strip()
+    asset = asset.replace('https://', '').replace('http://', '')
+    if not asset or asset.lower() in ['nan', 'none', '']:
+        return f'Application {index}' if asset_type == 'Host' else f'{asset_type} {index}'
+    return asset
+
+def get_asset_type_from_token(token):
+    """Determine professional asset type from token format"""
+    token_str = str(token).upper()
+    if 'IP_ADDRESS_TOKEN' in token_str:
+        return 'IP address'
+    elif 'HOSTNAME_TOKEN' in token_str:
+        return 'host'
+    elif 'DOMAIN_TOKEN' in token_str:
+        return 'domain'
+    elif 'URL_TOKEN' in token_str:
+        return 'URL'
+    elif 'EMAIL_TOKEN' in token_str:
+        return 'email address'
+    elif 'PATH_TOKEN' in token_str:
+        return 'file path'
+    else:
+        return 'asset'
+```
+
+======================================================================
+VULNERABILITY TYPE EXTRACTION
+======================================================================
+
+```python
+def extract_vuln_type(item, plugin_name=''):
+    """Extract standardized vulnerability type for consolidation"""
+    text = (str(item) + ' ' + str(plugin_name)).lower()
+    if 'certificate' in text:
+        if 'hostname' in text or 'mismatch' in text:
+            return 'TLS_CERT_HOSTNAME_MISMATCH'
+        elif 'expired' in text or 'expir' in text:
+            return 'TLS_CERT_EXPIRED'
+        elif 'self-signed' in text or 'selfsigned' in text:
+            return 'TLS_CERT_SELF_SIGNED'
+        elif 'untrusted' in text or 'cannot be trusted' in text:
+            return 'TLS_CERT_UNTRUSTED'
+        return 'TLS_CERT_ISSUE'
+    elif 'ssl' in text or 'tls' in text:
+        if 'weak' in text or 'medium strength' in text:
+            return 'TLS_WEAK_CIPHER'
+        elif 'sslv' in text or 'tlsv1.0' in text or 'tlsv1.1' in text:
+            return 'TLS_DEPRECATED_PROTOCOL'
+        return 'TLS_CONFIGURATION'
+    elif 'cookie' in text:
+        if 'secure' in text:
+            return 'COOKIE_SECURE_FLAG_MISSING'
+        elif 'httponly' in text:
+            return 'COOKIE_HTTPONLY_MISSING'
+    elif 'request smuggling' in text:
+        return 'HTTP_REQUEST_SMUGGLING'
+    elif 'xss' in text or 'cross-site scripting' in text:
+        if 'reflected' in text:
+            return 'XSS_REFLECTED'
+        elif 'stored' in text:
+            return 'XSS_STORED'
+        return 'XSS'
+    elif 'sql injection' in text or 'sqli' in text:
+        return 'SQL_INJECTION'
+    elif 'account' in text and 'discovery' in text:
+        return 'EXTERNAL_ACCOUNT_DISCOVERY'
+    elif 'dns' in text and ('amplification' in text or 'ddos' in text):
+        return 'DNS_DDOS_AMPLIFICATION'
+    elif 'redirection' in text or 'redirect' in text:
+        return 'OPEN_REDIRECTION'
+    elif 'strict transport' in text or 'hsts' in text:
+        return 'STRICT_TRANSPORT_SECURITY'
+    elif 'smb' in text:
+        return 'SMB_VULNERABILITY'
+    elif 'ssh' in text:
+        return 'SSH_VULNERABILITY'
+    elif 'rdp' in text or 'remote desktop' in text:
+        return 'RDP_VULNERABILITY'
+    return plugin_name.upper().replace(' ', '_').replace('-', '_')[:50] if plugin_name else 'UNKNOWN_VULN'
+```
+
+======================================================================
+ENHANCED DETAIL REQUIREMENTS (CRITICAL)
+======================================================================
+
+ALL findings MUST have:
+
+Item Column:
+- Specific, descriptive title with technical details
+- NOT generic like "SQL Injection"
+- YES detailed like "Time-Based Blind SQL Injection in User API - api.company.com/api/v1/users"
+- For consolidated: "[Vulnerability] - [X] instances across [Y] assets"
+
+Description Column (PRODUCTION - 3-5 SENTENCES / 1 PARAGRAPH):
+- MUST be 3-5 sentences forming a complete paragraph
+- Sentence 1: Technical description of what was found
+- Sentence 2: How it can be exploited (attack vector)
+- Sentence 3: Impact if exploited (consequences)
+- Sentences 4-5: Evidence, affected scope, or additional context
+
+Recommendation Column (PRODUCTION - 3-5 SENTENCES / 1 PARAGRAPH):
+- MUST be 3-5 sentences forming a complete paragraph
+- Sentence 1: Primary technical remediation (specific code fix)
+- Sentence 2: Defense-in-depth measures (WAF, monitoring)
+- Sentence 3: Verification and testing steps
+- Sentences 4-5: Long-term prevention, training, process improvements
+
+NEVER use single-sentence descriptions or recommendations in production output!
+
+======================================================================
+CONSOLIDATION & DEDUPLICATION
+======================================================================
+
+GOAL: Produce a concise, executive-readable report. Aggressively consolidate
+to minimize finding count while preserving granular detail in supporting CSVs.
+Target: under 20 consolidated findings per group.
+
+After extracting findings, BEFORE final output:
+
+1. GROUP similar findings by:
+   - Category + Vuln_Type + Priority
+   - Use normalized Vuln_Type from extract_vuln_type()
+   - Use normalized Priority from normalize_priority()
+   - CRITICAL: Vuln_Type must NOT include per-instance data (port numbers,
+     individual IPs, specific domains). Use the event type name or a risk
+     tier label so that instances consolidate properly.
+
+2. SPECIAL HANDLING — OPEN PORTS:
+   - NEVER create one finding per port. Consolidate into at most 3 findings
+     by risk tier: Critical-Risk, High-Risk, Standard.
+   - Each tier = ONE finding summarizing all ports and hosts in that tier.
+   - Detail CSV lists every port/host combination for drill-down.
+
+3. CONSOLIDATE groups with 2+ findings:
+   - Create single master finding
+   - Item: "[Vulnerability] - [X] instances across [Y] assets"
+   - Description: List ALL affected assets (first 5 + "and N more"), 3-5 sentences
+   - Recommendation: Universal remediation, 3-5 sentences
+   - Create detail breakdown CSV
+
+4. CREATE detail files:
+   - ./output/findings_details/findings_detail_[VULN_TYPE].csv
+   - Columns: Instance_Number, Asset, Specific_Details, Technical_Context, Individual_Notes
+   - Preserve ALL granular information — the detail CSV is the full inventory
+
+CONSOLIDATE these types:
+✓ Same vulnerability type, different assets
+✓ Same remediation approach
+✓ Same priority level
+✓ 2+ instances
+✓ Open ports by risk tier (NOT per-port)
+
+DO NOT consolidate:
+✗ Different vulnerability types
+✗ Different priorities
+✗ Unique findings (1 instance)
+✗ Different remediation needs
+
+======================================================================
+PROGRESSIVE ANALYSIS WORKFLOW (Aligned with ASM-NG Grade Categories)
+======================================================================
+
+Groups match ASM-NG grade categories 1:1, ordered by weight (highest first):
+
+- GROUP 1: Network Security (weight 1.0) - vulnerabilities, ports, IPs, defacement, proxy/VPN/TOR, AI infra
+- GROUP 2: Web App Security (weight 1.0) - webapp vulns, URLs, headers, tech, cookies, web content
+- GROUP 3: Information Leakage (weight 0.8) - breached creds, emails, PII, files, leak sites, passwords
+- GROUP 4: General Health (weight 0.8) - SSL certs, code repos, geo, app stores, vuln disclosures
+- GROUP 5: External Account Exposure (weight 0.7) - external accounts, social media, target accounts
+- GROUP 6: DNS Health (weight 0.7) - DNS records, SPF, domains, WHOIS, netblock WHOIS
+- GROUP 7: IP Reputation (weight 0.6) - blacklisted/malicious IPs, subnets, ASNs, names
+- EXCLUDED: Information / Reference (weight 0.0) - informational only, not graded
+- FINAL: Consolidation with web research enrichment and ASM-NG grade calculation
+
+======================================================================
+FINAL OUTPUTS
+======================================================================
+
+1. ALL_FINDINGS_CONSOLIDATED.csv
+   - Columns: Category, Tab, Priority, Item, Description, Recommendation, Tracking_Status, Avg_Risk
+   - ONLY Critical/High/Medium/Low (NO Info)
+   - Description: 3-5 sentences / 1 paragraph
+   - Recommendation: 3-5 sentences / 1 paragraph
+   - Consolidated findings with instance counts
+
+2. findings_details/ directory
+   - Detail CSV for each consolidated finding
+   - Full granular information per instance
+
+3. INFORMATIONAL_PATTERNS.csv
+   - Pattern-based findings from Info data
+   - Separate from main findings
+
+4. ALL_FINDINGS_DETAILED.xlsx
+   - Tab 1: Consolidated findings
+   - Tab 2-N: Detail sheets per vulnerability type
+
+5. FINAL_SECURITY_ASSESSMENT.md
+   - Executive summary with ASM-NG Overall Grade
+   - Detailed findings by priority
+   - CVR score summaries (when available)
+   - Tracking status breakdown
+   - Pattern analysis
+   - Correlations
+   - Remediation priorities
+
+QUALITY STANDARDS:
+- No 'nan', 'NULL', 'NA', or empty values in any output
+- All severities normalized before grouping
+- Fixed CSV column names (no case-insensitive guessing needed)
+- 3-5 sentence paragraphs for Description and Recommendation
+- All technical details preserved
+- Burp HTML enrichment for webapp findings
+- Nessus .nessus enrichment for external vulnerability findings
+- CVR scores included when available (10-col format)
+- Tracking status annotated on all findings
+- ASM-NG grade weights reflected in finding prioritization
+- Consolidation applied systematically

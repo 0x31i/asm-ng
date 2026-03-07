@@ -1,0 +1,187 @@
+Event_Type,Category,Weight,Rank,Points,Logic
+DNS_SPF,DNS Health,0.7,2,-10,zero_entries_fail
+DNS_TEXT,DNS Health,0.7,2,-10,zero_entries_fail
+DNS_SRV,DNS Health,0.7,3,0,informational
+DOMAIN_IMPERSONATION,DNS Health,0.7,5,0,informational
+DOMAIN_NAME,DNS Health,0.7,3,-5,unverified_exists
+DOMAIN_NAME_PARENT,DNS Health,0.7,4,-1,unverified_exists
+DOMAIN_REGISTRAR,DNS Health,0.7,3,-5,unverified_exists
+DOMAIN_WHOIS,DNS Health,0.7,4,-1,unverified_exists
+RAW_DNS_RECORDS,DNS Health,0.7,5,0,informational
+NETBLOCK_WHOIS,DNS Health,0.7,4,-1,unverified_exists
+APPSTORE_ENTRY,General Health,0.8,3,-5,unverified_exists
+BLACKLISTED_AFFILIATE_INTERNET_NAME,General Health,0.8,5,0,informational
+BLACKLISTED_AFFILIATE_IPADDR,General Health,0.8,5,0,informational
+COUNTRY_NAME,General Health,0.8,3,-5,unverified_exists
+GEOINFO,General Health,0.8,3,-5,unverified_exists
+PHYSICAL_COORDINATES,General Health,0.8,3,-5,unverified_exists
+PUBLIC_CODE_REPO,General Health,0.8,2,-10,unverified_exists
+SSL_CERTIFICATE_EXPIRING,General Health,0.8,2,-10,unverified_exists
+SSL_CERTIFICATE_EXPIRED,General Health,0.8,2,-10,unverified_exists
+SSL_CERTIFICATE_ISSUED,General Health,0.8,4,-1,unverified_exists
+SSL_CERTIFICATE_ISSUER,General Health,0.8,4,-1,unverified_exists
+SSL_CERTIFICATE_MISMATCH,General Health,0.8,2,-10,unverified_exists
+SSL_CERTIFICATE_RAW,General Health,0.8,5,0,informational
+VULNERABILITY_DISCLOSURE,General Health,0.8,1,-20,unverified_exists
+AFFILIATE_COMPANY_NAME,Information / Reference,0.0,5,0,informational
+AFFILIATE_DESCRIPTION_ABSTRACT,Information / Reference,0.0,5,0,informational
+AFFILIATE_DESCRIPTION_CATEGORY,Information / Reference,0.0,5,0,informational
+AFFILIATE_DOMAIN_NAME,Information / Reference,0.0,5,0,informational
+AFFILIATE_DOMAIN_UNREGISTERED,Information / Reference,0.0,5,0,informational
+AFFILIATE_DOMAIN_WHOIS,Information / Reference,0.0,5,0,informational
+AFFILIATE_EMAILADDR,Information / Reference,0.0,5,0,informational
+AFFILIATE_INTERNET_NAME,Information / Reference,0.0,5,0,informational
+AFFILIATE_INTERNET_NAME_HIJACKABLE,Information / Reference,0.0,5,0,informational
+AFFILIATE_INTERNET_NAME_UNRESOLVED,Information / Reference,0.0,5,0,informational
+AFFILIATE_IPADDR,Information / Reference,0.0,5,0,informational
+AFFILIATE_IPV6_ADDRESS,Information / Reference,0.0,5,0,informational
+AFFILIATE_WEB_CONTENT,Information / Reference,0.0,5,0,informational
+BGP_AS_MEMBER,Information / Reference,0.0,5,0,informational
+BGP_AS_OWNER,Information / Reference,0.0,5,0,informational
+BITCOIN_ADDRESS,Information / Reference,0.0,5,0,informational
+BITCOIN_BALANCE,Information / Reference,0.0,5,0,informational
+CLOUD_STORAGE_BUCKET,Information / Reference,0.0,5,0,informational
+CLOUD_STORAGE_BUCKET_OPEN,Information / Reference,0.0,3,-10,unverified_exists
+CO_HOSTED_SITE,Information / Reference,0.0,5,0,informational
+CO_HOSTED_SITE_DOMAIN,Information / Reference,0.0,5,0,informational
+CO_HOSTED_SITE_DOMAIN_WHOIS,Information / Reference,0.0,5,0,informational
+COMPANY_NAME,Information / Reference,0.0,5,0,informational
+DESCRIPTION_ABSTRACT,Information / Reference,0.0,5,0,informational
+DESCRIPTION_CATEGORY,Information / Reference,0.0,5,0,informational
+LEI,Information / Reference,0.0,5,0,informational
+MALICIOUS_AFFILIATE_INTERNET_NAME,Information / Reference,0.0,5,0,informational
+MALICIOUS_AFFILIATE_IPADDR,Information / Reference,0.0,5,0,informational
+MALICIOUS_COHOST,Information / Reference,0.0,5,0,informational
+NETBLOCK_MEMBER,Information / Reference,0.0,5,0,informational
+NETBLOCK_OWNER,Information / Reference,0.0,5,0,informational
+NETBLOCKV6_MEMBER,Information / Reference,0.0,5,0,informational
+NETBLOCKV6_OWNER,Information / Reference,0.0,5,0,informational
+PROVIDER_DNS,Information / Reference,0.0,5,0,informational
+PROVIDER_HOSTING,Information / Reference,0.0,5,0,informational
+PROVIDER_JAVASCRIPT,Information / Reference,0.0,5,0,informational
+PROVIDER_MAIL,Information / Reference,0.0,5,0,informational
+PROVIDER_TELCO,Information / Reference,0.0,5,0,informational
+SIMILARDOMAIN,Information / Reference,0.0,5,0,informational
+SIMILARDOMAIN_WHOIS,Information / Reference,0.0,5,0,informational
+ETHEREUM_ADDRESS,Information / Reference,0.0,5,0,informational
+ETHEREUM_BALANCE,Information / Reference,0.0,5,0,informational
+BASE64_DATA,Information / Reference,0.0,5,0,informational
+DEVICE_TYPE,Information / Reference,0.0,5,0,informational
+OPERATING_SYSTEM,Information / Reference,0.0,5,0,informational
+ERROR_MESSAGE,Information / Reference,0.0,5,0,informational
+JUNK_FILE,Information / Reference,0.0,5,0,informational
+SEARCH_ENGINE_WEB_CONTENT,Information / Reference,0.0,5,0,informational
+WIKIPEDIA_PAGE_EDIT,Information / Reference,0.0,5,0,informational
+WIFI_ACCESS_POINT,Information / Reference,0.0,5,0,informational
+DARKNET_MENTION_URL,Information / Reference,0.0,3,-10,unverified_exists
+DARKNET_MENTION_CONTENT,Information / Reference,0.0,3,0,informational
+RAW_RIR_DATA,Information / Reference,0.0,5,0,informational
+ROOT,Information / Reference,0.0,5,0,informational
+AI_SINGLE_SCAN_CORRELATION,Information / Reference,0.0,5,0,informational
+AI_CROSS_SCAN_CORRELATION,Information / Reference,0.0,5,0,informational
+BREACHED_CREDENTIALS,Information Leakage,0.8,1,-20,unverified_exists
+EMAILADDR,Information Leakage,0.8,2,-10,unverified_exists
+EMAILADDR_COMPROMISED,Information Leakage,0.8,2,-10,unverified_exists
+EMAILADDR_DELIVERABLE,Information Leakage,0.8,3,-5,unverified_exists
+EMAILADDR_DISPOSABLE,Information Leakage,0.8,3,-5,unverified_exists
+EMAILADDR_GENERIC,Information Leakage,0.8,4,0,informational
+EMAILADDR_UNDELIVERABLE,Information Leakage,0.8,4,0,informational
+HASH,Information Leakage,0.8,3,-5,unverified_exists
+HASH_COMPROMISED,Information Leakage,0.8,1,-20,unverified_exists
+HUMAN_NAME,Information Leakage,0.8,3,-5,unverified_exists
+PERSON_NAME,Information Leakage,0.8,3,-5,unverified_exists
+DATE_HUMAN_DOB,Information Leakage,0.8,2,-10,unverified_exists
+JOB_TITLE,Information Leakage,0.8,4,-5,unverified_exists
+IBAN_NUMBER,Information Leakage,0.8,5,0,informational
+CREDIT_CARD_NUMBER,Information Leakage,0.8,1,-20,unverified_exists
+INTERESTING_FILE,Information Leakage,0.8,2,-10,unverified_exists
+INTERESTING_FILE_HISTORIC,Information Leakage,0.8,3,-5,unverified_exists
+MALICIOUS_EMAILADDR,Information Leakage,0.8,2,-10,unverified_exists
+PGP_KEY,Information Leakage,0.8,2,-10,unverified_exists
+PHONE_NUMBER,Information Leakage,0.8,3,-5,unverified_exists
+PHONE_NUMBER_COMPROMISED,Information Leakage,0.8,2,-10,unverified_exists
+PHONE_NUMBER_TYPE,Information Leakage,0.8,4,0,informational
+MALICIOUS_PHONE_NUMBER,Information Leakage,0.8,2,-10,unverified_exists
+PHYSICAL_ADDRESS,Information Leakage,0.8,3,-5,unverified_exists
+RAW_FILE_META_DATA,Information Leakage,0.8,5,0,informational
+SOFTWARE_USED,Information Leakage,0.8,3,-5,unverified_exists
+USERNAME,Information Leakage,0.8,3,-5,unverified_exists
+PASSWORD_COMPROMISED,Information Leakage,0.8,1,-20,unverified_exists
+LEAKSITE_URL,Information Leakage,0.8,1,-20,unverified_exists
+LEAKSITE_CONTENT,Information Leakage,0.8,1,-20,unverified_exists
+BLACKLISTED_IPADDR,IP Reputation,0.6,1,-20,unverified_exists
+BLACKLISTED_SUBNET,IP Reputation,0.6,5,0,informational
+BLACKLISTED_COHOST,IP Reputation,0.6,2,-10,unverified_exists
+BLACKLISTED_INTERNET_NAME,IP Reputation,0.6,2,-10,unverified_exists
+BLACKLISTED_NETBLOCK,IP Reputation,0.6,3,-5,unverified_exists
+MALICIOUS_IPADDR,IP Reputation,0.6,1,-20,unverified_exists
+MALICIOUS_SUBNET,IP Reputation,0.6,5,0,informational
+MALICIOUS_ASN,IP Reputation,0.6,2,-10,unverified_exists
+MALICIOUS_INTERNET_NAME,IP Reputation,0.6,2,-10,unverified_exists
+MALICIOUS_NETBLOCK,IP Reputation,0.6,3,-5,unverified_exists
+MALICIOUS_BITCOIN_ADDRESS,IP Reputation,0.6,2,-10,unverified_exists
+EXTERNAL_VULNERABILITIES,Network Security,1.0,1,0,crit_high_med
+VULNERABILITY_CVE_CRITICAL,Network Security,1.0,1,-20,unverified_exists
+VULNERABILITY_CVE_HIGH,Network Security,1.0,1,-15,unverified_exists
+VULNERABILITY_CVE_MEDIUM,Network Security,1.0,2,-10,unverified_exists
+VULNERABILITY_CVE_LOW,Network Security,1.0,3,-5,unverified_exists
+VULNERABILITY_GENERAL,Network Security,1.0,2,-10,unverified_exists
+INTERNAL_IP_ADDRESS,Network Security,1.0,1,-20,unverified_exists
+IP_ADDRESS,Network Security,1.0,3,-5,unverified_exists
+IPV6_ADDRESS,Network Security,1.0,3,-5,unverified_exists
+TCP_PORT_OPEN,Network Security,1.0,2,-10,unverified_exists
+TCP_PORT_OPEN_BANNER,Network Security,1.0,5,0,informational
+UDP_PORT_OPEN,Network Security,1.0,2,-10,unverified_exists
+UDP_PORT_OPEN_INFO,Network Security,1.0,5,0,informational
+DEFACED_INTERNET_NAME,Network Security,1.0,1,-20,unverified_exists
+DEFACED_IPADDR,Network Security,1.0,1,-20,unverified_exists
+DEFACED_AFFILIATE_INTERNET_NAME,Network Security,1.0,2,-10,unverified_exists
+DEFACED_COHOST,Network Security,1.0,2,-10,unverified_exists
+DEFACED_AFFILIATE_IPADDR,Network Security,1.0,2,-10,unverified_exists
+PROXY_HOST,Network Security,1.0,3,-5,unverified_exists
+VPN_HOST,Network Security,1.0,3,-5,unverified_exists
+TOR_EXIT_NODE,Network Security,1.0,3,-5,unverified_exists
+ACCOUNT_EXTERNAL_OWNED,External Account Exposure,0.7,3,-5,unverified_exists
+ACCOUNT_EXTERNAL_OWNED_COMPROMISED,External Account Exposure,0.7,1,-20,unverified_exists
+ACCOUNT_EXTERNAL_USER_SHARED_COMPROMISED,External Account Exposure,0.7,1,-20,unverified_exists
+SIMILAR_ACCOUNT_EXTERNAL,External Account Exposure,0.7,3,-5,unverified_exists
+SOCIAL_MEDIA,External Account Exposure,0.7,3,-5,unverified_exists
+TARGET_ACCOUNTS,External Account Exposure,0.7,2,-10,unverified_exists
+HTTP_CODE,Web App Security,1.0,3,-5,unverified_exists
+INTERNET_NAME,Web App Security,1.0,2,-10,unverified_exists
+INTERNET_NAME_UNRESOLVED,Web App Security,1.0,5,0,informational
+LEAKSITE_URL_WEBAPP,Web App Security,1.0,5,0,informational
+LINKED_URL_EXTERNAL,Web App Security,1.0,5,0,informational
+LINKED_URL_INTERNAL,Web App Security,1.0,5,0,informational
+TARGET_WEB_CONTENT,Web App Security,1.0,3,-5,unverified_exists
+TARGET_WEB_CONTENT_TYPE,Web App Security,1.0,3,-5,unverified_exists
+TARGET_WEB_COOKIE,Web App Security,1.0,3,-5,unverified_exists
+URL_FORM,Web App Security,1.0,3,-5,unverified_exists
+URL_JAVASCRIPT,Web App Security,1.0,4,-1,unverified_exists
+URL_FLASH,Web App Security,1.0,3,-5,unverified_exists
+URL_JAVA_APPLET,Web App Security,1.0,3,-5,unverified_exists
+URL_PASSWORD,Web App Security,1.0,2,-10,unverified_exists
+URL_PASSWORD_HISTORIC,Web App Security,1.0,3,-5,unverified_exists
+URL_STATIC,Web App Security,1.0,3,-5,unverified_exists
+URL_UPLOAD,Web App Security,1.0,2,-10,unverified_exists
+URL_WEB_FRAMEWORK,Web App Security,1.0,4,-5,unverified_exists
+URL_ADBLOCKED_EXTERNAL,Web App Security,1.0,4,-1,unverified_exists
+URL_ADBLOCKED_INTERNAL,Web App Security,1.0,4,-1,unverified_exists
+URL_FORM_HISTORIC,Web App Security,1.0,4,-1,unverified_exists
+URL_FLASH_HISTORIC,Web App Security,1.0,4,-1,unverified_exists
+URL_JAVASCRIPT_HISTORIC,Web App Security,1.0,4,-1,unverified_exists
+URL_WEB_FRAMEWORK_HISTORIC,Web App Security,1.0,4,-1,unverified_exists
+URL_JAVA_APPLET_HISTORIC,Web App Security,1.0,4,-1,unverified_exists
+URL_STATIC_HISTORIC,Web App Security,1.0,4,-1,unverified_exists
+URL_UPLOAD_HISTORIC,Web App Security,1.0,4,-1,unverified_exists
+WAYBACK_FOOTPRINTING,Web App Security,1.0,5,0,informational
+WEB_ANALYTICS_ID,Web App Security,1.0,5,0,informational
+WEBAPP_VULNERABILITIES,Web App Security,1.0,1,0,crit_high_med
+WEBSERVER_BANNER,Web App Security,1.0,5,0,informational
+WEBSERVER_HTTPHEADERS,Web App Security,1.0,5,0,informational
+WEBSERVER_STRANGEHEADER,Web App Security,1.0,3,-5,unverified_exists
+WEBSERVER_TECHNOLOGY,Web App Security,1.0,2,-10,unverified_exists
+AI_ENDPOINT_UNAUTHENTICATED,Network Security,1.0,1,-20,unverified_exists
+AI_MODEL_EXPOSED,Network Security,1.0,2,-10,unverified_exists
+AI_API_KEY_LEAKED,Information Leakage,0.8,1,-20,count_scaled
+AI_INFRASTRUCTURE_DETECTED,Information / Reference,0.0,5,0,informational

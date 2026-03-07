@@ -1,0 +1,1511 @@
+PRODUCTION ANALYSIS - GROUP 2: Web App Security
+=================================================
+ASM-NG Grade Category: Web App Security | Weight: 1.0 | Priority: P1
+=================================================
+
+CONFIGURATION:
+- CSV: Auto-detect (only .csv file in ./obfuscated/) -- ASM-NG export
+- Format: Auto-detect 7-col (standard) or 10-col (full_scored with CVR scores)
+- Burp File: Auto-detect (only .html file in ./obfuscated/) - for WEBAPP_VULNERABILITIES enrichment
+- Mode: PRODUCTION (analyze ALL rows)
+- Output: ./output/
+- Data: TOKENIZED/OBFUSCATED (IPs, domains, hosts are token identifiers)
+
+CONSOLIDATION RULES (MANDATORY):
+The goal is a concise, executive-readable report. Minimize finding count through
+aggressive consolidation while preserving detail in supporting CSVs.
+- NEVER create one finding per individual port, IP, domain, URL, or asset instance.
+- Group related findings by EVENT TYPE + SEVERITY TIER.
+- The consolidation phase groups by (Category, Vuln_Type, Priority) so multiple
+  instances of the same event type at the same severity merge into a single finding
+  with instance count and asset list.
+- Detail CSVs capture every individual instance for drill-down.
+- Target: under 20 consolidated findings per group. If consolidation produces more
+  than 20, review Vuln_Type keys for over-granularity.
+
+SETUP - IMPORT AND HELPER FUNCTIONS:
+```python
+import csv
+import os
+import glob
+import sys as _sys
+_sys.path.insert(0, './scripts')
+try:
+    from finding_enrichment import enrich_or_default as _enrich
+    print("finding_enrichment library loaded OK")
+except ImportError:
+    def _enrich(tab, lead, default_desc, default_rec):
+        return default_desc, default_rec
+    print("WARNING: finding_enrichment.py not found - using generic descriptions")
+
+import re
+from collections import defaultdict
+from html.parser import HTMLParser
+
+# ============================================================================
+# DYNAMIC FILE DETECTION
+# ============================================================================
+
+print("=== Dynamic File Detection ===")
+
+# Find CSV file in obfuscated folder
+csv_files = glob.glob('./obfuscated/*.csv')
+if not csv_files:
+    raise FileNotFoundError("No .csv file found in ./obfuscated/ folder")
+elif len(csv_files) > 1:
+    print(f"WARNING: Multiple .csv files found: {csv_files}")
+    print(f"Using first file: {csv_files[0]}")
+
+CSV_FILE = csv_files[0]
+print(f"CSV file detected: {CSV_FILE}")
+
+# Auto-detect CSV format (7-col standard or 10-col full_scored)
+def detect_csv_format(csv_file):
+    with open(csv_file, 'r') as f:
+        reader = csv.reader(f)
+        headers = next(reader)
+        headers_lower = [h.strip().lower() for h in headers]
+        if 'confidence' in headers_lower:
+            return 'full_scored', headers
+        else:
+            return 'standard', headers
+
+CSV_FORMAT, CSV_HEADERS = detect_csv_format(CSV_FILE)
+print(f"CSV format: {CSV_FORMAT} ({len(CSV_HEADERS)} columns)")
+
+# Load and group by event type
+def load_csv_by_event_type(csv_file):
+    rows_by_type = {}
+    with open(csv_file, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            etype = row['Type']
+            rows_by_type.setdefault(etype, []).append(row)
+    return rows_by_type
+
+ROWS_BY_TYPE = load_csv_by_event_type(CSV_FILE)
+print(f"Event types found: {len(ROWS_BY_TYPE)}")
+for etype, rows in sorted(ROWS_BY_TYPE.items(), key=lambda x: -len(x[1]))[:10]:
+    print(f"  {etype}: {len(rows)} rows")
+
+# Find Burp HTML file (for WEBAPP_VULNERABILITIES enrichment)
+burp_files = glob.glob('./obfuscated/*.html')
+if burp_files:
+    if len(burp_files) > 1:
+        print(f"WARNING: Multiple .html files found: {burp_files}")
+        print(f"Using first file: {burp_files[0]}")
+    BURP_FILE = burp_files[0]
+    print(f"Burp HTML file detected: {BURP_FILE}")
+else:
+    BURP_FILE = None
+    print("WARNING: No .html file found - WEBAPP_VULNERABILITIES will use generic descriptions")
+
+print("=" * 70)
+print("OBFUSCATED DATA MODE - Internal Processing")
+print("=" * 70)
+print("INTERNAL: Processing obfuscated data where:")
+print("  Infrastructure identifiers obfuscated for security")
+print("  Format: IP_ADDRESS_TOKEN_####, DOMAIN_TOKEN_####, HOSTNAME_TOKEN_####, etc.")
+print("=" * 70)
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def normalize_priority(severity, default='Medium'):
+    """Normalize severity to standard format"""
+    if not severity or str(severity).lower().strip() in ['nan', '', 'none']:
+        return default
+    severity = str(severity).strip().lower()
+    if severity in ['critical', 'crit', '4']:
+        return 'Critical'
+    elif severity in ['high', 'hi', '3']:
+        return 'High'
+    elif severity in ['medium', 'med', '2']:
+        return 'Medium'
+    elif severity in ['low', 'lo', '1']:
+        return 'Low'
+    elif severity in ['info', 'informational', '0']:
+        return 'Info'
+    return default
+
+def get_cvr_scores(row):
+    """Extract CVR scores from a row (10-col format only)."""
+    if CSV_FORMAT != 'full_scored':
+        return None, None, None
+    try:
+        confidence = int(row.get('Confidence', 0) or 0)
+        visibility = int(row.get('Visibility', 0) or 0)
+        risk = int(row.get('Risk', 0) or 0)
+        return confidence, visibility, risk
+    except (ValueError, TypeError):
+        return 0, 0, 0
+
+def get_tracking(row):
+    """Extract tracking status from row."""
+    return str(row.get('Tracking', 'OPEN')).strip().upper() or 'OPEN'
+
+def get_fp(row):
+    """Extract FP value. Returns int: 0=unverified, 1=false positive, 2=verified."""
+    try:
+        return int(row.get('F/P', 0) or 0)
+    except (ValueError, TypeError):
+        return 0
+
+def parse_severity_from_data(data_field, default='Medium'):
+    """Parse severity level from the Data field text."""
+    data_lower = str(data_field).lower()
+    if 'critical' in data_lower:
+        return 'Critical'
+    elif 'high' in data_lower:
+        return 'High'
+    elif 'medium' in data_lower or 'med' in data_lower:
+        return 'Medium'
+    elif 'low' in data_lower:
+        return 'Low'
+    elif 'info' in data_lower or 'informational' in data_lower:
+        return 'Info'
+    return default
+
+
+# ============================================================================
+# BURP HTML PARSER - For WEBAPP_VULNERABILITIES Enrichment
+# ============================================================================
+
+class BurpHTMLParser(HTMLParser):
+    """Parse Burp Suite HTML report to extract vulnerability details."""
+
+    def __init__(self):
+        super().__init__()
+        self.vulnerabilities = []
+        self.current_vuln = {}
+        self.current_tag = ''
+        self.current_class = ''
+        self.capture_text = False
+        self.captured_text = ''
+        self.in_issue_detail = False
+        self.in_issue_background = False
+        self.in_remediation_detail = False
+        self.in_remediation_background = False
+        self.in_severity = False
+        self.in_issue_name = False
+        self.in_url = False
+        self.section_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        attrs_dict = dict(attrs)
+        self.current_tag = tag
+        self.current_class = attrs_dict.get('class', '')
+
+        # Detect Burp report sections by common class/id patterns
+        if tag in ['h1', 'h2', 'h3'] and any(c in self.current_class.lower() for c in ['issue-name', 'vulnerability', 'finding']):
+            self.in_issue_name = True
+            self.captured_text = ''
+        elif 'issue-detail' in self.current_class.lower() or 'vulnerability-detail' in self.current_class.lower():
+            self.in_issue_detail = True
+            self.captured_text = ''
+        elif 'issue-background' in self.current_class.lower() or 'vulnerability-description' in self.current_class.lower():
+            self.in_issue_background = True
+            self.captured_text = ''
+        elif 'remediation-detail' in self.current_class.lower() or 'remediation' in self.current_class.lower():
+            self.in_remediation_detail = True
+            self.captured_text = ''
+        elif 'remediation-background' in self.current_class.lower():
+            self.in_remediation_background = True
+            self.captured_text = ''
+        elif 'severity' in self.current_class.lower():
+            self.in_severity = True
+            self.captured_text = ''
+        elif tag == 'a' and 'url' in self.current_class.lower():
+            self.in_url = True
+            self.captured_text = ''
+
+        # Also detect table-based Burp reports
+        if tag == 'span' and 'ISSUE_SEVERITY' in attrs_dict.get('class', '').upper():
+            self.in_severity = True
+            self.captured_text = ''
+
+    def handle_endtag(self, tag):
+        text = self.captured_text.strip()
+
+        if self.in_issue_name and tag in ['h1', 'h2', 'h3']:
+            if self.current_vuln:
+                self.vulnerabilities.append(self.current_vuln)
+            self.current_vuln = {'name': text, 'severity': '', 'detail': '',
+                                 'background': '', 'remediation': '', 'url': ''}
+            self.in_issue_name = False
+        elif self.in_issue_detail and tag == 'div':
+            if self.current_vuln:
+                self.current_vuln['detail'] = text
+            self.in_issue_detail = False
+        elif self.in_issue_background and tag == 'div':
+            if self.current_vuln:
+                self.current_vuln['background'] = text
+            self.in_issue_background = False
+        elif self.in_remediation_detail and tag == 'div':
+            if self.current_vuln:
+                self.current_vuln['remediation'] = text
+            self.in_remediation_detail = False
+        elif self.in_remediation_background and tag == 'div':
+            if self.current_vuln:
+                self.current_vuln['remediation'] += ' ' + text
+            self.in_remediation_background = False
+        elif self.in_severity and tag in ['span', 'div', 'td']:
+            if self.current_vuln:
+                self.current_vuln['severity'] = text
+            self.in_severity = False
+        elif self.in_url and tag == 'a':
+            if self.current_vuln:
+                self.current_vuln['url'] = text
+            self.in_url = False
+
+    def handle_data(self, data):
+        if any([self.in_issue_name, self.in_issue_detail, self.in_issue_background,
+                self.in_remediation_detail, self.in_remediation_background,
+                self.in_severity, self.in_url]):
+            self.captured_text += data
+
+    def finalize(self):
+        """Call after feeding all data to capture the last vulnerability."""
+        if self.current_vuln and self.current_vuln.get('name'):
+            self.vulnerabilities.append(self.current_vuln)
+        return self.vulnerabilities
+
+
+def load_burp_data(burp_file_path):
+    """Parse Burp HTML report and build lookup dictionary for enrichment."""
+    print(f"\n=== Loading Burp Data ===")
+    print(f"Parsing: {burp_file_path}")
+
+    burp_data = {}
+
+    try:
+        with open(burp_file_path, 'r', encoding='utf-8', errors='replace') as f:
+            html_content = f.read()
+
+        parser = BurpHTMLParser()
+        parser.feed(html_content)
+        vulnerabilities = parser.finalize()
+
+        # Also try regex-based fallback extraction for varied Burp formats
+        if not vulnerabilities:
+            print("  HTML parser found no structured data, trying regex fallback...")
+            # Common Burp report patterns
+            issue_blocks = re.findall(
+                r'<h[123][^>]*>([^<]+)</h[123]>.*?(?:severity[^>]*>([^<]+)<|'
+                r'class="[^"]*severity[^"]*"[^>]*>([^<]+)<).*?'
+                r'(?:detail|description)[^>]*>(.*?)</div>.*?'
+                r'(?:remediation|solution)[^>]*>(.*?)</div>',
+                html_content, re.DOTALL | re.IGNORECASE
+            )
+            for block in issue_blocks:
+                name = re.sub(r'<[^>]+>', '', block[0]).strip()
+                severity = (block[1] or block[2]).strip()
+                detail = re.sub(r'<[^>]+>', ' ', block[3]).strip()
+                remediation = re.sub(r'<[^>]+>', ' ', block[4]).strip()
+                if name:
+                    vulnerabilities.append({
+                        'name': name, 'severity': severity,
+                        'detail': detail, 'background': '',
+                        'remediation': remediation, 'url': ''
+                    })
+
+        findings_indexed = 0
+        for vuln in vulnerabilities:
+            name = vuln.get('name', '').strip()
+            if not name:
+                continue
+
+            # Create multiple lookup keys for flexible matching
+            name_key = name.lower().replace(' ', '_')
+            burp_data[name_key] = vuln
+            burp_data[name.lower()] = vuln
+
+            # Also index by partial name for fuzzy matching
+            words = name.lower().split()
+            if len(words) >= 2:
+                burp_data[' '.join(words[:3])] = vuln
+
+            findings_indexed += 1
+
+        print(f"Vulnerabilities parsed: {findings_indexed}")
+        print(f"Lookup keys created: {len(burp_data)}")
+        return burp_data
+
+    except Exception as e:
+        print(f"ERROR: Failed to load Burp file: {e}")
+        return {}
+
+
+def get_burp_enrichment(burp_data, data_field, source=''):
+    """Look up Burp enrichment data using multiple fallback strategies."""
+    if not burp_data:
+        return None
+    data_lower = str(data_field).lower().strip()
+
+    # Strategy 1: Direct lookup by data field content
+    for key in burp_data:
+        if key in data_lower or data_lower in key:
+            val = burp_data[key]
+            if isinstance(val, dict):
+                return val
+
+    # Strategy 2: Match by vulnerability name fragments
+    for key, vuln in burp_data.items():
+        if isinstance(vuln, dict) and vuln.get('name', '').lower() in data_lower:
+            return vuln
+
+    # Strategy 3: Match by first significant words
+    data_words = re.findall(r'\w+', data_lower)
+    if len(data_words) >= 2:
+        search_key = ' '.join(data_words[:3])
+        if search_key in burp_data:
+            val = burp_data[search_key]
+            if isinstance(val, dict):
+                return val
+
+    return None
+
+
+def format_burp_description(enrichment, source, data_field, severity):
+    """Format Burp description for output. Ensures 3-5 sentences."""
+    if not enrichment:
+        return None
+    detail = enrichment.get('detail', '') or enrichment.get('background', '')
+    raw = ' '.join(detail.split()) if detail else ''
+
+    desc = f"A {severity.lower()} severity web application vulnerability '{enrichment.get('name', data_field[:80])}' was identified on {source}. "
+    if raw:
+        if len(raw) > 800:
+            raw = raw[:800]
+            lp = raw.rfind('.')
+            raw = raw[:lp+1] if lp > 400 else raw + "..."
+        desc += raw + " "
+    desc += "Web application vulnerabilities of this type can be exploited to compromise user sessions, exfiltrate sensitive data, or gain unauthorized access to application functionality. "
+    url = enrichment.get('url', '')
+    if url and url not in ['nan', '']:
+        desc += f"Affected URL: {url}. "
+    desc += "Immediate assessment and remediation is recommended based on the severity and exposure of the affected endpoint."
+    return desc
+
+
+def format_burp_recommendation(enrichment, source, severity):
+    """Format Burp solution/recommendation. Ensures 3-5 sentences."""
+    if not enrichment:
+        return None
+    raw = ' '.join(enrichment.get('remediation', '').split()) if enrichment.get('remediation') else ''
+    if raw:
+        if len(raw) > 600:
+            raw = raw[:600]
+            lp = raw.rfind('.')
+            raw = raw[:lp+1] if lp > 300 else raw + "..."
+        rec = raw + " "
+    else:
+        rec = f"Apply the vendor-recommended remediation for this vulnerability on {source}. "
+    rec += "Verify remediation by re-scanning with web application security testing tools. "
+    rec += f"Priority: {severity} - address according to organizational vulnerability management SLAs. "
+    rec += "Consider implementing a Web Application Firewall (WAF) as a defense-in-depth measure while permanent fixes are applied. "
+    rec += "Include this endpoint in regular dynamic application security testing (DAST) scans."
+    return rec
+
+
+# ============================================================================
+# LOAD ENRICHMENT DATA
+# ============================================================================
+
+BURP_DATA = {}
+if BURP_FILE:
+    BURP_DATA = load_burp_data(BURP_FILE)
+    if BURP_DATA:
+        print(f"Burp enrichment ready - {len(BURP_DATA)} lookup keys available")
+    else:
+        print("WARNING: Burp file loaded but no data extracted")
+else:
+    print("No Burp file - WEBAPP_VULNERABILITIES will use generic descriptions")
+
+print("=" * 70)
+```
+
+CONFIDENCE/VISIBILITY/RISK SCORING (when available):
+- Use Risk score to prioritize within same severity tier
+- Flag Confidence <50 for manual verification
+- Highlight Visibility >75 as externally exposed
+- Include avg CVR in group statistics
+- If 7-col format: skip CVR, note "CVR scores not available"
+
+TRACKING STATUS:
+- Annotate each finding with OPEN/CLOSED/TICKETED from the Tracking column
+- Report status breakdown in group summary
+- Flag OPEN findings as requiring attention
+
+ASM-NG GRADE SCORING REFERENCE (from grade_config.py):
+Category: Web App Security | Weight: 1.0
+Score Formula: Score = max(0, 100 + (raw_score * 1.0))
+Grade Thresholds: A=90+, B=80+, C=70+, D=60+, F=<60
+
+EVENT TYPE SCORING:
+| Event Type | Rank | Points | Logic |
+|------------|------|--------|-------|
+| WEBAPP_VULNERABILITIES | 1 | crit=-20, high=-10, med=-5 | crit_high_med |
+| HTTP_CODE | 3 | -5 | unverified_exists |
+| INTERNET_NAME | 2 | -10 | unverified_exists |
+| INTERNET_NAME_UNRESOLVED | 5 | 0 | informational |
+| LEAKSITE_URL_WEBAPP | 5 | 0 | informational |
+| LINKED_URL_EXTERNAL | 5 | 0 | informational |
+| LINKED_URL_INTERNAL | 5 | 0 | informational |
+| TARGET_WEB_CONTENT | 3 | -5 | unverified_exists |
+| TARGET_WEB_CONTENT_TYPE | 3 | -5 | unverified_exists |
+| TARGET_WEB_COOKIE | 3 | -5 | unverified_exists |
+| URL_FORM | 3 | -5 | unverified_exists |
+| URL_JAVASCRIPT | 4 | -1 | unverified_exists |
+| URL_FLASH | 3 | -5 | unverified_exists |
+| URL_JAVA_APPLET | 3 | -5 | unverified_exists |
+| URL_PASSWORD | 2 | -10 | unverified_exists |
+| URL_PASSWORD_HISTORIC | 3 | -5 | unverified_exists |
+| URL_STATIC | 3 | -5 | unverified_exists |
+| URL_UPLOAD | 2 | -10 | unverified_exists |
+| URL_WEB_FRAMEWORK | 4 | -5 | unverified_exists |
+| URL_ADBLOCKED_EXTERNAL | 4 | -1 | unverified_exists |
+| URL_ADBLOCKED_INTERNAL | 4 | -1 | unverified_exists |
+| URL_FORM_HISTORIC | 4 | -1 | unverified_exists |
+| URL_FLASH_HISTORIC | 4 | -1 | unverified_exists |
+| URL_JAVASCRIPT_HISTORIC | 4 | -1 | unverified_exists |
+| URL_WEB_FRAMEWORK_HISTORIC | 4 | -1 | unverified_exists |
+| URL_JAVA_APPLET_HISTORIC | 4 | -1 | unverified_exists |
+| URL_STATIC_HISTORIC | 4 | -1 | unverified_exists |
+| URL_UPLOAD_HISTORIC | 4 | -1 | unverified_exists |
+| WAYBACK_FOOTPRINTING | 5 | 0 | informational |
+| WEB_ANALYTICS_ID | 5 | 0 | informational |
+| WEBSERVER_BANNER | 5 | 0 | informational |
+| WEBSERVER_HTTPHEADERS | 5 | 0 | informational |
+| WEBSERVER_STRANGEHEADER | 3 | -5 | unverified_exists |
+| WEBSERVER_TECHNOLOGY | 2 | -10 | unverified_exists |
+
+GROUP 2 EVENT TYPES TO ANALYZE (34 total):
+1. WEBAPP_VULNERABILITIES (Burp scan - WITH .HTML FILE ENRICHMENT, exclude Info severity)
+2. URL_PASSWORD
+3. URL_UPLOAD
+4. URL_FORM
+5. URL_FLASH
+6. URL_JAVA_APPLET
+7. WEBSERVER_TECHNOLOGY
+8. WEBSERVER_STRANGEHEADER
+9. WEBSERVER_BANNER (informational - analyze for patterns only)
+10. WEBSERVER_HTTPHEADERS (informational - analyze for patterns only)
+11. TARGET_WEB_CONTENT
+12. TARGET_WEB_CONTENT_TYPE
+13. TARGET_WEB_COOKIE
+14. HTTP_CODE
+15. INTERNET_NAME
+16. INTERNET_NAME_UNRESOLVED (informational - analyze for patterns only)
+17. URL_PASSWORD_HISTORIC
+18. URL_UPLOAD_HISTORIC
+19. URL_FORM_HISTORIC
+20. URL_FLASH_HISTORIC
+21. URL_JAVA_APPLET_HISTORIC
+22. URL_JAVASCRIPT_HISTORIC
+23. URL_WEB_FRAMEWORK_HISTORIC
+24. URL_STATIC_HISTORIC
+25. URL_JAVASCRIPT
+26. URL_STATIC
+27. URL_WEB_FRAMEWORK
+28. URL_ADBLOCKED_EXTERNAL
+29. URL_ADBLOCKED_INTERNAL
+30. LINKED_URL_EXTERNAL (informational - analyze for patterns only)
+31. LINKED_URL_INTERNAL (informational - analyze for patterns only)
+32. WAYBACK_FOOTPRINTING (informational - analyze for patterns only)
+33. WEB_ANALYTICS_ID (informational - analyze for patterns only)
+34. LEAKSITE_URL_WEBAPP (informational - analyze for patterns only)
+
+INITIALIZE OUTPUT:
+```python
+all_findings = []
+all_info_findings = []
+group_stats = {
+    'total_rows': 0,
+    'fp_excluded': 0,
+    'info_excluded': 0,
+    'findings_extracted': 0,
+    'burp_enriched': 0,
+    'burp_fallback': 0,
+    'tracking': {'OPEN': 0, 'CLOSED': 0, 'TICKETED': 0},
+    'cvr_scores': []
+}
+
+# URL type severity mapping
+URL_SEVERITY_MAP = {
+    'URL_PASSWORD': 'High',
+    'URL_UPLOAD': 'High',
+    'URL_FORM': 'Medium',
+    'URL_FLASH': 'Medium',
+    'URL_JAVA_APPLET': 'Medium',
+    'URL_PASSWORD_HISTORIC': 'Medium',
+    'URL_UPLOAD_HISTORIC': 'Medium',
+    'URL_FORM_HISTORIC': 'Low',
+    'URL_FLASH_HISTORIC': 'Low',
+    'URL_JAVA_APPLET_HISTORIC': 'Low',
+    'URL_JAVASCRIPT': 'Low',
+    'URL_JAVASCRIPT_HISTORIC': 'Low',
+    'URL_STATIC': 'Low',
+    'URL_STATIC_HISTORIC': 'Low',
+    'URL_WEB_FRAMEWORK': 'Medium',
+    'URL_WEB_FRAMEWORK_HISTORIC': 'Low',
+    'URL_ADBLOCKED_EXTERNAL': 'Low',
+    'URL_ADBLOCKED_INTERNAL': 'Low',
+}
+```
+
+EVENT TYPE BLOCK 1: WEBAPP_VULNERABILITIES (Burp HTML Enrichment)
+=================================================================
+```python
+print("\n=== Processing WEBAPP_VULNERABILITIES ===")
+
+rows = ROWS_BY_TYPE.get('WEBAPP_VULNERABILITIES', [])
+print(f"Rows found: {len(rows)}")
+
+tab_findings = []
+tab_info = []
+
+for idx, row in enumerate(rows):
+    group_stats['total_rows'] += 1
+    fp = get_fp(row)
+    if fp == 1:
+        group_stats['fp_excluded'] += 1
+        continue
+
+    tracking = get_tracking(row)
+    group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+    confidence, visibility, risk = get_cvr_scores(row)
+    if confidence is not None:
+        group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+    data_field = str(row.get('Data', '')).strip()
+    source = str(row.get('Source', '')).strip()
+    module = str(row.get('Module', '')).strip()
+
+    severity = parse_severity_from_data(data_field, 'Medium')
+    if severity == 'Info':
+        tab_info.append(row)
+        group_stats['info_excluded'] += 1
+        continue
+
+    # Try Burp HTML enrichment
+    burp_enrichment = None
+    if BURP_DATA:
+        burp_enrichment = get_burp_enrichment(BURP_DATA, data_field, source)
+
+    if burp_enrichment:
+        description = format_burp_description(burp_enrichment, source, data_field[:100], severity)
+        recommendation = format_burp_recommendation(burp_enrichment, source, severity)
+        group_stats['burp_enriched'] += 1
+    else:
+        group_stats['burp_fallback'] += 1
+        description = f"A {severity.lower()} severity web application vulnerability was detected on {source} via {module}. "
+        description += f"Finding details: {data_field[:500]}. "
+        description += "Web application vulnerabilities can be exploited to compromise user sessions, steal sensitive data, or gain unauthorized access to application functionality. "
+        description += "The specific impact depends on the vulnerability type, the data processed by the application, and the level of user interaction required. "
+        description += "Consult the Burp Suite or scanner documentation for detailed technical information on this finding."
+
+        recommendation = f"Apply secure coding remediation to address the web application vulnerability on {source}. "
+        recommendation += "Implement input validation, output encoding, and appropriate access controls as defense-in-depth measures. "
+        recommendation += "Verify remediation by re-scanning with dynamic application security testing (DAST) tools. "
+        recommendation += f"Priority: {severity} - address according to organizational vulnerability management SLAs. "
+        recommendation += "Consider deploying a Web Application Firewall (WAF) for immediate risk reduction while permanent fixes are developed."
+
+    finding = {
+        'Category': 'Web App Security',
+        'Tab': 'WEBAPP_VULNERABILITIES',
+        'Priority': severity,
+        'Item': f"Web App Vulnerability - {source} - {data_field[:80]}",
+        'Description': description,
+        'Recommendation': recommendation,
+        'Vuln_Type': 'WEBAPP_VULNERABILITIES',
+        'Asset': source,
+        'Plugin_Name': module,
+        'Tracking_Status': tracking,
+        'FP_Status': "Verified" if fp == 2 else "Unverified"
+    }
+    if risk is not None:
+        finding['Avg_Risk'] = risk
+    tab_findings.append(finding)
+    group_stats['findings_extracted'] += 1
+
+all_findings.extend(tab_findings)
+all_info_findings.extend(tab_info)
+print(f"WEBAPP_VULNERABILITIES: {len(tab_findings)} findings, {len(tab_info)} info excluded")
+print(f"  Burp-enriched: {group_stats['burp_enriched']}, Fallback: {group_stats['burp_fallback']}")
+```
+
+EVENT TYPE BLOCK 2: HIGH-RISK URL TYPES (URL_PASSWORD, URL_UPLOAD, URL_FORM, URL_FLASH, URL_JAVA_APPLET)
+==========================================================================================================
+```python
+print("\n=== Processing High-Risk URL Types ===")
+
+for url_type, label, desc_detail, rec_detail in [
+    ('URL_PASSWORD', 'Password in URL',
+     'A URL containing credentials or password parameters was discovered',
+     'credentials are transmitted via URL parameters which are logged in browser history, proxy logs, and server access logs'),
+    ('URL_UPLOAD', 'File Upload Endpoint',
+     'A file upload endpoint was discovered',
+     'file upload functionality can be abused to upload malicious files including web shells, malware, or files that exploit server-side processing vulnerabilities'),
+    ('URL_FORM', 'Input Form',
+     'A web form accepting user input was discovered',
+     'input forms are primary attack vectors for injection attacks including SQL injection, cross-site scripting (XSS), and command injection'),
+    ('URL_FLASH', 'Flash Content',
+     'A URL serving Adobe Flash content was discovered',
+     'Adobe Flash has reached end-of-life and no longer receives security updates, making it a persistent vulnerability'),
+    ('URL_JAVA_APPLET', 'Java Applet',
+     'A URL serving a Java applet was discovered',
+     'Java applets are a deprecated technology with a history of critical security vulnerabilities and should be replaced with modern alternatives'),
+]:
+    rows = ROWS_BY_TYPE.get(url_type, [])
+    if not rows:
+        print(f"  {url_type}: No data")
+        continue
+
+    print(f"\n  Processing {url_type} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    severity = URL_SEVERITY_MAP.get(url_type, 'Medium')
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        description = f"{desc_detail} on {source} via {module}. "
+        description += f"URL details: {data_field[:400]}. "
+        description += f"This is a {severity.lower()} severity finding because {rec_detail}. "
+        if url_type == 'URL_PASSWORD':
+            description += "Credentials exposed in URLs violate security best practices and may lead to unauthorized account access. "
+            description += "URL parameters are frequently cached, logged, and visible in referrer headers sent to third-party sites."
+        elif url_type == 'URL_UPLOAD':
+            description += "Unrestricted or poorly validated file upload endpoints are among the most critical web application vulnerabilities. "
+            description += "Successful exploitation can lead to remote code execution, data exfiltration, or complete server compromise."
+        elif url_type == 'URL_FORM':
+            description += "Each input form represents a potential entry point for injection attacks and should be tested for proper input validation. "
+            description += "Forms that process sensitive data require additional protections including CSRF tokens and secure transmission."
+        elif url_type == 'URL_FLASH':
+            description += "Flash content is no longer supported by major browsers and presents both security and functionality risks. "
+            description += "Known Flash vulnerabilities include remote code execution, cross-site scripting, and sandbox bypass."
+        elif url_type == 'URL_JAVA_APPLET':
+            description += "Java applets execute client-side code with elevated privileges and have been deprecated due to persistent security issues. "
+            description += "Exploitation of Java applet vulnerabilities can lead to client-side compromise and drive-by download attacks."
+
+        if url_type == 'URL_PASSWORD':
+            recommendation = f"Immediately remove password parameters from URLs on {source} and switch to POST-based form submission with HTTPS. "
+            recommendation += "Implement secure session management using HTTP-only, secure cookies instead of URL-based authentication tokens. "
+            recommendation += "Review server access logs for evidence of credential exposure and rotate any potentially compromised credentials. "
+            recommendation += "Configure web servers and proxies to suppress URL logging for sensitive endpoints. "
+            recommendation += "Implement Content-Security-Policy and Referrer-Policy headers to prevent credential leakage to third parties."
+        elif url_type == 'URL_UPLOAD':
+            recommendation = f"Implement strict file upload validation on {source} including file type whitelisting, size limits, and content-type verification. "
+            recommendation += "Store uploaded files outside the web root and serve them through a separate domain or CDN with restricted execution permissions. "
+            recommendation += "Scan all uploaded files with antivirus and malware detection before processing or storage. "
+            recommendation += "Implement authentication and authorization checks on upload endpoints to prevent anonymous uploads. "
+            recommendation += "Consider implementing Content-Disposition headers and randomized filenames to prevent direct access exploitation."
+        elif url_type == 'URL_FORM':
+            recommendation = f"Implement comprehensive input validation on all form fields on {source} using server-side validation as the primary control. "
+            recommendation += "Apply parameterized queries for database operations and contextual output encoding to prevent injection attacks. "
+            recommendation += "Deploy CSRF protection tokens on all state-changing forms and enforce rate limiting on form submissions. "
+            recommendation += "Conduct targeted penetration testing on form endpoints focusing on SQL injection, XSS, and command injection. "
+            recommendation += "Implement Web Application Firewall rules to detect and block common form-based attack patterns."
+        elif url_type == 'URL_FLASH':
+            recommendation = f"Remove all Flash content from {source} and replace with modern HTML5, CSS3, or JavaScript alternatives. "
+            recommendation += "If Flash cannot be immediately removed, restrict access to the Flash content and warn users about the security risks. "
+            recommendation += "Audit the application for any remaining Flash dependencies and create a migration timeline. "
+            recommendation += "Block Flash content execution at the network level using proxy rules or Content-Security-Policy headers. "
+            recommendation += "Monitor for exploitation attempts targeting known Flash vulnerabilities on these endpoints."
+        elif url_type == 'URL_JAVA_APPLET':
+            recommendation = f"Remove all Java applet content from {source} and replace with modern web technologies. "
+            recommendation += "If immediate removal is not possible, restrict access and implement additional security controls around applet endpoints. "
+            recommendation += "Audit the application for Java applet dependencies and develop a migration plan to modern alternatives. "
+            recommendation += "Ensure the Java Runtime Environment is updated to the latest version if applets must remain temporarily. "
+            recommendation += "Implement client-side security policies to restrict applet execution scope and permissions."
+
+        finding = {
+            'Category': 'Web App Security',
+            'Tab': url_type,
+            'Priority': severity,
+            'Item': f"{label} - {source} - {data_field[:80]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': url_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {url_type}: {len(tab_findings_local)} findings")
+```
+
+EVENT TYPE BLOCK 3: WEB SERVER ANALYSIS (WEBSERVER_TECHNOLOGY, WEBSERVER_STRANGEHEADER, WEBSERVER_BANNER, WEBSERVER_HTTPHEADERS)
+================================================================================================================================
+```python
+print("\n=== Processing Web Server Analysis ===")
+
+# Scored web server types
+for ws_type, default_sev, label, desc_detail in [
+    ('WEBSERVER_TECHNOLOGY', 'High',
+     'Web Server Technology Disclosure',
+     'specific web server or framework technology was identified'),
+    ('WEBSERVER_STRANGEHEADER', 'Medium',
+     'Unusual HTTP Header',
+     'an unusual or non-standard HTTP response header was detected'),
+]:
+    rows = ROWS_BY_TYPE.get(ws_type, [])
+    if not rows:
+        print(f"  {ws_type}: No data")
+        continue
+
+    print(f"\n  Processing {ws_type} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        if ws_type == 'WEBSERVER_TECHNOLOGY':
+            description = f"A {desc_detail} on {source}: {data_field[:300]}. "
+            description += "Technology disclosure allows attackers to research known vulnerabilities specific to the identified software version. "
+            description += "This information significantly accelerates the reconnaissance phase of an attack by narrowing the scope of applicable exploits. "
+            description += "Server technology fingerprinting is a standard step in penetration testing methodologies and automated attack tools. "
+            description += "Concealing server technology details is a defense-in-depth measure that raises the cost of targeted attacks."
+
+            recommendation = f"Configure the web server on {source} to suppress version information in response headers, error pages, and default content. "
+            recommendation += "Remove or customize default server banners, error pages, and documentation that reveal technology stack details. "
+            recommendation += "Ensure the identified technology is running the latest security-patched version and is within vendor support lifecycle. "
+            recommendation += "Implement a reverse proxy or WAF that normalizes response headers and strips technology fingerprints. "
+            recommendation += "Subscribe to security advisories for the detected technology to enable proactive vulnerability management."
+
+        elif ws_type == 'WEBSERVER_STRANGEHEADER':
+            description = f"An unusual HTTP response header was detected on {source}: {data_field[:300]}. "
+            description += "Non-standard or unexpected HTTP headers may indicate debugging configurations left in production, custom middleware, or misconfigured security controls. "
+            description += "Strange headers can leak internal infrastructure details such as internal IP addresses, load balancer identifiers, or application framework metadata. "
+            description += "Some unusual headers may also indicate the presence of security tools, CDN configurations, or proxy chains that reveal network architecture. "
+            description += "Each non-standard header should be evaluated for necessity and potential information disclosure risk."
+
+            recommendation = f"Review and validate all HTTP response headers returned by {source} against a baseline of expected headers. "
+            recommendation += "Remove any debugging, diagnostic, or internal-use headers that are not required for application functionality. "
+            recommendation += "Implement a response header policy that strips non-essential headers at the reverse proxy or WAF layer. "
+            recommendation += "Verify that standard security headers (X-Frame-Options, X-Content-Type-Options, Strict-Transport-Security, Content-Security-Policy) are properly configured. "
+            recommendation += "Document all intentional custom headers and include them in security review processes."
+
+        finding = {
+            'Category': 'Web App Security',
+            'Tab': ws_type,
+            'Priority': default_sev,
+            'Item': f"{label} - {source} - {data_field[:80]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': ws_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {ws_type}: {len(tab_findings_local)} findings")
+
+# Informational web server types (pattern analysis only)
+for info_type in ['WEBSERVER_BANNER', 'WEBSERVER_HTTPHEADERS']:
+    rows = ROWS_BY_TYPE.get(info_type, [])
+    if rows:
+        print(f"\n  {info_type}: {len(rows)} informational rows (analyzed for patterns)")
+        for row in rows:
+            group_stats['total_rows'] += 1
+            fp = get_fp(row)
+            if fp == 1:
+                group_stats['fp_excluded'] += 1
+                continue
+            all_info_findings.append(row)
+            group_stats['info_excluded'] += 1
+```
+
+EVENT TYPE BLOCK 4: WEB CONTENT ANALYSIS (TARGET_WEB_CONTENT, TARGET_WEB_CONTENT_TYPE, TARGET_WEB_COOKIE, HTTP_CODE)
+=====================================================================================================================
+```python
+print("\n=== Processing Web Content Analysis ===")
+
+for content_type, default_sev, label, desc_detail, rec_detail in [
+    ('TARGET_WEB_CONTENT', 'Medium',
+     'Web Content Discovery',
+     'Specific web content was identified on the target',
+     'Review the discovered content to determine if it exposes sensitive information, internal paths, or configuration details'),
+    ('TARGET_WEB_CONTENT_TYPE', 'Medium',
+     'Content-Type Discovery',
+     'A specific content type was served by the target application',
+     'Review served content types to ensure no sensitive file types (configuration files, backups, source code) are accessible'),
+    ('TARGET_WEB_COOKIE', 'Medium',
+     'Cookie Analysis',
+     'A cookie was identified in the target web application response',
+     'Review cookie configuration for security attributes including Secure, HttpOnly, SameSite flags, and appropriate expiration'),
+    ('HTTP_CODE', 'Medium',
+     'HTTP Response Code',
+     'A notable HTTP response code was observed during scanning',
+     'Unusual HTTP response codes may indicate misconfigured redirects, access control issues, or information disclosure through error pages'),
+]:
+    rows = ROWS_BY_TYPE.get(content_type, [])
+    if not rows:
+        print(f"  {content_type}: No data")
+        continue
+
+    print(f"\n  Processing {content_type} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        description = f"{desc_detail} on {source} via {module}. "
+        description += f"Details: {data_field[:400]}. "
+
+        if content_type == 'TARGET_WEB_CONTENT':
+            description += "Discovered web content may expose sensitive information such as internal documentation, configuration details, or application architecture. "
+            description += "Content enumeration reveals the application's directory structure and available resources, which aids attacker reconnaissance. "
+            description += "Sensitive content that is not properly access-controlled can lead to information disclosure or unauthorized access."
+        elif content_type == 'TARGET_WEB_CONTENT_TYPE':
+            description += "The content types served by a web application reveal the nature of accessible resources and potential attack vectors. "
+            description += "Unexpected content types such as application/json, text/xml, or application/octet-stream may indicate API endpoints, configuration files, or downloadable resources. "
+            description += "Each content type should be evaluated for appropriate access controls and secure transmission."
+        elif content_type == 'TARGET_WEB_COOKIE':
+            description += "Cookie security is critical for session management and preventing session hijacking, fixation, and cross-site attacks. "
+            description += "Cookies lacking security attributes (Secure, HttpOnly, SameSite) are vulnerable to interception, client-side script access, and cross-site request forgery. "
+            description += "Session cookies with excessive lifetimes increase the window of opportunity for session-based attacks."
+        elif content_type == 'HTTP_CODE':
+            description += "HTTP response codes provide insights into server behavior, access control enforcement, and application error handling. "
+            description += "Codes such as 401/403 may reveal protected resources, 500-series codes indicate server errors that may leak debug information, and 301/302 codes show redirect behavior. "
+            description += "Consistent monitoring of response codes helps identify application health issues and potential security misconfigurations."
+
+        recommendation = f"{rec_detail} on {source}. "
+        if content_type == 'TARGET_WEB_CONTENT':
+            recommendation += "Implement access controls to restrict access to sensitive content and remove unnecessary files from web-accessible directories. "
+            recommendation += "Deploy a web application firewall or access control list to block unauthorized access to sensitive paths. "
+            recommendation += "Conduct a content audit to identify and remove or protect development artifacts, backup files, and internal documentation. "
+            recommendation += "Implement proper directory listing restrictions and custom error pages that do not reveal content structure."
+        elif content_type == 'TARGET_WEB_CONTENT_TYPE':
+            recommendation += "Verify that all served content types are intentional and appropriately secured with access controls. "
+            recommendation += "Set proper Content-Type headers and implement X-Content-Type-Options: nosniff to prevent MIME-type confusion attacks. "
+            recommendation += "Restrict access to API endpoints and configuration files using authentication and authorization mechanisms. "
+            recommendation += "Review web server MIME type configuration to ensure sensitive file extensions are not served to unauthorized users."
+        elif content_type == 'TARGET_WEB_COOKIE':
+            recommendation += "Configure all cookies with the Secure flag to ensure transmission only over HTTPS connections. "
+            recommendation += "Set the HttpOnly flag on session cookies to prevent client-side script access and mitigate XSS-based session theft. "
+            recommendation += "Implement SameSite=Strict or SameSite=Lax attribute to protect against cross-site request forgery attacks. "
+            recommendation += "Set appropriate expiration times and implement server-side session management with timeout enforcement."
+        elif content_type == 'HTTP_CODE':
+            recommendation += "Configure custom error pages that do not disclose server technology, framework details, or stack traces. "
+            recommendation += "Ensure 401/403 responses use consistent behavior to prevent access control enumeration attacks. "
+            recommendation += "Implement centralized logging and alerting for unusual patterns of error response codes. "
+            recommendation += "Review redirect chains (301/302) for open redirect vulnerabilities that could be used in phishing attacks."
+
+        finding = {
+            'Category': 'Web App Security',
+            'Tab': content_type,
+            'Priority': default_sev,
+            'Item': f"{label} - {source} - {data_field[:80]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': content_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {content_type}: {len(tab_findings_local)} findings")
+```
+
+EVENT TYPE BLOCK 5: INTERNET NAMES (INTERNET_NAME, INTERNET_NAME_UNRESOLVED)
+==============================================================================
+```python
+print("\n=== Processing Internet Names ===")
+
+# Scored: INTERNET_NAME
+rows = ROWS_BY_TYPE.get('INTERNET_NAME', [])
+if rows:
+    print(f"\n  Processing INTERNET_NAME ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        description = f"Internet name (hostname/domain) '{data_field[:200]}' was discovered in the web application attack surface via {source}. "
+        description += "Each discoverable internet name represents a potential web application entry point that may host web services, APIs, or administrative interfaces. "
+        description += "Subdomain and hostname enumeration is a standard reconnaissance technique used by attackers to map the full extent of an organization's web presence. "
+        description += "Undocumented or forgotten hostnames often run outdated software or lack proper security hardening. "
+        description += "All discovered internet names should be validated against the authorized asset inventory and assessed for security posture."
+
+        recommendation = f"Verify that the discovered internet name {data_field[:100]} is authorized and documented in the organization's asset inventory. "
+        recommendation += "Ensure all web services hosted on this name have current TLS certificates, security headers, and access controls. "
+        recommendation += "If the hostname is no longer needed, remove the DNS record to reduce the attack surface. "
+        recommendation += "Include this asset in regular web application vulnerability scanning and penetration testing scope. "
+        recommendation += "Implement DNS monitoring to detect unauthorized subdomain creation or DNS hijacking attempts."
+
+        finding = {
+            'Category': 'Web App Security',
+            'Tab': 'INTERNET_NAME',
+            'Priority': 'High',
+            'Item': f"Internet Name Discovered - {data_field[:80]} via {source}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': 'INTERNET_NAME',
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  INTERNET_NAME: {len(tab_findings_local)} findings")
+else:
+    print(f"  INTERNET_NAME: No data")
+
+# Informational: INTERNET_NAME_UNRESOLVED
+rows = ROWS_BY_TYPE.get('INTERNET_NAME_UNRESOLVED', [])
+if rows:
+    print(f"\n  INTERNET_NAME_UNRESOLVED: {len(rows)} informational rows (analyzed for patterns)")
+    for row in rows:
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+        all_info_findings.append(row)
+        group_stats['info_excluded'] += 1
+```
+
+EVENT TYPE BLOCK 6: HISTORIC URL TYPES (Lower Severity Variants)
+=================================================================
+```python
+print("\n=== Processing Historic URL Types ===")
+
+for hist_type, label, desc_detail in [
+    ('URL_PASSWORD_HISTORIC', 'Historic Password URL',
+     'A historically cached URL containing credential parameters was found in web archives'),
+    ('URL_UPLOAD_HISTORIC', 'Historic Upload Endpoint',
+     'A historically cached file upload endpoint was found in web archives'),
+    ('URL_FORM_HISTORIC', 'Historic Input Form',
+     'A historically cached web form was found in web archives'),
+    ('URL_FLASH_HISTORIC', 'Historic Flash Content',
+     'A historically cached Flash content URL was found in web archives'),
+    ('URL_JAVA_APPLET_HISTORIC', 'Historic Java Applet',
+     'A historically cached Java applet URL was found in web archives'),
+    ('URL_JAVASCRIPT_HISTORIC', 'Historic JavaScript',
+     'A historically cached JavaScript resource was found in web archives'),
+    ('URL_WEB_FRAMEWORK_HISTORIC', 'Historic Framework Indicator',
+     'A historically cached web framework indicator was found in web archives'),
+    ('URL_STATIC_HISTORIC', 'Historic Static Resource',
+     'A historically cached static resource URL was found in web archives'),
+]:
+    rows = ROWS_BY_TYPE.get(hist_type, [])
+    if not rows:
+        print(f"  {hist_type}: No data")
+        continue
+
+    print(f"\n  Processing {hist_type} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    severity = URL_SEVERITY_MAP.get(hist_type, 'Low')
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        description = f"{desc_detail} for {source}. "
+        description += f"Archived URL: {data_field[:400]}. "
+        description += "Historic URLs from web archives (Wayback Machine, cached search results) reveal the application's evolution and potentially expose endpoints that were once publicly accessible. "
+        if 'PASSWORD' in hist_type:
+            description += "Previously exposed credential URLs may indicate passwords that were historically transmitted insecurely and could still be valid if not rotated. "
+            description += "Web archive services may cache sensitive URL parameters, making credential exposure persistent even after the original page is secured."
+        elif 'UPLOAD' in hist_type:
+            description += "Historic upload endpoints may still exist but be unlisted, representing hidden attack surface that could be exploited if still functional. "
+            description += "Previously available upload functionality should be verified as properly decommissioned or secured."
+        else:
+            description += "While historic findings are lower severity than active ones, they provide valuable intelligence about the application's technology stack and historical attack surface. "
+            description += "Attackers routinely use web archives to discover forgotten endpoints, old parameter names, and previously exposed functionality."
+
+        recommendation = f"Verify whether the historically archived endpoint is still active on {source} and assess its current security posture. "
+        if 'PASSWORD' in hist_type:
+            recommendation += "If credentials were historically exposed in URLs, immediately rotate all potentially affected passwords and API keys. "
+            recommendation += "Request removal of sensitive cached content from web archive services where possible. "
+        elif 'UPLOAD' in hist_type:
+            recommendation += "If the upload endpoint is still accessible, ensure it has proper authentication, file type validation, and size restrictions. "
+            recommendation += "If deprecated, ensure the endpoint is properly decommissioned and returns appropriate error responses. "
+        else:
+            recommendation += "If the historic endpoint is still active, ensure it meets current security standards and is included in active scanning scope. "
+            recommendation += "If deprecated, verify it is properly decommissioned and no longer accessible. "
+        recommendation += "Include web archive monitoring in ongoing reconnaissance and attack surface management processes. "
+        recommendation += "Implement robots.txt and cache-control headers to limit future archival of sensitive application areas."
+
+        finding = {
+            'Category': 'Web App Security',
+            'Tab': hist_type,
+            'Priority': severity,
+            'Item': f"{label} - {source} - {data_field[:80]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': hist_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {hist_type}: {len(tab_findings_local)} findings")
+```
+
+EVENT TYPE BLOCK 7: LOW-IMPACT URL TYPES (URL_JAVASCRIPT, URL_STATIC, URL_WEB_FRAMEWORK, URL_ADBLOCKED_*)
+===========================================================================================================
+```python
+print("\n=== Processing Low-Impact URL Types ===")
+
+for url_type, label, desc_detail, rec_detail in [
+    ('URL_JAVASCRIPT', 'JavaScript Resource',
+     'A JavaScript resource was discovered in the web application',
+     'Review JavaScript files for sensitive information disclosure, API keys, hardcoded credentials, and internal endpoint references'),
+    ('URL_STATIC', 'Static Resource',
+     'A static resource URL was discovered in the web application',
+     'Review static resources for sensitive information, directory listing exposure, and proper access controls'),
+    ('URL_WEB_FRAMEWORK', 'Web Framework Indicator',
+     'A web framework technology indicator was discovered',
+     'Identify the specific framework version and ensure it is current with all security patches applied'),
+    ('URL_ADBLOCKED_EXTERNAL', 'Ad-blocked External URL',
+     'An external URL that matches ad-blocking patterns was discovered',
+     'Review external resource dependencies for supply chain risks and ensure third-party scripts are integrity-verified'),
+    ('URL_ADBLOCKED_INTERNAL', 'Ad-blocked Internal URL',
+     'An internal URL that matches ad-blocking patterns was discovered',
+     'Investigate why internal URLs match ad-blocking signatures as this may indicate tracking scripts or analytics embedded in the application'),
+]:
+    rows = ROWS_BY_TYPE.get(url_type, [])
+    if not rows:
+        print(f"  {url_type}: No data")
+        continue
+
+    print(f"\n  Processing {url_type} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    severity = URL_SEVERITY_MAP.get(url_type, 'Low')
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        description = f"{desc_detail} on {source} via {module}. "
+        description += f"Resource details: {data_field[:400]}. "
+
+        if url_type == 'URL_JAVASCRIPT':
+            description += "JavaScript files are high-value reconnaissance targets as they often contain API endpoint paths, authentication logic, and business rule implementations. "
+            description += "Client-side JavaScript may inadvertently expose internal API keys, access tokens, or debug endpoints that can be leveraged for further attacks. "
+            description += "Minification and obfuscation do not provide meaningful security protection against determined attackers."
+        elif url_type == 'URL_STATIC':
+            description += "Static resources include images, stylesheets, fonts, and document files served by the web application. "
+            description += "While individually low-risk, static resource enumeration reveals application structure and may expose backup files, configuration files, or development artifacts. "
+            description += "Improper access controls on static resource directories can lead to information disclosure."
+        elif url_type == 'URL_WEB_FRAMEWORK':
+            description += "Web framework identification reveals the underlying technology stack including framework name, version, and potentially the programming language and web server configuration. "
+            description += "This information enables targeted exploitation using framework-specific vulnerabilities and default configurations. "
+            description += "Framework-specific attack tools and exploit databases make technology identification a high-value reconnaissance finding."
+        elif url_type == 'URL_ADBLOCKED_EXTERNAL':
+            description += "External resources matching ad-blocking patterns typically include analytics trackers, advertising networks, or third-party scripts that may impact user privacy. "
+            description += "Third-party script dependencies introduce supply chain risk where compromised external resources could affect application security. "
+            description += "External resources increase the application's attack surface through dependency on third-party infrastructure."
+        elif url_type == 'URL_ADBLOCKED_INTERNAL':
+            description += "Internal URLs matching ad-blocking signatures may indicate analytics or tracking functionality embedded within the application. "
+            description += "This finding may also indicate false positives where legitimate application endpoints match common ad-blocking filter patterns. "
+            description += "Understanding internal tracking implementations is important for privacy compliance and data governance."
+
+        recommendation = f"{rec_detail} on {source}. "
+        if url_type == 'URL_JAVASCRIPT':
+            recommendation += "Implement static analysis scanning of JavaScript files to detect exposed secrets, API keys, and internal endpoint references. "
+            recommendation += "Use Subresource Integrity (SRI) hashes for all externally-hosted JavaScript files to prevent tampering. "
+            recommendation += "Implement Content-Security-Policy headers to restrict JavaScript execution sources. "
+            recommendation += "Conduct regular JavaScript dependency auditing to identify known vulnerable libraries."
+        elif url_type == 'URL_STATIC':
+            recommendation += "Implement proper access controls on static resource directories to prevent unauthorized file enumeration. "
+            recommendation += "Configure web servers to disable directory listing and return 403/404 for unauthorized path access. "
+            recommendation += "Remove development artifacts, backup files, and configuration files from web-accessible directories. "
+            recommendation += "Implement cache-control headers appropriate for the sensitivity of static content."
+        elif url_type == 'URL_WEB_FRAMEWORK':
+            recommendation += "Suppress framework version disclosure in HTTP headers, error pages, and default content. "
+            recommendation += "Keep the identified framework updated to the latest stable version with all security patches applied. "
+            recommendation += "Subscribe to the framework's security advisory mailing list for proactive vulnerability management. "
+            recommendation += "Implement a Web Application Firewall with rules tuned to the specific framework's attack patterns."
+        elif 'ADBLOCKED' in url_type:
+            recommendation += "Evaluate whether the identified external dependencies are necessary for application functionality. "
+            recommendation += "Implement Subresource Integrity (SRI) verification for all third-party scripts to prevent supply chain attacks. "
+            recommendation += "Review privacy implications of tracking scripts in the context of applicable data protection regulations (GDPR, CCPA). "
+            recommendation += "Consider self-hosting critical third-party resources to reduce external dependency risks."
+
+        finding = {
+            'Category': 'Web App Security',
+            'Tab': url_type,
+            'Priority': severity,
+            'Item': f"{label} - {source} - {data_field[:80]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': url_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {url_type}: {len(tab_findings_local)} findings")
+```
+
+EVENT TYPE BLOCK 8: INFORMATIONAL TYPES (LINKED_URL_*, WAYBACK_FOOTPRINTING, WEB_ANALYTICS_ID, LEAKSITE_URL_WEBAPP)
+=====================================================================================================================
+```python
+print("\n=== Processing Informational Types (Pattern Analysis Only) ===")
+
+for info_type in ['LINKED_URL_EXTERNAL', 'LINKED_URL_INTERNAL', 'WAYBACK_FOOTPRINTING',
+                   'WEB_ANALYTICS_ID', 'LEAKSITE_URL_WEBAPP']:
+    rows = ROWS_BY_TYPE.get(info_type, [])
+    if not rows:
+        print(f"  {info_type}: No data")
+        continue
+
+    print(f"\n  {info_type}: {len(rows)} informational rows (analyzed for patterns)")
+
+    # Collect for pattern analysis, no scored findings
+    for row in rows:
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        all_info_findings.append(row)
+        group_stats['info_excluded'] += 1
+
+    # Generate pattern analysis summary per informational type
+    data_values = [str(r.get('Data', '')).strip()[:200] for r in rows if get_fp(r) != 1]
+    sources = list(set([str(r.get('Source', '')).strip() for r in rows if get_fp(r) != 1]))
+
+    if data_values:
+        if info_type == 'LINKED_URL_EXTERNAL':
+            pattern_desc = f"External linked URLs: {len(data_values)} external links discovered across {len(sources)} assets. "
+            pattern_desc += "External links reveal third-party dependencies, partner relationships, and data flow destinations. "
+            pattern_desc += "External link analysis can identify supply chain risks and unauthorized data exfiltration endpoints. "
+            pattern_desc += "Each external dependency should be evaluated for trust, availability, and security posture."
+        elif info_type == 'LINKED_URL_INTERNAL':
+            pattern_desc = f"Internal linked URLs: {len(data_values)} internal links discovered across {len(sources)} assets. "
+            pattern_desc += "Internal link analysis maps the application's site structure and navigation paths. "
+            pattern_desc += "Link analysis can reveal hidden functionality, administrative interfaces, and content management endpoints. "
+            pattern_desc += "Broken internal links may indicate decommissioned but not fully removed functionality."
+        elif info_type == 'WAYBACK_FOOTPRINTING':
+            pattern_desc = f"Wayback Machine footprinting: {len(data_values)} archived snapshots discovered across {len(sources)} assets. "
+            pattern_desc += "Web archive analysis reveals the historical evolution of the application and previously exposed functionality. "
+            pattern_desc += "Archived content may contain sensitive information, deprecated endpoints, or historical vulnerability indicators. "
+            pattern_desc += "Attackers routinely use web archives to discover hidden endpoints and previously exposed secrets."
+        elif info_type == 'WEB_ANALYTICS_ID':
+            pattern_desc = f"Web analytics identifiers: {len(data_values)} analytics IDs discovered across {len(sources)} assets. "
+            pattern_desc += "Analytics ID correlation can link seemingly separate web properties to a common owner or organization. "
+            pattern_desc += "Shared analytics IDs reveal the full scope of an organization's web infrastructure. "
+            pattern_desc += "This information aids in attack surface mapping and target enumeration."
+        elif info_type == 'LEAKSITE_URL_WEBAPP':
+            pattern_desc = f"Leak site references: {len(data_values)} web application leak site URLs discovered across {len(sources)} assets. "
+            pattern_desc += "References to the organization's web applications on leak sites may indicate prior data breaches or compromises. "
+            pattern_desc += "Leak site monitoring is critical for early detection of data exposure and threat actor activity. "
+            pattern_desc += "Any confirmed leaks should trigger incident response procedures and credential rotation."
+
+        print(f"    Pattern summary: {pattern_desc[:200]}...")
+```
+
+CONSOLIDATION PHASE
+===================
+```python
+print("\n=== CONSOLIDATION PHASE ===")
+
+groups = defaultdict(list)
+for f in all_findings:
+    key = (f['Category'], f['Vuln_Type'], f['Priority'])
+    groups[key].append(f)
+
+print(f"Consolidation groups: {len(groups)}")
+for key, findings in groups.items():
+    if len(findings) > 1:
+        print(f"  {key}: {len(findings)} findings")
+
+consolidated_findings = []
+os.makedirs('./output/findings_details', exist_ok=True)
+
+for key, group_findings in groups.items():
+    if len(group_findings) == 1:
+        consolidated_findings.append(group_findings[0])
+    else:
+        category, vuln_type, priority = key
+        assets = [f['Asset'] for f in group_findings]
+        unique_assets = list(set([a for a in assets if a and a.lower() not in ['nan', 'none']]))
+        asset_count = len(unique_assets)
+        instance_count = len(group_findings)
+
+        asset_list = ", ".join([f"({i+1}) {unique_assets[i]}" for i in range(min(5, len(unique_assets)))])
+        if len(unique_assets) > 5:
+            asset_list += f", and {len(unique_assets)-5} more"
+
+        tracking_counts = defaultdict(int)
+        for f in group_findings:
+            tracking_counts[f.get('Tracking_Status', 'OPEN')] += 1
+        tracking_summary = ", ".join([f"{k}: {v}" for k, v in tracking_counts.items()])
+
+        avg_risk = None
+        risk_scores = [f.get('Avg_Risk') for f in group_findings if f.get('Avg_Risk') is not None]
+        if risk_scores:
+            avg_risk = sum(risk_scores) / len(risk_scores)
+
+        vuln_name = vuln_type.replace('_', ' ').title()
+        _lead = f"{vuln_name} was identified on {instance_count} instances across {asset_count} assets: {asset_list}."
+        _default_desc = (
+            _lead + " This represents a systematic security issue affecting multiple systems "
+            "requiring coordinated remediation. The widespread nature indicates common "
+            "misconfiguration, shared vulnerable components, or consistent security control gaps."
+        )
+        _default_rec = (
+            f"Implement systematic remediation across all {instance_count} affected instances. "
+            "Deploy consistent security controls and monitoring across all affected assets. "
+            f"Prioritize remediation based on asset criticality and verify each of the "
+            f"{asset_count} affected assets through targeted testing."
+        )
+        description, recommendation = _enrich(vuln_type, _lead, _default_desc, _default_rec)
+
+        consolidated = {
+            'Category': category,
+            'Tab': group_findings[0]['Tab'],
+            'Priority': priority,
+            'Item': f"{vuln_name} - {instance_count} instances across {asset_count} assets",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': vuln_type,
+            'Asset': ", ".join(unique_assets[:5]) if unique_assets else '',
+            'Plugin_Name': group_findings[0].get('Plugin_Name', ''),
+            'Tracking_Status': max(tracking_counts, key=tracking_counts.get),
+        }
+        if avg_risk is not None:
+            consolidated['Avg_Risk'] = round(avg_risk, 1)
+        consolidated_findings.append(consolidated)
+
+        # Create detail file
+        import csv as csv_mod
+        detail_data = [{'Instance': i+1, 'Asset': f['Asset'],
+                        'Details': f['Item'], 'Description': f['Description'][:500],
+                        'Tracking_Status': f.get('Tracking_Status', 'OPEN'),
+                        'FP_Status': f.get('FP_Status', 'Unverified')}
+                       for i, f in enumerate(group_findings)]
+        detail_file = f'./output/findings_details/findings_detail_{vuln_type}.csv'
+        with open(detail_file, 'w', newline='') as csvf:
+            writer = csv_mod.DictWriter(csvf, fieldnames=detail_data[0].keys())
+            writer.writeheader()
+            writer.writerows(detail_data)
+        print(f"  Created: {detail_file}")
+
+print(f"\nConsolidation complete: {len(all_findings)} -> {len(consolidated_findings)} findings")
+```
+
+SAVE OUTPUTS
+============
+```python
+import csv as csv_mod
+
+fieldnames = ['Category', 'Tab', 'Priority', 'Item', 'Description', 'Recommendation',
+              'Tracking_Status', 'Avg_Risk']
+with open('./output/findings_GROUP2_FULL_CONSOLIDATED.csv', 'w', newline='') as csvf:
+    writer = csv_mod.DictWriter(csvf, fieldnames=fieldnames, extrasaction='ignore')
+    writer.writeheader()
+    writer.writerows(consolidated_findings)
+print(f"\nSaved: ./output/findings_GROUP2_FULL_CONSOLIDATED.csv ({len(consolidated_findings)} findings)")
+
+# Statistics
+print("\n" + "=" * 70)
+print("GROUP 2: WEB APP SECURITY - STATISTICS")
+print("=" * 70)
+print(f"Total rows processed: {group_stats['total_rows']}")
+print(f"False positives excluded: {group_stats['fp_excluded']}")
+print(f"Info severity excluded: {group_stats['info_excluded']}")
+print(f"Findings extracted: {group_stats['findings_extracted']}")
+print(f"Consolidated findings: {len(consolidated_findings)}")
+print(f"\nBURP ENRICHMENT:")
+print(f"  Enriched from .html: {group_stats['burp_enriched']}")
+print(f"  Generic fallback: {group_stats['burp_fallback']}")
+if group_stats['burp_enriched'] + group_stats['burp_fallback'] > 0:
+    rate = group_stats['burp_enriched'] / (group_stats['burp_enriched'] + group_stats['burp_fallback']) * 100
+    print(f"  Enrichment success rate: {rate:.1f}%")
+print(f"\nTRACKING STATUS:")
+for status, count in group_stats['tracking'].items():
+    print(f"  {status}: {count}")
+
+if group_stats['cvr_scores']:
+    avg_c = sum(s[0] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    avg_v = sum(s[1] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    avg_r = sum(s[2] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    print(f"\nCVR SCORE AVERAGES:")
+    print(f"  Avg Confidence: {avg_c:.1f}")
+    print(f"  Avg Visibility: {avg_v:.1f}")
+    print(f"  Avg Risk: {avg_r:.1f}")
+else:
+    print(f"\nCVR scores: Not available (7-col format)")
+
+print("=" * 70)
+
+# Update progress tracker
+tracker_path = './output/analysis_progress_tracker.md'
+tracker_exists = os.path.exists(tracker_path)
+
+with open(tracker_path, 'a' if tracker_exists else 'w') as f:
+    if not tracker_exists:
+        f.write("# Security Analysis Progress Tracker\n\n")
+    f.write("## GROUP 2: Web App Security (Weight 1.0) - COMPLETED\n\n")
+    f.write(f"**Findings:** {len(consolidated_findings)}\n")
+    f.write(f"**Rows Processed:** {group_stats['total_rows']}\n")
+    f.write(f"**FP Excluded:** {group_stats['fp_excluded']}\n")
+    f.write(f"**Info Excluded:** {group_stats['info_excluded']}\n\n")
+    f.write("### Burp Enrichment\n")
+    f.write(f"- Enriched from .html: {group_stats['burp_enriched']}\n")
+    f.write(f"- Generic fallback: {group_stats['burp_fallback']}\n\n")
+    f.write("### Tracking Status\n")
+    for status, count in group_stats['tracking'].items():
+        f.write(f"- {status}: {count}\n")
+    f.write("\n---\n\n")
+
+print("\nGROUP 2 COMPLETE - Web App Security analysis saved")
+```
+
+QUALITY VERIFICATION CHECKLIST:
+- [ ] All descriptions are 3-5 sentences / full paragraphs
+- [ ] All recommendations are 3-5 sentences / full paragraphs
+- [ ] No 'nan' appears in any field
+- [ ] Severities normalized (Critical/High/Medium/Low)
+- [ ] Consolidated findings show instance counts
+- [ ] Detail files created for multi-instance findings
+- [ ] Burp .html enrichment for WEBAPP_VULNERABILITIES
+- [ ] Progress tracker updated
+- [ ] Tracking status (OPEN/CLOSED/TICKETED) annotated on all findings
+- [ ] CVR scores extracted and averaged (10-col format) or noted as unavailable
+- [ ] All 34 Web App Security event types processed
+- [ ] Grade weights referenced: Web App Security = 1.0
+- [ ] URL type severities applied correctly (High for PASSWORD/UPLOAD, Medium for FORM/FLASH/APPLET, one level lower for historic)
+- [ ] Informational types analyzed for patterns only (no scored findings)
+- [ ] Burp HTML parser handles multiple report formats with regex fallback
