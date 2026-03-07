@@ -1,0 +1,379 @@
+<%include file="HEADER.tmpl"/>
+<%
+import json as _json
+%>
+<style>
+/* ──────────────────────────────────────────────────────────────────
+   AI ANALYSIS PAGE — sharp modern hacker aesthetic
+   Purple accent theme (#a855f7 / #c4b5fd)
+────────────────────────────────────────────────────────────────── */
+
+/* Page title — mono font, uppercase, glow */
+.analysis-header { display:flex; align-items:center; gap:14px; margin-bottom:24px; }
+.analysis-title  {
+    font-family:var(--font-mono); font-size:22px; font-weight:700;
+    color:var(--text-primary); letter-spacing:2px; text-transform:uppercase;
+    text-shadow: 0 0 10px rgba(168,85,247,0.4), 0 0 20px rgba(168,85,247,0.2);
+}
+.analysis-sub { color:var(--text-muted); font-size:12px; margin-left:8px; font-family:var(--font-mono); letter-spacing:.3px; }
+
+/* ── Cards: glass panels, sharp corners, glow borders ── */
+.analysis-card {
+    background:var(--glass-bg); border:1px solid var(--glass-border);
+    border-radius:0; margin-bottom:20px; overflow:hidden;
+    box-shadow: var(--shadow-md), 0 0 1px rgba(168,85,247,0.3);
+}
+.analysis-card-hdr {
+    background:var(--bg-tertiary); border-bottom:1px solid var(--glass-border);
+    padding:10px 18px; display:flex; align-items:center; justify-content:space-between;
+}
+.analysis-card-hdr-label {
+    font-family:var(--font-mono); font-size:10px; font-weight:700;
+    letter-spacing:2px; text-transform:uppercase; color:#a855f7;
+    text-shadow: 0 0 6px rgba(168,85,247,0.4);
+}
+.analysis-card-body { padding:20px; }
+
+/* ── Export form ── */
+.analysis-export-form { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; }
+.analysis-export-form .form-group { margin-bottom:0; min-width:220px; }
+.analysis-export-form label {
+    font-family:var(--font-mono); font-size:10px; font-weight:700;
+    color:var(--text-secondary); text-transform:uppercase; letter-spacing:1.5px;
+    display:block; margin-bottom:5px;
+}
+.analysis-export-form select {
+    background:var(--bg-secondary); border:1px solid var(--glass-border);
+    color:var(--text-primary); border-radius:0; padding:8px 12px; width:100%;
+    font-family:var(--font-mono); font-size:13px;
+    transition: border-color .15s, box-shadow .15s;
+}
+.analysis-export-form select:focus {
+    border-color:#a855f7; box-shadow:0 0 8px rgba(168,85,247,0.3); outline:none;
+}
+
+/* ── Stat counters — glowing numbers ── */
+.analysis-stats { display:flex; gap:12px; margin:18px 0; flex-wrap:wrap; }
+.analysis-stat {
+    background:var(--bg-secondary); border:1px solid var(--glass-border);
+    border-radius:0; padding:14px 20px; min-width:110px; text-align:center;
+    transition: border-color .2s, box-shadow .2s;
+}
+.analysis-stat:hover { border-color:#a855f7; box-shadow:0 0 12px rgba(168,85,247,0.3); }
+.analysis-stat-val {
+    font-family:var(--font-mono); font-size:24px; font-weight:700;
+    color:#a855f7; text-shadow:0 0 8px rgba(168,85,247,0.4);
+}
+.analysis-stat-val.types { color:var(--accent-cyan, #22d3ee); text-shadow:0 0 8px var(--glow-cyan, rgba(34,211,238,0.3)); }
+.analysis-stat-val.nessus { color:#f59e0b; text-shadow:0 0 8px rgba(245,158,11,0.3); }
+.analysis-stat-val.burp { color:var(--accent-red, #ef4444); text-shadow:0 0 8px var(--glow-red, rgba(239,68,68,0.3)); }
+.analysis-stat-label {
+    font-family:var(--font-mono); font-size:9px; font-weight:600;
+    color:var(--text-muted); text-transform:uppercase; letter-spacing:1.5px; margin-top:4px;
+}
+
+/* ── Buttons — gradient + glow ── */
+.btn-analysis-export {
+    background:linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+    color:#fff !important; border:none; border-radius:0; padding:8px 22px;
+    font-family:var(--font-mono); font-weight:700; font-size:12px;
+    text-transform:uppercase; letter-spacing:1px; cursor:pointer;
+    box-shadow:0 0 15px rgba(168,85,247,0.3);
+    transition: box-shadow .2s, transform .1s;
+}
+.btn-analysis-export:hover {
+    box-shadow:0 0 25px rgba(168,85,247,0.5), 0 4px 15px rgba(0,0,0,0.3);
+    transform:translateY(-1px); color:#fff !important;
+}
+.btn-analysis-export:disabled {
+    background:var(--bg-tertiary) !important; color:var(--text-muted) !important;
+    box-shadow:none; cursor:not-allowed; transform:none;
+}
+
+/* ── Info box — purple accent ── */
+.analysis-info {
+    background:var(--bg-secondary); border:1px solid #a855f7;
+    border-left:3px solid #a855f7; border-radius:0;
+    padding:14px 18px; margin-top:16px; font-size:12px;
+    color:var(--text-secondary); line-height:1.8; font-family:var(--font-sans);
+    box-shadow:0 0 8px rgba(168,85,247,0.15);
+}
+.analysis-info strong { color:var(--text-primary); font-family:var(--font-mono); text-transform:uppercase; letter-spacing:1px; }
+.analysis-info code {
+    background:var(--bg-tertiary); border:1px solid var(--glass-border);
+    padding:2px 6px; border-radius:0; color:#c4b5fd;
+    font-family:var(--font-mono); font-size:11px;
+}
+
+/* ── Instructions Modal ── */
+.analysis-modal-overlay {
+    display:none; position:fixed; top:0; left:0; right:0; bottom:0;
+    background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);
+    z-index:2000; align-items:center; justify-content:center;
+}
+.analysis-modal-overlay.active { display:flex; }
+.analysis-modal {
+    background:var(--bg-primary); border:1px solid #a855f7;
+    border-radius:0; width:680px; max-width:90vw; max-height:85vh; overflow-y:auto;
+    box-shadow:0 0 30px rgba(168,85,247,0.3), 0 20px 60px rgba(0,0,0,0.5);
+}
+.analysis-modal-hdr {
+    background:var(--bg-tertiary); border-bottom:1px solid var(--glass-border);
+    padding:14px 20px; display:flex; align-items:center; justify-content:space-between;
+}
+.analysis-modal-hdr-label {
+    font-family:var(--font-mono); font-size:11px; font-weight:700;
+    color:#a855f7; letter-spacing:2px; text-transform:uppercase;
+    text-shadow:0 0 6px rgba(168,85,247,0.4);
+}
+.analysis-modal-close {
+    background:none; border:none; color:var(--text-muted); font-size:18px;
+    cursor:pointer; padding:0 4px; line-height:1;
+}
+.analysis-modal-close:hover { color:var(--accent-red); }
+.analysis-modal-body {
+    padding:20px; color:var(--text-primary); font-size:13px; line-height:1.8;
+}
+.analysis-modal-body .step-num {
+    display:inline-block; width:22px; height:22px; line-height:22px;
+    text-align:center; background:#a855f7; color:#fff;
+    font-family:var(--font-mono); font-size:11px; font-weight:700;
+    margin-right:8px; border-radius:0;
+}
+.analysis-modal-body .step-text { font-family:var(--font-sans); color:var(--text-secondary); }
+.analysis-modal-body .step { margin-bottom:14px; }
+.analysis-cmd-block {
+    position:relative; background:var(--bg-tertiary); border:1px solid #a855f7;
+    border-radius:0; padding:14px 16px; margin:10px 0 16px 0; cursor:pointer;
+    transition: box-shadow .2s;
+}
+.analysis-cmd-block:hover { box-shadow:0 0 15px rgba(168,85,247,0.3); }
+.analysis-cmd-block code {
+    font-family:var(--font-mono); font-size:13px; font-weight:600;
+    color:#c4b5fd; background:none; border:none; padding:0;
+    user-select:all; -webkit-user-select:all;
+}
+.analysis-cmd-copy-hint {
+    position:absolute; top:8px; right:10px;
+    font-family:var(--font-mono); font-size:9px; font-weight:700;
+    color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;
+}
+.analysis-cmd-block.copied .analysis-cmd-copy-hint { color:#a855f7; }
+</style>
+
+<a href="${docroot}/ai" class="ai-back-link">
+    <i class="glyphicon glyphicon-chevron-left"></i> AI Workflows
+</a>
+
+<div class="analysis-header">
+    <span class="analysis-title">AI Analysis</span>
+    <span class="analysis-sub">Export a complete analysis package with prompts, scripts, and scan data for the 8-group pipeline</span>
+</div>
+
+<!-- ── EXPORT SECTION ──────────────────────────────────────────── -->
+<div class="analysis-card">
+    <div class="analysis-card-hdr">
+        <span class="analysis-card-hdr-label">Export Analysis Package</span>
+        <span id="analysis-result-count" style="color:var(--text-muted); font-size:12px;"></span>
+    </div>
+    <div class="analysis-card-body">
+        <div class="analysis-export-form">
+            <div class="form-group">
+                <label>Scan</label>
+                <select id="analysis-scan-select">
+                    <option value="">-- Select a scan --</option>
+                    % for scan in scans:
+                    <option value="${scan[0]}" data-target="${scan[2]}" data-name="${scan[1]}" data-status="${scan[6]}">${scan[1]} (${scan[2]}) - ${scan[6]}</option>
+                    % endfor
+                </select>
+            </div>
+            <div class="form-group">
+                <button class="btn-analysis-export" id="btn-analysis-export" onclick="analysisExport()" disabled>
+                    Export Analysis Package
+                </button>
+            </div>
+        </div>
+
+        <div id="analysis-export-stats" class="analysis-stats" style="display:none;">
+            <div class="analysis-stat">
+                <div class="analysis-stat-val" id="astat-total">0</div>
+                <div class="analysis-stat-label">Total Results</div>
+            </div>
+            <div class="analysis-stat">
+                <div class="analysis-stat-val types" id="astat-types">0</div>
+                <div class="analysis-stat-label">Event Types</div>
+            </div>
+            <div class="analysis-stat">
+                <div class="analysis-stat-val nessus" id="astat-nessus">0</div>
+                <div class="analysis-stat-label">Nessus Findings</div>
+            </div>
+            <div class="analysis-stat">
+                <div class="analysis-stat-val burp" id="astat-burp">0</div>
+                <div class="analysis-stat-label">Burp Findings</div>
+            </div>
+        </div>
+
+        <div class="analysis-info">
+            <strong>How it works:</strong><br>
+            1. Select a completed scan and click <code>Export Analysis Package</code><br>
+            2. A ZIP downloads containing scan data CSVs, all 8 group prompts, processing scripts, and reference files<br>
+            3. Extract the ZIP and run <code>python scripts/obfuscate-asm-data.py</code> to anonymize client data<br>
+            4. Run <code>python scripts/run_all_groups.py</code> to execute all 7 group analyses + final consolidation<br>
+            5. The pipeline produces executive-grade findings in <code>output/FINAL_CONSOLIDATION.md</code>
+        </div>
+    </div>
+</div>
+
+<!-- ── PIPELINE OVERVIEW ───────────────────────────────────────── -->
+<div class="analysis-card">
+    <div class="analysis-card-hdr">
+        <span class="analysis-card-hdr-label">8-Group Analysis Pipeline</span>
+    </div>
+    <div class="analysis-card-body">
+        <div class="analysis-info" style="border-color:var(--glass-border); box-shadow:none;">
+            <strong>Pipeline Overview:</strong><br><br>
+            The analysis pipeline processes scan data through 7 specialized groups, then consolidates into executive findings:<br><br>
+            <code>GROUP 1</code> &mdash; Infrastructure &amp; Network Exposure<br>
+            <code>GROUP 2</code> &mdash; DNS, Domains &amp; Certificate Intelligence<br>
+            <code>GROUP 3</code> &mdash; Web Application Security<br>
+            <code>GROUP 4</code> &mdash; Data Leakage &amp; Credential Exposure<br>
+            <code>GROUP 5</code> &mdash; Threat Intelligence &amp; Dark Web<br>
+            <code>GROUP 6</code> &mdash; Cloud &amp; Third-Party Services<br>
+            <code>GROUP 7</code> &mdash; Social Engineering &amp; Human Factors<br>
+            <code>FINAL</code> &mdash; Consolidation of all group outputs into prioritized executive findings<br><br>
+            Each group prompt instructs Claude to analyze its category of findings, correlate with Nessus/Burp vulnerability data, and produce structured output. The final consolidation merges all group analyses into a single report.
+        </div>
+    </div>
+</div>
+
+<!-- ── INSTRUCTIONS MODAL ──────────────────────────────────────── -->
+<div class="analysis-modal-overlay" id="analysis-instructions-modal">
+    <div class="analysis-modal">
+        <div class="analysis-modal-hdr">
+            <span class="analysis-modal-hdr-label">Post-Export Instructions</span>
+            <button class="analysis-modal-close" onclick="closeAnalysisModal()">&times;</button>
+        </div>
+        <div class="analysis-modal-body">
+            <div class="step">
+                <span class="step-num">1</span>
+                <span class="step-text">Extract the downloaded ZIP to a working directory</span>
+            </div>
+            <div class="analysis-cmd-block" onclick="copyCmd(this)">
+                <code>unzip ANALYSIS-PKG*.zip -d analysis-workspace && cd analysis-workspace</code>
+                <span class="analysis-cmd-copy-hint">click to copy</span>
+            </div>
+
+            <div class="step">
+                <span class="step-num">2</span>
+                <span class="step-text">Obfuscate client-sensitive data (recommended for external AI processing)</span>
+            </div>
+            <div class="analysis-cmd-block" onclick="copyCmd(this)">
+                <code>python scripts/obfuscate-asm-data.py --input data/scan_results.csv --output data/scan_results_obfuscated.csv</code>
+                <span class="analysis-cmd-copy-hint">click to copy</span>
+            </div>
+
+            <div class="step">
+                <span class="step-num">3</span>
+                <span class="step-text">If you have original Nessus (.nessus) or Burp (.html) files, drop them into the <code>data/</code> folder for richer analysis. Then inject them:</span>
+            </div>
+            <div class="analysis-cmd-block" onclick="copyCmd(this)">
+                <code>python scripts/inject_nessus_burp.py --data-dir data/</code>
+                <span class="analysis-cmd-copy-hint">click to copy</span>
+            </div>
+
+            <div class="step">
+                <span class="step-num">4</span>
+                <span class="step-text">Run the full analysis pipeline (all 7 groups + final consolidation)</span>
+            </div>
+            <div class="analysis-cmd-block" onclick="copyCmd(this)">
+                <code>python scripts/run_all_groups.py --prompts-dir prompts/ --data-dir data/ --output-dir output/</code>
+                <span class="analysis-cmd-copy-hint">click to copy</span>
+            </div>
+
+            <div class="step">
+                <span class="step-num">5</span>
+                <span class="step-text">Review the final consolidated analysis</span>
+            </div>
+            <div class="analysis-cmd-block" onclick="copyCmd(this)">
+                <code>cat output/FINAL_CONSOLIDATION.md</code>
+                <span class="analysis-cmd-copy-hint">click to copy</span>
+            </div>
+
+            <div style="font-family:var(--font-mono); font-size:11px; font-weight:700; color:#a855f7; text-transform:uppercase; letter-spacing:1px; margin-top:16px; padding-top:12px; border-top:1px solid var(--glass-border); text-shadow:0 0 6px rgba(168,85,247,0.4);">
+                Analysis output is standalone &mdash; no import back to ASM-NG required
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var docroot = '${docroot}';
+    var scanSelect = document.getElementById('analysis-scan-select');
+    var exportBtn = document.getElementById('btn-analysis-export');
+    var statsDiv = document.getElementById('analysis-export-stats');
+
+    scanSelect.addEventListener('change', function() {
+        var id = this.value;
+        if (!id) {
+            exportBtn.disabled = true;
+            statsDiv.style.display = 'none';
+            return;
+        }
+        exportBtn.disabled = false;
+
+        // Fetch counts
+        fetch(docroot + '/analysiscounts?id=' + encodeURIComponent(id))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                document.getElementById('astat-total').textContent = data.counts.total;
+                document.getElementById('astat-types').textContent = data.counts.types;
+                document.getElementById('astat-nessus').textContent = data.counts.nessus_count;
+                document.getElementById('astat-burp').textContent = data.counts.burp_count;
+                statsDiv.style.display = 'flex';
+            }
+        });
+    });
+
+    window.analysisExport = function() {
+        var id = scanSelect.value;
+        if (!id) return;
+        window.location.href = docroot + '/analysisexport?id=' + encodeURIComponent(id);
+        // Show instructions modal after a brief delay
+        setTimeout(function() {
+            document.getElementById('analysis-instructions-modal').classList.add('active');
+        }, 1000);
+    };
+
+    window.closeAnalysisModal = function() {
+        document.getElementById('analysis-instructions-modal').classList.remove('active');
+    };
+
+    // Close modal on overlay click
+    document.getElementById('analysis-instructions-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeAnalysisModal();
+    });
+
+    // Close modal on Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeAnalysisModal();
+    });
+
+    window.copyCmd = function(block) {
+        var code = block.querySelector('code');
+        if (!code) return;
+        navigator.clipboard.writeText(code.textContent).then(function() {
+            block.classList.add('copied');
+            var hint = block.querySelector('.analysis-cmd-copy-hint');
+            if (hint) hint.textContent = 'copied!';
+            setTimeout(function() {
+                block.classList.remove('copied');
+                if (hint) hint.textContent = 'click to copy';
+            }, 2000);
+        });
+    };
+})();
+</script>
+
+<%include file="FOOTER.tmpl"/>

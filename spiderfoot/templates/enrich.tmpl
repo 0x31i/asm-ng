@@ -8,6 +8,16 @@ import json as _json
    Mirrors triage.tmpl design system
 ────────────────────────────────────────────────────────────────── */
 
+/* ── Back link to AI landing ── */
+.ai-back-link {
+    display:inline-flex; align-items:center; gap:6px;
+    font-family:var(--font-mono); font-size:11px; font-weight:600;
+    color:var(--text-muted); text-decoration:none; letter-spacing:1px;
+    text-transform:uppercase; margin-bottom:16px;
+    transition:color 0.2s;
+}
+.ai-back-link:hover { color:var(--text-primary); text-decoration:none; }
+
 /* Page title — mono font, uppercase, glow */
 .enrich-header { display:flex; align-items:center; gap:14px; margin-bottom:24px; }
 .enrich-title  {
@@ -220,6 +230,10 @@ import json as _json
     box-shadow: none !important;
 }
 </style>
+
+<a href="${docroot}/ai" class="ai-back-link">
+    <i class="glyphicon glyphicon-chevron-left"></i> AI Workflows
+</a>
 
 <div class="enrich-header">
     <span class="enrich-title">Enrich Data</span>

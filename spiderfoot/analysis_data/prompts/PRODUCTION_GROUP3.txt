@@ -1,0 +1,1687 @@
+PRODUCTION ANALYSIS - GROUP 3: Information Leakage
+===================================================
+ASM-NG Grade Category: Information Leakage | Weight: 0.8 | Priority: P2
+===================================================
+
+CONFIGURATION:
+- CSV: Auto-detect (only .csv file in ./obfuscated/) -- ASM-NG export
+- Format: Auto-detect 7-col (standard) or 10-col (full_scored with CVR scores)
+- Mode: PRODUCTION (analyze ALL rows)
+- Output: ./output/
+- Data: TOKENIZED/OBFUSCATED (IPs, domains, hosts are token identifiers)
+
+CONSOLIDATION RULES (MANDATORY):
+The goal is a concise, executive-readable report. Minimize finding count through
+aggressive consolidation while preserving detail in supporting CSVs.
+- NEVER create one finding per individual port, IP, domain, URL, or asset instance.
+- Group related findings by EVENT TYPE + SEVERITY TIER.
+- The consolidation phase groups by (Category, Vuln_Type, Priority) so multiple
+  instances of the same event type at the same severity merge into a single finding
+  with instance count and asset list.
+- Detail CSVs capture every individual instance for drill-down.
+- Target: under 20 consolidated findings per group. If consolidation produces more
+  than 20, review Vuln_Type keys for over-granularity.
+
+SETUP - IMPORT AND HELPER FUNCTIONS:
+```python
+import csv
+import os
+import glob
+import sys as _sys
+_sys.path.insert(0, './scripts')
+try:
+    from finding_enrichment import enrich_or_default as _enrich
+    print("finding_enrichment library loaded OK")
+except ImportError:
+    def _enrich(tab, lead, default_desc, default_rec):
+        return default_desc, default_rec
+    print("WARNING: finding_enrichment.py not found - using generic descriptions")
+
+import re
+from collections import defaultdict
+
+# ============================================================================
+# DYNAMIC FILE DETECTION
+# ============================================================================
+
+print("=== Dynamic File Detection ===")
+
+# Find CSV file in obfuscated folder
+csv_files = glob.glob('./obfuscated/*.csv')
+if not csv_files:
+    raise FileNotFoundError("No .csv file found in ./obfuscated/ folder")
+elif len(csv_files) > 1:
+    print(f"WARNING: Multiple .csv files found: {csv_files}")
+    print(f"Using first file: {csv_files[0]}")
+
+CSV_FILE = csv_files[0]
+print(f"CSV file detected: {CSV_FILE}")
+
+# Auto-detect CSV format (7-col standard or 10-col full_scored)
+def detect_csv_format(csv_file):
+    with open(csv_file, 'r') as f:
+        reader = csv.reader(f)
+        headers = next(reader)
+        headers_lower = [h.strip().lower() for h in headers]
+        if 'confidence' in headers_lower:
+            return 'full_scored', headers
+        else:
+            return 'standard', headers
+
+CSV_FORMAT, CSV_HEADERS = detect_csv_format(CSV_FILE)
+print(f"CSV format: {CSV_FORMAT} ({len(CSV_HEADERS)} columns)")
+
+# Load and group by event type
+def load_csv_by_event_type(csv_file):
+    rows_by_type = {}
+    with open(csv_file, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            etype = row['Type']
+            rows_by_type.setdefault(etype, []).append(row)
+    return rows_by_type
+
+ROWS_BY_TYPE = load_csv_by_event_type(CSV_FILE)
+print(f"Event types found: {len(ROWS_BY_TYPE)}")
+for etype, rows in sorted(ROWS_BY_TYPE.items(), key=lambda x: -len(x[1]))[:10]:
+    print(f"  {etype}: {len(rows)} rows")
+
+print("=" * 70)
+print("OBFUSCATED DATA MODE - Internal Processing")
+print("=" * 70)
+print("INTERNAL: Processing obfuscated data where:")
+print("  Infrastructure identifiers obfuscated for security")
+print("  Format: IP_ADDRESS_TOKEN_####, DOMAIN_TOKEN_####, HOSTNAME_TOKEN_####, etc.")
+print("=" * 70)
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def normalize_priority(severity, default='Medium'):
+    """Normalize severity to standard format"""
+    if not severity or str(severity).lower().strip() in ['nan', '', 'none']:
+        return default
+    severity = str(severity).strip().lower()
+    if severity in ['critical', 'crit', '4']:
+        return 'Critical'
+    elif severity in ['high', 'hi', '3']:
+        return 'High'
+    elif severity in ['medium', 'med', '2']:
+        return 'Medium'
+    elif severity in ['low', 'lo', '1']:
+        return 'Low'
+    elif severity in ['info', 'informational', '0']:
+        return 'Info'
+    return default
+
+def get_cvr_scores(row):
+    """Extract CVR scores from a row (10-col format only)."""
+    if CSV_FORMAT != 'full_scored':
+        return None, None, None
+    try:
+        confidence = int(row.get('Confidence', 0) or 0)
+        visibility = int(row.get('Visibility', 0) or 0)
+        risk = int(row.get('Risk', 0) or 0)
+        return confidence, visibility, risk
+    except (ValueError, TypeError):
+        return 0, 0, 0
+
+def get_tracking(row):
+    """Extract tracking status from row."""
+    return str(row.get('Tracking', 'OPEN')).strip().upper() or 'OPEN'
+
+def get_fp(row):
+    """Extract FP value. Returns int: 0=unverified, 1=false positive, 2=verified."""
+    try:
+        return int(row.get('F/P', 0) or 0)
+    except (ValueError, TypeError):
+        return 0
+
+def parse_severity_from_data(data_field, default='Medium'):
+    """Parse severity level from the Data field text."""
+    data_lower = str(data_field).lower()
+    if 'critical' in data_lower:
+        return 'Critical'
+    elif 'high' in data_lower:
+        return 'High'
+    elif 'medium' in data_lower or 'med' in data_lower:
+        return 'Medium'
+    elif 'low' in data_lower:
+        return 'Low'
+    elif 'info' in data_lower or 'informational' in data_lower:
+        return 'Info'
+    return default
+
+print("=" * 70)
+```
+
+CONFIDENCE/VISIBILITY/RISK SCORING (when available):
+- Use Risk score to prioritize within same severity tier
+- Flag Confidence <50 for manual verification
+- Highlight Visibility >75 as externally exposed
+- Include avg CVR in group statistics
+- If 7-col format: skip CVR, note "CVR scores not available"
+
+TRACKING STATUS:
+- Annotate each finding with OPEN/CLOSED/TICKETED from the Tracking column
+- Report status breakdown in group summary
+- Flag OPEN findings as requiring attention
+
+ASM-NG GRADE SCORING REFERENCE (from grade_config.py):
+Category: Information Leakage | Weight: 0.8
+Score Formula: Score = max(0, 100 + (raw_score * 0.8))
+Grade Thresholds: A=90+, B=80+, C=70+, D=60+, F=<60
+
+EVENT TYPE SCORING:
+| Event Type | Rank | Points | Logic |
+|------------|------|--------|-------|
+| BREACHED_CREDENTIALS | 1 | -20 | unverified_exists |
+| EMAILADDR | 2 | -10 | unverified_exists |
+| EMAILADDR_COMPROMISED | 2 | -10 | unverified_exists |
+| EMAILADDR_DELIVERABLE | 3 | -5 | unverified_exists |
+| EMAILADDR_DISPOSABLE | 3 | -5 | unverified_exists |
+| EMAILADDR_GENERIC | 4 | 0 | informational |
+| EMAILADDR_UNDELIVERABLE | 4 | 0 | informational |
+| HASH | 3 | -5 | unverified_exists |
+| HASH_COMPROMISED | 1 | -20 | unverified_exists |
+| HUMAN_NAME | 3 | -5 | unverified_exists |
+| PERSON_NAME | 3 | -5 | unverified_exists |
+| DATE_HUMAN_DOB | 2 | -10 | unverified_exists |
+| JOB_TITLE | 4 | -5 | unverified_exists |
+| IBAN_NUMBER | 5 | 0 | informational |
+| CREDIT_CARD_NUMBER | 1 | -20 | unverified_exists |
+| INTERESTING_FILE | 2 | -10 | unverified_exists |
+| INTERESTING_FILE_HISTORIC | 3 | -5 | unverified_exists |
+| MALICIOUS_EMAILADDR | 2 | -10 | unverified_exists |
+| PGP_KEY | 2 | -10 | unverified_exists |
+| PHONE_NUMBER | 3 | -5 | unverified_exists |
+| PHONE_NUMBER_COMPROMISED | 2 | -10 | unverified_exists |
+| PHONE_NUMBER_TYPE | 4 | 0 | informational |
+| MALICIOUS_PHONE_NUMBER | 2 | -10 | unverified_exists |
+| PHYSICAL_ADDRESS | 3 | -5 | unverified_exists |
+| RAW_FILE_META_DATA | 5 | 0 | informational |
+| SOFTWARE_USED | 3 | -5 | unverified_exists |
+| USERNAME | 3 | -5 | unverified_exists |
+| PASSWORD_COMPROMISED | 1 | -20 | unverified_exists |
+| LEAKSITE_URL | 1 | -20 | unverified_exists |
+| LEAKSITE_CONTENT | 1 | -20 | unverified_exists |
+| AI_API_KEY_LEAKED | 1 | -20 | count_scaled |
+
+SEVERITY MAPPING:
+- Rank 1 types: Critical or High
+- Rank 2 types: High or Medium
+- Rank 3 types: Medium or Low
+- Rank 4-5 types: Low or Info
+
+GROUP 3 EVENT TYPES TO ANALYZE (31 total):
+1. BREACHED_CREDENTIALS
+2. EMAILADDR
+3. EMAILADDR_COMPROMISED
+4. EMAILADDR_DELIVERABLE
+5. EMAILADDR_DISPOSABLE
+6. EMAILADDR_GENERIC (informational)
+7. EMAILADDR_UNDELIVERABLE (informational)
+8. HASH
+9. HASH_COMPROMISED
+10. HUMAN_NAME
+11. PERSON_NAME
+12. DATE_HUMAN_DOB
+13. JOB_TITLE
+14. IBAN_NUMBER (informational)
+15. CREDIT_CARD_NUMBER
+16. INTERESTING_FILE
+17. INTERESTING_FILE_HISTORIC
+18. MALICIOUS_EMAILADDR
+19. PGP_KEY
+20. PHONE_NUMBER
+21. PHONE_NUMBER_COMPROMISED
+22. PHONE_NUMBER_TYPE (informational)
+23. MALICIOUS_PHONE_NUMBER
+24. PHYSICAL_ADDRESS
+25. RAW_FILE_META_DATA (informational)
+26. SOFTWARE_USED
+27. USERNAME
+28. PASSWORD_COMPROMISED
+29. LEAKSITE_URL
+30. LEAKSITE_CONTENT
+31. AI_API_KEY_LEAKED
+
+INITIALIZE OUTPUT:
+```python
+all_findings = []
+all_info_findings = []
+group_stats = {
+    'total_rows': 0,
+    'fp_excluded': 0,
+    'info_excluded': 0,
+    'findings_extracted': 0,
+    'tracking': {'OPEN': 0, 'CLOSED': 0, 'TICKETED': 0},
+    'cvr_scores': []
+}
+```
+
+EVENT TYPE BLOCK 1: CRITICAL CREDENTIAL EXPOSURE (BREACHED_CREDENTIALS, PASSWORD_COMPROMISED, HASH_COMPROMISED, CREDIT_CARD_NUMBER, AI_API_KEY_LEAKED)
+========================================================================================================================================================
+```python
+print("\n=== Processing Critical Credential Exposure ===")
+
+# --- BREACHED_CREDENTIALS ---
+rows = ROWS_BY_TYPE.get('BREACHED_CREDENTIALS', [])
+print(f"BREACHED_CREDENTIALS rows found: {len(rows)}")
+tab_findings = []
+
+for idx, row in enumerate(rows):
+    group_stats['total_rows'] += 1
+    fp = get_fp(row)
+    if fp == 1:
+        group_stats['fp_excluded'] += 1
+        continue
+
+    tracking = get_tracking(row)
+    group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+    confidence, visibility, risk = get_cvr_scores(row)
+    if confidence is not None:
+        group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+    data_field = str(row.get('Data', '')).strip()
+    source = str(row.get('Source', '')).strip()
+    module = str(row.get('Module', '')).strip()
+
+    # Special handling: escalate to Critical if password indicators found in Data
+    data_lower = data_field.lower()
+    if any(kw in data_lower for kw in ['password', 'passwd', 'plaintext', 'cleartext', 'hash:']):
+        severity = 'Critical'
+    else:
+        severity = 'High'
+
+    description = f"Breached credentials associated with {source} were discovered via {module}. "
+    description += f"Breach details: {data_field[:500]}. "
+    description += "Compromised credentials represent a critical security risk as they allow unauthorized access to systems, applications, and sensitive data. "
+    description += "Attackers routinely use breached credential databases to perform credential stuffing and account takeover attacks across multiple services. "
+    if severity == 'Critical':
+        description += "Password material was identified in this breach record, significantly increasing the risk of immediate exploitation."
+    else:
+        description += "The affected accounts should be considered compromised and require immediate credential rotation."
+
+    recommendation = "Immediately reset passwords for all affected accounts and enforce multi-factor authentication (MFA). "
+    recommendation += f"Audit login activity for {source} to detect unauthorized access attempts using the breached credentials. "
+    recommendation += "Implement credential monitoring services to receive early warnings of future breaches. "
+    recommendation += "Deploy password policies requiring unique, complex passwords and prohibiting credential reuse across systems. "
+    recommendation += "Consider implementing passwordless authentication or hardware security keys for high-value accounts."
+
+    finding = {
+        'Category': 'Information Leakage',
+        'Tab': 'BREACHED_CREDENTIALS',
+        'Priority': severity,
+        'Item': f"Breached Credentials - {source} - {data_field[:80]}",
+        'Description': description,
+        'Recommendation': recommendation,
+        'Vuln_Type': 'BREACHED_CREDENTIALS',
+        'Asset': source,
+        'Plugin_Name': module,
+        'Tracking_Status': tracking,
+        'FP_Status': "Verified" if fp == 2 else "Unverified"
+    }
+    if risk is not None:
+        finding['Avg_Risk'] = risk
+    tab_findings.append(finding)
+    group_stats['findings_extracted'] += 1
+
+all_findings.extend(tab_findings)
+print(f"BREACHED_CREDENTIALS: {len(tab_findings)} findings")
+
+# --- PASSWORD_COMPROMISED ---
+rows = ROWS_BY_TYPE.get('PASSWORD_COMPROMISED', [])
+print(f"\nPASSWORD_COMPROMISED rows found: {len(rows)}")
+tab_findings = []
+
+for idx, row in enumerate(rows):
+    group_stats['total_rows'] += 1
+    fp = get_fp(row)
+    if fp == 1:
+        group_stats['fp_excluded'] += 1
+        continue
+
+    tracking = get_tracking(row)
+    group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+    confidence, visibility, risk = get_cvr_scores(row)
+    if confidence is not None:
+        group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+    data_field = str(row.get('Data', '')).strip()
+    source = str(row.get('Source', '')).strip()
+    module = str(row.get('Module', '')).strip()
+
+    severity = 'Critical'
+
+    description = f"A compromised password was identified associated with {source} via {module}. "
+    description += f"Details: {data_field[:500]}. "
+    description += "Compromised passwords in publicly available breach databases pose an immediate and critical risk to organizational security. "
+    description += "Attackers use automated tools to test leaked passwords across multiple services, exploiting credential reuse to gain unauthorized access. "
+    description += "This finding indicates direct exposure of authentication material that must be rotated immediately."
+
+    recommendation = f"Immediately force a password reset for all accounts associated with {source} and invalidate all active sessions. "
+    recommendation += "Enforce multi-factor authentication (MFA) to prevent account takeover even if credentials are compromised. "
+    recommendation += "Audit access logs for unauthorized login activity corresponding to the timeframe of the breach. "
+    recommendation += "Implement credential screening against known breach databases (e.g., Have I Been Pwned API) during password changes. "
+    recommendation += "Deploy account lockout policies and anomaly-based login detection to mitigate credential stuffing attacks."
+
+    finding = {
+        'Category': 'Information Leakage',
+        'Tab': 'PASSWORD_COMPROMISED',
+        'Priority': severity,
+        'Item': f"Compromised Password - {source} - {data_field[:80]}",
+        'Description': description,
+        'Recommendation': recommendation,
+        'Vuln_Type': 'PASSWORD_COMPROMISED',
+        'Asset': source,
+        'Plugin_Name': module,
+        'Tracking_Status': tracking,
+        'FP_Status': "Verified" if fp == 2 else "Unverified"
+    }
+    if risk is not None:
+        finding['Avg_Risk'] = risk
+    tab_findings.append(finding)
+    group_stats['findings_extracted'] += 1
+
+all_findings.extend(tab_findings)
+print(f"PASSWORD_COMPROMISED: {len(tab_findings)} findings")
+
+# --- HASH_COMPROMISED ---
+rows = ROWS_BY_TYPE.get('HASH_COMPROMISED', [])
+print(f"\nHASH_COMPROMISED rows found: {len(rows)}")
+tab_findings = []
+
+for idx, row in enumerate(rows):
+    group_stats['total_rows'] += 1
+    fp = get_fp(row)
+    if fp == 1:
+        group_stats['fp_excluded'] += 1
+        continue
+
+    tracking = get_tracking(row)
+    group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+    confidence, visibility, risk = get_cvr_scores(row)
+    if confidence is not None:
+        group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+    data_field = str(row.get('Data', '')).strip()
+    source = str(row.get('Source', '')).strip()
+    module = str(row.get('Module', '')).strip()
+
+    severity = 'Critical'
+
+    description = f"A compromised password hash was identified associated with {source} via {module}. "
+    description += f"Hash details: {data_field[:500]}. "
+    description += "Compromised password hashes can be cracked using rainbow tables, GPU-accelerated brute force, or dictionary attacks to recover plaintext credentials. "
+    description += "Weak hashing algorithms (MD5, SHA-1, unsalted SHA-256) can be cracked in seconds with modern hardware. "
+    description += "This finding represents critical credential exposure requiring immediate remediation and investigation."
+
+    recommendation = f"Immediately rotate all credentials associated with {source} and enforce multi-factor authentication. "
+    recommendation += "Investigate the source of the hash leak and remediate the underlying exposure vector. "
+    recommendation += "Verify that current password storage uses strong hashing algorithms (bcrypt, scrypt, Argon2) with unique per-password salts. "
+    recommendation += "Audit all systems for similar hashing weaknesses and upgrade legacy authentication mechanisms. "
+    recommendation += "Monitor for unauthorized access attempts using potentially cracked credentials."
+
+    finding = {
+        'Category': 'Information Leakage',
+        'Tab': 'HASH_COMPROMISED',
+        'Priority': severity,
+        'Item': f"Compromised Hash - {source} - {data_field[:80]}",
+        'Description': description,
+        'Recommendation': recommendation,
+        'Vuln_Type': 'HASH_COMPROMISED',
+        'Asset': source,
+        'Plugin_Name': module,
+        'Tracking_Status': tracking,
+        'FP_Status': "Verified" if fp == 2 else "Unverified"
+    }
+    if risk is not None:
+        finding['Avg_Risk'] = risk
+    tab_findings.append(finding)
+    group_stats['findings_extracted'] += 1
+
+all_findings.extend(tab_findings)
+print(f"HASH_COMPROMISED: {len(tab_findings)} findings")
+
+# --- CREDIT_CARD_NUMBER ---
+rows = ROWS_BY_TYPE.get('CREDIT_CARD_NUMBER', [])
+print(f"\nCREDIT_CARD_NUMBER rows found: {len(rows)}")
+tab_findings = []
+
+for idx, row in enumerate(rows):
+    group_stats['total_rows'] += 1
+    fp = get_fp(row)
+    if fp == 1:
+        group_stats['fp_excluded'] += 1
+        continue
+
+    tracking = get_tracking(row)
+    group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+    confidence, visibility, risk = get_cvr_scores(row)
+    if confidence is not None:
+        group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+    data_field = str(row.get('Data', '')).strip()
+    source = str(row.get('Source', '')).strip()
+    module = str(row.get('Module', '')).strip()
+
+    # CREDIT_CARD_NUMBER is always Critical
+    severity = 'Critical'
+
+    description = f"A credit card number was detected in content associated with {source} via {module}. "
+    description += f"Detection context: {data_field[:500]}. "
+    description += "Exposure of credit card numbers constitutes a critical PCI DSS compliance violation and poses immediate financial risk. "
+    description += "Credit card data leakage can result in fraudulent transactions, regulatory fines, and significant reputational damage. "
+    description += "This finding requires immediate incident response procedures and notification to the payment card issuer."
+
+    recommendation = f"Immediately remove the exposed credit card data from {source} and initiate PCI DSS incident response procedures. "
+    recommendation += "Notify the affected cardholder(s) and payment card issuer to enable fraud monitoring and potential card replacement. "
+    recommendation += "Conduct a forensic investigation to determine how the card data was exposed and the extent of the breach. "
+    recommendation += "Review data handling practices and implement tokenization or encryption for all cardholder data in transit and at rest. "
+    recommendation += "Engage your Qualified Security Assessor (QSA) to evaluate PCI DSS compliance posture and breach reporting obligations."
+
+    finding = {
+        'Category': 'Information Leakage',
+        'Tab': 'CREDIT_CARD_NUMBER',
+        'Priority': severity,
+        'Item': f"Credit Card Number Exposed - {source} - {data_field[:80]}",
+        'Description': description,
+        'Recommendation': recommendation,
+        'Vuln_Type': 'CREDIT_CARD_NUMBER',
+        'Asset': source,
+        'Plugin_Name': module,
+        'Tracking_Status': tracking,
+        'FP_Status': "Verified" if fp == 2 else "Unverified"
+    }
+    if risk is not None:
+        finding['Avg_Risk'] = risk
+    tab_findings.append(finding)
+    group_stats['findings_extracted'] += 1
+
+all_findings.extend(tab_findings)
+print(f"CREDIT_CARD_NUMBER: {len(tab_findings)} findings")
+
+# --- AI_API_KEY_LEAKED ---
+rows = ROWS_BY_TYPE.get('AI_API_KEY_LEAKED', [])
+print(f"\nAI_API_KEY_LEAKED rows found: {len(rows)}")
+tab_findings = []
+
+# count_scaled scoring: more keys = worse, base -20 per key
+ai_key_count = 0
+for idx, row in enumerate(rows):
+    group_stats['total_rows'] += 1
+    fp = get_fp(row)
+    if fp == 1:
+        group_stats['fp_excluded'] += 1
+        continue
+
+    tracking = get_tracking(row)
+    group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+    confidence, visibility, risk = get_cvr_scores(row)
+    if confidence is not None:
+        group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+    data_field = str(row.get('Data', '')).strip()
+    source = str(row.get('Source', '')).strip()
+    module = str(row.get('Module', '')).strip()
+
+    ai_key_count += 1
+    severity = 'Critical'
+
+    description = f"A leaked AI/ML API key was discovered associated with {source} via {module} (key #{ai_key_count} of {len(rows)} total). "
+    description += f"Key details: {data_field[:500]}. "
+    description += "Leaked AI API keys enable unauthorized access to AI/ML services, potentially incurring significant financial costs through unauthorized inference requests. "
+    description += "Attackers can use leaked API keys to exfiltrate training data, poison models, or abuse the AI service for malicious purposes such as generating harmful content. "
+    description += "This finding uses count-scaled scoring where each additional leaked key compounds the severity of the exposure."
+
+    recommendation = f"Immediately revoke the leaked API key and generate a new key with appropriate access restrictions for {source}. "
+    recommendation += "Audit API usage logs for unauthorized requests made with the compromised key and assess potential data exposure. "
+    recommendation += "Implement API key rotation policies with short-lived tokens and environment-based key management (never hardcode keys in source). "
+    recommendation += "Deploy secret scanning in CI/CD pipelines to prevent API keys from being committed to repositories. "
+    recommendation += "Enforce least-privilege access controls and spending limits on all AI/ML API accounts."
+
+    finding = {
+        'Category': 'Information Leakage',
+        'Tab': 'AI_API_KEY_LEAKED',
+        'Priority': severity,
+        'Item': f"AI API Key Leaked - {source} - Key #{ai_key_count}",
+        'Description': description,
+        'Recommendation': recommendation,
+        'Vuln_Type': 'AI_API_KEY_LEAKED',
+        'Asset': source,
+        'Plugin_Name': module,
+        'Tracking_Status': tracking,
+        'FP_Status': "Verified" if fp == 2 else "Unverified"
+    }
+    if risk is not None:
+        finding['Avg_Risk'] = risk
+    tab_findings.append(finding)
+    group_stats['findings_extracted'] += 1
+
+all_findings.extend(tab_findings)
+if ai_key_count > 0:
+    print(f"AI_API_KEY_LEAKED: {len(tab_findings)} findings (count_scaled: {ai_key_count} keys, score impact: {ai_key_count * -20} pts)")
+else:
+    print(f"AI_API_KEY_LEAKED: No data")
+```
+
+EVENT TYPE BLOCK 2: LEAK SITE FINDINGS (LEAKSITE_URL, LEAKSITE_CONTENT)
+========================================================================
+```python
+print("\n=== Processing Leak Site Findings ===")
+
+for leak_type, label in [
+    ('LEAKSITE_URL', 'Leak Site URL'),
+    ('LEAKSITE_CONTENT', 'Leak Site Content'),
+]:
+    rows = ROWS_BY_TYPE.get(leak_type, [])
+    if not rows:
+        print(f"  {leak_type}: No data")
+        continue
+
+    print(f"\n  Processing {leak_type} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        # Leak site findings are always Critical
+        severity = 'Critical'
+
+        if leak_type == 'LEAKSITE_URL':
+            description = f"Organizational data was found referenced on a leak site URL associated with {source}, detected by {module}. "
+            description += f"Leak site reference: {data_field[:500]}. "
+            description += "The presence of organizational data on leak sites indicates that a data breach has occurred and stolen information is being distributed or sold. "
+            description += "Leak sites are commonly operated by ransomware groups, hacktivists, or data brokers who publish exfiltrated data to extort victims or monetize stolen information. "
+            description += "This finding requires immediate incident response activation and breach assessment to determine the scope and impact of the data exposure."
+        else:
+            description = f"Organizational content was discovered on a leak site associated with {source}, detected by {module}. "
+            description += f"Content details: {data_field[:500]}. "
+            description += "Actual organizational content found on leak sites confirms that sensitive data has been exfiltrated and is actively being exposed to unauthorized parties. "
+            description += "The leaked content may include intellectual property, customer data, financial records, or internal communications that pose severe business and compliance risks. "
+            description += "This finding represents confirmed data loss requiring executive-level incident response and potential regulatory notification."
+
+        recommendation = f"Immediately activate the organization's incident response plan and engage legal counsel regarding breach notification obligations. "
+        recommendation += "Conduct forensic analysis to determine the breach vector, timeline, and full scope of compromised data. "
+        recommendation += "Assess whether the leaked data includes personally identifiable information (PII) requiring regulatory notification under GDPR, CCPA, or other applicable regulations. "
+        recommendation += "Engage threat intelligence services to monitor the leak site for additional data publications and track threat actor activity. "
+        recommendation += "Implement enhanced monitoring, credential rotation, and access controls to prevent further data exfiltration."
+
+        finding = {
+            'Category': 'Information Leakage',
+            'Tab': leak_type,
+            'Priority': severity,
+            'Item': f"{label} - {source} - {data_field[:80]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': leak_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {leak_type}: {len(tab_findings_local)} findings")
+```
+
+EVENT TYPE BLOCK 3: EMAIL EXPOSURE (EMAILADDR, EMAILADDR_COMPROMISED, EMAILADDR_DELIVERABLE, EMAILADDR_DISPOSABLE, MALICIOUS_EMAILADDR) + INFORMATIONAL (EMAILADDR_GENERIC, EMAILADDR_UNDELIVERABLE)
+=======================================================================================================================================================================================================
+```python
+print("\n=== Processing Email Exposure ===")
+
+# --- Scored email types ---
+for email_type, default_sev, context in [
+    ('EMAILADDR', 'High', 'email address discovered in attack surface'),
+    ('EMAILADDR_COMPROMISED', 'High', 'email address found in known data breach'),
+    ('EMAILADDR_DELIVERABLE', 'Medium', 'deliverable email address confirmed'),
+    ('EMAILADDR_DISPOSABLE', 'Medium', 'disposable/temporary email address detected'),
+    ('MALICIOUS_EMAILADDR', 'High', 'email address associated with malicious activity'),
+]:
+    rows = ROWS_BY_TYPE.get(email_type, [])
+    if not rows:
+        print(f"  {email_type}: No data")
+        continue
+
+    print(f"\n  Processing {email_type} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = default_sev
+
+        if email_type == 'EMAILADDR':
+            description = f"An organizational {context}: {data_field[:300]} discovered via {source} by {module}. "
+            description += "Exposed email addresses enable targeted phishing campaigns, social engineering attacks, and credential stuffing against associated accounts. "
+            description += "Attackers harvest email addresses from public sources to build targeted attack lists for spear-phishing and business email compromise (BEC) campaigns. "
+            description += "Each discovered email address increases the organization's phishing attack surface and risk of account compromise. "
+            description += "The email should be assessed for association with sensitive roles or privileged system access."
+        elif email_type == 'EMAILADDR_COMPROMISED':
+            description = f"An organizational {context}: {data_field[:300]} identified via {source} by {module}. "
+            description += "This email address appeared in a known data breach, indicating that associated credentials may be exposed in breach databases. "
+            description += "Compromised email addresses are prime targets for credential stuffing attacks where attackers test leaked passwords across multiple services. "
+            description += "The associated account holder is at elevated risk of account takeover, phishing exploitation, and identity theft. "
+            description += "Immediate credential rotation and enhanced monitoring are required for this account."
+        elif email_type == 'EMAILADDR_DELIVERABLE':
+            description = f"A confirmed {context}: {data_field[:300]} identified via {source} by {module}. "
+            description += "Confirmation that an email address is deliverable validates it as a live target for phishing and social engineering attacks. "
+            description += "Deliverable email validation is a key step in attack preparation, allowing adversaries to build verified target lists. "
+            description += "This finding indicates the address is actively monitored and messages will reach the inbox. "
+            description += "Consider whether this email exposure is necessary or if the address should be protected from enumeration."
+        elif email_type == 'EMAILADDR_DISPOSABLE':
+            description = f"A {context}: {data_field[:300]} identified via {source} by {module}. "
+            description += "Disposable email addresses associated with organizational assets may indicate fraudulent account creation, policy evasion, or reconnaissance activity. "
+            description += "Legitimate users rarely use disposable addresses for business purposes, making this a potential indicator of suspicious activity. "
+            description += "These addresses may be used to bypass email verification, create throwaway accounts, or test systems anonymously. "
+            description += "Investigate the context of this disposable address to determine if it represents malicious or unauthorized activity."
+        else:  # MALICIOUS_EMAILADDR
+            description = f"An {context}: {data_field[:300]} identified via {source} by {module}. "
+            description += "This email address has been flagged in threat intelligence databases as associated with malicious campaigns, spam operations, or fraud activity. "
+            description += "Malicious email addresses interacting with organizational systems may indicate ongoing attacks, compromised accounts, or phishing infrastructure. "
+            description += "The presence of this address in the attack surface warrants investigation of any communications or account activity linked to it. "
+            description += "Block this address and investigate any prior interactions with organizational systems."
+
+        recommendation = f"Review the exposure context of {data_field[:100]} on {source} and assess whether the disclosure is necessary. "
+        recommendation += "Implement email address harvesting protections such as CAPTCHA, obfuscation, and rate limiting on web forms and directories. "
+        if email_type in ['EMAILADDR_COMPROMISED', 'MALICIOUS_EMAILADDR']:
+            recommendation += "Immediately reset credentials for this account and enable multi-factor authentication. "
+            recommendation += "Monitor the account for suspicious login attempts and unauthorized activity. "
+        else:
+            recommendation += "Enforce phishing-resistant MFA on all accounts to mitigate credential compromise risk. "
+            recommendation += "Deploy email security controls including DMARC, DKIM, and SPF to reduce phishing effectiveness. "
+        recommendation += "Include this finding in security awareness training to educate users about targeted phishing risks."
+
+        finding = {
+            'Category': 'Information Leakage',
+            'Tab': email_type,
+            'Priority': severity,
+            'Item': f"{email_type.replace('_', ' ').title()} - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': email_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {email_type}: {len(tab_findings_local)} findings")
+
+# --- Informational email types (pattern analysis only) ---
+for info_type in ['EMAILADDR_GENERIC', 'EMAILADDR_UNDELIVERABLE']:
+    rows = ROWS_BY_TYPE.get(info_type, [])
+    if rows:
+        print(f"\n  {info_type}: {len(rows)} informational rows (analyzed for patterns)")
+        for row in rows:
+            group_stats['total_rows'] += 1
+            fp = get_fp(row)
+            if fp == 1:
+                group_stats['fp_excluded'] += 1
+                continue
+            all_info_findings.append(row)
+            group_stats['info_excluded'] += 1
+```
+
+EVENT TYPE BLOCK 4: PII EXPOSURE (HUMAN_NAME, PERSON_NAME, DATE_HUMAN_DOB, JOB_TITLE, PHONE_NUMBER, PHONE_NUMBER_COMPROMISED, MALICIOUS_PHONE_NUMBER, PHYSICAL_ADDRESS) + INFORMATIONAL (PHONE_NUMBER_TYPE)
+===============================================================================================================================================================================================================
+```python
+print("\n=== Processing PII Exposure ===")
+
+# --- HUMAN_NAME and PERSON_NAME ---
+for name_type in ['HUMAN_NAME', 'PERSON_NAME']:
+    rows = ROWS_BY_TYPE.get(name_type, [])
+    if not rows:
+        print(f"  {name_type}: No data")
+        continue
+
+    print(f"\n  Processing {name_type} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = 'Medium'
+
+        description = f"A personal name was identified in content associated with {source} via {module}: {data_field[:300]}. "
+        description += "Exposed personal names can be used for social engineering attacks, spear-phishing campaigns, and identity correlation across multiple data sources. "
+        description += "When combined with other leaked PII (email addresses, job titles, phone numbers), names significantly amplify the effectiveness of targeted attacks. "
+        description += "Attackers use name information to craft convincing pretexting scenarios for business email compromise and vishing attacks. "
+        description += "Evaluate whether the name disclosure is necessary and appropriate for the context in which it appears."
+
+        recommendation = f"Assess whether the personal name exposure on {source} is necessary for business operations. "
+        recommendation += "Implement data minimization practices to reduce unnecessary PII exposure in public-facing content and metadata. "
+        recommendation += "Review web content, directory listings, and document metadata for inadvertent personal name disclosures. "
+        recommendation += "Educate employees about the risks of personal information exposure and social engineering threats. "
+        recommendation += "Consider implementing privacy controls that limit personnel information visibility to authenticated and authorized users."
+
+        finding = {
+            'Category': 'Information Leakage',
+            'Tab': name_type,
+            'Priority': severity,
+            'Item': f"{name_type.replace('_', ' ').title()} Exposed - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': name_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {name_type}: {len(tab_findings_local)} findings")
+
+# --- DATE_HUMAN_DOB ---
+rows = ROWS_BY_TYPE.get('DATE_HUMAN_DOB', [])
+if rows:
+    print(f"\n  Processing DATE_HUMAN_DOB ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = 'High'
+
+        description = f"A date of birth was discovered in content associated with {source} via {module}: {data_field[:300]}. "
+        description += "Date of birth is a key component of personally identifiable information (PII) used for identity verification across financial institutions, government services, and healthcare providers. "
+        description += "Exposure of date of birth data enables identity theft, fraudulent account creation, and bypass of knowledge-based authentication security questions. "
+        description += "When combined with names and other PII, date of birth provides sufficient information for comprehensive identity fraud. "
+        description += "This finding may constitute a privacy regulation violation under GDPR, CCPA, HIPAA, or other applicable data protection laws."
+
+        recommendation = f"Immediately remove or redact the exposed date of birth information from {source}. "
+        recommendation += "Conduct a data inventory to identify all locations where date of birth data is stored, processed, or exposed. "
+        recommendation += "Implement data masking and access controls to prevent unauthorized PII disclosure. "
+        recommendation += "Assess regulatory notification requirements under applicable privacy laws (GDPR, CCPA, HIPAA). "
+        recommendation += "Discontinue the use of date of birth as a security verification factor and implement stronger authentication mechanisms."
+
+        finding = {
+            'Category': 'Information Leakage',
+            'Tab': 'DATE_HUMAN_DOB',
+            'Priority': severity,
+            'Item': f"Date of Birth Exposed - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': 'DATE_HUMAN_DOB',
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  DATE_HUMAN_DOB: {len(tab_findings_local)} findings")
+else:
+    print(f"  DATE_HUMAN_DOB: No data")
+
+# --- JOB_TITLE ---
+rows = ROWS_BY_TYPE.get('JOB_TITLE', [])
+if rows:
+    print(f"\n  Processing JOB_TITLE ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = 'Low'
+
+        description = f"A job title was identified in content associated with {source} via {module}: {data_field[:300]}. "
+        description += "Exposed job titles reveal organizational structure and help attackers identify high-value targets for spear-phishing and social engineering. "
+        description += "Knowledge of job roles enables attackers to craft role-specific pretexting scenarios and identify individuals with privileged access or financial authority. "
+        description += "Job title enumeration is a standard reconnaissance technique used in advanced persistent threat (APT) campaigns and business email compromise schemes. "
+        description += "While individually low severity, job titles combined with names and contact details create a comprehensive target profile."
+
+        recommendation = f"Review the necessity of job title exposure on {source} and limit to what is required for business purposes. "
+        recommendation += "Implement privacy controls on corporate directories, social media profiles, and public-facing staff listings. "
+        recommendation += "Train employees in privileged roles (finance, IT, executive) to recognize targeted social engineering attempts. "
+        recommendation += "Consider using generic role descriptions in public-facing content rather than specific internal job titles. "
+        recommendation += "Monitor for reconnaissance activity targeting organizational personnel information."
+
+        finding = {
+            'Category': 'Information Leakage',
+            'Tab': 'JOB_TITLE',
+            'Priority': severity,
+            'Item': f"Job Title Exposed - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': 'JOB_TITLE',
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  JOB_TITLE: {len(tab_findings_local)} findings")
+else:
+    print(f"  JOB_TITLE: No data")
+
+# --- PHONE_NUMBER, PHONE_NUMBER_COMPROMISED, MALICIOUS_PHONE_NUMBER ---
+for phone_type, default_sev, context in [
+    ('PHONE_NUMBER', 'Medium', 'phone number discovered in attack surface'),
+    ('PHONE_NUMBER_COMPROMISED', 'High', 'phone number found in known data breach'),
+    ('MALICIOUS_PHONE_NUMBER', 'High', 'phone number associated with malicious activity'),
+]:
+    rows = ROWS_BY_TYPE.get(phone_type, [])
+    if not rows:
+        print(f"  {phone_type}: No data")
+        continue
+
+    print(f"\n  Processing {phone_type} ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = default_sev
+
+        if phone_type == 'PHONE_NUMBER':
+            description = f"A {context}: {data_field[:300]} discovered via {source} by {module}. "
+            description += "Exposed phone numbers enable vishing (voice phishing), smishing (SMS phishing), and SIM swapping attacks targeting organizational personnel. "
+            description += "Phone numbers linked to business accounts can be used to bypass SMS-based multi-factor authentication through SIM swap fraud. "
+            description += "Attackers use phone numbers for caller ID spoofing, social engineering of telecom providers, and targeted harassment campaigns. "
+            description += "Assess whether this phone number is linked to accounts using SMS-based authentication."
+        elif phone_type == 'PHONE_NUMBER_COMPROMISED':
+            description = f"A {context}: {data_field[:300]} identified via {source} by {module}. "
+            description += "This phone number appeared in a known data breach, indicating it may be targeted for vishing, smishing, or SIM swapping attacks. "
+            description += "Compromised phone numbers are actively traded in underground markets and used for targeted social engineering campaigns. "
+            description += "The associated individual is at elevated risk of account takeover through SMS-based MFA bypass. "
+            description += "Immediate protective measures should be implemented including carrier PIN/passphrase and MFA method review."
+        else:  # MALICIOUS_PHONE_NUMBER
+            description = f"A {context}: {data_field[:300]} identified via {source} by {module}. "
+            description += "This phone number has been flagged in threat intelligence databases as associated with fraud, scam operations, or malicious activity. "
+            description += "Malicious phone numbers interacting with organizational contacts may indicate ongoing vishing campaigns or social engineering attempts. "
+            description += "The presence of this number in the attack surface warrants investigation of any communications or transactions linked to it. "
+            description += "Block this number and alert personnel who may have received calls or messages from it."
+
+        recommendation = f"Review the exposure context of the phone number on {source} and limit public disclosure where possible. "
+        if phone_type in ['PHONE_NUMBER_COMPROMISED', 'MALICIOUS_PHONE_NUMBER']:
+            recommendation += "Immediately notify the affected individual and recommend enabling carrier account PIN protection. "
+            recommendation += "Migrate from SMS-based MFA to app-based TOTP or hardware security keys for all associated accounts. "
+        else:
+            recommendation += "Implement data minimization practices to reduce phone number exposure in public-facing content. "
+            recommendation += "Ensure phone-based MFA uses authenticator apps or hardware tokens rather than SMS where possible. "
+        recommendation += "Monitor for SIM swap attempts and unauthorized number porting by configuring carrier security alerts. "
+        recommendation += "Include vishing and smishing scenarios in security awareness training programs."
+
+        finding = {
+            'Category': 'Information Leakage',
+            'Tab': phone_type,
+            'Priority': severity,
+            'Item': f"{phone_type.replace('_', ' ').title()} - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': phone_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  {phone_type}: {len(tab_findings_local)} findings")
+
+# --- PHYSICAL_ADDRESS ---
+rows = ROWS_BY_TYPE.get('PHYSICAL_ADDRESS', [])
+if rows:
+    print(f"\n  Processing PHYSICAL_ADDRESS ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = 'Medium'
+
+        description = f"A physical address was identified in content associated with {source} via {module}: {data_field[:300]}. "
+        description += "Exposed physical addresses can be used for physical security reconnaissance, targeted social engineering, and identity verification fraud. "
+        description += "Address information enables doxing attacks, fraudulent document creation, and physical intrusion planning. "
+        description += "When combined with personnel names and roles, physical addresses create a comprehensive target profile for both cyber and physical attacks. "
+        description += "Evaluate whether the address disclosure is intentional (e.g., public office location) or represents inadvertent PII exposure."
+
+        recommendation = f"Assess whether the physical address exposure on {source} is necessary and appropriate for business purposes. "
+        recommendation += "Distinguish between intentional public disclosures (office locations) and inadvertent personal address exposure requiring remediation. "
+        recommendation += "Implement data classification policies that clearly define handling requirements for physical address information. "
+        recommendation += "Remove personal residential addresses from any public-facing content and restrict access to authorized personnel only. "
+        recommendation += "Review document metadata, WHOIS records, and web content for unintended physical address disclosures."
+
+        finding = {
+            'Category': 'Information Leakage',
+            'Tab': 'PHYSICAL_ADDRESS',
+            'Priority': severity,
+            'Item': f"Physical Address Exposed - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': 'PHYSICAL_ADDRESS',
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  PHYSICAL_ADDRESS: {len(tab_findings_local)} findings")
+else:
+    print(f"  PHYSICAL_ADDRESS: No data")
+
+# --- Informational: PHONE_NUMBER_TYPE (pattern analysis only) ---
+rows = ROWS_BY_TYPE.get('PHONE_NUMBER_TYPE', [])
+if rows:
+    print(f"\n  PHONE_NUMBER_TYPE: {len(rows)} informational rows (analyzed for patterns)")
+    for row in rows:
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+        all_info_findings.append(row)
+        group_stats['info_excluded'] += 1
+```
+
+EVENT TYPE BLOCK 5: FILE AND DATA EXPOSURE (INTERESTING_FILE, INTERESTING_FILE_HISTORIC, HASH, PGP_KEY, RAW_FILE_META_DATA)
+=============================================================================================================================
+```python
+print("\n=== Processing File and Data Exposure ===")
+
+# --- INTERESTING_FILE ---
+rows = ROWS_BY_TYPE.get('INTERESTING_FILE', [])
+if rows:
+    print(f"\n  Processing INTERESTING_FILE ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = 'High'
+
+        description = f"An interesting file was discovered on {source} via {module}: {data_field[:500]}. "
+        description += "Exposed files may contain sensitive configuration data, credentials, backup archives, database dumps, or internal documentation not intended for public access. "
+        description += "Common findings include .env files, .git directories, backup files (.bak, .sql), configuration files, and administrative interfaces. "
+        description += "These files often contain credentials, API keys, database connection strings, or internal architecture details that facilitate further attacks. "
+        description += "Immediate review and access restriction is required to prevent exploitation of the exposed content."
+
+        recommendation = f"Immediately restrict access to the exposed file on {source} and assess its contents for sensitive information. "
+        recommendation += "If credentials or API keys were present in the file, rotate them immediately across all affected systems. "
+        recommendation += "Implement web server access controls to block access to sensitive file types (.env, .git, .bak, .sql, .conf). "
+        recommendation += "Deploy file integrity monitoring and alerting for unauthorized file exposure on public-facing servers. "
+        recommendation += "Conduct a comprehensive scan for similar file exposures across all web-accessible assets."
+
+        finding = {
+            'Category': 'Information Leakage',
+            'Tab': 'INTERESTING_FILE',
+            'Priority': severity,
+            'Item': f"Interesting File Exposed - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': 'INTERESTING_FILE',
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  INTERESTING_FILE: {len(tab_findings_local)} findings")
+else:
+    print(f"  INTERESTING_FILE: No data")
+
+# --- INTERESTING_FILE_HISTORIC ---
+rows = ROWS_BY_TYPE.get('INTERESTING_FILE_HISTORIC', [])
+if rows:
+    print(f"\n  Processing INTERESTING_FILE_HISTORIC ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = 'Medium'
+
+        description = f"A historic interesting file was discovered associated with {source} via {module}: {data_field[:500]}. "
+        description += "Historic file exposure indicates that sensitive files were previously accessible and may have been cached by search engines, web archives, or threat actors. "
+        description += "Even if the file has been removed, cached copies may persist in the Wayback Machine, Google Cache, or adversary-maintained archives. "
+        description += "Historic files may contain credentials, configuration data, or architecture details that remain valid and exploitable. "
+        description += "This finding warrants investigation to determine if the exposed content contained sensitive data and whether any credentials need rotation."
+
+        recommendation = f"Verify that the historically exposed file on {source} is no longer accessible and rotate any credentials it may have contained. "
+        recommendation += "Submit removal requests to search engines (Google, Bing) and web archives (Wayback Machine) for cached copies of sensitive files. "
+        recommendation += "Audit current web server configurations to prevent similar file exposures from recurring. "
+        recommendation += "Implement robots.txt directives and meta tags to discourage caching of sensitive directory paths. "
+        recommendation += "Conduct a review of all web-accessible file paths against an approved content whitelist."
+
+        finding = {
+            'Category': 'Information Leakage',
+            'Tab': 'INTERESTING_FILE_HISTORIC',
+            'Priority': severity,
+            'Item': f"Historic File Exposure - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': 'INTERESTING_FILE_HISTORIC',
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  INTERESTING_FILE_HISTORIC: {len(tab_findings_local)} findings")
+else:
+    print(f"  INTERESTING_FILE_HISTORIC: No data")
+
+# --- HASH ---
+rows = ROWS_BY_TYPE.get('HASH', [])
+if rows:
+    print(f"\n  Processing HASH ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = 'Medium'
+
+        description = f"A cryptographic hash was identified in content associated with {source} via {module}: {data_field[:300]}. "
+        description += "Exposed hashes may represent password hashes, file integrity checksums, API tokens, or other cryptographic material. "
+        description += "Password hashes can be subjected to offline cracking attacks using rainbow tables, dictionary attacks, or GPU-accelerated brute force. "
+        description += "The exposure of hashes in public content may indicate improper handling of cryptographic material or leakage of authentication data. "
+        description += "The hash type and context should be analyzed to determine the sensitivity and risk of this exposure."
+
+        recommendation = f"Identify the type and purpose of the exposed hash found on {source} to assess the risk level. "
+        recommendation += "If the hash represents a password, immediately rotate the associated credentials and verify the hashing algorithm meets current security standards. "
+        recommendation += "Remove exposed hashes from public-facing content and implement access controls to prevent future disclosure. "
+        recommendation += "Ensure all password hashing uses strong algorithms (bcrypt, Argon2) with unique salts. "
+        recommendation += "Implement content scanning to detect and prevent the publication of cryptographic material in web content."
+
+        finding = {
+            'Category': 'Information Leakage',
+            'Tab': 'HASH',
+            'Priority': severity,
+            'Item': f"Hash Exposed - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': 'HASH',
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  HASH: {len(tab_findings_local)} findings")
+else:
+    print(f"  HASH: No data")
+
+# --- PGP_KEY ---
+rows = ROWS_BY_TYPE.get('PGP_KEY', [])
+if rows:
+    print(f"\n  Processing PGP_KEY ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = 'High'
+
+        description = f"A PGP key associated with {source} was discovered via {module}: {data_field[:300]}. "
+        description += "PGP key exposure reveals cryptographic identity information including email addresses, names, key fingerprints, and potentially organizational cryptographic infrastructure. "
+        description += "While public keys are intended for sharing, their discovery in the attack surface confirms the identity of key holders and reveals the organization's encryption practices. "
+        description += "PGP key metadata can be used for targeted attacks against encrypted communications and to map the organization's trusted communication channels. "
+        description += "Verify that only intended public keys are exposed and that no private key material has been inadvertently disclosed."
+
+        recommendation = f"Verify that the PGP key discovered on {source} is a public key and that no private key material was exposed. "
+        recommendation += "If private key material is found, immediately revoke the key pair, generate new keys, and re-establish encrypted communication channels. "
+        recommendation += "Review PGP key server submissions and public repositories for unintended key disclosures. "
+        recommendation += "Implement key management policies specifying approved key servers, key sizes, and expiration periods. "
+        recommendation += "Ensure all PGP keys follow organizational cryptographic standards and are regularly rotated."
+
+        finding = {
+            'Category': 'Information Leakage',
+            'Tab': 'PGP_KEY',
+            'Priority': severity,
+            'Item': f"PGP Key Exposed - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': 'PGP_KEY',
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  PGP_KEY: {len(tab_findings_local)} findings")
+else:
+    print(f"  PGP_KEY: No data")
+
+# --- Informational: RAW_FILE_META_DATA (pattern analysis only) ---
+rows = ROWS_BY_TYPE.get('RAW_FILE_META_DATA', [])
+if rows:
+    print(f"\n  RAW_FILE_META_DATA: {len(rows)} informational rows (analyzed for patterns)")
+    for row in rows:
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+        all_info_findings.append(row)
+        group_stats['info_excluded'] += 1
+```
+
+EVENT TYPE BLOCK 6: ACCOUNT DATA (USERNAME, SOFTWARE_USED) + INFORMATIONAL (IBAN_NUMBER)
+==========================================================================================
+```python
+print("\n=== Processing Account Data ===")
+
+# --- USERNAME ---
+rows = ROWS_BY_TYPE.get('USERNAME', [])
+if rows:
+    print(f"\n  Processing USERNAME ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = 'Medium'
+
+        description = f"A username was identified in content associated with {source} via {module}: {data_field[:300]}. "
+        description += "Exposed usernames provide attackers with valid account identifiers for brute-force attacks, credential stuffing, and targeted phishing campaigns. "
+        description += "Username enumeration is a critical first step in authentication-based attacks, significantly reducing the attacker's effort by eliminating the need to guess account names. "
+        description += "When combined with breached password databases, known usernames dramatically increase the success rate of credential stuffing operations. "
+        description += "Evaluate whether the username corresponds to administrative, service, or high-privilege accounts requiring enhanced protection."
+
+        recommendation = f"Assess the exposure context of the username discovered on {source} and limit public disclosure where possible. "
+        recommendation += "Implement account lockout policies and rate limiting to mitigate brute-force attacks against known usernames. "
+        recommendation += "Deploy multi-factor authentication on all accounts to prevent compromise even when usernames are known. "
+        recommendation += "Configure web applications to avoid username enumeration through consistent error messages for login failures. "
+        recommendation += "Monitor authentication logs for targeted attacks against the discovered username(s)."
+
+        finding = {
+            'Category': 'Information Leakage',
+            'Tab': 'USERNAME',
+            'Priority': severity,
+            'Item': f"Username Exposed - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': 'USERNAME',
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  USERNAME: {len(tab_findings_local)} findings")
+else:
+    print(f"  USERNAME: No data")
+
+# --- SOFTWARE_USED ---
+rows = ROWS_BY_TYPE.get('SOFTWARE_USED', [])
+if rows:
+    print(f"\n  Processing SOFTWARE_USED ({len(rows)} rows)")
+    tab_findings_local = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        severity = 'Medium'
+
+        description = f"Software technology was identified on {source} via {module}: {data_field[:300]}. "
+        description += "Disclosure of software names and versions enables attackers to search vulnerability databases (CVE, NVD) for known exploits targeting the specific software version. "
+        description += "Technology fingerprinting is a standard reconnaissance technique that significantly accelerates the exploit development and vulnerability identification process. "
+        description += "Exposed software information reduces the attacker's effort from broad scanning to targeted exploitation of known weaknesses. "
+        description += "Version-specific vulnerability information is widely available and actively exploited by automated attack tools."
+
+        recommendation = f"Review and minimize software version disclosure on {source} through configuration hardening. "
+        recommendation += "Remove or customize server banners, HTTP headers (Server, X-Powered-By), and error pages that reveal technology details. "
+        recommendation += "Ensure all identified software is updated to the latest patched version to mitigate known vulnerabilities. "
+        recommendation += "Implement a vulnerability management program that tracks all deployed software versions against CVE databases. "
+        recommendation += "Deploy web application firewalls (WAF) with rules to suppress technology disclosure in responses."
+
+        finding = {
+            'Category': 'Information Leakage',
+            'Tab': 'SOFTWARE_USED',
+            'Priority': severity,
+            'Item': f"Software Identified - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': 'SOFTWARE_USED',
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings_local.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings_local)
+    print(f"  SOFTWARE_USED: {len(tab_findings_local)} findings")
+else:
+    print(f"  SOFTWARE_USED: No data")
+
+# --- Informational: IBAN_NUMBER (pattern analysis only) ---
+rows = ROWS_BY_TYPE.get('IBAN_NUMBER', [])
+if rows:
+    print(f"\n  IBAN_NUMBER: {len(rows)} informational rows (analyzed for patterns)")
+    for row in rows:
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+        all_info_findings.append(row)
+        group_stats['info_excluded'] += 1
+```
+
+CONSOLIDATION PHASE
+===================
+```python
+print("\n=== CONSOLIDATION PHASE ===")
+
+groups = defaultdict(list)
+for f in all_findings:
+    key = (f['Category'], f['Vuln_Type'], f['Priority'])
+    groups[key].append(f)
+
+print(f"Consolidation groups: {len(groups)}")
+for key, findings in groups.items():
+    if len(findings) > 1:
+        print(f"  {key}: {len(findings)} findings")
+
+consolidated_findings = []
+os.makedirs('./output/findings_details', exist_ok=True)
+
+for key, group_findings in groups.items():
+    if len(group_findings) == 1:
+        consolidated_findings.append(group_findings[0])
+    else:
+        category, vuln_type, priority = key
+        assets = [f['Asset'] for f in group_findings]
+        unique_assets = list(set([a for a in assets if a and a.lower() not in ['nan', 'none']]))
+        asset_count = len(unique_assets)
+        instance_count = len(group_findings)
+
+        asset_list = ", ".join([f"({i+1}) {unique_assets[i]}" for i in range(min(5, len(unique_assets)))])
+        if len(unique_assets) > 5:
+            asset_list += f", and {len(unique_assets)-5} more"
+
+        tracking_counts = defaultdict(int)
+        for f in group_findings:
+            tracking_counts[f.get('Tracking_Status', 'OPEN')] += 1
+        tracking_summary = ", ".join([f"{k}: {v}" for k, v in tracking_counts.items()])
+
+        avg_risk = None
+        risk_scores = [f.get('Avg_Risk') for f in group_findings if f.get('Avg_Risk') is not None]
+        if risk_scores:
+            avg_risk = sum(risk_scores) / len(risk_scores)
+
+        vuln_name = vuln_type.replace('_', ' ').title()
+        _lead = f"{vuln_name} was identified on {instance_count} instances across {asset_count} assets: {asset_list}."
+        _default_desc = (
+            _lead + " This represents a systematic security issue affecting multiple systems "
+            "requiring coordinated remediation. The widespread nature indicates common "
+            "misconfiguration, shared vulnerable components, or consistent security control gaps."
+        )
+        _default_rec = (
+            f"Implement systematic remediation across all {instance_count} affected instances. "
+            "Deploy consistent security controls and monitoring across all affected assets. "
+            f"Prioritize remediation based on asset criticality and verify each of the "
+            f"{asset_count} affected assets through targeted testing."
+        )
+        description, recommendation = _enrich(vuln_type, _lead, _default_desc, _default_rec)
+
+        consolidated = {
+            'Category': category,
+            'Tab': group_findings[0]['Tab'],
+            'Priority': priority,
+            'Item': f"{vuln_name} - {instance_count} instances across {asset_count} assets",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': vuln_type,
+            'Asset': ", ".join(unique_assets[:5]) if unique_assets else '',
+            'Plugin_Name': group_findings[0].get('Plugin_Name', ''),
+            'Tracking_Status': max(tracking_counts, key=tracking_counts.get),
+        }
+        if avg_risk is not None:
+            consolidated['Avg_Risk'] = round(avg_risk, 1)
+        consolidated_findings.append(consolidated)
+
+        # Create detail file
+        import csv as csv_mod
+        detail_data = [{'Instance': i+1, 'Asset': f['Asset'],
+                        'Details': f['Item'], 'Description': f['Description'][:500],
+                        'Tracking_Status': f.get('Tracking_Status', 'OPEN'),
+                        'FP_Status': f.get('FP_Status', 'Unverified')}
+                       for i, f in enumerate(group_findings)]
+        detail_file = f'./output/findings_details/findings_detail_{vuln_type}.csv'
+        with open(detail_file, 'w', newline='') as csvf:
+            writer = csv_mod.DictWriter(csvf, fieldnames=detail_data[0].keys())
+            writer.writeheader()
+            writer.writerows(detail_data)
+        print(f"  Created: {detail_file}")
+
+print(f"\nConsolidation complete: {len(all_findings)} -> {len(consolidated_findings)} findings")
+```
+
+SAVE OUTPUTS
+============
+```python
+import csv as csv_mod
+
+fieldnames = ['Category', 'Tab', 'Priority', 'Item', 'Description', 'Recommendation',
+              'Tracking_Status', 'Avg_Risk']
+with open('./output/findings_GROUP3_FULL_CONSOLIDATED.csv', 'w', newline='') as csvf:
+    writer = csv_mod.DictWriter(csvf, fieldnames=fieldnames, extrasaction='ignore')
+    writer.writeheader()
+    writer.writerows(consolidated_findings)
+print(f"\nSaved: ./output/findings_GROUP3_FULL_CONSOLIDATED.csv ({len(consolidated_findings)} findings)")
+
+# Statistics
+print("\n" + "=" * 70)
+print("GROUP 3: INFORMATION LEAKAGE - STATISTICS")
+print("=" * 70)
+print(f"Total rows processed: {group_stats['total_rows']}")
+print(f"False positives excluded: {group_stats['fp_excluded']}")
+print(f"Info severity excluded: {group_stats['info_excluded']}")
+print(f"Findings extracted: {group_stats['findings_extracted']}")
+print(f"Consolidated findings: {len(consolidated_findings)}")
+print(f"\nTRACKING STATUS:")
+for status, count in group_stats['tracking'].items():
+    print(f"  {status}: {count}")
+
+if group_stats['cvr_scores']:
+    avg_c = sum(s[0] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    avg_v = sum(s[1] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    avg_r = sum(s[2] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    print(f"\nCVR SCORE AVERAGES:")
+    print(f"  Avg Confidence: {avg_c:.1f}")
+    print(f"  Avg Visibility: {avg_v:.1f}")
+    print(f"  Avg Risk: {avg_r:.1f}")
+else:
+    print(f"\nCVR scores: Not available (7-col format)")
+
+print("=" * 70)
+
+# Update progress tracker
+tracker_path = './output/analysis_progress_tracker.md'
+tracker_exists = os.path.exists(tracker_path)
+
+with open(tracker_path, 'a' if tracker_exists else 'w') as f:
+    if not tracker_exists:
+        f.write("# Security Analysis Progress Tracker\n\n")
+    f.write("## GROUP 3: Information Leakage (Weight 0.8) - COMPLETED\n\n")
+    f.write(f"**Findings:** {len(consolidated_findings)}\n")
+    f.write(f"**Rows Processed:** {group_stats['total_rows']}\n")
+    f.write(f"**FP Excluded:** {group_stats['fp_excluded']}\n")
+    f.write(f"**Info Excluded:** {group_stats['info_excluded']}\n\n")
+    f.write("### Tracking Status\n")
+    for status, count in group_stats['tracking'].items():
+        f.write(f"- {status}: {count}\n")
+    f.write("\n---\n\n")
+
+print("\nGROUP 3 COMPLETE - Information Leakage analysis saved")
+```
+
+QUALITY VERIFICATION CHECKLIST:
+- [ ] All descriptions are 3-5 sentences / full paragraphs
+- [ ] All recommendations are 3-5 sentences / full paragraphs
+- [ ] No 'nan' appears in any field
+- [ ] Severities normalized (Critical/High/Medium/Low/Info)
+- [ ] Consolidated findings show instance counts
+- [ ] Detail files created for multi-instance findings
+- [ ] Progress tracker updated
+- [ ] Tracking status (OPEN/CLOSED/TICKETED) annotated on all findings
+- [ ] CVR scores extracted and averaged (10-col format) or noted as unavailable
+- [ ] All 31 Information Leakage event types processed
+- [ ] Grade weights referenced: Information Leakage = 0.8
+- [ ] BREACHED_CREDENTIALS escalated to Critical when password indicators present
+- [ ] CREDIT_CARD_NUMBER always Critical
+- [ ] AI_API_KEY_LEAKED uses count_scaled scoring
+- [ ] LEAKSITE_URL/LEAKSITE_CONTENT always Critical
+- [ ] Informational types (EMAILADDR_GENERIC, EMAILADDR_UNDELIVERABLE, PHONE_NUMBER_TYPE, RAW_FILE_META_DATA, IBAN_NUMBER) analyzed for patterns only
+- [ ] Severity mapping: Rank 1=Critical/High, Rank 2=High/Medium, Rank 3=Medium/Low, Rank 4-5=Low/Info

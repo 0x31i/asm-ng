@@ -1,0 +1,743 @@
+PRODUCTION ANALYSIS - GROUP 7: IP Reputation
+==============================================
+ASM-NG Grade Category: IP Reputation | Weight: 0.6 | Priority: P3
+==============================================
+
+CONFIGURATION:
+- CSV: Auto-detect (only .csv file in ./obfuscated/) -- ASM-NG export
+- Format: Auto-detect 7-col (standard) or 10-col (full_scored with CVR scores)
+- Mode: PRODUCTION (analyze ALL rows)
+- Output: ./output/
+- Data: TOKENIZED/OBFUSCATED (IPs, domains, hosts are token identifiers)
+
+CONSOLIDATION RULES (MANDATORY):
+The goal is a concise, executive-readable report. Minimize finding count through
+aggressive consolidation while preserving detail in supporting CSVs.
+- NEVER create one finding per individual port, IP, domain, URL, or asset instance.
+- Group related findings by EVENT TYPE + SEVERITY TIER.
+- The consolidation phase groups by (Category, Vuln_Type, Priority) so multiple
+  instances of the same event type at the same severity merge into a single finding
+  with instance count and asset list.
+- Detail CSVs capture every individual instance for drill-down.
+- Target: under 20 consolidated findings per group. If consolidation produces more
+  than 20, review Vuln_Type keys for over-granularity.
+
+SETUP - IMPORT AND HELPER FUNCTIONS:
+```python
+import csv
+import os
+import glob
+import sys as _sys
+_sys.path.insert(0, './scripts')
+try:
+    from finding_enrichment import enrich_or_default as _enrich
+    print("finding_enrichment library loaded OK")
+except ImportError:
+    def _enrich(tab, lead, default_desc, default_rec):
+        return default_desc, default_rec
+    print("WARNING: finding_enrichment.py not found - using generic descriptions")
+
+import re
+from collections import defaultdict
+
+# ============================================================================
+# DYNAMIC FILE DETECTION
+# ============================================================================
+
+print("=== Dynamic File Detection ===")
+
+# Find CSV file in obfuscated folder
+csv_files = glob.glob('./obfuscated/*.csv')
+if not csv_files:
+    raise FileNotFoundError("No .csv file found in ./obfuscated/ folder")
+elif len(csv_files) > 1:
+    print(f"WARNING: Multiple .csv files found: {csv_files}")
+    print(f"Using first file: {csv_files[0]}")
+
+CSV_FILE = csv_files[0]
+print(f"CSV file detected: {CSV_FILE}")
+
+# Auto-detect CSV format (7-col standard or 10-col full_scored)
+def detect_csv_format(csv_file):
+    with open(csv_file, 'r') as f:
+        reader = csv.reader(f)
+        headers = next(reader)
+        headers_lower = [h.strip().lower() for h in headers]
+        if 'confidence' in headers_lower:
+            return 'full_scored', headers
+        else:
+            return 'standard', headers
+
+CSV_FORMAT, CSV_HEADERS = detect_csv_format(CSV_FILE)
+print(f"CSV format: {CSV_FORMAT} ({len(CSV_HEADERS)} columns)")
+
+# Load and group by event type
+def load_csv_by_event_type(csv_file):
+    rows_by_type = {}
+    with open(csv_file, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            etype = row['Type']
+            rows_by_type.setdefault(etype, []).append(row)
+    return rows_by_type
+
+ROWS_BY_TYPE = load_csv_by_event_type(CSV_FILE)
+print(f"Event types found: {len(ROWS_BY_TYPE)}")
+for etype, rows in sorted(ROWS_BY_TYPE.items(), key=lambda x: -len(x[1]))[:10]:
+    print(f"  {etype}: {len(rows)} rows")
+
+print("=" * 70)
+print("OBFUSCATED DATA MODE - Internal Processing")
+print("=" * 70)
+print("INTERNAL: Processing obfuscated data where:")
+print("  Infrastructure identifiers obfuscated for security")
+print("  Format: IP_ADDRESS_TOKEN_####, DOMAIN_TOKEN_####, HOSTNAME_TOKEN_####, etc.")
+print("=" * 70)
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def normalize_priority(severity, default='Medium'):
+    """Normalize severity to standard format"""
+    if not severity or str(severity).lower().strip() in ['nan', '', 'none']:
+        return default
+    severity = str(severity).strip().lower()
+    if severity in ['critical', 'crit', '4']:
+        return 'Critical'
+    elif severity in ['high', 'hi', '3']:
+        return 'High'
+    elif severity in ['medium', 'med', '2']:
+        return 'Medium'
+    elif severity in ['low', 'lo', '1']:
+        return 'Low'
+    elif severity in ['info', 'informational', '0']:
+        return 'Info'
+    return default
+
+def get_cvr_scores(row):
+    """Extract CVR scores from a row (10-col format only)."""
+    if CSV_FORMAT != 'full_scored':
+        return None, None, None
+    try:
+        confidence = int(row.get('Confidence', 0) or 0)
+        visibility = int(row.get('Visibility', 0) or 0)
+        risk = int(row.get('Risk', 0) or 0)
+        return confidence, visibility, risk
+    except (ValueError, TypeError):
+        return 0, 0, 0
+
+def get_tracking(row):
+    """Extract tracking status from row."""
+    return str(row.get('Tracking', 'OPEN')).strip().upper() or 'OPEN'
+
+def get_fp(row):
+    """Extract FP value. Returns int: 0=unverified, 1=false positive, 2=verified."""
+    try:
+        return int(row.get('F/P', 0) or 0)
+    except (ValueError, TypeError):
+        return 0
+
+def parse_severity_from_data(data_field, default='Medium'):
+    """Parse severity level from the Data field text."""
+    data_lower = str(data_field).lower()
+    if 'critical' in data_lower:
+        return 'Critical'
+    elif 'high' in data_lower:
+        return 'High'
+    elif 'medium' in data_lower or 'med' in data_lower:
+        return 'Medium'
+    elif 'low' in data_lower:
+        return 'Low'
+    elif 'info' in data_lower or 'informational' in data_lower:
+        return 'Info'
+    return default
+
+print("=" * 70)
+```
+
+CONFIDENCE/VISIBILITY/RISK SCORING (when available):
+- Use Risk score to prioritize within same severity tier
+- Flag Confidence <50 for manual verification
+- Highlight Visibility >75 as externally exposed
+- Include avg CVR in group statistics
+- If 7-col format: skip CVR, note "CVR scores not available"
+
+TRACKING STATUS:
+- Annotate each finding with OPEN/CLOSED/TICKETED from the Tracking column
+- Report status breakdown in group summary
+- Flag OPEN findings as requiring attention
+
+ASM-NG GRADE SCORING REFERENCE (from grade_config.py):
+Category: IP Reputation | Weight: 0.6
+Score Formula: Score = max(0, 100 + (raw_score * 0.6))
+Grade Thresholds: A=90+, B=80+, C=70+, D=60+, F=<60
+
+EVENT TYPE SCORING:
+| Event Type | Rank | Points | Logic |
+|------------|------|--------|-------|
+| BLACKLISTED_IPADDR | 1 | -20 | unverified_exists |
+| BLACKLISTED_SUBNET | 5 | 0 | informational |
+| BLACKLISTED_COHOST | 2 | -10 | unverified_exists |
+| BLACKLISTED_INTERNET_NAME | 2 | -10 | unverified_exists |
+| BLACKLISTED_NETBLOCK | 3 | -5 | unverified_exists |
+| MALICIOUS_IPADDR | 1 | -20 | unverified_exists |
+| MALICIOUS_SUBNET | 5 | 0 | informational |
+| MALICIOUS_ASN | 2 | -10 | unverified_exists |
+| MALICIOUS_INTERNET_NAME | 2 | -10 | unverified_exists |
+| MALICIOUS_NETBLOCK | 3 | -5 | unverified_exists |
+| MALICIOUS_BITCOIN_ADDRESS | 2 | -10 | unverified_exists |
+
+GROUP 7 EVENT TYPES TO ANALYZE (11 total):
+1. BLACKLISTED_IPADDR
+2. MALICIOUS_IPADDR
+3. BLACKLISTED_INTERNET_NAME
+4. MALICIOUS_INTERNET_NAME
+5. BLACKLISTED_COHOST
+6. MALICIOUS_ASN
+7. BLACKLISTED_NETBLOCK
+8. MALICIOUS_NETBLOCK
+9. MALICIOUS_BITCOIN_ADDRESS
+10. BLACKLISTED_SUBNET (informational)
+11. MALICIOUS_SUBNET (informational)
+
+INITIALIZE OUTPUT:
+```python
+all_findings = []
+all_info_findings = []
+group_stats = {
+    'total_rows': 0,
+    'fp_excluded': 0,
+    'info_excluded': 0,
+    'findings_extracted': 0,
+    'tracking': {'OPEN': 0, 'CLOSED': 0, 'TICKETED': 0},
+    'cvr_scores': []
+}
+```
+
+EVENT TYPE BLOCK 1: CRITICAL REPUTATION ISSUES (BLACKLISTED_IPADDR, MALICIOUS_IPADDR)
+======================================================================================
+```python
+print("\n=== Processing Critical IP Reputation Issues ===")
+
+for rep_type, context, threat_class in [
+    ('BLACKLISTED_IPADDR', 'IP address appearing on one or more blacklists', 'blacklisted'),
+    ('MALICIOUS_IPADDR', 'IP address flagged as malicious by threat intelligence sources', 'malicious'),
+]:
+    rows = ROWS_BY_TYPE.get(rep_type, [])
+    if not rows:
+        print(f"  {rep_type}: No data")
+        continue
+
+    print(f"\n  Processing {rep_type} ({len(rows)} rows)")
+    tab_findings = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        severity = 'Critical'
+
+        if rep_type == 'BLACKLISTED_IPADDR':
+            description = f"Organizational IP address {source} was found on one or more security blacklists via {module}. "
+            description += f"Blacklist details: {data_field[:500]}. "
+            description += "Blacklisted IP addresses indicate that the IP has been associated with spam, malware distribution, brute force attacks, or other malicious activity detected by threat intelligence providers. "
+            description += "This can cause email delivery failures, service access restrictions, and reputational damage to the organization. "
+            description += "Immediate investigation is required to determine the root cause - whether the IP was compromised, misconfigured, or incorrectly listed."
+
+            recommendation = f"Immediately investigate the blacklisting of {source} to determine the root cause of the listing. "
+            recommendation += "Check for compromised systems, open relays, malware infections, or unauthorized services running on the IP address. "
+            recommendation += "After remediating the underlying issue, submit delisting requests to each blacklist provider with evidence of remediation. "
+            recommendation += "Implement continuous IP reputation monitoring to detect future blacklistings promptly. "
+            recommendation += "Priority: Critical - investigate within 24 hours as blacklisting directly impacts service availability and email deliverability."
+        else:
+            description = f"Organizational IP address {source} was flagged as malicious by threat intelligence sources via {module}. "
+            description += f"Threat intelligence details: {data_field[:500]}. "
+            description += "A malicious classification indicates that the IP address has been observed participating in active attacks, hosting malware, serving as a command-and-control endpoint, or engaging in other hostile network activity. "
+            description += "This is a critical indicator of compromise suggesting that systems at this IP address may be under attacker control. "
+            description += "Immediate incident response is required to contain potential compromise and prevent further malicious activity."
+
+            recommendation = f"Initiate incident response procedures for {source} immediately, treating this as a potential compromise. "
+            recommendation += "Isolate affected systems for forensic investigation while maintaining evidence integrity. "
+            recommendation += "Scan all systems on the IP address for malware, backdoors, unauthorized access, and indicators of compromise. "
+            recommendation += "Review network logs for lateral movement, data exfiltration, and communication with known threat infrastructure. "
+            recommendation += "Priority: Critical - initiate incident response within 4 hours as active malicious classification indicates potential ongoing compromise."
+
+        finding = {
+            'Category': 'IP Reputation',
+            'Tab': rep_type,
+            'Priority': severity,
+            'Item': f"{rep_type.replace('_', ' ').title()} - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': rep_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings)
+    print(f"  {rep_type}: {len(tab_findings)} findings")
+```
+
+EVENT TYPE BLOCK 2: DOMAIN/NAME REPUTATION (BLACKLISTED_INTERNET_NAME, MALICIOUS_INTERNET_NAME, BLACKLISTED_COHOST, MALICIOUS_ASN)
+====================================================================================================================================
+```python
+print("\n=== Processing Domain/Name Reputation Issues ===")
+
+for rep_type, default_sev, context in [
+    ('BLACKLISTED_INTERNET_NAME', 'High', 'domain or hostname found on security blacklists'),
+    ('MALICIOUS_INTERNET_NAME', 'High', 'domain or hostname flagged as malicious by threat intelligence'),
+    ('BLACKLISTED_COHOST', 'High', 'co-hosted site on same IP found on blacklists'),
+    ('MALICIOUS_ASN', 'High', 'autonomous system number flagged for malicious activity'),
+]:
+    rows = ROWS_BY_TYPE.get(rep_type, [])
+    if not rows:
+        print(f"  {rep_type}: No data")
+        continue
+
+    print(f"\n  Processing {rep_type} ({len(rows)} rows)")
+    tab_findings = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        severity = default_sev
+
+        if rep_type == 'BLACKLISTED_INTERNET_NAME':
+            description = f"Domain or hostname {source} was found on security blacklists via {module}. "
+            description += f"Blacklist details: {data_field[:500]}. "
+            description += "Blacklisted domain names can result in browsers displaying security warnings, email rejection, search engine deranking, and blocking by corporate security controls. "
+            description += "Domain blacklisting typically occurs due to malware hosting, phishing pages, spam distribution, or association with malicious infrastructure. "
+            description += "This finding requires investigation to determine the cause and initiate delisting procedures."
+
+            recommendation = f"Investigate why {source} was blacklisted by reviewing hosted content, email sending patterns, and web application security. "
+            recommendation += "Scan the domain for malware, phishing pages, and unauthorized content modifications. "
+            recommendation += "After remediating the root cause, submit delisting requests to each blacklist provider. "
+            recommendation += "Implement web application firewalls and content integrity monitoring to prevent future incidents. "
+            recommendation += "Priority: High - blacklisted domains directly impact user trust, email delivery, and service availability."
+
+        elif rep_type == 'MALICIOUS_INTERNET_NAME':
+            description = f"Domain or hostname {source} was flagged as malicious by threat intelligence sources via {module}. "
+            description += f"Threat details: {data_field[:500]}. "
+            description += "A malicious domain classification indicates active association with cyberattacks such as phishing, malware distribution, command-and-control communications, or data exfiltration. "
+            description += "This classification suggests potential compromise of the domain, DNS hijacking, or unauthorized use of organizational infrastructure for attacks. "
+            description += "Immediate investigation and incident response procedures are required."
+
+            recommendation = f"Immediately investigate {source} for signs of compromise, DNS hijacking, or unauthorized content deployment. "
+            recommendation += "Verify DNS records have not been modified to redirect traffic to attacker-controlled infrastructure. "
+            recommendation += "Scan all web applications and services hosted on the domain for malware and unauthorized modifications. "
+            recommendation += "Review domain registrar account security for signs of unauthorized access. "
+            recommendation += "Priority: High - malicious domain classification requires investigation within 48 hours."
+
+        elif rep_type == 'BLACKLISTED_COHOST':
+            description = f"A co-hosted website sharing infrastructure with {source} was found on security blacklists via {module}. "
+            description += f"Co-host blacklist details: {data_field[:500]}. "
+            description += "When a co-hosted site is blacklisted, it can negatively impact all other sites sharing the same IP address through IP-based blacklisting and reputation contagion. "
+            description += "Shared hosting environments create collateral damage risk where one compromised tenant affects all neighbors on the same infrastructure. "
+            description += "The organization should assess whether shared hosting poses acceptable risk or if dedicated infrastructure is required."
+
+            recommendation = f"Assess the risk of shared hosting for {source} given the co-host blacklisting incident. "
+            recommendation += "Contact the hosting provider to report the blacklisted co-tenant and request remediation or removal. "
+            recommendation += "Consider migrating to dedicated IP addresses or isolated hosting to prevent future reputation contagion. "
+            recommendation += "Monitor the IP address reputation continuously for additional co-host reputation issues. "
+            recommendation += "Priority: High - co-host blacklisting creates immediate risk of collateral IP-based blocking."
+
+        else:  # MALICIOUS_ASN
+            description = f"The autonomous system number (ASN) associated with {source} was flagged for malicious activity via {module}. "
+            description += f"ASN threat details: {data_field[:500]}. "
+            description += "ASN-level malicious classification indicates that the network provider or hosting infrastructure has a significant concentration of malicious activity. "
+            description += "While this may not directly indicate compromise of organizational assets, it increases the risk of IP-based blocking and reputation issues for all services hosted within the ASN. "
+            description += "Organizations should evaluate whether their hosting provider maintains adequate abuse prevention measures."
+
+            recommendation = f"Evaluate the hosting provider and ASN reputation for infrastructure hosting {source}. "
+            recommendation += "Contact the hosting provider regarding their abuse prevention and security practices. "
+            recommendation += "Consider migration to a reputable hosting provider with strong security controls if ASN reputation is consistently poor. "
+            recommendation += "Monitor organizational IP addresses within the ASN for reputation impacts and proactive blacklisting. "
+            recommendation += "Priority: High - ASN reputation issues can cause widespread service disruption and email delivery failures."
+
+        finding = {
+            'Category': 'IP Reputation',
+            'Tab': rep_type,
+            'Priority': severity,
+            'Item': f"{rep_type.replace('_', ' ').title()} - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': rep_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings)
+    print(f"  {rep_type}: {len(tab_findings)} findings")
+```
+
+EVENT TYPE BLOCK 3: NETWORK BLOCK REPUTATION (BLACKLISTED_NETBLOCK, MALICIOUS_NETBLOCK)
+========================================================================================
+```python
+print("\n=== Processing Network Block Reputation ===")
+
+for rep_type, context in [
+    ('BLACKLISTED_NETBLOCK', 'network block found on security blacklists'),
+    ('MALICIOUS_NETBLOCK', 'network block flagged as malicious by threat intelligence'),
+]:
+    rows = ROWS_BY_TYPE.get(rep_type, [])
+    if not rows:
+        print(f"  {rep_type}: No data")
+        continue
+
+    print(f"\n  Processing {rep_type} ({len(rows)} rows)")
+    tab_findings = []
+
+    for idx, row in enumerate(rows):
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        data_field = str(row.get('Data', '')).strip()
+        source = str(row.get('Source', '')).strip()
+        module = str(row.get('Module', '')).strip()
+
+        severity = 'Medium'
+
+        description = f"Network block associated with {source} was {context} via {module}. "
+        description += f"Netblock reputation details: {data_field[:500]}. "
+        description += "Netblock-level reputation issues indicate that a range of IP addresses has been associated with malicious activity, which can affect all organizational assets within that range. "
+        description += "This may result from compromised systems within the netblock, shared hosting with malicious tenants, or network provider reputation problems. "
+        description += "While less specific than individual IP blacklisting, netblock reputation impacts all services and email originating from addresses within the range."
+
+        recommendation = f"Identify all organizational assets within the affected netblock and assess their security posture for signs of compromise. "
+        recommendation += "Work with the network provider or ISP to address the netblock reputation issue and implement stronger abuse prevention controls. "
+        recommendation += "Monitor all IP addresses within the netblock for individual blacklisting that may indicate specific compromised systems. "
+        recommendation += "Consider requesting a dedicated netblock or migrating to a provider with better reputation management if the issue persists. "
+        recommendation += f"Priority: Medium - investigate within 30 days and monitor for escalation to individual IP blacklisting."
+
+        finding = {
+            'Category': 'IP Reputation',
+            'Tab': rep_type,
+            'Priority': severity,
+            'Item': f"{rep_type.replace('_', ' ').title()} - {source} - {data_field[:60]}",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': rep_type,
+            'Asset': source,
+            'Plugin_Name': module,
+            'Tracking_Status': tracking,
+            'FP_Status': "Verified" if fp == 2 else "Unverified"
+        }
+        if risk is not None:
+            finding['Avg_Risk'] = risk
+        tab_findings.append(finding)
+        group_stats['findings_extracted'] += 1
+
+    all_findings.extend(tab_findings)
+    print(f"  {rep_type}: {len(tab_findings)} findings")
+```
+
+EVENT TYPE BLOCK 4: CRYPTOCURRENCY REPUTATION (MALICIOUS_BITCOIN_ADDRESS)
+==========================================================================
+```python
+print("\n=== Processing Cryptocurrency Reputation ===")
+
+rows = ROWS_BY_TYPE.get('MALICIOUS_BITCOIN_ADDRESS', [])
+print(f"MALICIOUS_BITCOIN_ADDRESS rows found: {len(rows)}")
+
+tab_findings = []
+
+for idx, row in enumerate(rows):
+    group_stats['total_rows'] += 1
+    fp = get_fp(row)
+    if fp == 1:
+        group_stats['fp_excluded'] += 1
+        continue
+
+    tracking = get_tracking(row)
+    group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+    confidence, visibility, risk = get_cvr_scores(row)
+    if confidence is not None:
+        group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+    data_field = str(row.get('Data', '')).strip()
+    source = str(row.get('Source', '')).strip()
+    module = str(row.get('Module', '')).strip()
+
+    severity = 'High'
+
+    description = f"A Bitcoin address associated with {source} was flagged as malicious by threat intelligence via {module}. "
+    description += f"Cryptocurrency threat details: {data_field[:500]}. "
+    description += "Malicious Bitcoin addresses are typically associated with ransomware payments, cryptocurrency theft, money laundering, or dark web marketplace activity. "
+    description += "The presence of a malicious Bitcoin address in the organizational attack surface may indicate ransomware infection, cryptocurrency mining malware, or association with threat actor infrastructure. "
+    description += "This finding requires immediate investigation to determine the context of the association and whether organizational systems have been compromised."
+
+    recommendation = f"Investigate the association between {source} and the flagged Bitcoin address to determine the nature and context of the relationship. "
+    recommendation += "Scan affected systems for ransomware, cryptocurrency miners, and other malware that may have introduced the Bitcoin address. "
+    recommendation += "Review web content, emails, and application data for unauthorized Bitcoin address references that may indicate defacement or injection. "
+    recommendation += "Report the malicious Bitcoin address to law enforcement and blockchain analysis firms for tracking. "
+    recommendation += "Priority: High - investigate within 48 hours as cryptocurrency associations may indicate active compromise or ransomware activity."
+
+    finding = {
+        'Category': 'IP Reputation',
+        'Tab': 'MALICIOUS_BITCOIN_ADDRESS',
+        'Priority': severity,
+        'Item': f"Malicious Bitcoin Address - {source} - {data_field[:60]}",
+        'Description': description,
+        'Recommendation': recommendation,
+        'Vuln_Type': 'MALICIOUS_BITCOIN_ADDRESS',
+        'Asset': source,
+        'Plugin_Name': module,
+        'Tracking_Status': tracking,
+        'FP_Status': "Verified" if fp == 2 else "Unverified"
+    }
+    if risk is not None:
+        finding['Avg_Risk'] = risk
+    tab_findings.append(finding)
+    group_stats['findings_extracted'] += 1
+
+all_findings.extend(tab_findings)
+print(f"MALICIOUS_BITCOIN_ADDRESS: {len(tab_findings)} findings")
+```
+
+EVENT TYPE BLOCK 5: INFORMATIONAL SUBNET REPUTATION (BLACKLISTED_SUBNET, MALICIOUS_SUBNET)
+============================================================================================
+```python
+print("\n=== Processing Subnet Reputation (Informational) ===")
+
+for info_type in ['BLACKLISTED_SUBNET', 'MALICIOUS_SUBNET']:
+    rows = ROWS_BY_TYPE.get(info_type, [])
+    if not rows:
+        print(f"  {info_type}: No data")
+        continue
+
+    print(f"\n  {info_type}: {len(rows)} informational rows (analyzed for patterns)")
+    for row in rows:
+        group_stats['total_rows'] += 1
+        fp = get_fp(row)
+        if fp == 1:
+            group_stats['fp_excluded'] += 1
+            continue
+
+        tracking = get_tracking(row)
+        group_stats['tracking'][tracking] = group_stats['tracking'].get(tracking, 0) + 1
+
+        confidence, visibility, risk = get_cvr_scores(row)
+        if confidence is not None:
+            group_stats['cvr_scores'].append((confidence, visibility, risk))
+
+        all_info_findings.append(row)
+        group_stats['info_excluded'] += 1
+
+    print(f"  {info_type}: {len(rows)} rows cataloged as informational patterns")
+```
+
+CONSOLIDATION PHASE
+===================
+```python
+print("\n=== CONSOLIDATION PHASE ===")
+
+groups = defaultdict(list)
+for f in all_findings:
+    key = (f['Category'], f['Vuln_Type'], f['Priority'])
+    groups[key].append(f)
+
+print(f"Consolidation groups: {len(groups)}")
+for key, findings in groups.items():
+    if len(findings) > 1:
+        print(f"  {key}: {len(findings)} findings")
+
+consolidated_findings = []
+os.makedirs('./output/findings_details', exist_ok=True)
+
+for key, group_findings in groups.items():
+    if len(group_findings) == 1:
+        consolidated_findings.append(group_findings[0])
+    else:
+        category, vuln_type, priority = key
+        assets = [f['Asset'] for f in group_findings]
+        unique_assets = list(set([a for a in assets if a and a.lower() not in ['nan', 'none']]))
+        asset_count = len(unique_assets)
+        instance_count = len(group_findings)
+
+        asset_list = ", ".join([f"({i+1}) {unique_assets[i]}" for i in range(min(5, len(unique_assets)))])
+        if len(unique_assets) > 5:
+            asset_list += f", and {len(unique_assets)-5} more"
+
+        tracking_counts = defaultdict(int)
+        for f in group_findings:
+            tracking_counts[f.get('Tracking_Status', 'OPEN')] += 1
+        tracking_summary = ", ".join([f"{k}: {v}" for k, v in tracking_counts.items()])
+
+        avg_risk = None
+        risk_scores = [f.get('Avg_Risk') for f in group_findings if f.get('Avg_Risk') is not None]
+        if risk_scores:
+            avg_risk = sum(risk_scores) / len(risk_scores)
+
+        vuln_name = vuln_type.replace('_', ' ').title()
+        _lead = f"{vuln_name} was identified on {instance_count} instances across {asset_count} assets: {asset_list}."
+        _default_desc = (
+            _lead + " This represents a systematic security issue affecting multiple systems "
+            "requiring coordinated remediation. The widespread nature indicates common "
+            "misconfiguration, shared vulnerable components, or consistent security control gaps."
+        )
+        _default_rec = (
+            f"Implement systematic remediation across all {instance_count} affected instances. "
+            "Deploy consistent security controls and monitoring across all affected assets. "
+            f"Prioritize remediation based on asset criticality and verify each of the "
+            f"{asset_count} affected assets through targeted testing."
+        )
+        description, recommendation = _enrich(vuln_type, _lead, _default_desc, _default_rec)
+
+        consolidated = {
+            'Category': category,
+            'Tab': group_findings[0]['Tab'],
+            'Priority': priority,
+            'Item': f"{vuln_name} - {instance_count} instances across {asset_count} assets",
+            'Description': description,
+            'Recommendation': recommendation,
+            'Vuln_Type': vuln_type,
+            'Asset': ", ".join(unique_assets[:5]) if unique_assets else '',
+            'Plugin_Name': group_findings[0].get('Plugin_Name', ''),
+            'Tracking_Status': max(tracking_counts, key=tracking_counts.get),
+        }
+        if avg_risk is not None:
+            consolidated['Avg_Risk'] = round(avg_risk, 1)
+        consolidated_findings.append(consolidated)
+
+        # Create detail file
+        import csv as csv_mod
+        detail_data = [{'Instance': i+1, 'Asset': f['Asset'],
+                        'Details': f['Item'], 'Description': f['Description'][:500],
+                        'Tracking_Status': f.get('Tracking_Status', 'OPEN'),
+                        'FP_Status': f.get('FP_Status', 'Unverified')}
+                       for i, f in enumerate(group_findings)]
+        detail_file = f'./output/findings_details/findings_detail_{vuln_type}.csv'
+        with open(detail_file, 'w', newline='') as csvf:
+            writer = csv_mod.DictWriter(csvf, fieldnames=detail_data[0].keys())
+            writer.writeheader()
+            writer.writerows(detail_data)
+        print(f"  Created: {detail_file}")
+
+print(f"\nConsolidation complete: {len(all_findings)} -> {len(consolidated_findings)} findings")
+```
+
+SAVE OUTPUTS
+============
+```python
+import csv as csv_mod
+
+fieldnames = ['Category', 'Tab', 'Priority', 'Item', 'Description', 'Recommendation',
+              'Tracking_Status', 'Avg_Risk']
+with open('./output/findings_GROUP7_FULL_CONSOLIDATED.csv', 'w', newline='') as csvf:
+    writer = csv_mod.DictWriter(csvf, fieldnames=fieldnames, extrasaction='ignore')
+    writer.writeheader()
+    writer.writerows(consolidated_findings)
+print(f"\nSaved: ./output/findings_GROUP7_FULL_CONSOLIDATED.csv ({len(consolidated_findings)} findings)")
+
+# Statistics
+print("\n" + "=" * 70)
+print("GROUP 7: IP REPUTATION - STATISTICS")
+print("=" * 70)
+print(f"Total rows processed: {group_stats['total_rows']}")
+print(f"False positives excluded: {group_stats['fp_excluded']}")
+print(f"Info severity excluded: {group_stats['info_excluded']}")
+print(f"Findings extracted: {group_stats['findings_extracted']}")
+print(f"Consolidated findings: {len(consolidated_findings)}")
+print(f"\nTRACKING STATUS:")
+for status, count in group_stats['tracking'].items():
+    print(f"  {status}: {count}")
+
+if group_stats['cvr_scores']:
+    avg_c = sum(s[0] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    avg_v = sum(s[1] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    avg_r = sum(s[2] for s in group_stats['cvr_scores']) / len(group_stats['cvr_scores'])
+    print(f"\nCVR SCORE AVERAGES:")
+    print(f"  Avg Confidence: {avg_c:.1f}")
+    print(f"  Avg Visibility: {avg_v:.1f}")
+    print(f"  Avg Risk: {avg_r:.1f}")
+else:
+    print(f"\nCVR scores: Not available (7-col format)")
+
+print("=" * 70)
+
+# Update progress tracker
+tracker_path = './output/analysis_progress_tracker.md'
+tracker_exists = os.path.exists(tracker_path)
+
+with open(tracker_path, 'a' if tracker_exists else 'w') as f:
+    if not tracker_exists:
+        f.write("# Security Analysis Progress Tracker\n\n")
+    f.write("## GROUP 7: IP Reputation (Weight 0.6) - COMPLETED\n\n")
+    f.write(f"**Findings:** {len(consolidated_findings)}\n")
+    f.write(f"**Rows Processed:** {group_stats['total_rows']}\n")
+    f.write(f"**FP Excluded:** {group_stats['fp_excluded']}\n")
+    f.write(f"**Info Excluded:** {group_stats['info_excluded']}\n\n")
+    f.write("### Tracking Status\n")
+    for status, count in group_stats['tracking'].items():
+        f.write(f"- {status}: {count}\n")
+    f.write("\n---\n\n")
+
+print("\nGROUP 7 COMPLETE - IP Reputation analysis saved")
+```
+
+QUALITY VERIFICATION CHECKLIST:
+- [ ] All descriptions are 3-5 sentences / full paragraphs
+- [ ] All recommendations are 3-5 sentences / full paragraphs
+- [ ] No 'nan' appears in any field
+- [ ] Severities normalized (Critical/High/Medium/Low)
+- [ ] Consolidated findings show instance counts
+- [ ] Detail files created for multi-instance findings
+- [ ] Progress tracker updated
+- [ ] Tracking status (OPEN/CLOSED/TICKETED) annotated on all findings
+- [ ] CVR scores extracted and averaged (10-col format) or noted as unavailable
+- [ ] All 11 IP Reputation event types processed
+- [ ] Grade weights referenced: IP Reputation = 0.6
+- [ ] BLACKLISTED_IPADDR and MALICIOUS_IPADDR flagged as Critical severity (rank 1)
+- [ ] BLACKLISTED_SUBNET and MALICIOUS_SUBNET handled as informational (patterns only)
+- [ ] MALICIOUS_BITCOIN_ADDRESS flagged as High severity
+- [ ] No Nessus/Burp enrichment (not applicable to this group)

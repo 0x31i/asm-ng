@@ -127,23 +127,13 @@
       </a>
     </li>
     <li
-% if pageid == "TRIAGE":
+% if pageid in ('AI', 'TRIAGE', 'ENRICH', 'ANALYSIS'):
     class="active"
 % endif
     >
-      <a id="nav-link-triage" href="${docroot}/triage">
-        <i class="glyphicon glyphicon-check nav-icon"></i>
-        <span class="nav-text">Triage</span>
-      </a>
-    </li>
-    <li
-% if pageid == "ENRICH":
-    class="active"
-% endif
-    >
-      <a id="nav-link-enrich" href="${docroot}/enrich">
+      <a id="nav-link-ai" href="${docroot}/ai">
         <i class="glyphicon glyphicon-flash nav-icon"></i>
-        <span class="nav-text">Enrich</span>
+        <span class="nav-text">AI</span>
       </a>
     </li>
 % endif

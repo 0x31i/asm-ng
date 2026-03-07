@@ -1,0 +1,144 @@
+<%include file="HEADER.tmpl"/>
+<style>
+/* ──────────────────────────────────────────────────────────────────
+   AI LANDING PAGE — workflow selector
+────────────────────────────────────────────────────────────────── */
+
+.ai-page-header {
+    text-align:center; margin-bottom:36px; padding:20px 0;
+}
+.ai-page-title {
+    font-family:var(--font-mono); font-size:24px; font-weight:700;
+    color:var(--text-primary); letter-spacing:3px; text-transform:uppercase;
+    text-shadow: 0 0 10px rgba(255,255,255,0.15);
+}
+.ai-page-desc {
+    color:var(--text-muted); font-size:13px; margin-top:10px;
+    font-family:var(--font-sans); max-width:600px; margin-left:auto; margin-right:auto;
+    line-height:1.6;
+}
+
+/* ── Workflow grid ── */
+.ai-workflow-grid {
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:24px;
+    max-width:1100px; margin:0 auto;
+}
+@media (max-width:900px) {
+    .ai-workflow-grid { grid-template-columns:1fr; max-width:420px; }
+}
+
+/* ── Cards: glass panels with accent glow ── */
+.ai-workflow-card {
+    background:var(--glass-bg); border:1px solid var(--glass-border);
+    border-radius:0; padding:32px 28px; cursor:pointer;
+    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+    transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
+    text-decoration:none !important; display:block; position:relative;
+    overflow:hidden;
+}
+.ai-workflow-card:hover {
+    transform:translateY(-3px);
+}
+.ai-workflow-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    opacity:0; transition:opacity 0.3s;
+}
+
+/* Triage — green */
+.ai-workflow-card.triage-card:hover {
+    border-color:var(--accent-green);
+    box-shadow:0 0 20px var(--glow-green), 0 8px 30px rgba(0,0,0,0.3);
+}
+.ai-workflow-card.triage-card::before { background:var(--accent-green); }
+.ai-workflow-card.triage-card:hover::before { opacity:1; }
+.triage-card .ai-card-icon { color:var(--accent-green); text-shadow:0 0 10px var(--glow-green); }
+
+/* Enrich — cyan */
+.ai-workflow-card.enrich-card:hover {
+    border-color:var(--accent-cyan, #22d3ee);
+    box-shadow:0 0 20px var(--glow-cyan, rgba(34,211,238,0.3)), 0 8px 30px rgba(0,0,0,0.3);
+}
+.ai-workflow-card.enrich-card::before { background:var(--accent-cyan, #22d3ee); }
+.ai-workflow-card.enrich-card:hover::before { opacity:1; }
+.enrich-card .ai-card-icon { color:var(--accent-cyan, #22d3ee); text-shadow:0 0 10px var(--glow-cyan, rgba(34,211,238,0.3)); }
+
+/* Analysis — purple */
+.ai-workflow-card.analysis-card:hover {
+    border-color:#a855f7;
+    box-shadow:0 0 20px rgba(168,85,247,0.3), 0 8px 30px rgba(0,0,0,0.3);
+}
+.ai-workflow-card.analysis-card::before { background:#a855f7; }
+.ai-workflow-card.analysis-card:hover::before { opacity:1; }
+.analysis-card .ai-card-icon { color:#a855f7; text-shadow:0 0 10px rgba(168,85,247,0.3); }
+
+/* ── Card content ── */
+.ai-card-icon {
+    font-size:36px; margin-bottom:18px; display:block;
+}
+.ai-card-title {
+    font-family:var(--font-mono); font-size:16px; font-weight:700;
+    color:var(--text-primary); letter-spacing:2px; text-transform:uppercase;
+    margin-bottom:12px;
+}
+.ai-card-desc {
+    font-family:var(--font-sans); font-size:13px; color:var(--text-muted);
+    line-height:1.7;
+}
+.ai-card-arrow {
+    font-family:var(--font-mono); font-size:12px; color:var(--text-muted);
+    margin-top:18px; display:block; letter-spacing:1px; text-transform:uppercase;
+    transition:color 0.3s;
+}
+.ai-workflow-card:hover .ai-card-arrow { color:var(--text-primary); }
+
+/* ── Back link ── */
+.ai-back-link {
+    display:inline-flex; align-items:center; gap:6px;
+    font-family:var(--font-mono); font-size:11px; font-weight:600;
+    color:var(--text-muted); text-decoration:none; letter-spacing:1px;
+    text-transform:uppercase; margin-bottom:16px;
+    transition:color 0.2s;
+}
+.ai-back-link:hover { color:var(--text-primary); text-decoration:none; }
+</style>
+
+<div class="ai-page-header">
+    <div class="ai-page-title">AI-Powered Workflows</div>
+    <div class="ai-page-desc">
+        Leverage AI to accelerate your attack surface analysis. Choose a workflow below to get started.
+    </div>
+</div>
+
+<div class="ai-workflow-grid">
+    <a href="${docroot}/triage" class="ai-workflow-card triage-card">
+        <i class="glyphicon glyphicon-check ai-card-icon"></i>
+        <div class="ai-card-title">AI Triage</div>
+        <div class="ai-card-desc">
+            Automatically classify scan findings as false positives, legitimate, or needs-review.
+            Export findings, process with Claude Code, and import triage decisions back.
+        </div>
+        <span class="ai-card-arrow">Open Triage &rarr;</span>
+    </a>
+
+    <a href="${docroot}/enrich" class="ai-workflow-card enrich-card">
+        <i class="glyphicon glyphicon-certificate ai-card-icon"></i>
+        <div class="ai-card-title">AI Enrich</div>
+        <div class="ai-card-desc">
+            Generate contextual insight notes for each finding.
+            Export scan data with full context, process with Claude Code, and import enrichment notes.
+        </div>
+        <span class="ai-card-arrow">Open Enrich &rarr;</span>
+    </a>
+
+    <a href="${docroot}/analysis" class="ai-workflow-card analysis-card">
+        <i class="glyphicon glyphicon-stats ai-card-icon"></i>
+        <div class="ai-card-title">AI Analysis</div>
+        <div class="ai-card-desc">
+            Full 8-group analysis pipeline. Export scan data, Nessus/Burp results, and processing prompts.
+            Run obfuscation, group analysis, and final consolidation to produce executive findings.
+        </div>
+        <span class="ai-card-arrow">Open Analysis &rarr;</span>
+    </a>
+</div>
+
+<%include file="FOOTER.tmpl"/>

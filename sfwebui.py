@@ -12893,3 +12893,303 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             'success': True,
             'deleted': deleted,
         }
+
+    # ==================================================================
+    # AI LANDING + AI ANALYSIS
+    # ==================================================================
+
+    @cherrypy.expose
+    def ai(self: 'SpiderFootWebUi') -> str:
+        """Render the AI workflows landing page.
+
+        Returns:
+            str: AI landing page HTML
+        """
+        self.requireAuth()
+        self.requireAdmin()
+
+        templ = Template(
+            filename='spiderfoot/templates/ai.tmpl',
+            lookup=self.lookup)
+        return templ.render(
+            pageid='AI',
+            docroot=self.docroot,
+            version=__version__,
+            user_role=self.currentUserRole(),
+        )
+
+    @cherrypy.expose
+    def analysis(self: 'SpiderFootWebUi') -> str:
+        """Render the AI Analysis page.
+
+        Returns:
+            str: analysis page HTML
+        """
+        self.requireAuth()
+        self.requireAdmin()
+
+        with SpiderFootDb(self.config) as dbh:
+            scans = dbh.scanInstanceList() or []
+
+        templ = Template(
+            filename='spiderfoot/templates/analysis.tmpl',
+            lookup=self.lookup)
+        return templ.render(
+            scans=scans,
+            pageid='ANALYSIS',
+            docroot=self.docroot,
+            version=__version__,
+            user_role=self.currentUserRole(),
+        )
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def analysiscounts(self: 'SpiderFootWebUi', id: str = None) -> dict:
+        """Get result counts for a scan to display in the analysis export panel.
+
+        Args:
+            id: scan instance ID
+
+        Returns:
+            dict: {success, counts: {total, types, nessus_count, burp_count}}
+        """
+        self.requireAuth()
+        if not id:
+            return {'success': False, 'error': 'Missing scan ID'}
+
+        with SpiderFootDb(self.config) as dbh:
+            fpCounts = dbh.scanResultEventCount(id)
+            total = sum(fpCounts.values())
+
+            try:
+                unique = dbh.scanResultEventUnique(id)
+                types_count = len(unique) if unique else 0
+            except Exception:
+                types_count = 0
+
+            try:
+                nessus_count = dbh.scanNessusCount(id)
+            except Exception:
+                nessus_count = 0
+
+            try:
+                burp_count = dbh.scanBurpCount(id)
+            except Exception:
+                burp_count = 0
+
+        return {
+            'success': True,
+            'counts': {
+                'total': total,
+                'types': types_count,
+                'nessus_count': nessus_count,
+                'burp_count': burp_count,
+            }
+        }
+
+    @cherrypy.expose
+    def analysisexport(self: 'SpiderFootWebUi', id: str = None) -> bytes:
+        """Export an analysis package ZIP with scan data, prompts, scripts, and reference files.
+
+        Creates a ZIP containing:
+        - data/scan_results.csv (10-col full_scored, FPs excluded)
+        - data/nessus_results.csv
+        - data/burp_results.csv
+        - prompts/ (all group prompts + final consolidation)
+        - scripts/ (obfuscation, runners, enrichment)
+        - reference/ (data structure, requirements, progress tracker)
+        - README.md (scan metadata + instructions)
+
+        Args:
+            id: scan instance ID
+
+        Returns:
+            bytes: ZIP file download
+        """
+        import zipfile
+
+        self.requireAuth()
+        self.requireAdmin()
+
+        if not id:
+            raise cherrypy.HTTPError(400, "Missing scan ID")
+
+        with SpiderFootDb(self.config) as dbh:
+            scanInfo = dbh.scanInstanceGet(id)
+            if not scanInfo:
+                raise cherrypy.HTTPError(404, "Scan not found")
+
+            scan_name = scanInfo[0]
+            target = scanInfo[1]
+
+            # ── Build scan_results.csv (full_scored, FPs excluded) ──
+            results = dbh.scanResultEvent(id, 'ALL')
+            targetFps = set()
+            try:
+                targetFps = dbh.targetFalsePositivesForTarget(target)
+            except Exception:
+                pass
+
+            tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
+            csv_buf = StringIO()
+            writer = csv.writer(csv_buf, dialect='excel')
+            writer.writerow([
+                "Updated", "Type", "Module", "Source", "F/P", "Tracking",
+                "Confidence", "Visibility", "Risk", "Data"
+            ])
+            result_count = 0
+            for row in (results or []):
+                if row[4] == "ROOT":
+                    continue
+                fp_flag = self._compute_fp_flag(row[13], row[4], row[1], row[2], targetFps)
+                if fp_flag == 1:
+                    continue
+                lastseen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
+                datafield = str(row[1]).replace("<SFURL>", "").replace("</SFURL>", "").replace("\x00", "")
+                event_type = translate_event_type(str(row[4]))
+                tracking_label = tracking_labels.get(row[16], 'OPEN')
+                writer.writerow([
+                    lastseen, event_type, str(row[3]), str(row[2]),
+                    fp_flag, tracking_label, row[5], row[6], row[7], datafield
+                ])
+                result_count += 1
+
+            # ── Build nessus_results.csv ──
+            nessus_headers = [
+                "Severity", "Severity Number", "Plugin Name", "Plugin ID",
+                "Host IP", "Host Name", "Operating System", "Description",
+                "Synopsis", "Solution", "See Also", "Service Name", "Port",
+                "Protocol", "Request", "Plugin Output", "CVSS3 Base Score", "Tracking"
+            ]
+            nessus_buf = StringIO()
+            nessus_writer = csv.writer(nessus_buf, dialect='excel')
+            nessus_writer.writerow(nessus_headers)
+            try:
+                nessus_rows = dbh.scanNessusList(id)
+                for row in nessus_rows:
+                    nessus_writer.writerow([
+                        str(row[1] or ''), str(row[2] or ''), str(row[3] or ''),
+                        str(row[4] or ''), str(row[5] or ''), str(row[6] or ''),
+                        str(row[7] or ''), str(row[8] or ''), str(row[9] or ''),
+                        str(row[10] or ''), str(row[11] or ''), str(row[12] or ''),
+                        str(row[13] or ''), str(row[14] or ''), str(row[15] or ''),
+                        str(row[16] or ''), str(row[17] or ''),
+                        tracking_labels.get(int(row[18] or 0), 'OPEN'),
+                    ])
+            except Exception:
+                pass
+
+            # ── Build burp_results.csv ──
+            burp_headers = [
+                "Severity", "Severity Number", "Host IP", "Host Name",
+                "Plugin Name", "Issue Type", "Path", "Location", "Confidence",
+                "Issue Background", "Issue Detail", "Solutions", "See Also",
+                "References", "Vulnerability Classifications",
+                "Request", "Response", "Tracking"
+            ]
+            burp_buf = StringIO()
+            burp_writer = csv.writer(burp_buf, dialect='excel')
+            burp_writer.writerow(burp_headers)
+            try:
+                burp_rows = dbh.scanBurpList(id)
+                for row in burp_rows:
+                    burp_writer.writerow([
+                        str(row[1] or ''), str(row[2] or ''), str(row[3] or ''),
+                        str(row[4] or ''), str(row[5] or ''), str(row[6] or ''),
+                        str(row[7] or ''), str(row[8] or ''), str(row[9] or ''),
+                        str(row[10] or ''), str(row[11] or ''), str(row[12] or ''),
+                        str(row[13] or ''), str(row[14] or ''), str(row[15] or ''),
+                        str(row[16] or ''), str(row[17] or ''),
+                        tracking_labels.get(int(row[18] or 0), 'OPEN'),
+                    ])
+            except Exception:
+                pass
+
+        # ── Load analysis pipeline files ──
+        from spiderfoot.analysis_prompts import get_all_analysis_files
+        pipeline_files = get_all_analysis_files()
+
+        # ── Build README.md ──
+        exported_at = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
+        readme = f"""# ASM-NG Analysis Package
+
+## Scan Metadata
+- **Scan Name:** {scan_name}
+- **Target:** {target}
+- **Scan ID:** {id}
+- **Exported:** {exported_at}
+- **Results:** {result_count} (false positives excluded)
+
+## Directory Structure
+
+```
+data/
+  scan_results.csv          <- ASM-NG scan results (10-col scored CSV, FPs excluded)
+  nessus_results.csv        <- Nessus vulnerability scan results (parsed)
+  burp_results.csv          <- Burp Suite web app scan results (parsed)
+prompts/
+  PRODUCTION_GROUP1.txt     <- Infrastructure & Network Exposure
+  PRODUCTION_GROUP2.txt     <- DNS, Domains & Certificate Intelligence
+  PRODUCTION_GROUP3.txt     <- Web Application Security
+  PRODUCTION_GROUP4.txt     <- Data Leakage & Credential Exposure
+  PRODUCTION_GROUP5.txt     <- Threat Intelligence & Dark Web
+  PRODUCTION_GROUP6.txt     <- Cloud & Third-Party Services
+  PRODUCTION_GROUP7.txt     <- Social Engineering & Human Factors
+  FINAL_CONSOLIDATION.txt   <- Merges all group outputs into executive findings
+reference/
+  data_structure_reference.csv          <- Column definitions for scan_results.csv
+  analysis_requirements_PRODUCTION.txt  <- Detailed analysis requirements
+  analysis_progress_tracker_TEMPLATE.md <- Template for tracking analysis progress
+scripts/
+  obfuscate-asm-data.py     <- Anonymize client-sensitive data before external AI processing
+  run_all_groups.py         <- Run all 7 group analyses + final consolidation
+  final_consolidation.py    <- Run final consolidation step only
+  finding_enrichment.py     <- Enrich individual findings with detailed analysis
+  inject_nessus_burp.py     <- Inject original Nessus/Burp files for richer analysis
+```
+
+## Quick Start
+
+```bash
+# 1. Extract
+unzip {self._export_filename(scan_name, id, 'ANALYSIS-PKG', 'zip')} -d analysis-workspace
+cd analysis-workspace
+
+# 2. (Optional) Obfuscate client data for external AI processing
+python scripts/obfuscate-asm-data.py --input data/scan_results.csv --output data/scan_results_obfuscated.csv
+
+# 3. (Optional) If you have original .nessus or Burp .html files, copy them to data/ and run:
+python scripts/inject_nessus_burp.py --data-dir data/
+
+# 4. Run the full analysis pipeline
+python scripts/run_all_groups.py --prompts-dir prompts/ --data-dir data/ --output-dir output/
+
+# 5. Review the consolidated analysis
+cat output/FINAL_CONSOLIDATION.md
+```
+
+## Notes
+
+- The `scan_results.csv` has false positives pre-filtered. All rows have `F/P = 0` (unverified) or `F/P = 2` (validated).
+- For richer vulnerability analysis, drop original `.nessus` XML and Burp `.html` export files into `data/` before running `inject_nessus_burp.py`.
+- The analysis output is standalone and does not need to be imported back into ASM-NG.
+"""
+
+        # ── Create ZIP ──
+        buf = BytesIO()
+        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr('data/scan_results.csv', csv_buf.getvalue())
+            zf.writestr('data/nessus_results.csv', nessus_buf.getvalue())
+            zf.writestr('data/burp_results.csv', burp_buf.getvalue())
+
+            for zip_path, content in pipeline_files.items():
+                zf.writestr(zip_path, content)
+
+            zf.writestr('README.md', readme)
+
+        buf.seek(0)
+        filename = self._export_filename(scan_name, id, 'ANALYSIS-PKG', 'zip')
+
+        cherrypy.response.headers['Content-Type'] = 'application/zip'
+        cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return buf.getvalue()

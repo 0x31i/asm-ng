@@ -7,6 +7,16 @@ import json as _json
    AI TRIAGE PAGE — sharp modern hacker aesthetic
 ────────────────────────────────────────────────────────────────── */
 
+/* ── Back link to AI landing ── */
+.ai-back-link {
+    display:inline-flex; align-items:center; gap:6px;
+    font-family:var(--font-mono); font-size:11px; font-weight:600;
+    color:var(--text-muted); text-decoration:none; letter-spacing:1px;
+    text-transform:uppercase; margin-bottom:16px;
+    transition:color 0.2s;
+}
+.ai-back-link:hover { color:var(--text-primary); text-decoration:none; }
+
 /* Page title — mono font, uppercase, glow */
 .triage-header { display:flex; align-items:center; gap:14px; margin-bottom:24px; }
 .triage-title  {
@@ -230,6 +240,10 @@ import json as _json
     text-shadow:0 0 6px var(--glow-green);
 }
 </style>
+
+<a href="${docroot}/ai" class="ai-back-link">
+    <i class="glyphicon glyphicon-chevron-left"></i> AI Workflows
+</a>
 
 <div class="triage-header">
     <span class="triage-title">AI Triage</span>

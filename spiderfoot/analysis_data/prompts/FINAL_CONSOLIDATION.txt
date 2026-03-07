@@ -1,0 +1,987 @@
+FINAL CONSOLIDATION - Enhanced with Dynamic Web Search for Remediation
+=======================================================================
+
+CRITICAL INSTRUCTIONS FOR CLAUDE:
+=================================
+1. **PRESERVE ALL TOKENS**: Never replace IP_ADDRESS_TOKEN_*, DOMAIN_TOKEN_*,
+   URL_TOKEN_*, HOSTNAME_TOKEN_*, SUBNET_TOKEN_*, or any other *_TOKEN_* values
+   with [ASSET], [IP], [DOMAIN], or any other placeholder. These tokens are
+   intentional obfuscation and MUST remain intact in all output.
+
+2. **DYNAMIC REMEDIATION RESEARCH**: For each unique vulnerability type that
+   doesn't have specific remediation in the knowledge base, USE WEB SEARCH to
+   find authoritative remediation guidance from sources like:
+   - NIST NVD (nvd.nist.gov)
+   - OWASP (owasp.org)
+   - CIS Benchmarks
+   - Vendor security advisories
+   - MITRE ATT&CK mitigations
+
+3. **NO GENERIC RECOMMENDATIONS**: Every recommendation MUST include specific,
+   actionable steps. Never use phrases like "implement appropriate remediation"
+   or "follow security best practices" without concrete details.
+
+```python
+import csv
+import os
+from collections import defaultdict
+import re
+
+# ============================================================================
+# CRITICAL: TOKEN PRESERVATION
+# ============================================================================
+# The following token patterns MUST be preserved exactly as they appear:
+#   - IP_ADDRESS_TOKEN_XXXX
+#   - DOMAIN_TOKEN_XXXX
+#   - URL_TOKEN_XXXX
+#   - HOSTNAME_TOKEN_XXXX
+#   - SUBNET_TOKEN_XXXX
+#   - EMAIL_TOKEN_XXXX
+#   - PATH_TOKEN_XXXX
+#
+# NEVER replace these with [ASSET], [IP], [DOMAIN], or any other placeholder!
+# ============================================================================
+
+TOKEN_PATTERNS = [
+    r'IP_ADDRESS_TOKEN_\d+',
+    r'DOMAIN_TOKEN_\d+',
+    r'URL_TOKEN_\d+',
+    r'HOSTNAME_TOKEN_\d+',
+    r'SUBNET_TOKEN_\d+',
+    r'EMAIL_TOKEN_\d+',
+    r'PATH_TOKEN_\d+'
+]
+
+def preserve_tokens(text):
+    """Ensure all tokens are preserved - this is a validation function."""
+    if not text:
+        return text
+    # This function validates tokens are intact - it doesn't modify them
+    for pattern in TOKEN_PATTERNS:
+        matches = re.findall(pattern, str(text))
+        if matches:
+            print(f"  Preserved {len(matches)} tokens matching {pattern}")
+    return text
+
+# ============================================================================
+# REMEDIATION KNOWLEDGE BASE - Core Vulnerability Types
+# ============================================================================
+
+REMEDIATION_KB = {
+    # TLS/SSL VULNERABILITIES
+    'TLS_CERT_EXPIRED': {
+        'remediation': "Renew the certificate immediately through your Certificate Authority (Let's Encrypt, DigiCert, Sectigo). For Let's Encrypt: `certbot renew --force-renewal`. For commercial CAs: generate new CSR with `openssl req -new -key server.key -out server.csr` and submit for renewal. Install the new certificate and restart the web server. Implement automated monitoring to alert 30 days before expiration using Certbot auto-renewal or services like UptimeRobot.",
+        'verification': "Verify with: `openssl s_client -connect hostname:443 -servername hostname | openssl x509 -noout -dates`"
+    },
+    'TLS_CERT_SELF_SIGNED': {
+        'remediation': "Replace with a certificate from a trusted CA. For public services, use Let's Encrypt (free): `certbot certonly --webroot -w /var/www/html -d yourdomain.com`. For internal services, deploy an internal PKI with proper root CA distribution to clients, or use a commercial wildcard certificate.",
+        'verification': "Verify the certificate chain with: `openssl s_client -connect hostname:443 -showcerts`"
+    },
+    'TLS_CERT_HOSTNAME_MISMATCH': {
+        'remediation': "Obtain a new certificate that includes all required hostnames in the Subject Alternative Names (SANs). For Let's Encrypt: `certbot certonly -d domain1.com -d domain2.com -d www.domain1.com`. Wildcard certificates (*.domain.com) don't cover the apex domain - include both in SANs.",
+        'verification': "Check SANs with: `openssl s_client -connect hostname:443 | openssl x509 -noout -text | grep -A1 'Subject Alternative Name'`"
+    },
+    'TLS_WEAK_CIPHER': {
+        'remediation': "Configure strong cipher suites only. Nginx: `ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384'; ssl_prefer_server_ciphers on;`. Apache: `SSLCipherSuite ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256`. Use Mozilla SSL Configuration Generator (ssl-config.mozilla.org).",
+        'verification': "Test with: `nmap --script ssl-enum-ciphers -p 443 hostname` or testssl.sh"
+    },
+    'TLS_DEPRECATED_PROTOCOL': {
+        'remediation': "Disable TLS 1.0, TLS 1.1, SSLv3, and SSLv2. Nginx: `ssl_protocols TLSv1.2 TLSv1.3;`. Apache: `SSLProtocol all -SSLv2 -SSLv3 -TLSv1 -TLSv1.1`. IIS: modify registry under HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols.",
+        'verification': "Verify with: `nmap --script ssl-enum-ciphers -p 443 hostname`"
+    },
+
+    # WEB APPLICATION VULNERABILITIES
+    'XSS': {
+        'remediation': "Implement context-aware output encoding for all user input. Use framework encoding: `htmlspecialchars()` (PHP), template auto-escaping (React/Angular/Vue). Deploy CSP headers: `Content-Security-Policy: default-src 'self'; script-src 'self'`. Set HTTPOnly flag on cookies. Use libraries like DOMPurify for HTML sanitization.",
+        'verification': "Test with payloads: `<script>alert(1)</script>`, `\"><img src=x onerror=alert(1)>`. Use Burp Suite or OWASP ZAP."
+    },
+    'SQL_INJECTION': {
+        'remediation': "Use parameterized queries exclusively. PHP: `$stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?'); $stmt->execute([$id]);`. Python: `cursor.execute('SELECT * FROM users WHERE id = %s', (id,))`. Never concatenate user input into SQL. Use least-privilege database accounts. Deploy WAF rules.",
+        'verification': "Test with: `' OR '1'='1`, `'; DROP TABLE users;--`. Use sqlmap for comprehensive testing."
+    },
+    'OPEN_REDIRECTION': {
+        'remediation': "Validate redirect URLs against a strict allowlist. Use relative URLs where possible. For absolute URLs: `if url.host not in ALLOWED_HOSTS: reject()`. Implement redirect warnings for external URLs. Use indirect references instead of user-controllable redirect parameters.",
+        'verification': "Test redirect parameters with: `//evil.com`, `https://evil.com`, URL-encoded variants."
+    },
+
+    # NETWORK VULNERABILITIES
+    'DNS_AMPLIFICATION': {
+        'remediation': "Disable recursion on authoritative DNS servers: BIND `recursion no;`. Implement Response Rate Limiting (RRL): BIND `rate-limit { responses-per-second 5; };`. Use BCP38/BCP84 source address validation. Consider Anycast DNS for DDoS resilience.",
+        'verification': "Test with: `dig @your-dns-server example.com ANY` from external IP - should fail if recursion disabled."
+    },
+    'OPEN_RDP': {
+        'remediation': "Never expose RDP (3389) directly to internet. Place behind VPN (WireGuard, OpenVPN) or zero-trust solution (Cloudflare Access, Tailscale). Enable Network Level Authentication (NLA). Implement account lockout policies. Use Remote Desktop Gateway for external access.",
+        'verification': "Scan with: `nmap -p 3389 external-ip` - should show filtered/closed."
+    },
+    'OPEN_SSH': {
+        'remediation': "Disable password authentication: `PasswordAuthentication no` in sshd_config. Use key-based auth only. Change default port (security through obscurity, not sole defense). Implement fail2ban: `apt install fail2ban`. Restrict with firewall to known IPs. Consider SSH bastion/jump host.",
+        'verification': "Test: `ssh -o PreferredAuthentications=password user@host` should fail."
+    },
+    'SMB_EXPOSED': {
+        'remediation': "Block SMB ports (445, 139, 137) at perimeter firewall. Never expose SMB to internet. For internal: disable SMBv1 `Set-SmbServerConfiguration -EnableSMB1Protocol $false`. Require SMB signing. Implement network segmentation.",
+        'verification': "External scan: `nmap -p 445,139,137 external-ip` should show closed/filtered."
+    },
+
+    # EMAIL/REPUTATION
+    'SPF_MISSING': {
+        'remediation': "Add SPF record to DNS: `v=spf1 include:_spf.google.com include:spf.protection.outlook.com -all` (adjust for your mail providers). Use `-all` (hard fail) not `~all`. Validate with: https://mxtoolbox.com/spf.aspx",
+        'verification': "Check: `dig TXT yourdomain.com | grep spf`"
+    },
+    'DMARC_MISSING': {
+        'remediation': "Add DMARC record: `_dmarc.yourdomain.com TXT \"v=DMARC1; p=reject; rua=mailto:dmarc@yourdomain.com; ruf=mailto:dmarc@yourdomain.com\"`. Start with p=none for monitoring, progress to p=quarantine, then p=reject.",
+        'verification': "Check: `dig TXT _dmarc.yourdomain.com`"
+    },
+    'DKIM_MISSING': {
+        'remediation': "Generate DKIM keys through your email provider (Google Workspace, Microsoft 365, etc.) and publish the public key as a DNS TXT record. For self-hosted: use OpenDKIM. Key should be at least 2048-bit RSA.",
+        'verification': "Send test email and check headers for DKIM-Signature, or use mail-tester.com"
+    },
+    'IP_BLACKLISTED': {
+        'remediation': "1) Identify cause: check for compromised systems, open relays, spam. 2) Remediate root cause completely. 3) Submit delisting requests to each blacklist (Spamhaus, Barracuda, etc.) with evidence of remediation. 4) Implement outbound email monitoring. Consider dedicated IP for transactional email.",
+        'verification': "Check status: https://mxtoolbox.com/blacklists.aspx"
+    },
+
+    # INFRASTRUCTURE
+    'EXPOSED_ADMIN_INTERFACE': {
+        'remediation': "Never expose admin interfaces to internet. Place behind VPN or zero-trust proxy. Implement IP allowlisting. Add MFA/2FA. Use unique, non-default paths. Enable account lockout. Consider client certificates for additional auth.",
+        'verification': "External scan should not find admin paths. Test from non-VPN IP."
+    },
+    'DEFAULT_CREDENTIALS': {
+        'remediation': "Immediately change all default credentials. Implement strong password policy (16+ chars, complexity). Use unique credentials per device/service. Deploy password manager for credential storage. Enable MFA where supported. Audit for other default creds.",
+        'verification': "Attempt login with known defaults - should fail."
+    },
+    'DIRECTORY_LISTING': {
+        'remediation': "Apache: `Options -Indexes` in httpd.conf or .htaccess. Nginx: `autoindex off;`. IIS: disable Directory Browsing in IIS Manager. Ensure index files exist in all directories.",
+        'verification': "Browse to directory without index file - should return 403 or custom error."
+    }
+}
+
+# ============================================================================
+# ASM-NG GRADE CONFIGURATION
+# ============================================================================
+# Used for calculating the Overall ASM-NG Grade in the executive summary.
+
+GRADE_CATEGORY_WEIGHTS = {
+    'Network Security': 1.0,
+    'Web App Security': 1.0,
+    'Information Leakage': 0.8,
+    'General Health': 0.8,
+    'External Account Exposure': 0.7,
+    'DNS Health': 0.7,
+    'IP Reputation': 0.6,
+    'Information / Reference': 0.0
+}
+
+GRADE_THRESHOLDS = {'A': 90, 'B': 80, 'C': 70, 'D': 60}  # F = below 60
+
+def calculate_letter_grade(score):
+    """Convert numeric score (0-100) to letter grade."""
+    if score >= 90:
+        return 'A'
+    elif score >= 80:
+        return 'B'
+    elif score >= 70:
+        return 'C'
+    elif score >= 60:
+        return 'D'
+    else:
+        return 'F'
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def extract_vulnerability_pattern(item_text):
+    """
+    Extract core vulnerability pattern for similarity matching.
+    CRITICAL: This function is ONLY for similarity detection.
+    It does NOT modify the actual finding data.
+    """
+    text = str(item_text).lower()
+    # Normalize for comparison only - don't replace tokens
+    text = re.sub(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '[IP_COMPARE]', text)
+    text = re.sub(r':\d+', ':[PORT]', text)
+    text = re.sub(r'\b\d+\b', '[NUM]', text)
+    text = re.sub(r'instance[s]?', 'instance', text)
+    text = re.sub(r'asset[s]?', 'asset', text)
+    text = ' '.join(text.split())
+    return text
+
+def calculate_similarity(text1, text2):
+    """Calculate similarity ratio between two texts"""
+    if not text1 or not text2:
+        return 0.0
+    shorter = min(len(text1), len(text2))
+    longer = max(len(text1), len(text2))
+    if longer == 0:
+        return 1.0
+    matches = sum(c1 == c2 for c1, c2 in zip(text1, text2))
+    return matches / longer
+
+def should_consolidate(finding1, finding2):
+    """Determine if two findings should be consolidated."""
+    if finding1.get('Priority') != finding2.get('Priority'):
+        return False
+
+    cat1 = str(finding1.get('Category', '')).lower()
+    cat2 = str(finding2.get('Category', '')).lower()
+    if cat1 != cat2 and not (cat1 in cat2 or cat2 in cat1):
+        return False
+
+    pattern1 = extract_vulnerability_pattern(finding1.get('Item', ''))
+    pattern2 = extract_vulnerability_pattern(finding2.get('Item', ''))
+
+    if pattern1 == pattern2:
+        return True
+    if calculate_similarity(pattern1, pattern2) >= 0.85:
+        return True
+
+    vtype1 = str(finding1.get('Vuln_Type', '')).lower().replace('_', '').replace('-', '')
+    vtype2 = str(finding2.get('Vuln_Type', '')).lower().replace('_', '').replace('-', '')
+    if vtype1 and vtype2 and (vtype1 == vtype2 or vtype1 in vtype2 or vtype2 in vtype1):
+        return True
+
+    return False
+
+def get_kb_remediation(vuln_type, item='', category=''):
+    """Get remediation from knowledge base."""
+    vuln_type_upper = str(vuln_type).upper().strip()
+
+    # Direct match
+    if vuln_type_upper in REMEDIATION_KB:
+        entry = REMEDIATION_KB[vuln_type_upper]
+        return entry.get('remediation', ''), entry.get('verification', '')
+
+    # Partial match
+    for kb_key, entry in REMEDIATION_KB.items():
+        if kb_key in vuln_type_upper or vuln_type_upper in kb_key:
+            return entry.get('remediation', ''), entry.get('verification', '')
+
+    # Category-based match
+    item_lower = str(item).lower()
+    if 'certificate' in item_lower or 'ssl' in item_lower or 'tls' in item_lower:
+        if 'expired' in item_lower:
+            return REMEDIATION_KB['TLS_CERT_EXPIRED']['remediation'], REMEDIATION_KB['TLS_CERT_EXPIRED']['verification']
+        elif 'self-signed' in item_lower:
+            return REMEDIATION_KB['TLS_CERT_SELF_SIGNED']['remediation'], REMEDIATION_KB['TLS_CERT_SELF_SIGNED']['verification']
+
+    if 'blacklist' in item_lower:
+        return REMEDIATION_KB['IP_BLACKLISTED']['remediation'], REMEDIATION_KB['IP_BLACKLISTED']['verification']
+
+    if 'spf' in item_lower:
+        return REMEDIATION_KB['SPF_MISSING']['remediation'], REMEDIATION_KB['SPF_MISSING']['verification']
+
+    if 'dmarc' in item_lower:
+        return REMEDIATION_KB['DMARC_MISSING']['remediation'], REMEDIATION_KB['DMARC_MISSING']['verification']
+
+    return None, None
+
+def is_generic_content(text):
+    """Detect if content is too generic."""
+    generic_phrases = [
+        'implement appropriate',
+        'follow best practices',
+        'consult documentation',
+        'apply remediation',
+        'address accordingly',
+        'implement systematic',
+        'deploy standardized',
+        'verify remediation',
+        'address all instances',
+        '[sentence',
+        'sentence 1:',
+        'sentence 2:',
+    ]
+    text_lower = str(text).lower()
+    return any(phrase in text_lower for phrase in generic_phrases)
+
+def smart_consolidate(all_findings):
+    """Consolidate similar findings."""
+    print("\n" + "="*70)
+    print("CONSOLIDATION PHASE")
+    print("="*70)
+
+    if not all_findings:
+        print("No findings to consolidate")
+        return {}
+
+    original_count = len(all_findings)
+    groups = [[f] for f in all_findings]
+
+    print(f"Starting with {original_count} findings")
+
+    # Iteratively merge similar findings
+    merged = True
+    while merged:
+        merged = False
+        i = 0
+        while i < len(groups):
+            j = i + 1
+            while j < len(groups):
+                if should_consolidate(groups[i][0], groups[j][0]):
+                    groups[i].extend(groups[j])
+                    del groups[j]
+                    merged = True
+                else:
+                    j += 1
+            i += 1
+
+    # Convert to dict
+    consolidated = {}
+    for group in groups:
+        first = group[0]
+        key = (first.get('Category'), first.get('Vuln_Type'), first.get('Priority'))
+        consolidated[key] = group
+
+    print(f"Consolidated to {len(consolidated)} unique findings")
+    print(f"Reduction: {original_count - len(consolidated)} findings merged")
+
+    return consolidated
+
+# ============================================================================
+# LOAD ALL GROUP FINDINGS
+# ============================================================================
+
+print("="*70)
+print("FINAL CONSOLIDATION - Loading All Groups")
+print("="*70)
+
+all_findings = []
+invalid_count = 0
+fixed_vuln_type_count = 0
+
+# Tracking aggregation across all groups
+global_tracking = {'OPEN': 0, 'CLOSED': 0, 'TICKETED': 0}
+global_cvr_scores = []  # List of (confidence, visibility, risk) tuples
+category_scores = defaultdict(lambda: {'total_points': 0, 'finding_count': 0})
+
+for group_num in range(1, 8):  # 7 groups aligned with ASM-NG grade categories
+    file_path = f'./output/findings_GROUP{group_num}_FULL_CONSOLIDATED.csv'
+    if os.path.exists(file_path):
+        findings = []
+        with open(file_path, 'r', newline='') as csvf:
+            reader = csv.DictReader(csvf)
+            for row in reader:
+                findings.append(row)
+
+        # Validate and fix findings during load
+        valid_findings = []
+        for f in findings:
+            # Check if finding has minimum required data
+            has_item = f.get('Item') and str(f.get('Item', '')).lower() not in ['nan', 'none', '']
+            has_desc = f.get('Description') and str(f.get('Description', '')).lower() not in ['nan', 'none', '']
+
+            if not has_item and not has_desc:
+                invalid_count += 1
+                continue  # Skip completely invalid findings
+
+            # Fix missing/invalid Vuln_Type - derive from Tab
+            vuln_type = f.get('Vuln_Type', '')
+            if not vuln_type or str(vuln_type).lower() in ['nan', 'none', '']:
+                tab_name = f.get('Tab', '')
+                if tab_name and str(tab_name).lower() not in ['nan', 'none', '']:
+                    f['Vuln_Type'] = str(tab_name).upper()
+                    fixed_vuln_type_count += 1
+                else:
+                    # Try to derive from Item
+                    item_text = str(f.get('Item', ''))
+                    if ' - ' in item_text:
+                        f['Vuln_Type'] = item_text.split(' - ')[0].upper().replace(' ', '_')[:50]
+                        fixed_vuln_type_count += 1
+
+            # Aggregate tracking status
+            tracking = f.get('Tracking_Status', 'OPEN')
+            if tracking in global_tracking:
+                global_tracking[tracking] += 1
+
+            # Aggregate CVR scores
+            try:
+                avg_risk = f.get('Avg_Risk', '')
+                if avg_risk and str(avg_risk).lower() not in ['nan', 'none', '']:
+                    global_cvr_scores.append(float(avg_risk))
+            except (ValueError, TypeError):
+                pass
+
+            valid_findings.append(f)
+
+        print(f"GROUP {group_num}: {len(valid_findings)} findings loaded (from {len(findings)} total)")
+        all_findings.extend(valid_findings)
+    else:
+        print(f"GROUP {group_num}: File not found - {file_path}")
+
+print(f"\nTotal findings loaded: {len(all_findings)}")
+if invalid_count > 0:
+    print(f"Skipped {invalid_count} invalid findings (no Item or Description)")
+if fixed_vuln_type_count > 0:
+    print(f"Fixed {fixed_vuln_type_count} findings with missing Vuln_Type (derived from Tab/Item)")
+
+# ============================================================================
+# CONSOLIDATION
+# ============================================================================
+
+groups = smart_consolidate(all_findings)
+os.makedirs('./output/findings_details_GLOBAL', exist_ok=True)
+
+# ============================================================================
+# BUILD FINAL FINDINGS WITH DYNAMIC REMEDIATION
+# ============================================================================
+
+print("\n" + "="*70)
+print("REMEDIATION ENRICHMENT")
+print("="*70)
+
+final_findings = []
+needs_web_research = []
+
+for key, group_findings in groups.items():
+    category, vuln_type, priority = key
+    instance_count = len(group_findings)
+    first = group_findings[0]
+
+    # ==========================================================================
+    # CRITICAL FIX: Handle None/NaN/Empty Vuln_Type
+    # ==========================================================================
+    # If Vuln_Type is invalid, derive a meaningful name from Tab or Item
+    vuln_type_str = str(vuln_type).strip() if vuln_type else ''
+
+    if not vuln_type_str or vuln_type_str.lower() in ['nan', 'none', 'null', '']:
+        # Try to get from Tab first
+        tab_name = first.get('Tab', '')
+        if tab_name and str(tab_name).lower() not in ['nan', 'none', '']:
+            vuln_type_str = str(tab_name)
+            print(f"  Vuln_Type was None/NaN - using Tab name: {vuln_type_str}")
+        else:
+            # Try to extract from Item
+            item_text = first.get('Item', '')
+            if item_text and str(item_text).lower() not in ['nan', 'none', '']:
+                # Extract first meaningful part of Item
+                vuln_type_str = str(item_text).split(' - ')[0].split(' on ')[0][:50]
+                print(f"  Vuln_Type was None/NaN - derived from Item: {vuln_type_str}")
+            else:
+                # Last resort - use category
+                vuln_type_str = str(category) if category else 'UNKNOWN_FINDING'
+                print(f"  Vuln_Type was None/NaN - using Category: {vuln_type_str}")
+
+    # Collect assets - PRESERVE TOKENS
+    assets = []
+    for f in group_findings:
+        asset = f.get('Asset', '')
+        if asset and str(asset).lower() not in ['nan', 'none', '']:
+            assets.append(str(asset))  # Keep original token format
+
+    unique_assets = list(dict.fromkeys(assets))  # Preserve order, remove dupes
+    asset_count = len(unique_assets)
+
+    # Build Item with preserved tokens and VALID vuln_name
+    vuln_name = vuln_type_str.replace('_', ' ').title()
+
+    # Ensure we have a meaningful item name
+    if vuln_name.lower() in ['nan', 'none', 'null', '']:
+        vuln_name = 'Security Finding'
+
+    if asset_count <= 5 and asset_count > 0:
+        asset_display = ", ".join(unique_assets[:5])
+        item = f"{vuln_name} - {instance_count} instances on {asset_display}"
+    else:
+        item = f"{vuln_name} - {instance_count} instances across {asset_count} assets"
+
+    # Get remediation from KB (use corrected vuln_type_str)
+    kb_remediation, kb_verification = get_kb_remediation(vuln_type_str, first.get('Item', ''), category)
+
+    # Build description from first finding (tokens preserved)
+    base_description = first.get('Description', '')
+
+    # Clean up any [Sentence X:] markers
+    base_description = re.sub(r'\[Sentence \d+:', '', base_description)
+    base_description = re.sub(r'\]\.', '.', base_description)
+
+    if instance_count > 1:
+        description = f"{base_description} This issue was identified across {instance_count} instances affecting {asset_count} unique assets, indicating a systematic problem requiring coordinated remediation."
+    else:
+        description = base_description
+
+    # Build recommendation
+    if kb_remediation:
+        recommendation = kb_remediation
+        if kb_verification:
+            recommendation += f" Verification: {kb_verification}"
+        print(f"{vuln_type_str}: KB match found")
+    elif is_generic_content(first.get('Recommendation', '')):
+        # Flag for web research
+        needs_web_research.append({
+            'vuln_type': vuln_type_str,
+            'item': first.get('Item', ''),
+            'category': category,
+            'priority': priority,
+            'finding_index': len(final_findings)
+        })
+        recommendation = first.get('Recommendation', '')
+        recommendation = re.sub(r'\[Sentence \d+:', '', recommendation)
+        recommendation = re.sub(r'\]\.', '.', recommendation)
+        print(f"{vuln_type_str}: Needs web research")
+    else:
+        recommendation = first.get('Recommendation', '')
+        recommendation = re.sub(r'\[Sentence \d+:', '', recommendation)
+        recommendation = re.sub(r'\]\.', '.', recommendation)
+        print(f"{vuln_type_str}: Using original (specific)")
+
+    # Aggregate tracking status for this consolidated finding
+    tracking_counts = defaultdict(int)
+    for f in group_findings:
+        ts = f.get('Tracking_Status', 'OPEN')
+        if ts and str(ts).lower() not in ['nan', 'none', '']:
+            tracking_counts[ts] += 1
+        else:
+            tracking_counts['OPEN'] += 1
+    # Use the most common tracking status
+    consolidated_tracking = max(tracking_counts, key=tracking_counts.get) if tracking_counts else 'OPEN'
+
+    # Aggregate risk scores
+    risk_scores = []
+    for f in group_findings:
+        try:
+            r = f.get('Avg_Risk', '')
+            if r and str(r).lower() not in ['nan', 'none', '']:
+                risk_scores.append(float(r))
+        except (ValueError, TypeError):
+            pass
+    avg_risk = round(sum(risk_scores) / len(risk_scores), 1) if risk_scores else None
+
+    finding = {
+        'Priority': priority,
+        'Category': category,
+        'Tab': first.get('Tab', 'Multiple'),
+        'Item': item,
+        'Description': description,
+        'Recommendation': recommendation,
+        'Tracking_Status': consolidated_tracking,
+        'Avg_Risk': avg_risk if avg_risk is not None else ''
+    }
+
+    final_findings.append(finding)
+
+    # Create detail file for multi-instance findings
+    if instance_count > 1:
+        detail_data = []
+        for i, f in enumerate(group_findings, 1):
+            detail_data.append({
+                'Instance': i,
+                'Asset': f.get('Asset', ''),
+                'Source_Tab': f.get('Tab', ''),
+                'Item': f.get('Item', ''),
+                'Description': f.get('Description', ''),
+                'Recommendation': f.get('Recommendation', ''),
+                'Tracking_Status': f.get('Tracking_Status', 'OPEN'),
+                'FP_Status': f.get('FP_Status', 'Unverified')
+            })
+
+        safe_name = re.sub(r'[^\w\-]', '_', str(vuln_type))[:50]
+        detail_file = f'./output/findings_details_GLOBAL/detail_{safe_name}.csv'
+        with open(detail_file, 'w', newline='') as csvf:
+            writer = csv.DictWriter(csvf, fieldnames=detail_data[0].keys())
+            writer.writeheader()
+            writer.writerows(detail_data)
+
+print(f"\nProcessed {len(final_findings)} consolidated findings")
+print(f"{len(needs_web_research)} findings need web research for specific remediation")
+```
+
+# ============================================================================
+# WEB RESEARCH PHASE - CLAUDE INSTRUCTIONS
+# ============================================================================
+
+**CRITICAL: For each item in `needs_web_research`, Claude MUST:**
+
+1. **Search for specific remediation** using web_search tool:
+   - Search: `"{vuln_type} remediation steps security"`
+   - Search: `"{vuln_type} CVE mitigation best practices"`
+   - Search: `"{item}" security fix`
+
+2. **Prioritize authoritative sources:**
+   - NIST NVD (nvd.nist.gov)
+   - OWASP (owasp.org)
+   - CIS Benchmarks
+   - Vendor security advisories (Microsoft, Cisco, etc.)
+   - SANS Institute
+
+3. **Extract specific, actionable guidance:**
+   - Specific commands or configurations
+   - Step-by-step procedures
+   - Verification methods
+   - Tool recommendations
+
+4. **Update the finding's Recommendation** with the researched content
+
+5. **Continue with the rest of the code after research is complete**
+
+```python
+# ============================================================================
+# AFTER WEB RESEARCH - Continue processing
+# ============================================================================
+
+# Sort by severity
+severity_order = {'Critical': 0, 'High': 1, 'Medium': 2, 'Low': 3, 'Info': 4}
+final_findings.sort(key=lambda x: severity_order.get(x.get('Priority', 'Medium'), 2))
+
+# Save CSV with updated columns (includes Tracking_Status and Avg_Risk)
+fieldnames = ['Category', 'Tab', 'Priority', 'Item', 'Description', 'Recommendation',
+              'Tracking_Status', 'Avg_Risk']
+
+with open('./output/ALL_FINDINGS_CONSOLIDATED.csv', 'w', newline='') as csvf:
+    writer = csv.DictWriter(csvf, fieldnames=fieldnames, extrasaction='ignore')
+    writer.writeheader()
+    writer.writerows(final_findings)
+print("Saved: ALL_FINDINGS_CONSOLIDATED.csv")
+
+# Count by priority
+priority_counts = defaultdict(int)
+for f in final_findings:
+    priority_counts[f.get('Priority', 'Medium')] += 1
+
+print(f"\nPriority Distribution:")
+for p in ['Critical', 'High', 'Medium', 'Low', 'Info']:
+    if priority_counts[p] > 0:
+        print(f"  {p}: {priority_counts[p]}")
+
+# ============================================================================
+# ASM-NG OVERALL GRADE CALCULATION
+# ============================================================================
+
+print("\n" + "="*70)
+print("ASM-NG GRADE CALCULATION")
+print("="*70)
+
+# Map findings to grade categories and calculate per-category scores
+# Each category starts at 100 and loses points based on findings
+category_base = 100
+category_point_map = {}
+
+# Map Tab names to grade categories using the reference
+TAB_TO_CATEGORY = {
+    # Network Security (weight 1.0)
+    'EXTERNAL_VULNERABILITIES': 'Network Security',
+    'VULNERABILITY_CVE_CRITICAL': 'Network Security',
+    'VULNERABILITY_CVE_HIGH': 'Network Security',
+    'VULNERABILITY_CVE_MEDIUM': 'Network Security',
+    'VULNERABILITY_CVE_LOW': 'Network Security',
+    'VULNERABILITY_GENERAL': 'Network Security',
+    'TCP_PORT_OPEN': 'Network Security',
+    'UDP_PORT_OPEN': 'Network Security',
+    'IP_ADDRESS': 'Network Security',
+    'IPV6_ADDRESS': 'Network Security',
+    'INTERNAL_IP_ADDRESS': 'Network Security',
+    'DEFACED_INTERNET_NAME': 'Network Security',
+    'DEFACED_IPADDR': 'Network Security',
+    'PROXY_HOST': 'Network Security',
+    'VPN_HOST': 'Network Security',
+    'TOR_EXIT_NODE': 'Network Security',
+    # Web App Security (weight 1.0)
+    'WEBAPP_VULNERABILITIES': 'Web App Security',
+    'INTERNET_NAME': 'Web App Security',
+    'HTTP_CODE': 'Web App Security',
+    'URL_FORM': 'Web App Security',
+    'URL_PASSWORD': 'Web App Security',
+    'URL_UPLOAD': 'Web App Security',
+    'URL_JAVASCRIPT': 'Web App Security',
+    'WEBSERVER_TECHNOLOGY': 'Web App Security',
+    'WEBSERVER_STRANGEHEADER': 'Web App Security',
+    'TARGET_WEB_CONTENT': 'Web App Security',
+    'TARGET_WEB_COOKIE': 'Web App Security',
+    # Information Leakage (weight 0.8)
+    'BREACHED_CREDENTIALS': 'Information Leakage',
+    'EMAILADDR': 'Information Leakage',
+    'EMAILADDR_COMPROMISED': 'Information Leakage',
+    'HASH': 'Information Leakage',
+    'HASH_COMPROMISED': 'Information Leakage',
+    'PASSWORD_COMPROMISED': 'Information Leakage',
+    'CREDIT_CARD_NUMBER': 'Information Leakage',
+    'HUMAN_NAME': 'Information Leakage',
+    'PERSON_NAME': 'Information Leakage',
+    'PHONE_NUMBER': 'Information Leakage',
+    'INTERESTING_FILE': 'Information Leakage',
+    'USERNAME': 'Information Leakage',
+    'LEAKSITE_URL': 'Information Leakage',
+    'LEAKSITE_CONTENT': 'Information Leakage',
+    # General Health (weight 0.8)
+    'SSL_CERTIFICATE_EXPIRING': 'General Health',
+    'SSL_CERTIFICATE_EXPIRED': 'General Health',
+    'SSL_CERTIFICATE_MISMATCH': 'General Health',
+    'APPSTORE_ENTRY': 'General Health',
+    'PUBLIC_CODE_REPO': 'General Health',
+    'VULNERABILITY_DISCLOSURE': 'General Health',
+    'COUNTRY_NAME': 'General Health',
+    'GEOINFO': 'General Health',
+    # External Account Exposure (weight 0.7)
+    'ACCOUNT_EXTERNAL_OWNED': 'External Account Exposure',
+    'ACCOUNT_EXTERNAL_OWNED_COMPROMISED': 'External Account Exposure',
+    'TARGET_ACCOUNTS': 'External Account Exposure',
+    'SOCIAL_MEDIA': 'External Account Exposure',
+    'SIMILAR_ACCOUNT_EXTERNAL': 'External Account Exposure',
+    # DNS Health (weight 0.7)
+    'DNS_SPF': 'DNS Health',
+    'DNS_TEXT': 'DNS Health',
+    'DOMAIN_NAME': 'DNS Health',
+    'DOMAIN_REGISTRAR': 'DNS Health',
+    'DOMAIN_IMPERSONATION': 'DNS Health',
+    # Network Security additions
+    'DEFACED_INTERNET_NAME': 'Network Security',
+    'DEFACED_AFFILIATE_INTERNET_NAME': 'Network Security',
+    'DEFACED_COHOST': 'Network Security',
+    'DEFACED_AFFILIATE_IPADDR': 'Network Security',
+    'TCP_PORT_OPEN_BANNER': 'Network Security',
+    'UDP_PORT_OPEN_INFO': 'Network Security',
+    'AI_ENDPOINT_UNAUTHENTICATED': 'Network Security',
+    'AI_MODEL_EXPOSED': 'Network Security',
+    # Web App Security additions
+    'INTERNET_NAME_UNRESOLVED': 'Web App Security',
+    'URL_FLASH': 'Web App Security',
+    'URL_JAVA_APPLET': 'Web App Security',
+    'URL_STATIC': 'Web App Security',
+    'URL_WEB_FRAMEWORK': 'Web App Security',
+    'WEBSERVER_BANNER': 'Web App Security',
+    'WEBSERVER_HTTPHEADERS': 'Web App Security',
+    'LINKED_URL_EXTERNAL': 'Web App Security',
+    'LINKED_URL_INTERNAL': 'Web App Security',
+    'LEAKSITE_URL_WEBAPP': 'Web App Security',
+    # Information Leakage additions
+    'EMAILADDR_DELIVERABLE': 'Information Leakage',
+    'EMAILADDR_DISPOSABLE': 'Information Leakage',
+    'MALICIOUS_EMAILADDR': 'Information Leakage',
+    'DATE_HUMAN_DOB': 'Information Leakage',
+    'JOB_TITLE': 'Information Leakage',
+    'PHONE_NUMBER_COMPROMISED': 'Information Leakage',
+    'MALICIOUS_PHONE_NUMBER': 'Information Leakage',
+    'PHYSICAL_ADDRESS': 'Information Leakage',
+    'SOFTWARE_USED': 'Information Leakage',
+    'PGP_KEY': 'Information Leakage',
+    'AI_API_KEY_LEAKED': 'Information Leakage',
+    # General Health additions
+    'SSL_CERTIFICATE_ISSUED': 'General Health',
+    'SSL_CERTIFICATE_ISSUER': 'General Health',
+    'SSL_CERTIFICATE_RAW': 'General Health',
+    'PHYSICAL_COORDINATES': 'General Health',
+    'BLACKLISTED_AFFILIATE_INTERNET_NAME': 'General Health',
+    'BLACKLISTED_AFFILIATE_IPADDR': 'General Health',
+    # External Account Exposure additions
+    'ACCOUNT_EXTERNAL_USER_SHARED_COMPROMISED': 'External Account Exposure',
+    # DNS Health additions
+    'DNS_TEXT': 'DNS Health',
+    'DOMAIN_NAME_PARENT': 'DNS Health',
+    'DOMAIN_WHOIS': 'DNS Health',
+    'RAW_DNS_RECORDS': 'DNS Health',
+    'DNS_SRV': 'DNS Health',
+    'NETBLOCK_WHOIS': 'DNS Health',
+    # IP Reputation (weight 0.6)
+    'BLACKLISTED_IPADDR': 'IP Reputation',
+    'BLACKLISTED_INTERNET_NAME': 'IP Reputation',
+    'BLACKLISTED_COHOST': 'IP Reputation',
+    'BLACKLISTED_SUBNET': 'IP Reputation',
+    'BLACKLISTED_NETBLOCK': 'IP Reputation',
+    'MALICIOUS_IPADDR': 'IP Reputation',
+    'MALICIOUS_INTERNET_NAME': 'IP Reputation',
+    'MALICIOUS_NETBLOCK': 'IP Reputation',
+    'MALICIOUS_ASN': 'IP Reputation',
+    'MALICIOUS_SUBNET': 'IP Reputation',
+    'MALICIOUS_BITCOIN_ADDRESS': 'IP Reputation',
+}
+
+# Severity to penalty point mapping (approximate from grade_config.py)
+SEVERITY_POINTS = {
+    'Critical': -20,
+    'High': -15,
+    'Medium': -10,
+    'Low': -5,
+    'Info': 0
+}
+
+# Calculate per-category scores
+category_deductions = defaultdict(int)
+category_finding_counts = defaultdict(int)
+
+for f in final_findings:
+    tab = f.get('Tab', '')
+    grade_cat = TAB_TO_CATEGORY.get(tab, None)
+    if grade_cat and grade_cat != 'Information / Reference':
+        penalty = SEVERITY_POINTS.get(f.get('Priority', 'Medium'), -5)
+        category_deductions[grade_cat] += abs(penalty)
+        category_finding_counts[grade_cat] += 1
+
+# Compute category scores (capped at 0 minimum)
+category_grades = {}
+for cat, weight in GRADE_CATEGORY_WEIGHTS.items():
+    if weight == 0.0:
+        continue  # Skip Information / Reference
+    deduction = category_deductions.get(cat, 0)
+    score = max(0, category_base - deduction)
+    letter = calculate_letter_grade(score)
+    category_grades[cat] = {'score': score, 'grade': letter, 'weight': weight,
+                            'findings': category_finding_counts.get(cat, 0)}
+
+# Calculate weighted overall grade
+total_weight = sum(g['weight'] for g in category_grades.values())
+if total_weight > 0:
+    weighted_score = sum(g['score'] * g['weight'] for g in category_grades.values()) / total_weight
+else:
+    weighted_score = 100.0
+
+overall_grade = calculate_letter_grade(weighted_score)
+
+print(f"\nCategory Grades:")
+for cat, info in sorted(category_grades.items(), key=lambda x: x[1]['score']):
+    print(f"  {cat}: {info['grade']} ({info['score']}/100) - weight {info['weight']}, {info['findings']} findings")
+print(f"\nOverall ASM-NG Grade: {overall_grade} ({weighted_score:.1f}/100)")
+
+# ============================================================================
+# EXCEL OUTPUT
+# ============================================================================
+
+try:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Consolidated Findings"
+
+    # Headers (updated with Tracking_Status and Avg_Risk)
+    headers = ['Priority', 'Category', 'Tab', 'Item', 'Description', 'Recommendation',
+               'Tracking_Status', 'Avg_Risk']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = PatternFill(start_color='2F5496', end_color='2F5496', fill_type='solid')
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+    # Data rows
+    priority_colors = {
+        'Critical': {'bg': 'FF0000', 'font': 'FFFFFF'},
+        'High': {'bg': 'FF6600', 'font': 'FFFFFF'},
+        'Medium': {'bg': 'FFCC00', 'font': '000000'},
+        'Low': {'bg': '92D050', 'font': '000000'},
+        'Info': {'bg': '00B0F0', 'font': '000000'}
+    }
+
+    for row_idx, finding in enumerate(final_findings, 2):
+        ws.cell(row=row_idx, column=1, value=finding.get('Priority', ''))
+        ws.cell(row=row_idx, column=2, value=finding.get('Category', ''))
+        ws.cell(row=row_idx, column=3, value=finding.get('Tab', ''))
+        ws.cell(row=row_idx, column=4, value=finding.get('Item', ''))
+        ws.cell(row=row_idx, column=5, value=finding.get('Description', ''))
+        ws.cell(row=row_idx, column=6, value=finding.get('Recommendation', ''))
+        ws.cell(row=row_idx, column=7, value=finding.get('Tracking_Status', ''))
+        ws.cell(row=row_idx, column=8, value=finding.get('Avg_Risk', ''))
+
+        # Style priority cell
+        priority = finding.get('Priority', '')
+        if priority in priority_colors:
+            colors = priority_colors[priority]
+            cell = ws.cell(row=row_idx, column=1)
+            cell.fill = PatternFill(start_color=colors['bg'], end_color=colors['bg'], fill_type='solid')
+            cell.font = Font(bold=True, color=colors['font'])
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        # Wrap text for long fields
+        for col in [4, 5, 6]:
+            ws.cell(row=row_idx, column=col).alignment = Alignment(wrap_text=True, vertical='top')
+
+    # Column widths
+    ws.column_dimensions['A'].width = 12
+    ws.column_dimensions['B'].width = 25
+    ws.column_dimensions['C'].width = 25
+    ws.column_dimensions['D'].width = 60
+    ws.column_dimensions['E'].width = 80
+    ws.column_dimensions['F'].width = 80
+    ws.column_dimensions['G'].width = 15
+    ws.column_dimensions['H'].width = 10
+
+    ws.freeze_panes = 'A2'
+
+    # Add Grade Summary sheet
+    ws_grade = wb.create_sheet("ASM-NG Grade")
+    ws_grade.cell(row=1, column=1, value="ASM-NG Security Grade Report")
+    ws_grade.cell(row=1, column=1).font = Font(bold=True, size=14)
+
+    ws_grade.cell(row=3, column=1, value="Overall Grade:")
+    ws_grade.cell(row=3, column=2, value=f"{overall_grade} ({weighted_score:.1f}/100)")
+    ws_grade.cell(row=3, column=2).font = Font(bold=True, size=12)
+
+    ws_grade.cell(row=5, column=1, value="Category")
+    ws_grade.cell(row=5, column=2, value="Grade")
+    ws_grade.cell(row=5, column=3, value="Score")
+    ws_grade.cell(row=5, column=4, value="Weight")
+    ws_grade.cell(row=5, column=5, value="Findings")
+    for col in range(1, 6):
+        ws_grade.cell(row=5, column=col).font = Font(bold=True)
+
+    for row_idx, (cat, info) in enumerate(sorted(category_grades.items(), key=lambda x: x[1]['score']), 6):
+        ws_grade.cell(row=row_idx, column=1, value=cat)
+        ws_grade.cell(row=row_idx, column=2, value=info['grade'])
+        ws_grade.cell(row=row_idx, column=3, value=info['score'])
+        ws_grade.cell(row=row_idx, column=4, value=info['weight'])
+        ws_grade.cell(row=row_idx, column=5, value=info['findings'])
+
+    ws_grade.column_dimensions['A'].width = 30
+    ws_grade.column_dimensions['B'].width = 10
+    ws_grade.column_dimensions['C'].width = 10
+    ws_grade.column_dimensions['D'].width = 10
+    ws_grade.column_dimensions['E'].width = 12
+
+    wb.save('./output/ALL_FINDINGS_DETAILED.xlsx')
+    print("Saved: ALL_FINDINGS_DETAILED.xlsx")
+
+except ImportError:
+    print("openpyxl not available - Excel file not created")
+
+# ============================================================================
+# FINAL REPORT
+# ============================================================================
+
+print("\n" + "="*70)
+print("FINAL CONSOLIDATION COMPLETE")
+print("="*70)
+
+print(f"\nOutput Files:")
+print(f"  ALL_FINDINGS_CONSOLIDATED.csv")
+print(f"  ALL_FINDINGS_DETAILED.xlsx")
+print(f"  findings_details_GLOBAL/ (per-vulnerability breakdowns)")
+
+print(f"\nSummary:")
+print(f"  Total consolidated findings: {len(final_findings)}")
+print(f"  Critical: {priority_counts['Critical']}")
+print(f"  High: {priority_counts['High']}")
+print(f"  Medium: {priority_counts['Medium']}")
+print(f"  Low: {priority_counts['Low']}")
+
+print(f"\nTracking Status:")
+print(f"  OPEN: {global_tracking['OPEN']}")
+print(f"  CLOSED: {global_tracking['CLOSED']}")
+print(f"  TICKETED: {global_tracking['TICKETED']}")
+
+if global_cvr_scores:
+    avg_global_risk = sum(global_cvr_scores) / len(global_cvr_scores)
+    print(f"\nCVR Scores:")
+    print(f"  Average Risk (across all groups): {avg_global_risk:.1f}")
+    print(f"  Findings with CVR scores: {len(global_cvr_scores)}")
+else:
+    print(f"\nCVR Scores: Not available (7-col format or no scores in group outputs)")
+
+print(f"\nASM-NG Overall Grade: {overall_grade} ({weighted_score:.1f}/100)")
+for cat, info in sorted(category_grades.items(), key=lambda x: x[1]['score']):
+    print(f"  {cat}: {info['grade']} ({info['score']})")
+
+print("\n" + "="*70)
+```
+
+## QUALITY CHECKLIST
+
+Before completing, verify:
+- [ ] All *_TOKEN_* values preserved (not replaced with [ASSET])
+- [ ] Every Recommendation has specific, actionable steps
+- [ ] No generic phrases like "implement appropriate remediation"
+- [ ] Verification steps included where applicable
+- [ ] No [Sentence X:] markers in output
+- [ ] Web research completed for non-KB findings
+- [ ] Tracking_Status column present in output CSV and Excel
+- [ ] Avg_Risk column present in output CSV and Excel
+- [ ] ASM-NG Grade calculated and included in executive summary
+- [ ] Grade summary sheet added to Excel output
+- [ ] Category grades reflect grade_config.py weights
