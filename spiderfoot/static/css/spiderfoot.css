@@ -2099,6 +2099,7 @@ pre.table-border-bg-inherit {
   min-width: 680px;
 }
 .col-data-chk     { width: 36px; }
+td.cb-cell         { cursor: pointer; }
 .col-data-status  { width: 110px; }
 .col-data-element { width: 30%; min-width: 160px; }
 .col-data-source  { width: 30%; min-width: 140px; }

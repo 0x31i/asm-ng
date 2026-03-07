@@ -660,6 +660,16 @@
             }
         });
 
+        // Click anywhere in checkbox cell — toggle checkbox, update toolbar, stop row expansion
+        function cbCellClick(td, e) {
+            e.stopPropagation();
+            if (e.target.type !== 'checkbox') {
+                var cb = td.querySelector("input[type='checkbox']");
+                if (cb) cb.checked = !cb.checked;
+            }
+            updateSelectionToolbar();
+        }
+
         function switchSelectAll() {
             if (!$("#checkall")[0].checked) {
                 $("input[id*=cb_]").prop('checked', false);
@@ -998,7 +1008,7 @@
                     if (isKnownAsset) rowClasses.push("known-asset-row");
 
                     var row = "<tr class='" + rowClasses.join(" ") + "' data-event-idx='" + i + "' data-event-hash='" + allData[i][7] + "' onclick='toggleDataDetail(" + i + ")'>";
-                    row += "<td class='text-center' onclick='event.stopPropagation()'><input type='checkbox' id='cb_" + allData[i][7] + "'></td>";
+                    row += "<td class='text-center cb-cell' onclick='cbCellClick(this, event)'><input type='checkbox' id='cb_" + allData[i][7] + "'></td>";
                     row += "<td class='text-center validation-status'>";
                     var importedClass = isImported ? " status-imported-glow" : "";
                     if (allData[i][8] == "1" || allData[i][11] == 1) {
@@ -11959,7 +11969,7 @@
                                 if (isKnownAsset) rowClasses.push("known-asset-row");
                                 table += "<tr class='" + rowClasses.join(" ") + "' data-event-idx='" + i + "' data-event-hash='" + data[i][7] + "' onclick='toggleDataDetail(" + i + ")'>";
                                 // Checkbox column (simple checkbox only, no persistence indicators)
-                                table += "<td class='text-center' onclick='event.stopPropagation()'><input type='checkbox' id='cb_" + data[i][7] + "'></td>";
+                                table += "<td class='text-center cb-cell' onclick='cbCellClick(this, event)'><input type='checkbox' id='cb_" + data[i][7] + "'></td>";
 
                                 // Status column with text badges
                                 // Imported entries get a purple glow behind the status badge
@@ -12068,20 +12078,10 @@
 
                             // Delegated handlers — survive tablesorter and load-all DOM rebuilds
                             // Click anywhere in checkbox cell toggles the checkbox
-                            $("#scansummary-content").off('click.cbcell').on('click.cbcell', 'td:first-child', function(e) {
-                                if (e.target.type !== 'checkbox') {
-                                    var cb = $(this).find("input[type='checkbox']");
-                                    cb.prop('checked', !cb.prop('checked'));
-                                }
-                                updateSelectionToolbar();
-                            });
-
-                            // Update toolbar on any checkbox change (direct click on checkbox)
+                            // Delegated change handlers for toolbar updates
                             $("#scansummary-content").off('change.cb').on('change.cb', "input[id*=cb_]", function() {
                                 updateSelectionToolbar();
                             });
-
-                            // Update toolbar when "select all" checkbox changes
                             $("#scansummary-content").off('change.chkall').on('change.chkall', '#checkall', function() {
                                 updateSelectionToolbar();
                             });
@@ -12367,13 +12367,6 @@
                     });
 
                     // Click anywhere in first cell to toggle checkbox
-                    $("#scansummary-content").off('click.cbcell').on('click.cbcell', 'td:first-child', function(e) {
-                        if (e.target.type !== 'checkbox') {
-                            var cb = $(this).find("input[type='checkbox']");
-                            cb.prop('checked', !cb.prop('checked'));
-                        }
-                        updateSelectionToolbar();
-                    });
                     $("#scansummary-content").off('change.cb').on('change.cb', "input[id*=cb_]", function() { updateSelectionToolbar(); });
                     $("#scansummary-content").off('change.chkall').on('change.chkall', '#checkall', function() { updateSelectionToolbar(); });
                 }
