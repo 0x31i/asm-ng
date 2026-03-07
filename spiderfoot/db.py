@@ -1414,10 +1414,13 @@ class SpiderFootDb:
                 for qry in schema:
                     # Add IF NOT EXISTS so create() is idempotent and
                     # survives partially-created schemas from prior runs.
-                    safe = qry.replace(
-                        'CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS ')
-                    safe = safe.replace(
-                        'CREATE INDEX ', 'CREATE INDEX IF NOT EXISTS ')
+                    # Only add when not already present to avoid duplication.
+                    safe = qry
+                    if 'IF NOT EXISTS' not in safe:
+                        safe = safe.replace(
+                            'CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS ')
+                        safe = safe.replace(
+                            'CREATE INDEX ', 'CREATE INDEX IF NOT EXISTS ')
                     self.dbh.execute(safe)
 
                 self.conn.commit()
