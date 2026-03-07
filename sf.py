@@ -388,7 +388,10 @@ def main():
             if args.q:
                 sfConfig['__logging'] = False
 
-            loggingQueue = mp.Queue()
+            # Use spawn-context Queue so it can be passed to spawn-context
+            # scan subprocesses without a fork/spawn semaphore mismatch.
+            _spawn_ctx = mp.get_context("spawn")
+            loggingQueue = _spawn_ctx.Queue()
             logListenerSetup(loggingQueue, sfConfig)
             logWorkerSetup(loggingQueue)
 
