@@ -1242,42 +1242,47 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
     </table>
     </div>
 % endfor
-</div>
 <div id='optsect_logs' class="tab-pane" style="display: none">
 <script>document.write('<script type="text/javascript" src="${docroot}/static/js/spiderfoot.logs.js?v=' + Date.now() + '"><\/script>');</script>
 
 <style>
 /* Log Management — scoped styles */
+#optsect_logs { width: 100%; max-width: 100%; padding: 0; }
 #optsect_logs .log-header { margin-bottom: 20px; }
 #optsect_logs .log-header h4 { margin-bottom: 4px; }
 #optsect_logs .log-subtitle { color: var(--text-muted, #6b7280); font-size: 13px; font-family: var(--font-sans, sans-serif); }
 
-/* Sub-tab pills */
+/* Sub-tab pills — !important needed to override global a { color: green !important } */
 #optsect_logs .log-pills { display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
-#optsect_logs .log-pills a {
+#optsect_logs .log-pills a,
+#optsect_logs .log-pills a:visited {
   display: inline-block;
   padding: 7px 16px;
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
   font-family: var(--font-mono, monospace);
-  color: var(--text-secondary, #4b5563);
-  background: var(--bg-tertiary, #e9ecef);
-  text-decoration: none;
+  color: var(--text-secondary, #4b5563) !important;
+  background: var(--bg-tertiary, #e9ecef) !important;
+  text-decoration: none !important;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   transition: all 0.2s ease;
   cursor: pointer;
   border: 1px solid transparent;
 }
-#optsect_logs .log-pills a:hover {
-  background: var(--bg-elevated, #fff);
-  color: var(--text-primary, #1f2937);
+#optsect_logs .log-pills a:hover,
+#optsect_logs .log-pills a:focus {
+  background: var(--bg-elevated, #fff) !important;
+  color: var(--text-primary, #1f2937) !important;
   border-color: var(--accent-cyan, #0891b2);
 }
-#optsect_logs .log-pills a.active {
-  background: linear-gradient(135deg, var(--accent-cyan, #0891b2) 0%, var(--accent-cyan-light, #06b6d4) 100%);
-  color: #ffffff;
+#optsect_logs .log-pills a.active,
+#optsect_logs .log-pills a.active:visited,
+#optsect_logs .log-pills a.active:hover,
+#optsect_logs .log-pills a.active:focus {
+  background: linear-gradient(135deg, var(--accent-cyan, #0891b2) 0%, var(--accent-cyan-light, #06b6d4) 100%) !important;
+  color: #ffffff !important;
   box-shadow: 0 2px 8px var(--glow-cyan, rgba(8, 145, 178, 0.25));
   border-color: transparent;
 }
@@ -1307,6 +1312,16 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
 #optsect_logs .log-filters input[type="text"] { min-width: 120px; }
 #optsect_logs .log-filters input[type="date"] { min-width: 130px; }
 #optsect_logs .log-filters .filter-sep { flex-grow: 1; }
+
+/* Ensure tables fill full width */
+#optsect_logs .table { width: 100% !important; table-layout: auto; }
+
+/* Override Bootstrap col-md-9 padding pushing content right */
+#optsect_logs .log-filters a,
+#optsect_logs .log-meta a,
+#optsect_logs .retention-section a {
+  color: var(--accent-cyan, #0891b2) !important;
+}
 
 /* Log count */
 #optsect_logs .log-meta {
@@ -1377,7 +1392,7 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
 <!-- Log sub-tabs -->
 <div class="log-pills">
   <a id="logtab_activity" class="active" onclick="LogsUI.switchLogTab('activity')">Activity Log</a>
-  <a id="logtab_scanlogs" onclick="LogsUI.switchLogTab('scanlogs')">Scan Logs</a>
+  <a id="logtab_scanlogs" onclick="LogsUI.switchLogTab('scanlogs')">Scan Activity</a>
   <a id="logtab_apiaccess" onclick="LogsUI.switchLogTab('apiaccess')">API Access</a>
   <a id="logtab_requests" onclick="LogsUI.switchLogTab('requests')">HTTP Requests</a>
   <a id="logtab_system" onclick="LogsUI.switchLogTab('system')">System</a>
@@ -1409,20 +1424,27 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
   <div id="audit-pagination"></div>
 </div>
 
-<!-- ===== Scan Logs ===== -->
+<!-- ===== Scan Activity ===== -->
 <div id="logpane_scanlogs" style="display:none">
   <div class="log-filters">
-    <input type="text" id="scanlog-filter-scan" placeholder="Scan ID..." style="min-width:200px;">
-    <select id="scanlog-filter-type">
-      <option value="">All Types</option>
-      <option value="ERROR">Error</option>
-      <option value="WARNING">Warning</option>
-      <option value="STATUS">Status</option>
-      <option value="PROGRESS">Progress</option>
-      <option value="DEBUG">Debug</option>
+    <select id="scanlog-filter-scan" style="min-width:220px;"><option value="">All Scans</option></select>
+    <select id="scanlog-filter-action">
+      <option value="">All Actions</option>
+      <option value="SCAN_START">Scan Started</option>
+      <option value="SCAN_STOP">Scan Stopped</option>
+      <option value="SCAN_DELETE">Scan Deleted</option>
+      <option value="SCAN_VIEW">Scan Viewed</option>
+      <option value="SCAN_STATUS_OVERRIDE">Status Override</option>
+      <option value="RESULT_FP_CHANGE">FP Change</option>
+      <option value="RESULT_TRACKING">Tracking Change</option>
+      <option value="ANALYST_COMMENT">Analyst Comment</option>
+      <option value="ANALYST_NOTE">Analyst Note</option>
+      <option value="FP_ADD">FP Added</option>
+      <option value="FP_REMOVE">FP Removed</option>
+      <option value="DATA_EXPORT">Data Export</option>
+      <option value="DATA_IMPORT">Data Import</option>
     </select>
-    <input type="text" id="scanlog-filter-component" placeholder="Component...">
-    <input type="text" id="scanlog-filter-search" placeholder="Search message...">
+    <input type="text" id="scanlog-filter-search" placeholder="Search details...">
     <span class="filter-sep"></span>
     <button class="btn btn-primary btn-sm" onclick="LogsUI.loadScanLogs(0)">Filter</button>
     <button class="btn btn-default btn-sm" onclick="LogsUI.exportLogCSV('scanlogs')" title="Export CSV"><i class="glyphicon glyphicon-download-alt"></i> CSV</button>
@@ -1431,10 +1453,10 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
   <table class="table table-striped table-condensed">
     <thead><tr>
       <th style="width:155px;">Time</th>
+      <th style="width:100px;">User</th>
       <th style="width:180px;">Scan</th>
-      <th style="width:130px;">Component</th>
-      <th style="width:85px;">Type</th>
-      <th>Message</th>
+      <th style="width:150px;">Action</th>
+      <th>Details</th>
     </tr></thead>
     <tbody id="scanlog-body"></tbody>
   </table>
@@ -1538,6 +1560,7 @@ $(document).ready(function() {
 </script>
 
 </div>
+</div> <!-- /tab-content col-md-9 -->
 </div> <!-- /tabbable tabs-left -->
 </form>
 

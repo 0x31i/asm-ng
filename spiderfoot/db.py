@@ -6857,7 +6857,7 @@ class SpiderFootDb:
     def auditLogGet(self, limit: int = 50, offset: int = 0, username: str = None,
                     action: str = None, search: str = None,
                     date_from: int = None, date_to: int = None,
-                    scan_id: str = None) -> dict:
+                    scan_id: str = None, scan_only: bool = False) -> dict:
         """Get audit log entries with pagination, search, and date range.
 
         Args:
@@ -6869,40 +6869,46 @@ class SpiderFootDb:
             date_from (int): filter entries created >= this timestamp (ms)
             date_to (int): filter entries created <= this timestamp (ms)
             scan_id (str): filter by scan instance ID
+            scan_only (bool): if True, only return entries linked to a scan
 
         Returns:
             dict: {entries: [...], total: N, limit: N, offset: N}
         """
         conditions = []
         params = []
+        # When scan_only=True, queries use table alias 'a' for the JOIN
+        col = "a." if scan_only else ""
+
+        if scan_only:
+            conditions.append(f"{col}scan_instance_id IS NOT NULL")
 
         if username:
-            conditions.append("username = ?")
+            conditions.append(f"{col}username = ?")
             params.append(username)
 
         if action:
             if action.endswith('*'):
-                conditions.append("action LIKE ?")
+                conditions.append(f"{col}action LIKE ?")
                 params.append(action.replace('*', '%'))
             else:
-                conditions.append("action = ?")
+                conditions.append(f"{col}action = ?")
                 params.append(action)
 
         if scan_id:
-            conditions.append("scan_instance_id = ?")
+            conditions.append(f"{col}scan_instance_id = ?")
             params.append(scan_id)
 
         if search:
-            conditions.append("(detail ILIKE ? OR username ILIKE ?)")
+            conditions.append(f"({col}detail ILIKE ? OR {col}username ILIKE ?)")
             params.append(f"%{search}%")
             params.append(f"%{search}%")
 
         if date_from is not None:
-            conditions.append("created >= ?")
+            conditions.append(f"{col}created >= ?")
             params.append(int(date_from))
 
         if date_to is not None:
-            conditions.append("created <= ?")
+            conditions.append(f"{col}created <= ?")
             params.append(int(date_to))
 
         where = ""
@@ -6911,12 +6917,42 @@ class SpiderFootDb:
 
         with self.dbhLock:
             try:
-                # Get total count
+                if scan_only:
+                    # JOIN with scan instance to get scan name/target
+                    count_qry = f"SELECT COUNT(*) FROM tbl_audit_log a{where}"
+                    self.dbh.execute(count_qry, params[:])
+                    total = self.dbh.fetchone()[0]
+
+                    qry = (f"SELECT a.id, a.username, a.action, a.detail, a.ip_address, "
+                           f"a.created, a.scan_instance_id, s.scan_name, s.seed_target "
+                           f"FROM tbl_audit_log a "
+                           f"LEFT JOIN tbl_scan_instance s ON a.scan_instance_id = s.guid "
+                           f"{where} ORDER BY a.created DESC LIMIT ? OFFSET ?")
+                    page_params = params + [limit, offset]
+                    self.dbh.execute(qry, page_params)
+                    rows = self.dbh.fetchall()
+
+                    entries = [
+                        {
+                            'id': row[0],
+                            'username': row[1],
+                            'action': row[2],
+                            'detail': row[3],
+                            'ip_address': row[4],
+                            'created': row[5],
+                            'scan_id': row[6],
+                            'scan_name': row[7],
+                            'scan_target': row[8]
+                        }
+                        for row in rows
+                    ]
+                    return {'entries': entries, 'total': total, 'limit': limit, 'offset': offset}
+
+                # Standard query (no join)
                 count_qry = f"SELECT COUNT(*) FROM tbl_audit_log{where}"
                 self.dbh.execute(count_qry, params[:])
                 total = self.dbh.fetchone()[0]
 
-                # Get page of entries
                 qry = f"SELECT id, username, action, detail, ip_address, created, scan_instance_id FROM tbl_audit_log{where} ORDER BY created DESC LIMIT ? OFFSET ?"
                 page_params = params + [limit, offset]
                 self.dbh.execute(qry, page_params)

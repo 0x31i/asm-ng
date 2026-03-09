@@ -22,7 +22,7 @@ var LogsUI = (function() {
         }
         // Load data for the selected tab
         if (tab === 'activity') loadAuditLog(0);
-        else if (tab === 'scanlogs') loadScanLogs(0);
+        else if (tab === 'scanlogs') { loadScanList(); loadScanLogs(0); }
         else if (tab === 'apiaccess') loadApiLogs(0);
         else if (tab === 'system') loadSystemLog('debug');
         else if (tab === 'requests') loadRequestLog(0);
@@ -107,37 +107,47 @@ var LogsUI = (function() {
         $('#audit-log-count').text(data.total || 0);
     }
 
-    // --- Scan Logs ---
+    // --- Scan Activity (audit entries linked to scans) ---
     function loadScanLogs(offset) {
-        var limit = 100;
-        var params = 'limit=' + limit + '&offset=' + offset;
+        var limit = 50;
+        var params = 'limit=' + limit + '&offset=' + offset + '&scan_only=1';
         var scanId = $('#scanlog-filter-scan').val();
-        var logType = $('#scanlog-filter-type').val();
-        var component = $('#scanlog-filter-component').val();
+        var action = $('#scanlog-filter-action').val();
         var search = $('#scanlog-filter-search').val();
 
         if (scanId) params += '&scan_id=' + encodeURIComponent(scanId);
-        if (logType) params += '&log_type=' + encodeURIComponent(logType);
-        if (component) params += '&component=' + encodeURIComponent(component);
+        if (action) params += '&action=' + encodeURIComponent(action);
         if (search) params += '&search=' + encodeURIComponent(search);
 
-        $.getJSON(docroot + '/scanlogsglobal?' + params, function(data) {
+        $.getJSON(docroot + '/auditlogapi?' + params, function(data) {
             var rows = '';
             var entries = data.entries || [];
-            var typeClasses = {'ERROR': 'label-danger', 'WARNING': 'label-warning', 'STATUS': 'label-info', 'PROGRESS': 'label-default', 'DEBUG': 'label-default'};
+            var actionClasses = {
+                'SCAN_START': 'label-primary', 'SCAN_STOP': 'label-warning',
+                'SCAN_DELETE': 'label-danger', 'SCAN_VIEW': 'label-default',
+                'SCAN_STATUS_OVERRIDE': 'label-warning',
+                'RESULT_FP_CHANGE': 'label-info', 'RESULT_TRACKING': 'label-info',
+                'ANALYST_COMMENT': 'label-info', 'ANALYST_NOTE': 'label-info',
+                'FP_ADD': 'label-warning', 'FP_REMOVE': 'label-default',
+                'DATA_EXPORT': 'label-primary', 'DATA_IMPORT': 'label-primary',
+                'DATA_MODIFY': 'label-warning'
+            };
             for (var i = 0; i < entries.length; i++) {
                 var e = entries[i];
-                var cls = typeClasses[e.type] || 'label-default';
+                var cls = actionClasses[e.action] || 'label-default';
+                var scanLabel = escHtml(e.scan_name || '');
+                if (e.scan_target && e.scan_name) scanLabel = escHtml(e.scan_name) + ' <span class="text-muted">(' + escHtml(e.scan_target) + ')</span>';
+                else if (e.scan_id) scanLabel = scanLabel || '<code>' + escHtml(e.scan_id).substring(0, 8) + '</code>';
                 rows += '<tr>' +
                     '<td><span class="text-muted">' + escHtml(e.time_str || '') + '</span></td>' +
-                    '<td>' + escHtml(e.scan_name || e.scan_id || '') + '</td>' +
-                    '<td>' + escHtml(e.component || '') + '</td>' +
-                    '<td><span class="label ' + cls + '">' + escHtml(e.type) + '</span></td>' +
-                    '<td style="max-width:500px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(e.message || '') + '</td>' +
+                    '<td><strong>' + escHtml(e.username) + '</strong></td>' +
+                    '<td>' + scanLabel + '</td>' +
+                    '<td><span class="label ' + cls + '">' + escHtml(e.action) + '</span></td>' +
+                    '<td>' + escHtml(e.detail || '') + '</td>' +
                     '</tr>';
             }
             if (!entries.length) {
-                rows = '<tr><td colspan="5" class="text-center text-muted" style="padding:30px;">No scan logs found.</td></tr>';
+                rows = '<tr><td colspan="5" class="text-center text-muted" style="padding:30px;">No scan activity found.</td></tr>';
             }
             $('#scanlog-body').html(rows);
             $('#scanlog-count').text(data.total || 0);
@@ -283,10 +293,11 @@ var LogsUI = (function() {
             window.location.href = docroot + '/auditlogexport?' + params;
         } else if (logType === 'scanlogs') {
             var scanId = $('#scanlog-filter-scan').val();
-            var lt = $('#scanlog-filter-type').val();
+            var sa = $('#scanlog-filter-action').val();
+            params += '&scan_only=1';
             if (scanId) params += '&scan_id=' + encodeURIComponent(scanId);
-            if (lt) params += '&log_type=' + encodeURIComponent(lt);
-            window.location.href = docroot + '/scanlogexport?' + params;
+            if (sa) params += '&action=' + encodeURIComponent(sa);
+            window.location.href = docroot + '/auditlogexport?' + params;
         } else if (logType === 'requests') {
             var ru = $('#reqlog-filter-user').val();
             var rp = $('#reqlog-filter-path').val();
@@ -374,6 +385,22 @@ var LogsUI = (function() {
             userSel.empty().append('<option value="">All Users</option>');
             (data.users || []).forEach(function(u) {
                 userSel.append('<option value="' + escHtml(u) + '">' + escHtml(u) + '</option>');
+            });
+        });
+    }
+
+    // --- Load scan list for Scan Logs dropdown ---
+    var _scanListLoaded = false;
+    function loadScanList() {
+        if (_scanListLoaded) return;
+        _scanListLoaded = true;
+        $.getJSON(docroot + '/scanslistjson', function(scans) {
+            var sel = $('#scanlog-filter-scan');
+            sel.empty().append('<option value="">All Scans</option>');
+            (scans || []).forEach(function(s) {
+                var label = escHtml(s.name || s.target || s.id);
+                if (s.target && s.name) label = escHtml(s.name) + ' (' + escHtml(s.target) + ')';
+                sel.append('<option value="' + escHtml(s.id) + '">' + label + '</option>');
             });
         });
     }

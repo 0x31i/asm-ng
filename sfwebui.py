@@ -13401,7 +13401,8 @@ cat output/FINAL_CONSOLIDATION.md
     @cherrypy.tools.json_out()
     def auditlogapi(self: 'SpiderFootWebUi', limit: str = '50', offset: str = '0',
                     username: str = None, action: str = None, search: str = None,
-                    date_from: str = None, date_to: str = None) -> dict:
+                    date_from: str = None, date_to: str = None,
+                    scan_id: str = None, scan_only: str = None) -> dict:
         """Paginated audit log API endpoint.
 
         Args:
@@ -13412,6 +13413,8 @@ cat output/FINAL_CONSOLIDATION.md
             search: search in detail/username
             date_from: filter >= timestamp in ms
             date_to: filter <= timestamp in ms
+            scan_id: filter by scan instance ID
+            scan_only: if '1', only return entries linked to a scan
 
         Returns:
             dict: {entries, total, limit, offset}
@@ -13422,7 +13425,9 @@ cat output/FINAL_CONSOLIDATION.md
                 limit=int(limit), offset=int(offset),
                 username=username, action=action, search=search,
                 date_from=int(date_from) if date_from else None,
-                date_to=int(date_to) if date_to else None
+                date_to=int(date_to) if date_to else None,
+                scan_id=scan_id,
+                scan_only=(scan_only == '1')
             )
             # Add formatted timestamps
             for entry in result.get('entries', []):
@@ -13594,32 +13599,45 @@ cat output/FINAL_CONSOLIDATION.md
 
     @cherrypy.expose
     def auditlogexport(self: 'SpiderFootWebUi', username: str = None, action: str = None,
-                       search: str = None, date_from: str = None, date_to: str = None) -> bytes:
+                       search: str = None, date_from: str = None, date_to: str = None,
+                       scan_id: str = None, scan_only: str = None) -> bytes:
         """Export filtered audit log as CSV.
 
         Returns:
             bytes: CSV file download
         """
         self.requireAdmin()
+        is_scan_only = (scan_only == '1')
         with SpiderFootDb(self.config) as dbh:
             result = dbh.auditLogGet(
                 limit=100000, offset=0,
                 username=username, action=action, search=search,
                 date_from=int(date_from) if date_from else None,
-                date_to=int(date_to) if date_to else None
+                date_to=int(date_to) if date_to else None,
+                scan_id=scan_id, scan_only=is_scan_only
             )
             dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
                          detail="Audit log CSV exported", ip_address=self.clientIP())
 
         buf = StringIO()
         writer = csv.writer(buf)
-        writer.writerow(['Time', 'Username', 'Action', 'Detail', 'IP Address'])
-        for entry in result.get('entries', []):
-            writer.writerow([
-                time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(entry['created'] / 1000)),
-                entry['username'], entry['action'],
-                entry['detail'] or '', entry['ip_address'] or ''
-            ])
+        if is_scan_only:
+            writer.writerow(['Time', 'Username', 'Scan', 'Target', 'Action', 'Detail'])
+            for entry in result.get('entries', []):
+                writer.writerow([
+                    time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(entry['created'] / 1000)),
+                    entry['username'], entry.get('scan_name', ''),
+                    entry.get('scan_target', ''), entry['action'],
+                    entry['detail'] or ''
+                ])
+        else:
+            writer.writerow(['Time', 'Username', 'Action', 'Detail', 'IP Address'])
+            for entry in result.get('entries', []):
+                writer.writerow([
+                    time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(entry['created'] / 1000)),
+                    entry['username'], entry['action'],
+                    entry['detail'] or '', entry['ip_address'] or ''
+                ])
 
         cherrypy.response.headers['Content-Type'] = 'application/csv'
         cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="audit_log_{time.strftime("%Y%m%d")}.csv"'
