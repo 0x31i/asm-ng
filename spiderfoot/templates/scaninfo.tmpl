@@ -12740,7 +12740,7 @@
             $("#scanreminder").hide();
             navTo("btn-info");
             pushViewState('btn-info');
-            scanLogLoaded = false;
+            scanActivityLoaded = false;
             refresh = function() { viewScanConfig(instanceId); }
             sf.fetchData('${docroot}/scanopts', {'id': instanceId}, function(data) {
                 var table = "<div id='scansummary-content'>";
@@ -12815,15 +12815,16 @@
                 table += "</tbody></table></div>";
                 table += "</div></div>";
 
-                // Scan Log - collapsible button at the bottom
+                // Scan Activity - collapsible feed at the bottom
                 table += "<div class='manage-section'>";
-                table += "<div class='manage-section-header collapsed' id='scan-log-header' onclick='toggleScanLog(this, \"" + instanceId + "\")'>";
+                table += "<div class='manage-section-header collapsed' id='scan-activity-header' onclick='toggleScanActivity(this, \"" + instanceId + "\")'>";
                 table += "<i class='glyphicon glyphicon-chevron-right section-chevron'></i>";
-                table += "<h4><i class='glyphicon glyphicon-book'></i>&nbsp;Scan Log</h4>";
+                table += "<h4><i class='glyphicon glyphicon-list-alt'></i>&nbsp;Scan Activity</h4>";
                 table += "</div>";
-                table += "<div class='manage-section-body' id='scan-log-body' style='display:none'>";
-                table += "<div id='scan-log-loader' style='text-align:center; padding: 20px; display:none'><img src=\"${docroot}/static/img/loader.gif\"></div>";
-                table += "<div id='scan-log-content'></div>";
+                table += "<div class='manage-section-body' id='scan-activity-body' style='display:none'>";
+                table += "<p style='color:var(--text-muted,#6b7280);font-size:12px;margin:0 0 10px'>Edit history for this scan &mdash; FP changes, tracking updates, notes, exports, and imports.</p>";
+                table += "<div id='scan-activity-content'></div>";
+                table += "<div id='scan-activity-pagination' style='margin-top:8px'></div>";
                 table += "</div></div>";
 
                 // Scan Actions (admin only) - override scan status
@@ -12982,11 +12983,13 @@
             }
         }
 
-        // Toggle scan log section - fetches logs on first expand
-        var scanLogLoaded = false;
-        function toggleScanLog(header, instanceId) {
+        // Toggle scan activity section - fetches activity feed on first expand
+        var scanActivityLoaded = false;
+        var scanActivityPage = 0;
+
+        function toggleScanActivity(header, instanceId) {
             var $header = $(header);
-            var $body = $('#scan-log-body');
+            var $body = $('#scan-activity-body');
             var $chevron = $header.find('.section-chevron');
 
             if ($header.hasClass('collapsed')) {
@@ -12994,36 +12997,75 @@
                 $chevron.removeClass('glyphicon-chevron-right').addClass('glyphicon-chevron-down');
                 $body.slideDown(200);
 
-                // Fetch logs on first expand
-                if (!scanLogLoaded) {
-                    scanLogLoaded = true;
-                    $('#scan-log-loader').show();
-                    sf.fetchData('${docroot}/scanlog', {'id': instanceId}, function(data) {
-                        var logTable = "<table class='table table-bordered table-striped table-condensed small tablesorter' style='table-layout: fixed'>";
-                        logTable += "<thead><tr><th>Time</th><th>Component</th><th>Type</th><th>Event</th></tr></thead><tbody>";
-                        for (var i = 0; i < data.length; i++) {
-                            if (data[i][2] == "ERROR") {
-                                logTable += "<tr class='danger'>";
-                            } else {
-                                logTable += "<tr>";
-                            }
-                            logTable += "<td>" + data[i][0] + "</td>";
-                            logTable += "<td>" + data[i][1] + "</td>";
-                            logTable += "<td>" + data[i][2] + "</td>";
-                            logTable += "<td>" + data[i][3] + "</td>";
-                            logTable += "</tr>";
-                        }
-                        logTable += "</tbody></table>";
-                        $('#scan-log-loader').hide();
-                        $('#scan-log-content').html(logTable);
-                        $('#scan-log-content .tablesorter').tablesorter({widgets: ["filter"], widgetOptions : { filter_searchDelay : 300, filter_hideFilters : false }});
-                    });
+                if (!scanActivityLoaded) {
+                    scanActivityLoaded = true;
+                    loadScanActivity(instanceId, 0);
                 }
             } else {
                 $header.addClass('collapsed');
                 $chevron.removeClass('glyphicon-chevron-down').addClass('glyphicon-chevron-right');
                 $body.slideUp(200);
             }
+        }
+
+        function loadScanActivity(instanceId, offset) {
+            var limit = 25;
+            $('#scan-activity-content').html('<div style="text-align:center;padding:20px;color:var(--text-muted,#888)"><i class="glyphicon glyphicon-refresh"></i> Loading...</div>');
+            sf.fetchData('${docroot}/scanactivity', {id: instanceId, limit: limit, offset: offset}, function(data) {
+                if (!data || !data.entries) {
+                    $('#scan-activity-content').html('<div style="padding:20px;text-align:center;color:var(--text-muted,#888)">No activity recorded for this scan.</div>');
+                    return;
+                }
+                var actionStyles = {
+                    'RESULT_FP_CHANGE': {icon: 'glyphicon-flag', cls: 'label-warning'},
+                    'RESULT_TRACKING': {icon: 'glyphicon-transfer', cls: 'label-primary'},
+                    'ANALYST_COMMENT': {icon: 'glyphicon-comment', cls: 'label-info'},
+                    'ANALYST_NOTE': {icon: 'glyphicon-edit', cls: 'label-info'},
+                    'SCAN_VIEW': {icon: 'glyphicon-eye-open', cls: 'label-default'},
+                    'DATA_EXPORT': {icon: 'glyphicon-export', cls: 'label-primary'},
+                    'DATA_IMPORT': {icon: 'glyphicon-import', cls: 'label-info'},
+                    'DATA_MODIFY': {icon: 'glyphicon-wrench', cls: 'label-warning'},
+                    'SCAN_START': {icon: 'glyphicon-play', cls: 'label-success'},
+                    'SCAN_STOP': {icon: 'glyphicon-stop', cls: 'label-danger'},
+                    'SCAN_DELETE': {icon: 'glyphicon-trash', cls: 'label-danger'},
+                    'SCAN_STATUS_OVERRIDE': {icon: 'glyphicon-cog', cls: 'label-warning'},
+                    'FP_ADD': {icon: 'glyphicon-plus', cls: 'label-warning'},
+                    'FP_REMOVE': {icon: 'glyphicon-minus', cls: 'label-default'},
+                    'DB_MAINTENANCE': {icon: 'glyphicon-hdd', cls: 'label-default'}
+                };
+                var html = '<table class="table table-condensed" style="font-size:13px;margin:0">';
+                html += '<thead><tr><th style="width:155px">Time</th><th style="width:90px">User</th><th style="width:150px">Action</th><th>Details</th></tr></thead><tbody>';
+                var entries = data.entries;
+                for (var i = 0; i < entries.length; i++) {
+                    var e = entries[i];
+                    var style = actionStyles[e.action] || {icon: 'glyphicon-record', cls: 'label-default'};
+                    html += '<tr>';
+                    html += '<td style="color:var(--text-muted,#888)">' + sf.escapeHtml(e.time_str || '') + '</td>';
+                    html += '<td><strong>' + sf.escapeHtml(e.username || '') + '</strong></td>';
+                    html += '<td><span class="label ' + style.cls + '"><i class="glyphicon ' + style.icon + '"></i> ' + sf.escapeHtml(e.action) + '</span></td>';
+                    html += '<td>' + sf.escapeHtml(e.detail || '') + '</td>';
+                    html += '</tr>';
+                }
+                html += '</tbody></table>';
+
+                // Pagination
+                var total = data.total || 0;
+                var pages = Math.ceil(total / limit);
+                var currentPage = Math.floor(offset / limit);
+                if (pages > 1) {
+                    html += '<div style="text-align:center;margin-top:8px">';
+                    if (currentPage > 0) {
+                        html += '<a href="javascript:void(0)" onclick="loadScanActivity(\'' + instanceId + '\',' + ((currentPage-1)*limit) + ')" class="btn btn-default btn-xs">&laquo; Prev</a> ';
+                    }
+                    html += '<span style="font-size:11px;color:var(--text-muted,#888);margin:0 8px">Page ' + (currentPage+1) + ' of ' + pages + ' (' + total + ' entries)</span>';
+                    if (currentPage < pages - 1) {
+                        html += ' <a href="javascript:void(0)" onclick="loadScanActivity(\'' + instanceId + '\',' + ((currentPage+1)*limit) + ')" class="btn btn-default btn-xs">Next &raquo;</a>';
+                    }
+                    html += '</div>';
+                }
+
+                $('#scan-activity-content').html(html);
+            });
         }
 
         // Always default to Summary view

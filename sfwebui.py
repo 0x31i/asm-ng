@@ -1341,7 +1341,7 @@ class SpiderFootWebUi:
 
             dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
                          detail=f"Full backup ZIP for scan {id}",
-                         ip_address=self.clientIP())
+                         ip_address=self.clientIP(), scan_id=id)
 
             cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={zip_filename}'
             cherrypy.response.headers['Content-Type'] = 'application/zip'
@@ -1517,7 +1517,7 @@ class SpiderFootWebUi:
             data = dbh.scanResultEvent(id, type)
             dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
                          detail=f"Scan {id} results as {filetype} ({export_mode})",
-                         ip_address=self.clientIP())
+                         ip_address=self.clientIP(), scan_id=id)
             filter_fps = export_mode in ("analysis", "analysis_correlations")
 
             # Force Excel for analysis_correlations mode (correlations tab requires .xlsx)
@@ -4496,7 +4496,7 @@ class SpiderFootWebUi:
                 return self.error("Scan ID not found.")
 
             dbh.auditLog(self.currentUser() or 'system', 'SCAN_VIEW',
-                         detail=f"Viewed scan {id}", ip_address=self.clientIP())
+                         detail=f"Viewed scan {id}", ip_address=self.clientIP(), scan_id=id)
 
             templ = Template(filename='spiderfoot/templates/scaninfo.tmpl',
                              lookup=self.lookup, input_encoding='utf-8')
@@ -5418,7 +5418,7 @@ class SpiderFootWebUi:
             dbh.auditLog(
                 self.currentUser() or 'unknown', 'SCAN_DELETE',
                 detail=f"Deleted scan(s): {id}",
-                ip_address=self.clientIP()
+                ip_address=self.clientIP(), scan_id=id
             )
 
             return ""
@@ -5622,6 +5622,10 @@ class SpiderFootWebUi:
                 if not ret:
                     return json.dumps(["ERROR", "Failed to update status."]).encode('utf-8')
                 self.log.info(f"FP update: scan={id} results={len(ids)} flag={fp}")
+                tracking_labels = {0: 'unverified', 1: 'false positive', 2: 'validated'}
+                dbh.auditLog(self.currentUser() or 'system', 'RESULT_FP_CHANGE',
+                             detail=f"Set {len(ids)} result(s) to {tracking_labels.get(int(fp), fp)}",
+                             ip_address=self.clientIP(), scan_id=id)
                 return json.dumps(["SUCCESS", ""]).encode('utf-8')
             except Exception as e:
                 self.log.error(f"Error updating FP for scan {id}: {e}", exc_info=True)
@@ -5711,6 +5715,10 @@ class SpiderFootWebUi:
                 return json.dumps(["ERROR", "Failed to update status."]).encode('utf-8')
 
             self.log.info(f"FP persist: scan={id} results={len(allIds)} flag={fp} persist={persist}")
+            tracking_labels = {0: 'unverified', 1: 'false positive', 2: 'validated'}
+            dbh.auditLog(self.currentUser() or 'system', 'RESULT_FP_CHANGE',
+                         detail=f"Set {len(ids)} result(s) to {tracking_labels.get(int(fp), fp)} (persist={persist})",
+                         ip_address=self.clientIP(), scan_id=id)
 
             # Handle target-level persistence and cross-scan sync
             # Uses batch methods and background thread for performance
@@ -7351,7 +7359,7 @@ class SpiderFootWebUi:
             dbh.auditLog(
                 self.currentUser() or 'unknown', 'SCAN_START',
                 detail=f"Scan '{scanname}' on target '{scantarget}' (ID: {scanId})",
-                ip_address=self.clientIP()
+                ip_address=self.clientIP(), scan_id=scanId
             )
 
             if cherrypy.request.headers.get('Accept') and 'application/json' in cherrypy.request.headers.get('Accept'):
@@ -7439,7 +7447,7 @@ class SpiderFootWebUi:
                 dbh.auditLog(
                     self.currentUser() or 'unknown', 'SCAN_STOP',
                     detail=f"Stopped scan(s): {id}",
-                    ip_address=self.clientIP()
+                    ip_address=self.clientIP(), scan_id=id
                 )
             except Exception:
                 pass  # Don't fail the stop operation over audit logging
@@ -7512,7 +7520,7 @@ class SpiderFootWebUi:
                 dbh.auditLog(
                     self.currentUser() or 'unknown', 'SCAN_STATUS_OVERRIDE',
                     detail=f"Overrode scan {id} status from '{old_status}' to '{status}'",
-                    ip_address=self.clientIP()
+                    ip_address=self.clientIP(), scan_id=id
                 )
             except Exception:
                 pass  # Don't fail the override over audit logging
@@ -8989,7 +8997,7 @@ class SpiderFootWebUi:
                 count = dbh.scanFindingsStore(id, findings)
                 dbh.auditLog(self.currentUser() or 'system', 'DATA_IMPORT',
                              detail=f"Findings imported for scan {id}: {count} items",
-                             ip_address=self.clientIP())
+                             ip_address=self.clientIP(), scan_id=id)
 
                 return {
                     'success': True,
@@ -9094,7 +9102,7 @@ class SpiderFootWebUi:
         try:
             with SpiderFootDb(self.config) as dbh:
                 dbh.auditLog(self.currentUser() or 'system', 'DATA_IMPORT',
-                             detail=f"Nessus import for scan {id}", ip_address=self.clientIP())
+                             detail=f"Nessus import for scan {id}", ip_address=self.clientIP(), scan_id=id)
         except Exception:
             pass
 
@@ -9214,7 +9222,7 @@ class SpiderFootWebUi:
         try:
             with SpiderFootDb(self.config) as dbh:
                 dbh.auditLog(self.currentUser() or 'system', 'DATA_IMPORT',
-                             detail=f"Burp XML import for scan {id}", ip_address=self.clientIP())
+                             detail=f"Burp XML import for scan {id}", ip_address=self.clientIP(), scan_id=id)
         except Exception:
             pass
 
@@ -9255,7 +9263,7 @@ class SpiderFootWebUi:
         try:
             with SpiderFootDb(self.config) as dbh:
                 dbh.auditLog(self.currentUser() or 'system', 'DATA_IMPORT',
-                             detail=f"Burp HTML enhance for scan {id}", ip_address=self.clientIP())
+                             detail=f"Burp HTML enhance for scan {id}", ip_address=self.clientIP(), scan_id=id)
         except Exception:
             pass
 
@@ -9281,7 +9289,7 @@ class SpiderFootWebUi:
             _scan_name = scan[0] if scan else ''
             dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
                          detail=f"Scan {id} vulns as {filetype}",
-                         ip_address=self.clientIP())
+                         ip_address=self.clientIP(), scan_id=id)
 
             # --- Nessus data ---
             nessus_headers = [
@@ -9431,6 +9439,10 @@ class SpiderFootWebUi:
 
             try:
                 dbh.scanNessusUpdateTracking(id, int(resultId), int(tracking))
+                tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
+                dbh.auditLog(self.currentUser() or 'system', 'RESULT_TRACKING',
+                             detail=f"Nessus result {resultId} set to {tracking_labels.get(int(tracking), tracking)}",
+                             ip_address=self.clientIP(), scan_id=id)
                 return {'success': True}
             except Exception as e:
                 self.log.error(f"Error updating Nessus tracking for scan {id}, result {resultId}: {e}", exc_info=True)
@@ -9453,6 +9465,10 @@ class SpiderFootWebUi:
 
             try:
                 dbh.scanBurpUpdateTracking(id, int(resultId), int(tracking))
+                tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
+                dbh.auditLog(self.currentUser() or 'system', 'RESULT_TRACKING',
+                             detail=f"Burp result {resultId} set to {tracking_labels.get(int(tracking), tracking)}",
+                             ip_address=self.clientIP(), scan_id=id)
                 return {'success': True}
             except Exception as e:
                 self.log.error(f"Error updating Burp tracking for scan {id}, result {resultId}: {e}", exc_info=True)
@@ -9487,6 +9503,10 @@ class SpiderFootWebUi:
                             eventDetails[2], int(tracking)
                         )
 
+                tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
+                dbh.auditLog(self.currentUser() or 'system', 'RESULT_TRACKING',
+                             detail=f"Event {resultHash[:8]} set to {tracking_labels.get(int(tracking), tracking)}",
+                             ip_address=self.clientIP(), scan_id=id)
                 return {'success': True}
             except Exception as e:
                 self.log.error(f"Error updating event tracking for scan {id}, hash {resultHash}: {e}", exc_info=True)
@@ -9539,7 +9559,7 @@ class SpiderFootWebUi:
                 action = 'ANALYST_COMMENT'
                 detail = f"Type comment {'saved' if comment else 'cleared'} for {eventType} on scan {id}"
                 dbh.auditLog(self.currentUser() or 'system', action,
-                             detail=detail, ip_address=self.clientIP())
+                             detail=detail, ip_address=self.clientIP(), scan_id=id)
                 return {'success': True}
             except Exception as e:
                 self.log.error(f"Error saving type comment for scan {id}, type {eventType}: {e}", exc_info=True)
@@ -9571,7 +9591,7 @@ class SpiderFootWebUi:
                 action = 'ANALYST_NOTE'
                 detail = f"Row note {'saved' if note else 'cleared'} for hash {resultHash[:8]} on scan {id}"
                 dbh.auditLog(self.currentUser() or 'system', action,
-                             detail=detail, ip_address=self.clientIP())
+                             detail=detail, ip_address=self.clientIP(), scan_id=id)
                 return {'success': True}
             except Exception as e:
                 self.log.error(f"Error saving row note for scan {id}, hash {resultHash}: {e}", exc_info=True)
@@ -12314,7 +12334,7 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             scan_name = scanInfo[0]
             dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
                          detail=f"Triage export for scan {id}",
-                         ip_address=self.clientIP())
+                         ip_address=self.clientIP(), scan_id=id)
             target = scanInfo[1]
 
             # Fetch results — filter by FP status if requested
@@ -12403,7 +12423,7 @@ This is a placeholder MCP report. Integration with actual MCP server required.
 
             dbh.auditLog(self.currentUser() or 'system', 'DATA_IMPORT',
                          detail=f"Triage import for scan {scan_id}: {applied['fp']} FP, {applied['legit']} legit",
-                         ip_address=self.clientIP())
+                         ip_address=self.clientIP(), scan_id=scan_id)
 
             # Record in triage history
             try:
@@ -12566,7 +12586,7 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             scan_status = scanInfo[5]
             dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
                          detail=f"Enrichment export for scan {id}",
-                         ip_address=self.clientIP())
+                         ip_address=self.clientIP(), scan_id=id)
 
             # Get all results
             results = dbh.scanResultEvent(id, 'ALL')
@@ -13030,7 +13050,7 @@ This is a placeholder MCP report. Integration with actual MCP server required.
 
             dbh.auditLog(self.currentUser() or 'system', 'DATA_IMPORT',
                          detail=f"Enrichment import for scan {scan_id}: {stats['written']} notes",
-                         ip_address=self.clientIP())
+                         ip_address=self.clientIP(), scan_id=scan_id)
 
         return {
             'success': True,
@@ -13063,7 +13083,7 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             deleted = dbh.rowNotesClearAI(target)
             dbh.auditLog(self.currentUser() or 'system', 'DATA_MODIFY',
                          detail=f"Cleared AI notes for target {target}: {deleted} removed",
-                         ip_address=self.clientIP())
+                         ip_address=self.clientIP(), scan_id=id)
 
         return {
             'success': True,
@@ -13199,7 +13219,7 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             target = scanInfo[1]
             dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
                          detail=f"Analysis export for scan {id}",
-                         ip_address=self.clientIP())
+                         ip_address=self.clientIP(), scan_id=id)
 
             # ── Build scan_results.csv (full_scored, FPs excluded) ──
             results = dbh.scanResultEvent(id, 'ALL')
@@ -13673,3 +13693,23 @@ cat output/FINAL_CONSOLIDATION.md
         cherrypy.response.headers['Content-Type'] = 'application/csv'
         cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="request_log_{time.strftime("%Y%m%d")}.csv"'
         return buf.getvalue().encode('utf-8')
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scanactivity(self: 'SpiderFootWebUi', id: str, limit: str = '50', offset: str = '0') -> dict:
+        """Get all edit activity for a specific scan.
+
+        Args:
+            id: scan instance ID
+            limit: max entries per page
+            offset: pagination offset
+
+        Returns:
+            dict: {entries, total, limit, offset}
+        """
+        with SpiderFootDb(self.config) as dbh:
+            result = dbh.scanActivityGet(id, limit=int(limit), offset=int(offset))
+            for entry in result.get('entries', []):
+                entry['time_str'] = time.strftime(
+                    "%Y-%m-%d %H:%M:%S", time.localtime(entry['created'] / 1000))
+            return result
