@@ -22,7 +22,7 @@ var LogsUI = (function() {
         }
         // Load data for the selected tab
         if (tab === 'activity') loadAuditLog(0);
-        else if (tab === 'scanlogs') loadScanLogs(0);
+        else if (tab === 'scanlogs') { loadScanList(); loadScanLogs(0); }
         else if (tab === 'apiaccess') loadApiLogs(0);
         else if (tab === 'system') loadSystemLog('debug');
         else if (tab === 'requests') loadRequestLog(0);
@@ -374,6 +374,22 @@ var LogsUI = (function() {
             userSel.empty().append('<option value="">All Users</option>');
             (data.users || []).forEach(function(u) {
                 userSel.append('<option value="' + escHtml(u) + '">' + escHtml(u) + '</option>');
+            });
+        });
+    }
+
+    // --- Load scan list for Scan Logs dropdown ---
+    var _scanListLoaded = false;
+    function loadScanList() {
+        if (_scanListLoaded) return;
+        _scanListLoaded = true;
+        $.getJSON(docroot + '/scanslistjson', function(scans) {
+            var sel = $('#scanlog-filter-scan');
+            sel.empty().append('<option value="">All Scans</option>');
+            (scans || []).forEach(function(s) {
+                var label = escHtml(s.name || s.target || s.id);
+                if (s.target && s.name) label = escHtml(s.name) + ' (' + escHtml(s.target) + ')';
+                sel.append('<option value="' + escHtml(s.id) + '">' + label + '</option>');
             });
         });
     }
