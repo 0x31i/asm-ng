@@ -259,6 +259,72 @@ class SpiderFootWebUi:
 
         cherrypy.tools.auth_check = cherrypy.Tool('before_handler', check_auth)
 
+        # --- HTTP request logging hooks ---
+        self._request_log_buffer = []
+        self._request_log_lock = threading.Lock()
+
+        def _log_before_handler():
+            """Record request start time for response_ms calculation."""
+            cherrypy.request._sf_start_time = time.time()
+
+        def _log_on_end_request():
+            """Buffer request data; flush in batch when buffer is full."""
+            try:
+                req = cherrypy.request
+                path = getattr(req, 'path_info', '')
+                # Skip static assets and unauthenticated requests
+                if '/static/' in path:
+                    return
+                username = None
+                try:
+                    username = cherrypy.session.get('username')
+                except Exception:
+                    pass
+                if not username:
+                    return
+
+                start = getattr(req, '_sf_start_time', None)
+                response_ms = int((time.time() - start) * 1000) if start else None
+                status_code = None
+                try:
+                    status_code = int(str(cherrypy.response.status).split()[0])
+                except Exception:
+                    pass
+
+                entry = (username, req.method, path, status_code,
+                         response_ms, req.remote.ip, int(time.time() * 1000))
+
+                with self._request_log_lock:
+                    self._request_log_buffer.append(entry)
+                    if len(self._request_log_buffer) >= 50:
+                        batch = list(self._request_log_buffer)
+                        self._request_log_buffer.clear()
+                        t = threading.Thread(target=self._flush_request_log, args=(batch,), daemon=True)
+                        t.start()
+            except Exception:
+                pass  # Never let logging break the app
+
+        cherrypy.tools.sf_log_before = cherrypy.Tool('before_handler', _log_before_handler, priority=10)
+        cherrypy.tools.sf_log_end = cherrypy.Tool('on_end_request', _log_on_end_request, priority=80)
+
+        # Periodic flush for request log buffer (every 30s, catches low-traffic leftovers)
+        def _periodic_flush():
+            while True:
+                time.sleep(30)
+                try:
+                    with self._request_log_lock:
+                        if self._request_log_buffer:
+                            batch = list(self._request_log_buffer)
+                            self._request_log_buffer.clear()
+                        else:
+                            batch = None
+                    if batch:
+                        self._flush_request_log(batch)
+                except Exception:
+                    pass
+
+        threading.Thread(target=_periodic_flush, daemon=True).start()
+
         # 'config' supplied will be the defaults, let's supplement them
         # now with any configuration which may have previously been saved.
         self.defaultConfig = deepcopy(config)
@@ -302,6 +368,18 @@ class SpiderFootWebUi:
                     print(" Check the logs for database errors.")
                     print("*************************************************************")
                     print("")
+
+        # Auto-purge old logs on startup
+        try:
+            with SpiderFootDb(self.config, init=True) as dbh_purge:
+                audit_days = int(self.config.get('__log_retention_audit_days', 365))
+                scan_days = int(self.config.get('__log_retention_scan_days', 90))
+                request_days = int(self.config.get('__log_retention_request_days', 30))
+                result = dbh_purge.logPurgeAll(audit_days, scan_days, request_days)
+                if any(v > 0 for v in result.values()):
+                    self.log.info(f"Log purge on startup: {result}")
+        except Exception:
+            pass
 
         csp = (
             secure.ContentSecurityPolicy()
@@ -509,6 +587,14 @@ class SpiderFootWebUi:
             str: client IP address
         """
         return cherrypy.request.remote.ip
+
+    def _flush_request_log(self, batch: list) -> None:
+        """Flush a batch of request log entries to the database."""
+        try:
+            with SpiderFootDb(self.config) as dbh:
+                dbh.requestLogBatch(batch)
+        except Exception:
+            pass
 
     def _kill_scan_process(self: 'SpiderFootWebUi', scan_id: str) -> bool:
         """Kill a scan subprocess by scan ID.
@@ -1253,6 +1339,10 @@ class SpiderFootWebUi:
             safe_target = re.sub(r'[^\w\-.]', '_', target or 'Export').strip('_') or 'Export'
             zip_filename = f"{safe_target}_FULL_BACKUP_{now.strftime('%m')}_{now.strftime('%Y')}.zip"
 
+            dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
+                         detail=f"Full backup ZIP for scan {id}",
+                         ip_address=self.clientIP())
+
             cherrypy.response.headers['Content-Disposition'] = f'attachment; filename={zip_filename}'
             cherrypy.response.headers['Content-Type'] = 'application/zip'
             cherrypy.response.headers['Pragma'] = 'no-cache'
@@ -1425,6 +1515,9 @@ class SpiderFootWebUi:
             type = 'ALL'
         with SpiderFootDb(self.config) as dbh:
             data = dbh.scanResultEvent(id, type)
+            dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
+                         detail=f"Scan {id} results as {filetype} ({export_mode})",
+                         ip_address=self.clientIP())
             filter_fps = export_mode in ("analysis", "analysis_correlations")
 
             # Force Excel for analysis_correlations mode (correlations tab requires .xlsx)
@@ -2896,6 +2989,10 @@ class SpiderFootWebUi:
                 dbh.conn.commit()
 
             dbh.scanInstanceSet(scan_id, status='FINISHED', ended=time.time() * 1000)
+
+            dbh.auditLog(self.currentUser() or 'system', 'DATA_IMPORT',
+                         detail=f"Scan data imported: type={import_type}, {stats['rows_imported']} rows",
+                         ip_address=self.clientIP())
 
             return {
                 'success': True,
@@ -4398,6 +4495,9 @@ class SpiderFootWebUi:
             if res is None:
                 return self.error("Scan ID not found.")
 
+            dbh.auditLog(self.currentUser() or 'system', 'SCAN_VIEW',
+                         detail=f"Viewed scan {id}", ip_address=self.clientIP())
+
             templ = Template(filename='spiderfoot/templates/scaninfo.tmpl',
                              lookup=self.lookup, input_encoding='utf-8')
             return templ.render(id=id, name=html.escape(res[0]), status=res[5], docroot=self.docroot, version=__version__,
@@ -4617,7 +4717,8 @@ class SpiderFootWebUi:
             str: audit log page HTML
         """
         with SpiderFootDb(self.config) as dbh:
-            logs = dbh.auditLogGet(limit=500, username=username, action=action)
+            result = dbh.auditLogGet(limit=500, username=username, action=action)
+            logs = result.get('entries', [])
 
             # Format timestamps for display
             for entry in logs:
@@ -5247,6 +5348,13 @@ class SpiderFootWebUi:
                     content += f"{opt}={conf[opt]}\n"
             else:
                 content += f"{opt}={conf[opt]}\n"
+
+        try:
+            with SpiderFootDb(self.config) as dbh:
+                dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
+                             detail="API keys exported", ip_address=self.clientIP())
+        except Exception:
+            pass
 
         cherrypy.response.headers['Content-Disposition'] = 'attachment; filename="SpiderFoot.cfg"'
         cherrypy.response.headers['Content-Type'] = "text/plain"
@@ -7412,6 +7520,8 @@ class SpiderFootWebUi:
         with SpiderFootDb(self.config) as dbh:
             try:
                 if dbh.vacuumDB():
+                    dbh.auditLog(self.currentUser() or 'system', 'DB_MAINTENANCE',
+                                 detail="Database vacuum executed", ip_address=self.clientIP())
                     return json.dumps(["SUCCESS", ""]).encode('utf-8')
                 return json.dumps(["ERROR", "Vacuuming the database failed"]).encode('utf-8')
             except Exception as e:
@@ -7496,6 +7606,9 @@ class SpiderFootWebUi:
                 backup_size = os.path.getsize(result_path)
                 size_mb = backup_size / (1024 * 1024)
 
+                dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
+                             detail="Database backup created", ip_address=self.clientIP())
+
                 return {
                     'status': 'success',
                     'backup_path': result_path,
@@ -7525,6 +7638,9 @@ class SpiderFootWebUi:
                     data = f.read()
                 os.unlink(tmp_path)
 
+                dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
+                             detail="Database backup downloaded", ip_address=self.clientIP())
+
                 timestamp = time.strftime("%Y%m%d_%H%M%S")
                 filename = f"asmng_pg_backup_{timestamp}.sql"
 
@@ -7551,6 +7667,8 @@ class SpiderFootWebUi:
         """
         with SpiderFootDb(self.config) as dbh:
             try:
+                dbh.auditLog(self.currentUser() or 'system', 'DB_MAINTENANCE',
+                             detail="Database integrity check", ip_address=self.clientIP())
                 return dbh.integrityCheck()
             except Exception as e:
                 return {'ok': False, 'integrity_check': [str(e)], 'foreign_key_check': []}
@@ -8863,6 +8981,9 @@ class SpiderFootWebUi:
 
             with SpiderFootDb(self.config) as dbh:
                 count = dbh.scanFindingsStore(id, findings)
+                dbh.auditLog(self.currentUser() or 'system', 'DATA_IMPORT',
+                             detail=f"Findings imported for scan {id}: {count} items",
+                             ip_address=self.clientIP())
 
                 return {
                     'success': True,
@@ -8963,6 +9084,13 @@ class SpiderFootWebUi:
 
         if not content.strip():
             return {'success': False, 'message': 'Uploaded file is empty.'}
+
+        try:
+            with SpiderFootDb(self.config) as dbh:
+                dbh.auditLog(self.currentUser() or 'system', 'DATA_IMPORT',
+                             detail=f"Nessus import for scan {id}", ip_address=self.clientIP())
+        except Exception:
+            pass
 
         return self._processNessusImport(content, None, None, importfile,
                                           is_dry_run=False, existing_scan_id=id)
@@ -9077,6 +9205,13 @@ class SpiderFootWebUi:
         if not content.strip():
             return {'success': False, 'message': 'Uploaded file is empty.'}
 
+        try:
+            with SpiderFootDb(self.config) as dbh:
+                dbh.auditLog(self.currentUser() or 'system', 'DATA_IMPORT',
+                             detail=f"Burp XML import for scan {id}", ip_address=self.clientIP())
+        except Exception:
+            pass
+
         return self._processBurpImport(content, None, None, importfile,
                                         is_dry_run=False, existing_scan_id=id)
 
@@ -9111,6 +9246,13 @@ class SpiderFootWebUi:
         if not content.strip():
             return {'success': False, 'message': 'Uploaded file is empty.'}
 
+        try:
+            with SpiderFootDb(self.config) as dbh:
+                dbh.auditLog(self.currentUser() or 'system', 'DATA_IMPORT',
+                             detail=f"Burp HTML enhance for scan {id}", ip_address=self.clientIP())
+        except Exception:
+            pass
+
         return self._processBurpHtmlEnhance(content, None, None, importfile,
                                             is_dry_run=False, existing_scan_id=id)
 
@@ -9131,6 +9273,9 @@ class SpiderFootWebUi:
         with SpiderFootDb(self.config) as dbh:
             scan = dbh.scanInstanceGet(id)
             _scan_name = scan[0] if scan else ''
+            dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
+                         detail=f"Scan {id} vulns as {filetype}",
+                         ip_address=self.clientIP())
 
             # --- Nessus data ---
             nessus_headers = [
@@ -12153,6 +12298,9 @@ This is a placeholder MCP report. Integration with actual MCP server required.
                 raise cherrypy.HTTPError(404, "Scan not found")
 
             scan_name = scanInfo[0]
+            dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
+                         detail=f"Triage export for scan {id}",
+                         ip_address=self.clientIP())
             target = scanInfo[1]
 
             # Fetch results — filter by FP status if requested
@@ -12238,6 +12386,10 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             if legit_hashes:
                 dbh.scanResultsUpdateFP(scan_id, legit_hashes, 2)
                 applied['legit'] = len(legit_hashes)
+
+            dbh.auditLog(self.currentUser() or 'system', 'DATA_IMPORT',
+                         detail=f"Triage import for scan {scan_id}: {applied['fp']} FP, {applied['legit']} legit",
+                         ip_address=self.clientIP())
 
             # Record in triage history
             try:
@@ -12398,6 +12550,9 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             scan_name = scanInfo[0]
             target = scanInfo[1]
             scan_status = scanInfo[5]
+            dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
+                         detail=f"Enrichment export for scan {id}",
+                         ip_address=self.clientIP())
 
             # Get all results
             results = dbh.scanResultEvent(id, 'ALL')
@@ -12859,6 +13014,10 @@ This is a placeholder MCP report. Integration with actual MCP server required.
                 except Exception:
                     stats['errors'] += 1
 
+            dbh.auditLog(self.currentUser() or 'system', 'DATA_IMPORT',
+                         detail=f"Enrichment import for scan {scan_id}: {stats['written']} notes",
+                         ip_address=self.clientIP())
+
         return {
             'success': True,
             'scan_id': scan_id,
@@ -12888,6 +13047,9 @@ This is a placeholder MCP report. Integration with actual MCP server required.
 
             target = scanInfo[1]
             deleted = dbh.rowNotesClearAI(target)
+            dbh.auditLog(self.currentUser() or 'system', 'DATA_MODIFY',
+                         detail=f"Cleared AI notes for target {target}: {deleted} removed",
+                         ip_address=self.clientIP())
 
         return {
             'success': True,
@@ -13021,6 +13183,9 @@ This is a placeholder MCP report. Integration with actual MCP server required.
 
             scan_name = scanInfo[0]
             target = scanInfo[1]
+            dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
+                         detail=f"Analysis export for scan {id}",
+                         ip_address=self.clientIP())
 
             # ── Build scan_results.csv (full_scored, FPs excluded) ──
             results = dbh.scanResultEvent(id, 'ALL')
@@ -13193,3 +13358,304 @@ cat output/FINAL_CONSOLIDATION.md
         cherrypy.response.headers['Content-Type'] = 'application/zip'
         cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
         return buf.getvalue()
+
+    # ==================================================================
+    # CENTRALIZED LOG MANAGEMENT ENDPOINTS
+    # ==================================================================
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def auditlogapi(self: 'SpiderFootWebUi', limit: str = '50', offset: str = '0',
+                    username: str = None, action: str = None, search: str = None,
+                    date_from: str = None, date_to: str = None) -> dict:
+        """Paginated audit log API endpoint.
+
+        Args:
+            limit: entries per page
+            offset: pagination offset
+            username: filter by username
+            action: filter by action type (supports prefix match with *)
+            search: search in detail/username
+            date_from: filter >= timestamp in ms
+            date_to: filter <= timestamp in ms
+
+        Returns:
+            dict: {entries, total, limit, offset}
+        """
+        self.requireAdmin()
+        with SpiderFootDb(self.config) as dbh:
+            result = dbh.auditLogGet(
+                limit=int(limit), offset=int(offset),
+                username=username, action=action, search=search,
+                date_from=int(date_from) if date_from else None,
+                date_to=int(date_to) if date_to else None
+            )
+            # Add formatted timestamps
+            for entry in result.get('entries', []):
+                entry['time_str'] = time.strftime(
+                    "%Y-%m-%d %H:%M:%S", time.localtime(entry['created'] / 1000))
+            return result
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def auditlogmeta(self: 'SpiderFootWebUi') -> dict:
+        """Get distinct actions and users for filter dropdowns.
+
+        Returns:
+            dict: {actions: [...], users: [...]}
+        """
+        self.requireAdmin()
+        with SpiderFootDb(self.config) as dbh:
+            return {
+                'actions': dbh.auditLogActions(),
+                'users': dbh.auditLogUsers()
+            }
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def scanlogsglobal(self: 'SpiderFootWebUi', limit: str = '100', offset: str = '0',
+                       scan_id: str = None, log_type: str = None, component: str = None,
+                       search: str = None, date_from: str = None, date_to: str = None) -> dict:
+        """Cross-scan log query with pagination.
+
+        Returns:
+            dict: {entries, total, limit, offset}
+        """
+        self.requireAdmin()
+        with SpiderFootDb(self.config) as dbh:
+            result = dbh.scanLogsGlobal(
+                limit=int(limit), offset=int(offset),
+                scan_id=scan_id, log_type=log_type, component=component,
+                search=search,
+                date_from=int(date_from) if date_from else None,
+                date_to=int(date_to) if date_to else None
+            )
+            for entry in result.get('entries', []):
+                entry['time_str'] = time.strftime(
+                    "%Y-%m-%d %H:%M:%S", time.localtime(entry['generated'] / 1000))
+            return result
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def requestlogapi(self: 'SpiderFootWebUi', limit: str = '50', offset: str = '0',
+                      username: str = None, path: str = None,
+                      date_from: str = None, date_to: str = None) -> dict:
+        """HTTP request log API endpoint with pagination.
+
+        Returns:
+            dict: {entries, total, limit, offset}
+        """
+        self.requireAdmin()
+        with SpiderFootDb(self.config) as dbh:
+            result = dbh.requestLogGet(
+                limit=int(limit), offset=int(offset),
+                username=username, path=path,
+                date_from=int(date_from) if date_from else None,
+                date_to=int(date_to) if date_to else None
+            )
+            for entry in result.get('entries', []):
+                entry['time_str'] = time.strftime(
+                    "%Y-%m-%d %H:%M:%S", time.localtime(entry['created'] / 1000))
+            return result
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def systemlog(self: 'SpiderFootWebUi', logfile: str = 'debug', lines: str = '200') -> dict:
+        """Tail lines from debug.log or error.log.
+
+        Args:
+            logfile: 'debug' or 'error'
+            lines: number of lines to tail
+
+        Returns:
+            dict: {lines: [...], filename: str}
+        """
+        self.requireAdmin()
+        allowed = {'debug': 'debug.log', 'error': 'error.log'}
+        fname = allowed.get(logfile, 'debug.log')
+        log_path = os.path.join(os.path.dirname(__file__), fname)
+
+        if not os.path.isfile(log_path):
+            return {'lines': [], 'filename': fname, 'error': 'Log file not found'}
+
+        try:
+            max_lines = min(int(lines), 2000)
+            with open(log_path, 'r', encoding='utf-8', errors='replace') as f:
+                all_lines = f.readlines()
+            tail = all_lines[-max_lines:] if len(all_lines) > max_lines else all_lines
+            return {'lines': [l.rstrip() for l in tail], 'filename': fname}
+        except Exception as e:
+            return {'lines': [], 'filename': fname, 'error': str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def logpurge(self: 'SpiderFootWebUi', audit_days: str = None,
+                 scan_days: str = None, request_days: str = None) -> dict:
+        """Manual log purge endpoint.
+
+        Args:
+            audit_days: purge audit entries older than N days
+            scan_days: purge scan log entries older than N days
+            request_days: purge request log entries older than N days
+
+        Returns:
+            dict: {success, purged: {audit, scan, request}}
+        """
+        self.requireAdmin()
+
+        a_days = int(audit_days) if audit_days else int(self.config.get('__log_retention_audit_days', 365))
+        s_days = int(scan_days) if scan_days else int(self.config.get('__log_retention_scan_days', 90))
+        r_days = int(request_days) if request_days else int(self.config.get('__log_retention_request_days', 30))
+
+        with SpiderFootDb(self.config) as dbh:
+            result = dbh.logPurgeAll(a_days, s_days, r_days)
+            dbh.auditLog(self.currentUser() or 'system', 'DB_MAINTENANCE',
+                         detail=f"Manual log purge: audit={a_days}d scan={s_days}d request={r_days}d, deleted={result}",
+                         ip_address=self.clientIP())
+            return {'success': True, 'purged': result}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def logsettings(self: 'SpiderFootWebUi', audit_days: str = None,
+                    scan_days: str = None, request_days: str = None) -> dict:
+        """Save log retention settings to tbl_config.
+
+        Returns:
+            dict: {success: True}
+        """
+        self.requireAdmin()
+        with SpiderFootDb(self.config) as dbh:
+            if audit_days is not None:
+                dbh.configSet({'__log_retention_audit_days': int(audit_days)})
+                self.config['__log_retention_audit_days'] = int(audit_days)
+            if scan_days is not None:
+                dbh.configSet({'__log_retention_scan_days': int(scan_days)})
+                self.config['__log_retention_scan_days'] = int(scan_days)
+            if request_days is not None:
+                dbh.configSet({'__log_retention_request_days': int(request_days)})
+                self.config['__log_retention_request_days'] = int(request_days)
+            dbh.auditLog(self.currentUser() or 'system', 'SETTINGS_SAVE',
+                         detail=f"Log retention settings updated: audit={audit_days}d scan={scan_days}d request={request_days}d",
+                         ip_address=self.clientIP())
+            return {'success': True}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def logsettingsget(self: 'SpiderFootWebUi') -> dict:
+        """Get current log retention settings.
+
+        Returns:
+            dict: {audit_days, scan_days, request_days}
+        """
+        self.requireAdmin()
+        return {
+            'audit_days': int(self.config.get('__log_retention_audit_days', 365)),
+            'scan_days': int(self.config.get('__log_retention_scan_days', 90)),
+            'request_days': int(self.config.get('__log_retention_request_days', 30)),
+        }
+
+    # ==================================================================
+    # LOG CSV EXPORT ENDPOINTS
+    # ==================================================================
+
+    @cherrypy.expose
+    def auditlogexport(self: 'SpiderFootWebUi', username: str = None, action: str = None,
+                       search: str = None, date_from: str = None, date_to: str = None) -> bytes:
+        """Export filtered audit log as CSV.
+
+        Returns:
+            bytes: CSV file download
+        """
+        self.requireAdmin()
+        with SpiderFootDb(self.config) as dbh:
+            result = dbh.auditLogGet(
+                limit=100000, offset=0,
+                username=username, action=action, search=search,
+                date_from=int(date_from) if date_from else None,
+                date_to=int(date_to) if date_to else None
+            )
+            dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
+                         detail="Audit log CSV exported", ip_address=self.clientIP())
+
+        buf = StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(['Time', 'Username', 'Action', 'Detail', 'IP Address'])
+        for entry in result.get('entries', []):
+            writer.writerow([
+                time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(entry['created'] / 1000)),
+                entry['username'], entry['action'],
+                entry['detail'] or '', entry['ip_address'] or ''
+            ])
+
+        cherrypy.response.headers['Content-Type'] = 'application/csv'
+        cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="audit_log_{time.strftime("%Y%m%d")}.csv"'
+        return buf.getvalue().encode('utf-8')
+
+    @cherrypy.expose
+    def scanlogexport(self: 'SpiderFootWebUi', scan_id: str = None, log_type: str = None,
+                      component: str = None, search: str = None,
+                      date_from: str = None, date_to: str = None) -> bytes:
+        """Export filtered scan logs as CSV.
+
+        Returns:
+            bytes: CSV file download
+        """
+        self.requireAdmin()
+        with SpiderFootDb(self.config) as dbh:
+            result = dbh.scanLogsGlobal(
+                limit=100000, offset=0,
+                scan_id=scan_id, log_type=log_type, component=component,
+                search=search,
+                date_from=int(date_from) if date_from else None,
+                date_to=int(date_to) if date_to else None
+            )
+            dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
+                         detail="Scan log CSV exported", ip_address=self.clientIP())
+
+        buf = StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(['Time', 'Scan ID', 'Scan Name', 'Component', 'Type', 'Message'])
+        for entry in result.get('entries', []):
+            writer.writerow([
+                time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(entry['generated'] / 1000)),
+                entry['scan_id'], entry['scan_name'],
+                entry['component'], entry['type'], entry['message']
+            ])
+
+        cherrypy.response.headers['Content-Type'] = 'application/csv'
+        cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="scan_log_{time.strftime("%Y%m%d")}.csv"'
+        return buf.getvalue().encode('utf-8')
+
+    @cherrypy.expose
+    def requestlogexport(self: 'SpiderFootWebUi', username: str = None, path: str = None,
+                         date_from: str = None, date_to: str = None) -> bytes:
+        """Export filtered request log as CSV.
+
+        Returns:
+            bytes: CSV file download
+        """
+        self.requireAdmin()
+        with SpiderFootDb(self.config) as dbh:
+            result = dbh.requestLogGet(
+                limit=100000, offset=0,
+                username=username, path=path,
+                date_from=int(date_from) if date_from else None,
+                date_to=int(date_to) if date_to else None
+            )
+            dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
+                         detail="Request log CSV exported", ip_address=self.clientIP())
+
+        buf = StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(['Time', 'Username', 'Method', 'Path', 'Status', 'Response (ms)', 'IP Address'])
+        for entry in result.get('entries', []):
+            writer.writerow([
+                time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(entry['created'] / 1000)),
+                entry['username'], entry['method'], entry['path'],
+                entry['status_code'] or '', entry['response_ms'] or '',
+                entry['ip_address'] or ''
+            ])
+
+        cherrypy.response.headers['Content-Type'] = 'application/csv'
+        cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="request_log_{time.strftime("%Y%m%d")}.csv"'
+        return buf.getvalue().encode('utf-8')

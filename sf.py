@@ -119,6 +119,10 @@ sfConfig = {
     '_grade_thresholds': '',
     # Resource tuning tier (light, medium, heavy)
     '_resource_tier': 'medium',
+    # Log retention (days)
+    '__log_retention_audit_days': 365,
+    '__log_retention_scan_days': 90,
+    '__log_retention_request_days': 30,
 }
 sfOptdescs = {
     '_debug': "Enable debugging?",
@@ -142,6 +146,9 @@ sfOptdescs = {
     '_grade_event_overrides': "JSON to override scoring for specific event types. Example: {\"TCP_PORT_OPEN\": {\"category\": \"Network Security\", \"points\": -15, \"logic\": \"unverified_exists\"}}. Leave empty for defaults.",
     '_grade_thresholds': "JSON to override grade letter thresholds. Example: [{\"min\": 90, \"grade\": \"A\"}, {\"min\": 80, \"grade\": \"B\"}, ...]. Leave empty for defaults.",
     '_resource_tier': "Resource tuning tier. Controls PostgreSQL session settings, module concurrency, and web server threads. Options: light, medium, heavy.",
+    '__log_retention_audit_days': "Number of days to retain audit log entries. Entries older than this are purged on startup.",
+    '__log_retention_scan_days': "Number of days to retain scan log entries. Entries older than this are purged on startup.",
+    '__log_retention_request_days': "Number of days to retain HTTP request log entries. Entries older than this are purged on startup.",
 }
 
 
@@ -1292,6 +1299,8 @@ def start_web_server(sfWebUiConfig: dict, sfConfig: dict, loggingQueue=None) -> 
             },
             '/': {
                 'tools.auth_check.on': True,
+                'tools.sf_log_before.on': True,
+                'tools.sf_log_end.on': True,
             },
             '/login': {
                 'tools.auth_check.on': False,
