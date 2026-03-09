@@ -6924,7 +6924,7 @@ class SpiderFootDb:
                     total = self.dbh.fetchone()[0]
 
                     qry = (f"SELECT a.id, a.username, a.action, a.detail, a.ip_address, "
-                           f"a.created, a.scan_instance_id, s.scan_name, s.seed_target "
+                           f"a.created, a.scan_instance_id, s.name, s.seed_target "
                            f"FROM tbl_audit_log a "
                            f"LEFT JOIN tbl_scan_instance s ON a.scan_instance_id = s.guid "
                            f"{where} ORDER BY a.created DESC LIMIT ? OFFSET ?")
