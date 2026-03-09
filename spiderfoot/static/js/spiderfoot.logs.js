@@ -28,10 +28,10 @@ var LogsUI = (function() {
         else if (tab === 'requests') loadRequestLog(0);
     }
 
-    // --- Audit Log ---
+    // --- User Activity (excludes scan-linked entries) ---
     function loadAuditLog(offset) {
         var limit = 50;
-        var params = 'limit=' + limit + '&offset=' + offset;
+        var params = 'limit=' + limit + '&offset=' + offset + '&exclude_scans=1';
         var action = $('#log-filter-action').val();
         var user = $('#log-filter-user').val();
         var search = $('#log-filter-search').val();
@@ -287,6 +287,7 @@ var LogsUI = (function() {
             var action = $('#log-filter-action').val();
             var user = $('#log-filter-user').val();
             var search = $('#log-filter-search').val();
+            params += '&exclude_scans=1';
             if (action) params += '&action=' + encodeURIComponent(action);
             if (user) params += '&username=' + encodeURIComponent(user);
             if (search) params += '&search=' + encodeURIComponent(search);

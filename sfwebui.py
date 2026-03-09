@@ -13402,7 +13402,8 @@ cat output/FINAL_CONSOLIDATION.md
     def auditlogapi(self: 'SpiderFootWebUi', limit: str = '50', offset: str = '0',
                     username: str = None, action: str = None, search: str = None,
                     date_from: str = None, date_to: str = None,
-                    scan_id: str = None, scan_only: str = None) -> dict:
+                    scan_id: str = None, scan_only: str = None,
+                    exclude_scans: str = None) -> dict:
         """Paginated audit log API endpoint.
 
         Args:
@@ -13415,6 +13416,7 @@ cat output/FINAL_CONSOLIDATION.md
             date_to: filter <= timestamp in ms
             scan_id: filter by scan instance ID
             scan_only: if '1', only return entries linked to a scan
+            exclude_scans: if '1', exclude entries linked to a scan
 
         Returns:
             dict: {entries, total, limit, offset}
@@ -13427,7 +13429,8 @@ cat output/FINAL_CONSOLIDATION.md
                 date_from=int(date_from) if date_from else None,
                 date_to=int(date_to) if date_to else None,
                 scan_id=scan_id,
-                scan_only=(scan_only == '1')
+                scan_only=(scan_only == '1'),
+                exclude_scans=(exclude_scans == '1')
             )
             # Add formatted timestamps
             for entry in result.get('entries', []):
@@ -13600,7 +13603,8 @@ cat output/FINAL_CONSOLIDATION.md
     @cherrypy.expose
     def auditlogexport(self: 'SpiderFootWebUi', username: str = None, action: str = None,
                        search: str = None, date_from: str = None, date_to: str = None,
-                       scan_id: str = None, scan_only: str = None) -> bytes:
+                       scan_id: str = None, scan_only: str = None,
+                       exclude_scans: str = None) -> bytes:
         """Export filtered audit log as CSV.
 
         Returns:
@@ -13608,13 +13612,15 @@ cat output/FINAL_CONSOLIDATION.md
         """
         self.requireAdmin()
         is_scan_only = (scan_only == '1')
+        is_exclude_scans = (exclude_scans == '1')
         with SpiderFootDb(self.config) as dbh:
             result = dbh.auditLogGet(
                 limit=100000, offset=0,
                 username=username, action=action, search=search,
                 date_from=int(date_from) if date_from else None,
                 date_to=int(date_to) if date_to else None,
-                scan_id=scan_id, scan_only=is_scan_only
+                scan_id=scan_id, scan_only=is_scan_only,
+                exclude_scans=is_exclude_scans
             )
             dbh.auditLog(self.currentUser() or 'system', 'DATA_EXPORT',
                          detail="Audit log CSV exported", ip_address=self.clientIP())

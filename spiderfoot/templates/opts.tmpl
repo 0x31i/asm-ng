@@ -18,7 +18,7 @@
         <button id="btn-import-config" class='btn btn-info'>Import API Keys</button>
         <button id="btn-opt-export" class='btn btn-info'>Export API Keys</button>
         <button id="btn-reset-settings" class='btn btn-danger'>Reset to Factory Default</button>
-        <a href="javascript:void(0)" id="btn-activity-log" class='btn btn-default' onclick="switchTab('logs'); LogsUI.init();">Activity Log</a>
+        <a href="javascript:void(0)" id="btn-activity-log" class='btn btn-default' onclick="switchTab('logs'); LogsUI.init();">Audit Logs</a>
 % if user_role == 'admin':
         <a href="${docroot}/users" id="btn-user-management" class='btn btn-warning'><i class="glyphicon glyphicon-user"></i> User Management</a>
         <a href="${docroot}/extapi" id="btn-ext-api" class='btn btn-info'><i class="glyphicon glyphicon-lock"></i> External API</a>
@@ -1391,14 +1391,14 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
 
 <!-- Log sub-tabs -->
 <div class="log-pills">
-  <a id="logtab_activity" class="active" onclick="LogsUI.switchLogTab('activity')">Activity Log</a>
-  <a id="logtab_scanlogs" onclick="LogsUI.switchLogTab('scanlogs')">Scan Activity</a>
+  <a id="logtab_activity" class="active" onclick="LogsUI.switchLogTab('activity')">User Activity</a>
+  <a id="logtab_scanlogs" onclick="LogsUI.switchLogTab('scanlogs')">Scan Audit</a>
   <a id="logtab_apiaccess" onclick="LogsUI.switchLogTab('apiaccess')">API Access</a>
   <a id="logtab_requests" onclick="LogsUI.switchLogTab('requests')">HTTP Requests</a>
   <a id="logtab_system" onclick="LogsUI.switchLogTab('system')">System</a>
 </div>
 
-<!-- ===== Activity Log ===== -->
+<!-- ===== User Activity (system-level, no scan-linked entries) ===== -->
 <div id="logpane_activity">
   <div class="log-filters">
     <select id="log-filter-action"><option value="">All Actions</option></select>
@@ -1424,7 +1424,7 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
   <div id="audit-pagination"></div>
 </div>
 
-<!-- ===== Scan Activity ===== -->
+<!-- ===== Scan Audit (all scan-linked activity) ===== -->
 <div id="logpane_scanlogs" style="display:none">
   <div class="log-filters">
     <select id="scanlog-filter-scan" style="min-width:220px;"><option value="">All Scans</option></select>
