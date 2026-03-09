@@ -915,6 +915,17 @@ class SpiderFootDb:
                 except DatabaseError:
                     pass
 
+            # Migration: Add scan_instance_id column to tbl_audit_log
+            try:
+                self.dbh.execute("SELECT scan_instance_id FROM tbl_audit_log LIMIT 1")
+            except DatabaseError:
+                try:
+                    self.dbh.execute("ALTER TABLE tbl_audit_log ADD COLUMN scan_instance_id VARCHAR")
+                    self.dbh.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_scan_id ON tbl_audit_log (scan_instance_id)")
+                    self.conn.commit()
+                except DatabaseError:
+                    pass
+
             # Migration: Add tbl_request_log table if it doesn't exist
             try:
                 self.dbh.execute("SELECT COUNT(*) FROM tbl_request_log")
@@ -6822,7 +6833,7 @@ class SpiderFootDb:
     # Audit log methods
     #
 
-    def auditLog(self, username: str, action: str, detail: str = None, ip_address: str = None) -> None:
+    def auditLog(self, username: str, action: str, detail: str = None, ip_address: str = None, scan_id: str = None) -> None:
         """Record an audit log entry.
 
         Args:
@@ -6830,21 +6841,23 @@ class SpiderFootDb:
             action (str): action type (e.g. LOGIN, SCAN_START, SETTINGS_CHANGE)
             detail (str): optional detail string
             ip_address (str): optional IP address of the user
+            scan_id (str): optional scan instance ID to associate with this entry
         """
         created = int(time.time() * 1000)
 
-        qry = "INSERT INTO tbl_audit_log (username, action, detail, ip_address, created) VALUES (?, ?, ?, ?, ?)"
+        qry = "INSERT INTO tbl_audit_log (username, action, detail, ip_address, scan_instance_id, created) VALUES (?, ?, ?, ?, ?, ?)"
 
         with self.dbhLock:
             try:
-                self.dbh.execute(qry, [username, action, detail, ip_address, created])
+                self.dbh.execute(qry, [username, action, detail, ip_address, scan_id, created])
                 self.conn.commit()
             except DatabaseError:
                 pass
 
     def auditLogGet(self, limit: int = 50, offset: int = 0, username: str = None,
                     action: str = None, search: str = None,
-                    date_from: int = None, date_to: int = None) -> dict:
+                    date_from: int = None, date_to: int = None,
+                    scan_id: str = None) -> dict:
         """Get audit log entries with pagination, search, and date range.
 
         Args:
@@ -6855,6 +6868,7 @@ class SpiderFootDb:
             search (str): search in detail field (ILIKE)
             date_from (int): filter entries created >= this timestamp (ms)
             date_to (int): filter entries created <= this timestamp (ms)
+            scan_id (str): filter by scan instance ID
 
         Returns:
             dict: {entries: [...], total: N, limit: N, offset: N}
@@ -6873,6 +6887,10 @@ class SpiderFootDb:
             else:
                 conditions.append("action = ?")
                 params.append(action)
+
+        if scan_id:
+            conditions.append("scan_instance_id = ?")
+            params.append(scan_id)
 
         if search:
             conditions.append("(detail ILIKE ? OR username ILIKE ?)")
@@ -6899,7 +6917,7 @@ class SpiderFootDb:
                 total = self.dbh.fetchone()[0]
 
                 # Get page of entries
-                qry = f"SELECT id, username, action, detail, ip_address, created FROM tbl_audit_log{where} ORDER BY created DESC LIMIT ? OFFSET ?"
+                qry = f"SELECT id, username, action, detail, ip_address, created, scan_instance_id FROM tbl_audit_log{where} ORDER BY created DESC LIMIT ? OFFSET ?"
                 page_params = params + [limit, offset]
                 self.dbh.execute(qry, page_params)
                 rows = self.dbh.fetchall()
@@ -6911,13 +6929,27 @@ class SpiderFootDb:
                         'action': row[2],
                         'detail': row[3],
                         'ip_address': row[4],
-                        'created': row[5]
+                        'created': row[5],
+                        'scan_id': row[6]
                     }
                     for row in rows
                 ]
                 return {'entries': entries, 'total': total, 'limit': limit, 'offset': offset}
             except DatabaseError:
                 return {'entries': [], 'total': 0, 'limit': limit, 'offset': offset}
+
+    def scanActivityGet(self, scan_id: str, limit: int = 100, offset: int = 0) -> dict:
+        """Get all audit log activity for a specific scan.
+
+        Args:
+            scan_id (str): scan instance ID
+            limit (int): max entries per page
+            offset (int): pagination offset
+
+        Returns:
+            dict: {entries: [...], total: N}
+        """
+        return self.auditLogGet(limit=limit, offset=offset, scan_id=scan_id)
 
     def auditLogActions(self) -> list:
         """Get distinct action types from audit log.
