@@ -32,6 +32,10 @@
           <option value="PASSWORD_CHANGE">Password Change</option>
           <option value="EXT_KEY_CREATE">Ext API Key Created</option>
           <option value="EXT_KEY_REVOKE">Ext API Key Revoked</option>
+          <option value="ANALYST_COMMENT">Analyst Comment</option>
+          <option value="ANALYST_NOTE">Analyst Note</option>
+          <option value="FP_ADD">False Positive Added</option>
+          <option value="FP_REMOVE">False Positive Removed</option>
         </select>
       </div>
       <div class="col-md-3">
@@ -85,6 +89,10 @@ action_classes = {
     'PASSWORD_CHANGE': 'label-warning',
     'EXT_KEY_CREATE': 'label-success',
     'EXT_KEY_REVOKE': 'label-danger',
+    'ANALYST_COMMENT': 'label-info',
+    'ANALYST_NOTE': 'label-info',
+    'FP_ADD': 'label-warning',
+    'FP_REMOVE': 'label-default',
 }
 cls = action_classes.get(entry['action'], 'label-default')
 %>
