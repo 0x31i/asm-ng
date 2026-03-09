@@ -5847,6 +5847,9 @@ class SpiderFootWebUi:
             try:
                 ret = dbh.targetFalsePositiveAdd(target, event_type, event_data, notes)
                 if ret:
+                    dbh.auditLog(self.currentUser() or 'system', 'FP_ADD',
+                                 detail=f"False positive added: {event_type} / {event_data[:50]} on {target}",
+                                 ip_address=self.clientIP())
                     return json.dumps(["SUCCESS", ""]).encode('utf-8')
             except Exception as e:
                 return json.dumps(["ERROR", str(e)]).encode('utf-8')
@@ -5881,6 +5884,9 @@ class SpiderFootWebUi:
                     return json.dumps(["ERROR", "Must provide either ID or target/event_type/event_data."]).encode('utf-8')
 
                 if ret:
+                    dbh.auditLog(self.currentUser() or 'system', 'FP_REMOVE',
+                                 detail=f"False positive removed: id={id or 'N/A'} type={event_type or 'N/A'}",
+                                 ip_address=self.clientIP())
                     return json.dumps(["SUCCESS", ""]).encode('utf-8')
             except Exception as e:
                 return json.dumps(["ERROR", str(e)]).encode('utf-8')
@@ -9530,6 +9536,10 @@ class SpiderFootWebUi:
                 if not target:
                     return {'success': False, 'message': 'Scan not found'}
                 dbh.typeCommentSet(target, eventType, comment)
+                action = 'ANALYST_COMMENT'
+                detail = f"Type comment {'saved' if comment else 'cleared'} for {eventType} on scan {id}"
+                dbh.auditLog(self.currentUser() or 'system', action,
+                             detail=detail, ip_address=self.clientIP())
                 return {'success': True}
             except Exception as e:
                 self.log.error(f"Error saving type comment for scan {id}, type {eventType}: {e}", exc_info=True)
@@ -9558,6 +9568,10 @@ class SpiderFootWebUi:
                 if not eventDetails:
                     return {'success': False, 'message': 'Event not found'}
                 dbh.rowNoteSet(target, eventDetails[0], eventDetails[1], eventDetails[2], note)
+                action = 'ANALYST_NOTE'
+                detail = f"Row note {'saved' if note else 'cleared'} for hash {resultHash[:8]} on scan {id}"
+                dbh.auditLog(self.currentUser() or 'system', action,
+                             detail=detail, ip_address=self.clientIP())
                 return {'success': True}
             except Exception as e:
                 self.log.error(f"Error saving row note for scan {id}, hash {resultHash}: {e}", exc_info=True)

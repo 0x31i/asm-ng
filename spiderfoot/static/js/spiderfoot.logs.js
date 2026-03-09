@@ -52,20 +52,39 @@ var LogsUI = (function() {
 
     function renderAuditTable(data) {
         var actionClasses = {
-            'LOGIN': 'label-success', 'LOGIN_FAILED': 'label-danger', 'LOGOUT': 'label-default',
-            'SCAN_START': 'label-info', 'SCAN_STOP': 'label-warning', 'SCAN_DELETE': 'label-danger',
+            'LOGIN': 'label-success',
+            'LOGIN_FAILED': 'label-danger',
+            'LOGOUT': 'label-default',
+            'SCAN_START': 'label-primary',
+            'SCAN_STOP': 'label-warning',
+            'SCAN_DELETE': 'label-danger',
             'SCAN_VIEW': 'label-default',
-            'SETTINGS_SAVE': 'label-primary', 'SETTINGS_RESET': 'label-warning',
-            'DATA_EXPORT': 'label-info', 'DATA_IMPORT': 'label-primary', 'DATA_MODIFY': 'label-warning',
+            'SETTINGS_SAVE': 'label-info',
+            'SETTINGS_RESET': 'label-warning',
+            'DATA_EXPORT': 'label-primary',
+            'DATA_IMPORT': 'label-info',
+            'DATA_MODIFY': 'label-warning',
+            'ANALYST_NOTE': 'label-info',
+            'ANALYST_COMMENT': 'label-info',
+            'FP_ADD': 'label-warning',
+            'FP_REMOVE': 'label-default',
             'DB_MAINTENANCE': 'label-default',
-            'USER_CREATE': 'label-success', 'USER_UPDATE': 'label-info', 'USER_DELETE': 'label-danger',
+            'USER_CREATE': 'label-success',
+            'USER_UPDATE': 'label-primary',
+            'USER_DELETE': 'label-danger',
             'PASSWORD_CHANGE': 'label-warning',
-            'EXT_KEY_CREATE': 'label-success', 'EXT_KEY_REVOKE': 'label-danger',
-            'EXT_KEY_REINSTATE': 'label-info', 'EXT_KEY_REVEAL': 'label-warning',
+            'EXT_KEY_CREATE': 'label-success',
+            'EXT_KEY_REVOKE': 'label-danger',
+            'EXT_KEY_REINSTATE': 'label-primary',
+            'EXT_KEY_REVEAL': 'label-warning',
             'EXT_KEY_UPDATE': 'label-info',
-            'EXT_REQUEST': 'label-info', 'EXT_AUTH_DENIED': 'label-danger', 'EXT_RATE_LIMIT': 'label-warning',
+            'EXT_REQUEST': 'label-primary',
+            'EXT_AUTH_DENIED': 'label-danger',
+            'EXT_RATE_LIMIT': 'label-warning',
             'SCAN_STATUS_OVERRIDE': 'label-warning',
-            'RESOURCE_TIER': 'label-info', 'UPDATE_CHECK': 'label-default', 'UPDATE_APPLY': 'label-primary',
+            'RESOURCE_TIER': 'label-info',
+            'UPDATE_CHECK': 'label-default',
+            'UPDATE_APPLY': 'label-info',
             'LAUNCH_CODE_SET': 'label-info'
         };
         var rows = '';
@@ -131,16 +150,12 @@ var LogsUI = (function() {
         var limit = 50;
         var params = 'limit=' + limit + '&offset=' + offset + '&action=EXT_*';
         $.getJSON(docroot + '/auditlogapi?' + params, function(data) {
-            renderAuditTable(data);
-            $('#audit-log-body').closest('table').attr('id', 'api-access-table');
-            renderPagination('#api-pagination', data.total, data.limit, data.offset, loadApiLogs);
-
             var rows = '';
             var entries = data.entries || [];
             var actionClasses = {
-                'EXT_REQUEST': 'label-info', 'EXT_AUTH_DENIED': 'label-danger',
+                'EXT_REQUEST': 'label-primary', 'EXT_AUTH_DENIED': 'label-danger',
                 'EXT_RATE_LIMIT': 'label-warning', 'EXT_KEY_CREATE': 'label-success',
-                'EXT_KEY_REVOKE': 'label-danger', 'EXT_KEY_REINSTATE': 'label-info',
+                'EXT_KEY_REVOKE': 'label-danger', 'EXT_KEY_REINSTATE': 'label-primary',
                 'EXT_KEY_REVEAL': 'label-warning', 'EXT_KEY_UPDATE': 'label-info'
             };
             for (var i = 0; i < entries.length; i++) {
@@ -159,6 +174,7 @@ var LogsUI = (function() {
             }
             $('#api-access-body').html(rows);
             $('#api-access-count').text(data.total || 0);
+            renderPagination('#api-pagination', data.total, data.limit, data.offset, loadApiLogs);
         });
     }
 
