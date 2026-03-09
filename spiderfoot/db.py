@@ -6857,7 +6857,8 @@ class SpiderFootDb:
     def auditLogGet(self, limit: int = 50, offset: int = 0, username: str = None,
                     action: str = None, search: str = None,
                     date_from: int = None, date_to: int = None,
-                    scan_id: str = None, scan_only: bool = False) -> dict:
+                    scan_id: str = None, scan_only: bool = False,
+                    exclude_scans: bool = False) -> dict:
         """Get audit log entries with pagination, search, and date range.
 
         Args:
@@ -6870,6 +6871,7 @@ class SpiderFootDb:
             date_to (int): filter entries created <= this timestamp (ms)
             scan_id (str): filter by scan instance ID
             scan_only (bool): if True, only return entries linked to a scan
+            exclude_scans (bool): if True, exclude entries linked to a scan
 
         Returns:
             dict: {entries: [...], total: N, limit: N, offset: N}
@@ -6881,6 +6883,9 @@ class SpiderFootDb:
 
         if scan_only:
             conditions.append(f"{col}scan_instance_id IS NOT NULL")
+
+        if exclude_scans:
+            conditions.append("scan_instance_id IS NULL")
 
         if username:
             conditions.append(f"{col}username = ?")
