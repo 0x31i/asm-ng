@@ -3,6 +3,10 @@
     <p style="color: var(--text-muted, #6b7280); margin-bottom: 20px;">
       Record of user actions across the system.
     </p>
+    <p style="font-size: 12px; color: #999; margin-bottom: 10px;">
+      <i class="glyphicon glyphicon-info-sign"></i> For the full log management experience with pagination, export, and more, go to
+      <a href="${docroot}/opts" onclick="setTimeout(function(){if(typeof switchTab==='function')switchTab('logs');},500)">Settings &gt; Logs</a>.
+    </p>
 
     <div class="row" style="margin-bottom: 15px;">
       <div class="col-md-3">
@@ -16,6 +20,18 @@
           <option value="SCAN_DELETE">Scan Deleted</option>
           <option value="SETTINGS_SAVE">Settings Saved</option>
           <option value="SETTINGS_RESET">Settings Reset</option>
+          <option value="DATA_EXPORT">Data Export</option>
+          <option value="DATA_IMPORT">Data Import</option>
+          <option value="DATA_MODIFY">Data Modify</option>
+          <option value="DB_MAINTENANCE">DB Maintenance</option>
+          <option value="SCAN_VIEW">Scan View</option>
+          <option value="SCAN_STATUS_OVERRIDE">Scan Status Override</option>
+          <option value="USER_CREATE">User Created</option>
+          <option value="USER_UPDATE">User Updated</option>
+          <option value="USER_DELETE">User Deleted</option>
+          <option value="PASSWORD_CHANGE">Password Change</option>
+          <option value="EXT_KEY_CREATE">Ext API Key Created</option>
+          <option value="EXT_KEY_REVOKE">Ext API Key Revoked</option>
         </select>
       </div>
       <div class="col-md-3">
@@ -57,6 +73,18 @@ action_classes = {
     'SCAN_DELETE': 'label-danger',
     'SETTINGS_SAVE': 'label-primary',
     'SETTINGS_RESET': 'label-warning',
+    'DATA_EXPORT': 'label-info',
+    'DATA_IMPORT': 'label-primary',
+    'DATA_MODIFY': 'label-warning',
+    'DB_MAINTENANCE': 'label-default',
+    'SCAN_VIEW': 'label-default',
+    'SCAN_STATUS_OVERRIDE': 'label-warning',
+    'USER_CREATE': 'label-success',
+    'USER_UPDATE': 'label-info',
+    'USER_DELETE': 'label-danger',
+    'PASSWORD_CHANGE': 'label-warning',
+    'EXT_KEY_CREATE': 'label-success',
+    'EXT_KEY_REVOKE': 'label-danger',
 }
 cls = action_classes.get(entry['action'], 'label-default')
 %>

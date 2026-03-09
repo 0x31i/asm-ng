@@ -317,6 +317,18 @@ class SpiderFootDb:
         "CREATE INDEX idx_audit_log_username ON tbl_audit_log (username)",
         "CREATE INDEX idx_audit_log_created ON tbl_audit_log (created)",
         "CREATE INDEX idx_audit_log_action ON tbl_audit_log (action)",
+        "CREATE TABLE tbl_request_log ( \
+            id              INTEGER PRIMARY KEY AUTOINCREMENT, \
+            username        VARCHAR NOT NULL, \
+            method          VARCHAR(10) NOT NULL, \
+            path            VARCHAR NOT NULL, \
+            status_code     INT, \
+            response_ms     INT, \
+            ip_address      VARCHAR, \
+            created         INT NOT NULL \
+        )",
+        "CREATE INDEX idx_request_log_created ON tbl_request_log (created)",
+        "CREATE INDEX idx_request_log_username ON tbl_request_log (username)",
         "CREATE TABLE tbl_known_assets ( \
             id              INTEGER PRIMARY KEY AUTOINCREMENT, \
             target          VARCHAR NOT NULL, \
@@ -902,6 +914,26 @@ class SpiderFootDb:
                     self.conn.commit()
                 except DatabaseError:
                     pass
+
+            # Migration: Add tbl_request_log table if it doesn't exist
+            try:
+                self.dbh.execute("SELECT COUNT(*) FROM tbl_request_log")
+            except DatabaseError:
+                try:
+                    for query in self.createSchemaQueries:
+                        if "request_log" in query:
+                            self.dbh.execute(query)
+                    self.conn.commit()
+                except DatabaseError:
+                    pass
+
+            # Migration: Add scan log indexes if they don't exist
+            try:
+                self.dbh.execute("CREATE INDEX IF NOT EXISTS idx_scan_log_generated ON tbl_scan_log (generated)")
+                self.dbh.execute("CREATE INDEX IF NOT EXISTS idx_scan_log_type ON tbl_scan_log (type)")
+                self.conn.commit()
+            except DatabaseError:
+                pass
 
             # Migration: Add role column to tbl_users if it doesn't exist
             try:
@@ -6810,16 +6842,22 @@ class SpiderFootDb:
             except DatabaseError:
                 pass
 
-    def auditLogGet(self, limit: int = 200, username: str = None, action: str = None) -> list:
-        """Get audit log entries.
+    def auditLogGet(self, limit: int = 50, offset: int = 0, username: str = None,
+                    action: str = None, search: str = None,
+                    date_from: int = None, date_to: int = None) -> dict:
+        """Get audit log entries with pagination, search, and date range.
 
         Args:
-            limit (int): max number of entries to return
+            limit (int): max entries per page
+            offset (int): pagination offset
             username (str): filter by username
-            action (str): filter by action type
+            action (str): filter by action type (supports prefix match with *)
+            search (str): search in detail field (ILIKE)
+            date_from (int): filter entries created >= this timestamp (ms)
+            date_to (int): filter entries created <= this timestamp (ms)
 
         Returns:
-            list: list of audit log dicts
+            dict: {entries: [...], total: N, limit: N, offset: N}
         """
         conditions = []
         params = []
@@ -6829,21 +6867,44 @@ class SpiderFootDb:
             params.append(username)
 
         if action:
-            conditions.append("action = ?")
-            params.append(action)
+            if action.endswith('*'):
+                conditions.append("action LIKE ?")
+                params.append(action.replace('*', '%'))
+            else:
+                conditions.append("action = ?")
+                params.append(action)
+
+        if search:
+            conditions.append("(detail ILIKE ? OR username ILIKE ?)")
+            params.append(f"%{search}%")
+            params.append(f"%{search}%")
+
+        if date_from is not None:
+            conditions.append("created >= ?")
+            params.append(int(date_from))
+
+        if date_to is not None:
+            conditions.append("created <= ?")
+            params.append(int(date_to))
 
         where = ""
         if conditions:
             where = " WHERE " + " AND ".join(conditions)
 
-        qry = f"SELECT id, username, action, detail, ip_address, created FROM tbl_audit_log{where} ORDER BY created DESC LIMIT ?"
-        params.append(limit)
-
         with self.dbhLock:
             try:
-                self.dbh.execute(qry, params)
+                # Get total count
+                count_qry = f"SELECT COUNT(*) FROM tbl_audit_log{where}"
+                self.dbh.execute(count_qry, params[:])
+                total = self.dbh.fetchone()[0]
+
+                # Get page of entries
+                qry = f"SELECT id, username, action, detail, ip_address, created FROM tbl_audit_log{where} ORDER BY created DESC LIMIT ? OFFSET ?"
+                page_params = params + [limit, offset]
+                self.dbh.execute(qry, page_params)
                 rows = self.dbh.fetchall()
-                return [
+
+                entries = [
                     {
                         'id': row[0],
                         'username': row[1],
@@ -6854,8 +6915,117 @@ class SpiderFootDb:
                     }
                     for row in rows
                 ]
+                return {'entries': entries, 'total': total, 'limit': limit, 'offset': offset}
+            except DatabaseError:
+                return {'entries': [], 'total': 0, 'limit': limit, 'offset': offset}
+
+    def auditLogActions(self) -> list:
+        """Get distinct action types from audit log.
+
+        Returns:
+            list: sorted list of action type strings
+        """
+        qry = "SELECT DISTINCT action FROM tbl_audit_log ORDER BY action"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry)
+                return [row[0] for row in self.dbh.fetchall()]
             except DatabaseError:
                 return []
+
+    def auditLogUsers(self) -> list:
+        """Get distinct usernames from audit log.
+
+        Returns:
+            list: sorted list of username strings
+        """
+        qry = "SELECT DISTINCT username FROM tbl_audit_log ORDER BY username"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry)
+                return [row[0] for row in self.dbh.fetchall()]
+            except DatabaseError:
+                return []
+
+    def scanLogsGlobal(self, limit: int = 100, offset: int = 0, scan_id: str = None,
+                       log_type: str = None, component: str = None, search: str = None,
+                       date_from: int = None, date_to: int = None) -> dict:
+        """Get scan logs across all scans with pagination and filters.
+
+        Args:
+            limit (int): max entries per page
+            offset (int): pagination offset
+            scan_id (str): filter by scan instance ID
+            log_type (str): filter by log type (e.g. ERROR, STATUS)
+            component (str): filter by component
+            search (str): search in message field (ILIKE)
+            date_from (int): filter entries generated >= this timestamp (ms)
+            date_to (int): filter entries generated <= this timestamp (ms)
+
+        Returns:
+            dict: {entries: [...], total: N, limit: N, offset: N}
+        """
+        conditions = []
+        params = []
+
+        if scan_id:
+            conditions.append("l.scan_instance_id = ?")
+            params.append(scan_id)
+
+        if log_type:
+            conditions.append("l.type = ?")
+            params.append(log_type)
+
+        if component:
+            conditions.append("l.component = ?")
+            params.append(component)
+
+        if search:
+            conditions.append("l.message ILIKE ?")
+            params.append(f"%{search}%")
+
+        if date_from is not None:
+            conditions.append("l.generated >= ?")
+            params.append(int(date_from))
+
+        if date_to is not None:
+            conditions.append("l.generated <= ?")
+            params.append(int(date_to))
+
+        where = ""
+        if conditions:
+            where = " WHERE " + " AND ".join(conditions)
+
+        with self.dbhLock:
+            try:
+                count_qry = f"SELECT COUNT(*) FROM tbl_scan_log l{where}"
+                self.dbh.execute(count_qry, params[:])
+                total = self.dbh.fetchone()[0]
+
+                qry = (f"SELECT l.id, l.scan_instance_id, s.scan_name, l.generated, "
+                       f"l.component, l.type, l.message "
+                       f"FROM tbl_scan_log l "
+                       f"LEFT JOIN tbl_scan_instance s ON l.scan_instance_id = s.guid "
+                       f"{where} ORDER BY l.generated DESC LIMIT ? OFFSET ?")
+                page_params = params + [limit, offset]
+                self.dbh.execute(qry, page_params)
+                rows = self.dbh.fetchall()
+
+                entries = [
+                    {
+                        'id': row[0],
+                        'scan_id': row[1],
+                        'scan_name': row[2] or '',
+                        'generated': row[3],
+                        'component': row[4] or '',
+                        'type': row[5],
+                        'message': row[6] or ''
+                    }
+                    for row in rows
+                ]
+                return {'entries': entries, 'total': total, 'limit': limit, 'offset': offset}
+            except DatabaseError:
+                return {'entries': [], 'total': 0, 'limit': limit, 'offset': offset}
 
     #
     # Launch code methods
@@ -8259,3 +8429,147 @@ class SpiderFootDb:
             }
             for row in rows
         ]
+
+    #
+    # Request log methods
+    #
+
+    def requestLogBatch(self, entries: list) -> bool:
+        """Insert a batch of HTTP request log entries.
+
+        Args:
+            entries (list): list of tuples (username, method, path, status_code, response_ms, ip_address, created)
+
+        Returns:
+            bool: True if successful
+        """
+        if not entries:
+            return True
+
+        qry = ("INSERT INTO tbl_request_log "
+               "(username, method, path, status_code, response_ms, ip_address, created) "
+               "VALUES (?, ?, ?, ?, ?, ?, ?)")
+
+        with self.dbhLock:
+            try:
+                self.dbh.executemany(qry, entries)
+                self.conn.commit()
+                return True
+            except DatabaseError:
+                return False
+
+    def requestLogGet(self, limit: int = 50, offset: int = 0, username: str = None,
+                      path: str = None, date_from: int = None, date_to: int = None) -> dict:
+        """Get HTTP request log entries with pagination.
+
+        Args:
+            limit (int): max entries per page
+            offset (int): pagination offset
+            username (str): filter by username
+            path (str): filter by path (ILIKE)
+            date_from (int): filter entries created >= this timestamp (ms)
+            date_to (int): filter entries created <= this timestamp (ms)
+
+        Returns:
+            dict: {entries: [...], total: N, limit: N, offset: N}
+        """
+        conditions = []
+        params = []
+
+        if username:
+            conditions.append("username = ?")
+            params.append(username)
+
+        if path:
+            conditions.append("path ILIKE ?")
+            params.append(f"%{path}%")
+
+        if date_from is not None:
+            conditions.append("created >= ?")
+            params.append(int(date_from))
+
+        if date_to is not None:
+            conditions.append("created <= ?")
+            params.append(int(date_to))
+
+        where = ""
+        if conditions:
+            where = " WHERE " + " AND ".join(conditions)
+
+        with self.dbhLock:
+            try:
+                count_qry = f"SELECT COUNT(*) FROM tbl_request_log{where}"
+                self.dbh.execute(count_qry, params[:])
+                total = self.dbh.fetchone()[0]
+
+                qry = (f"SELECT id, username, method, path, status_code, response_ms, ip_address, created "
+                       f"FROM tbl_request_log{where} ORDER BY created DESC LIMIT ? OFFSET ?")
+                page_params = params + [limit, offset]
+                self.dbh.execute(qry, page_params)
+                rows = self.dbh.fetchall()
+
+                entries = [
+                    {
+                        'id': row[0],
+                        'username': row[1],
+                        'method': row[2],
+                        'path': row[3],
+                        'status_code': row[4],
+                        'response_ms': row[5],
+                        'ip_address': row[6],
+                        'created': row[7]
+                    }
+                    for row in rows
+                ]
+                return {'entries': entries, 'total': total, 'limit': limit, 'offset': offset}
+            except DatabaseError:
+                return {'entries': [], 'total': 0, 'limit': limit, 'offset': offset}
+
+    #
+    # Log purge methods
+    #
+
+    def logPurge(self, table: str, days: int, time_column: str = 'created') -> int:
+        """Delete log entries older than the specified number of days.
+
+        Args:
+            table (str): table name (must be one of the allowed log tables)
+            days (int): entries older than this many days will be deleted
+            time_column (str): name of the timestamp column
+
+        Returns:
+            int: number of rows deleted
+        """
+        allowed_tables = ('tbl_audit_log', 'tbl_scan_log', 'tbl_request_log')
+        if table not in allowed_tables:
+            return 0
+
+        cutoff_ms = int((time.time() - (days * 86400)) * 1000)
+        qry = f"DELETE FROM {table} WHERE {time_column} < ?"
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, [cutoff_ms])
+                deleted = self.dbh.rowcount
+                self.conn.commit()
+                return deleted
+            except DatabaseError:
+                return 0
+
+    def logPurgeAll(self, audit_days: int = 365, scan_days: int = 90,
+                    request_days: int = 30) -> dict:
+        """Purge old entries from all log tables.
+
+        Args:
+            audit_days (int): retain audit log entries for this many days
+            scan_days (int): retain scan log entries for this many days
+            request_days (int): retain request log entries for this many days
+
+        Returns:
+            dict: {audit: N, scan: N, request: N} rows deleted per table
+        """
+        return {
+            'audit': self.logPurge('tbl_audit_log', audit_days),
+            'scan': self.logPurge('tbl_scan_log', scan_days, time_column='generated'),
+            'request': self.logPurge('tbl_request_log', request_days),
+        }
