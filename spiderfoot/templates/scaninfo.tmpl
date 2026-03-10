@@ -321,11 +321,20 @@
         // ---- BROWSER HISTORY MANAGEMENT ----
         // Builds a state object representing the current view for history.pushState
         function buildHistoryState() {
+            // Capture active category filters for DATA list view
+            var dataFilterCats = null;
+            if (typeof _dataListFilterMode !== 'undefined' && _dataListFilterMode === 'selective') {
+                dataFilterCats = [];
+                for (var i = 0; i < categoryOrder.length; i++) {
+                    if (_dataListCategoryFilter[categoryOrder[i]]) dataFilterCats.push(categoryOrder[i]);
+                }
+            }
             return {
                 view: currentSection,
                 dataType: currentType,
                 dataTypeName: currentTypeName,
                 dataFormat: currentDataFormat,
+                dataFilterCats: dataFilterCats,
                 vulnTab: (typeof vulnActiveTab !== 'undefined') ? vulnActiveTab : 'nessus',
                 findingsTab: (typeof findingsActiveTab !== 'undefined') ? findingsActiveTab : 'findings',
                 assetsView: (typeof currentAssetsView !== 'undefined') ? currentAssetsView : 'overview',
@@ -333,6 +342,67 @@
                 searchType: lastSearchType,
                 scrollY: window.scrollY
             };
+        }
+
+        // Encode view state into a URL hash for refresh persistence
+        // Maps: btn-status→summary, btn-data→data, btn-findings→findings,
+        //        btn-graph→vulns, btn-assets→assets, btn-info→manage, btn-search→search
+        var _viewToHash = {
+            'btn-status': 'summary', 'btn-data': 'data', 'btn-findings': 'findings',
+            'btn-graph': 'vulns', 'btn-assets': 'assets', 'btn-info': 'manage', 'btn-search': 'search'
+        };
+        var _hashToView = {};
+        for (var _k in _viewToHash) { if (_viewToHash.hasOwnProperty(_k)) _hashToView[_viewToHash[_k]] = _k; }
+
+        function stateToHash(state) {
+            var viewKey = _viewToHash[state.view] || 'summary';
+            var parts = ['view=' + viewKey];
+            if (state.view === 'btn-data' && state.dataType && state.dataType !== 'ALL') {
+                parts.push('type=' + encodeURIComponent(state.dataType));
+                if (state.dataTypeName) parts.push('typeName=' + encodeURIComponent(state.dataTypeName));
+                if (state.dataFormat && state.dataFormat !== 'full') parts.push('format=' + state.dataFormat);
+            }
+            if (state.view === 'btn-data' && state.dataFilterCats && state.dataFilterCats.length > 0) {
+                parts.push('filter=' + encodeURIComponent(state.dataFilterCats.join(',')));
+            }
+            if (state.view === 'btn-findings' && state.findingsTab && state.findingsTab !== 'findings') {
+                parts.push('tab=' + state.findingsTab);
+            }
+            if (state.view === 'btn-graph' && state.vulnTab && state.vulnTab !== 'nessus') {
+                parts.push('tab=' + state.vulnTab);
+            }
+            if (state.view === 'btn-assets' && state.assetsView && state.assetsView !== 'overview') {
+                parts.push('sub=' + state.assetsView);
+            }
+            if (state.view === 'btn-search' && state.searchQuery) {
+                parts.push('q=' + encodeURIComponent(state.searchQuery));
+                if (state.searchType && state.searchType !== 'ALL') parts.push('st=' + encodeURIComponent(state.searchType));
+            }
+            return '#' + parts.join('&');
+        }
+
+        function hashToState() {
+            var hash = window.location.hash;
+            if (!hash || hash.length < 2) return null;
+            var params = {};
+            hash.substring(1).split('&').forEach(function(p) {
+                var kv = p.split('=');
+                if (kv.length === 2) params[kv[0]] = decodeURIComponent(kv[1]);
+            });
+            if (!params.view) return null;
+            var view = _hashToView[params.view];
+            if (!view) return null;
+            var state = {view: view};
+            if (params.type) { state.dataType = params.type; state.dataTypeName = params.typeName || params.type; }
+            if (params.format) state.dataFormat = params.format;
+            if (params.filter) state.dataFilterCats = params.filter.split(',');
+            if (params.tab) {
+                if (view === 'btn-findings') state.findingsTab = params.tab;
+                else if (view === 'btn-graph') state.vulnTab = params.tab;
+            }
+            if (params.sub) state.assetsView = params.sub;
+            if (params.q) { state.searchQuery = params.q; state.searchType = params.st || 'ALL'; }
+            return state;
         }
 
         // Push a new history entry for the current view state
@@ -346,7 +416,9 @@
                 }
             }
             state.scrollY = 0; // New view starts at top
-            history.pushState(state, '', window.location.href);
+            var newHash = stateToHash(state);
+            var url = window.location.pathname + window.location.search + newHash;
+            history.pushState(state, '', url);
         }
 
         // Restore a view from a history state object (called on popstate)
@@ -381,7 +453,7 @@
                     if (state.dataType && state.dataType !== 'ALL') {
                         dataEventData(_instanceId, state.dataTypeName, state.dataType, state.dataFormat || 'full');
                     } else {
-                        dataEventList(_instanceId);
+                        dataEventList(_instanceId, state.dataFilterCats);
                     }
                     break;
                 case 'btn-assets':
@@ -1861,11 +1933,16 @@
             var baseTitle = pageTitles[currentSection] || currentSection.replace("btn-", "").toUpperCase();
             if (subDirectory && subDirectory !== "All" && subDirectory !== "ALL") {
                 var decodedSubDir = decodeURIComponent(subDirectory);
-                $("#page-title-text").text(baseTitle + " / " + decodedSubDir.toUpperCase());
-                // Show action buttons on DATA type detail pages
+                // Make the base title a clickable link back to the parent view
                 if (currentSection === 'btn-data') {
+                    $("#page-title-text").html(
+                        "<a href='javascript:void(0)' onclick='dataEventList(\"" + _instanceId + "\")' class='page-title-link'>" + baseTitle + "</a>" +
+                        " / " + decodedSubDir.toUpperCase()
+                    );
                     $("#page-title-actions").addClass('visible');
                     updateInfoButtonStates();
+                } else {
+                    $("#page-title-text").text(baseTitle + " / " + decodedSubDir.toUpperCase());
                 }
             } else {
                 $("#page-title-text").text(baseTitle);
@@ -4209,7 +4286,8 @@
             if (!_skipHistoryPush && history.state) {
                 var s = history.state;
                 s.scrollY = window.scrollY;
-                history.replaceState(s, '', window.location.href);
+                var url = window.location.pathname + window.location.search + stateToHash(s);
+                history.replaceState(s, '', url);
             }
             var targets = [ "btn-data", "btn-info",
                 "btn-export", "btn-download-logs", "btn-viz",
@@ -11855,6 +11933,10 @@
             }
             updateAllTileVisuals();
             dataListApplySort(_dataListSort);
+            // Persist filter state to URL hash so refresh/back retains it
+            var s = buildHistoryState();
+            var url = window.location.pathname + window.location.search + stateToHash(s);
+            history.replaceState(s, '', url);
         }
 
         function dataListApplySort(sortMode) {
@@ -11930,7 +12012,8 @@
         }
 
         // Summary of event types and counts for a scan
-        function dataEventList(instanceId) {
+        // savedFilterCats: optional array of category names to restore filter state
+        function dataEventList(instanceId, savedFilterCats) {
             currentType = "ALL";
             currentTypeName = "All";
             updateExportCurrentType('');
@@ -11983,6 +12066,13 @@
 
                             // --- Category filter tiles ---
                             dataListInitFilters();
+                            // Restore saved category filter if navigating back
+                            if (savedFilterCats && savedFilterCats.length > 0) {
+                                _dataListFilterMode = 'selective';
+                                for (var ci = 0; ci < categoryOrder.length; ci++) {
+                                    _dataListCategoryFilter[categoryOrder[ci]] = (savedFilterCats.indexOf(categoryOrder[ci]) >= 0);
+                                }
+                            }
                             var legend = "<div class='data-list-legend'>";
                             for (var ci = 0; ci < categoryOrder.length; ci++) {
                                 var catName = categoryOrder[ci];
@@ -11995,8 +12085,9 @@
                                     if (data[di][6] === catName) catCount++;
                                 }
                                 if (catCount > 0) {
+                                    var inactiveClass = (!_dataListCategoryFilter[catName]) ? ' data-legend-inactive' : '';
                                     var tileId = 'data-legend-' + catName.replace(/[\s\/]/g, '-');
-                                    legend += "<button id='" + tileId + "' class='data-legend-tile' style='--tile-color: " + catColor + ";' onclick='toggleCategoryFilter(\"" + catName + "\")'>";
+                                    legend += "<button id='" + tileId + "' class='data-legend-tile" + inactiveClass + "' style='--tile-color: " + catColor + ";' onclick='toggleCategoryFilter(\"" + catName + "\")'>";
                                     legend += "<span class='data-legend-dot' style='background: " + catColor + ";'></span>";
                                     legend += "<span class='data-legend-tile-name'>" + catName + "</span>";
                                     legend += "<span class='data-legend-count'>" + catCount + "</span>";
@@ -12020,6 +12111,13 @@
                             if (data.length > 0) {
                                 // Apply default sort (group)
                                 dataListApplySort(_dataListSort);
+                            }
+
+                            // Update history state to reflect restored filter
+                            if (!_skipHistoryPush && savedFilterCats && savedFilterCats.length > 0) {
+                                var s = buildHistoryState();
+                                var url = window.location.pathname + window.location.search + stateToHash(s);
+                                history.replaceState(s, '', url);
                             }
             });
         }
@@ -13320,12 +13418,18 @@
             });
         }
 
-        // Always default to Summary view
-        // Use replaceState for initial load (don't push a new history entry)
+        // Restore view from URL hash (persists across refresh), or default to Summary
         _skipHistoryPush = true;
-        scanSummaryView("${id}");
+        var _initialState = hashToState();
+        if (_initialState) {
+            restoreViewFromState(_initialState);
+        } else {
+            scanSummaryView("${id}");
+        }
         _skipHistoryPush = false;
-        history.replaceState(buildHistoryState(), '', window.location.href);
+        var _initState = buildHistoryState();
+        var _initUrl = window.location.pathname + window.location.search + stateToHash(_initState);
+        history.replaceState(_initState, '', _initUrl);
 
         var refreshSummaryInterval;
 

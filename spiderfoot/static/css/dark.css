@@ -1992,6 +1992,16 @@ td.pre-expandable.pre-collapsed pre.table-border-bg-inherit {
   flex: 1;
 }
 
+.page-title-link {
+  color: #67e8f9;
+  text-decoration: none;
+  cursor: pointer;
+}
+.page-title-link:hover {
+  color: #a5f3fc;
+  text-decoration: underline;
+}
+
 .page-title-actions {
   display: none;
   gap: 8px;

@@ -2247,6 +2247,8 @@ td.pre-expandable.pre-expanded .pre-expand-hint {
 .page-title-text {
   flex: 1;
 }
+.page-title-link { color: #0284c7; text-decoration: none; cursor: pointer; }
+.page-title-link:hover { color: #0369a1; text-decoration: underline; }
 
 .page-title-actions {
   display: none;
