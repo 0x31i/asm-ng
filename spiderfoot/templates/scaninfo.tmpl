@@ -335,6 +335,63 @@
             };
         }
 
+        // Encode view state into a URL hash for refresh persistence
+        // Maps: btn-status→summary, btn-data→data, btn-findings→findings,
+        //        btn-graph→vulns, btn-assets→assets, btn-info→manage, btn-search→search
+        var _viewToHash = {
+            'btn-status': 'summary', 'btn-data': 'data', 'btn-findings': 'findings',
+            'btn-graph': 'vulns', 'btn-assets': 'assets', 'btn-info': 'manage', 'btn-search': 'search'
+        };
+        var _hashToView = {};
+        for (var _k in _viewToHash) { if (_viewToHash.hasOwnProperty(_k)) _hashToView[_viewToHash[_k]] = _k; }
+
+        function stateToHash(state) {
+            var viewKey = _viewToHash[state.view] || 'summary';
+            var parts = ['view=' + viewKey];
+            if (state.view === 'btn-data' && state.dataType && state.dataType !== 'ALL') {
+                parts.push('type=' + encodeURIComponent(state.dataType));
+                if (state.dataTypeName) parts.push('typeName=' + encodeURIComponent(state.dataTypeName));
+                if (state.dataFormat && state.dataFormat !== 'full') parts.push('format=' + state.dataFormat);
+            }
+            if (state.view === 'btn-findings' && state.findingsTab && state.findingsTab !== 'findings') {
+                parts.push('tab=' + state.findingsTab);
+            }
+            if (state.view === 'btn-graph' && state.vulnTab && state.vulnTab !== 'nessus') {
+                parts.push('tab=' + state.vulnTab);
+            }
+            if (state.view === 'btn-assets' && state.assetsView && state.assetsView !== 'overview') {
+                parts.push('sub=' + state.assetsView);
+            }
+            if (state.view === 'btn-search' && state.searchQuery) {
+                parts.push('q=' + encodeURIComponent(state.searchQuery));
+                if (state.searchType && state.searchType !== 'ALL') parts.push('st=' + encodeURIComponent(state.searchType));
+            }
+            return '#' + parts.join('&');
+        }
+
+        function hashToState() {
+            var hash = window.location.hash;
+            if (!hash || hash.length < 2) return null;
+            var params = {};
+            hash.substring(1).split('&').forEach(function(p) {
+                var kv = p.split('=');
+                if (kv.length === 2) params[kv[0]] = decodeURIComponent(kv[1]);
+            });
+            if (!params.view) return null;
+            var view = _hashToView[params.view];
+            if (!view) return null;
+            var state = {view: view};
+            if (params.type) { state.dataType = params.type; state.dataTypeName = params.typeName || params.type; }
+            if (params.format) state.dataFormat = params.format;
+            if (params.tab) {
+                if (view === 'btn-findings') state.findingsTab = params.tab;
+                else if (view === 'btn-graph') state.vulnTab = params.tab;
+            }
+            if (params.sub) state.assetsView = params.sub;
+            if (params.q) { state.searchQuery = params.q; state.searchType = params.st || 'ALL'; }
+            return state;
+        }
+
         // Push a new history entry for the current view state
         function pushViewState(viewName, extra) {
             if (_skipHistoryPush) return;
@@ -346,7 +403,9 @@
                 }
             }
             state.scrollY = 0; // New view starts at top
-            history.pushState(state, '', window.location.href);
+            var newHash = stateToHash(state);
+            var url = window.location.pathname + window.location.search + newHash;
+            history.pushState(state, '', url);
         }
 
         // Restore a view from a history state object (called on popstate)
@@ -4209,7 +4268,8 @@
             if (!_skipHistoryPush && history.state) {
                 var s = history.state;
                 s.scrollY = window.scrollY;
-                history.replaceState(s, '', window.location.href);
+                var url = window.location.pathname + window.location.search + stateToHash(s);
+                history.replaceState(s, '', url);
             }
             var targets = [ "btn-data", "btn-info",
                 "btn-export", "btn-download-logs", "btn-viz",
@@ -12061,6 +12121,14 @@
             updateExportCurrentType(eventTypeLabel);
             updatePageTitle(currentTypeName);
             pushViewState('btn-data', {dataType: eventType, dataTypeName: eventTypeLabel, dataFormat: format});
+
+            // Add breadcrumb navigation bar
+            var breadcrumb = "<div id='breadcrumbs' style='padding:8px 16px;font-family:var(--font-mono, monospace);font-size:11px;letter-spacing:1px;color:var(--text-secondary, #94a3b8);'>" +
+                "<a href='javascript:void(0)' onclick='dataEventList(\"" + instanceId + "\")' style='color:#67e8f9;text-decoration:none;text-transform:uppercase;'>" +
+                "<i class='glyphicon glyphicon-th-list' style='font-size:10px;'></i>&nbsp;&nbsp;DATA</a>" +
+                "<span style='margin:0 8px;opacity:0.4;'>&rsaquo;</span>" +
+                "<span style='text-transform:uppercase;color:var(--text-primary, #e2e8f0);'>" + $('<span>').text(eventTypeLabel).html() + "</span></div>";
+            $("#mainbody").prepend(breadcrumb);
             refresh = function() { dataEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated, filterImportedEntries); }
             dataUpdate = function(newformat) { dataEventData(instanceId, eventTypeLabel, eventType, newformat, filterFP, filterValidated, filterImportedEntries); }
             currentDataFormat = format;
@@ -13320,12 +13388,18 @@
             });
         }
 
-        // Always default to Summary view
-        // Use replaceState for initial load (don't push a new history entry)
+        // Restore view from URL hash (persists across refresh), or default to Summary
         _skipHistoryPush = true;
-        scanSummaryView("${id}");
+        var _initialState = hashToState();
+        if (_initialState) {
+            restoreViewFromState(_initialState);
+        } else {
+            scanSummaryView("${id}");
+        }
         _skipHistoryPush = false;
-        history.replaceState(buildHistoryState(), '', window.location.href);
+        var _initState = buildHistoryState();
+        var _initUrl = window.location.pathname + window.location.search + stateToHash(_initState);
+        history.replaceState(_initState, '', _initUrl);
 
         var refreshSummaryInterval;
 
