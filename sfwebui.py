@@ -8178,7 +8178,8 @@ class SpiderFootWebUi:
                     return {'enabled': False, 'error': 'Scan not found'}
 
                 result = self._calculateScanGrade(dbh, id)
-        except Exception:
+        except Exception as e:
+            self.log.error(f"scangrade: grade calculation failed for scan={id}: {e}", exc_info=True)
             return {'enabled': True, 'overall_grade': '-', 'overall_score': 0, 'categories': {},
                     'error': 'Temporarily unavailable'}
 
