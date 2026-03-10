@@ -1290,12 +1290,11 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
 /* Filter bar */
 #optsect_logs .log-filters {
   display: flex;
-  gap: 8px;
-  flex-wrap: nowrap;
+  gap: 6px;
+  flex-wrap: wrap;
   align-items: center;
   margin-bottom: 12px;
 }
-#optsect_logs .log-filters .btn { flex-shrink: 0; }
 #optsect_logs .log-filters select,
 #optsect_logs .log-filters input[type="text"],
 #optsect_logs .log-filters input[type="date"],
@@ -1308,11 +1307,12 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
   background: var(--bg-secondary, #f8f9fa);
   color: var(--text-primary, #1f2937);
   padding: 4px 8px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
-#optsect_logs .log-filters select { min-width: 140px; }
-#optsect_logs .log-filters input[type="text"] { min-width: 120px; }
-#optsect_logs .log-filters input[type="date"] { min-width: 130px; }
-#optsect_logs .log-filters .filter-sep { flex-grow: 1; }
+#optsect_logs .log-filters select { max-width: 160px; }
+#optsect_logs .log-filters input[type="text"] { max-width: 150px; }
+#optsect_logs .log-filters input[type="date"] { max-width: 140px; }
 
 /* Ensure tables fill full width */
 #optsect_logs .table { width: 100% !important; table-layout: auto; }
@@ -1407,7 +1407,7 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
     <input type="text" id="log-filter-search" placeholder="Search details...">
     <input type="date" id="log-filter-datefrom" title="From date">
     <input type="date" id="log-filter-dateto" title="To date">
-    <span class="filter-sep"></span>
+
     <button class="btn btn-primary btn-sm" onclick="LogsUI.loadAuditLog(0)">Filter</button>
     <button class="btn btn-default btn-sm" onclick="LogsUI.exportLogCSV('audit')" title="Export CSV"><i class="glyphicon glyphicon-download-alt"></i> CSV</button>
   </div>
@@ -1428,7 +1428,7 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
 <!-- ===== Scan Audit (all scan-linked activity) ===== -->
 <div id="logpane_scanlogs" style="display:none">
   <div class="log-filters">
-    <select id="scanlog-filter-scan" style="min-width:160px;max-width:260px;"><option value="">All Scans</option></select>
+    <select id="scanlog-filter-scan"><option value="">All Scans</option></select>
     <select id="scanlog-filter-action">
       <option value="">All Actions</option>
       <option value="SCAN_START">Scan Started</option>
@@ -1446,7 +1446,7 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
       <option value="DATA_IMPORT">Data Import</option>
     </select>
     <input type="text" id="scanlog-filter-search" placeholder="Search details...">
-    <span class="filter-sep"></span>
+
     <button class="btn btn-primary btn-sm" onclick="LogsUI.loadScanLogs(0)">Filter</button>
     <button class="btn btn-default btn-sm" onclick="LogsUI.exportLogCSV('scanlogs')" title="Export CSV"><i class="glyphicon glyphicon-download-alt"></i> CSV</button>
   </div>
@@ -1486,7 +1486,7 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
   <div class="log-filters">
     <input type="text" id="reqlog-filter-user" placeholder="Username...">
     <input type="text" id="reqlog-filter-path" placeholder="Path filter..." style="min-width:200px;">
-    <span class="filter-sep"></span>
+
     <button class="btn btn-primary btn-sm" onclick="LogsUI.loadRequestLog(0)">Filter</button>
     <button class="btn btn-default btn-sm" onclick="LogsUI.exportLogCSV('requests')" title="Export CSV"><i class="glyphicon glyphicon-download-alt"></i> CSV</button>
   </div>
