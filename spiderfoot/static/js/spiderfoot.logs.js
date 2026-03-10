@@ -10,7 +10,7 @@ var LogsUI = (function() {
     // --- Sub-tab toggling ---
     function switchLogTab(tab) {
         currentLogTab = tab;
-        var tabs = ['activity', 'scanlogs', 'apiaccess', 'system', 'requests'];
+        var tabs = ['activity', 'scanlogs', 'apiaccess', 'system', 'requests', 'options'];
         for (var i = 0; i < tabs.length; i++) {
             var el = document.getElementById('logpane_' + tabs[i]);
             var tabEl = document.getElementById('logtab_' + tabs[i]);
@@ -150,7 +150,7 @@ var LogsUI = (function() {
                     '<td><span class="text-muted">' + escHtml(e.time_str || '') + '</span></td>' +
                     '<td><strong>' + escHtml(e.username) + '</strong></td>' +
                     '<td>' + scanLabel + '</td>' +
-                    '<td><span style="display:inline-block;padding:3px 8px;border-radius:3px;font-size:11px;font-weight:600;font-family:var(--font-mono,monospace);background:' + ac.bg + ';color:' + ac.text + '">' + escHtml(e.action) + '</span></td>' +
+                    '<td><span style="display:inline-block;padding:3px 8px;border-radius:2px;font-size:11px;font-weight:600;font-family:var(--font-mono,monospace);background:' + ac.bg + ';color:' + ac.text + '">' + escHtml(e.action) + '</span></td>' +
                     '<td>' + escHtml(e.detail || '') + '</td>' +
                     '</tr>';
             }
@@ -374,6 +374,7 @@ var LogsUI = (function() {
             success: function(data) {
                 if (data.success) {
                     $('#retention-result').attr('class', 'alert alert-success').html('<strong>Saved!</strong> Retention settings updated.').show();
+                    $(document).trigger('retention-saved');
                 } else {
                     $('#retention-result').attr('class', 'alert alert-danger').html('<strong>Error:</strong> ' + (data.error || 'Unknown')).show();
                 }

@@ -1252,13 +1252,13 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
 #optsect_logs .log-header h4 { margin-bottom: 4px; }
 #optsect_logs .log-subtitle { color: var(--text-muted, #6b7280); font-size: 13px; font-family: var(--font-sans, sans-serif); }
 
-/* Sub-tab pills — !important needed to override global a { color: green !important } */
+/* Sub-tab pills — sharp corners, glow, !important to override global green link */
 #optsect_logs .log-pills { display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
 #optsect_logs .log-pills a,
 #optsect_logs .log-pills a:visited {
   display: inline-block;
   padding: 7px 16px;
-  border-radius: 6px;
+  border-radius: 2px;
   font-size: 12px;
   font-weight: 600;
   font-family: var(--font-mono, monospace);
@@ -1276,6 +1276,7 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
   background: var(--bg-elevated, #fff) !important;
   color: var(--text-primary, #1f2937) !important;
   border-color: var(--accent-cyan, #0891b2);
+  box-shadow: 0 0 8px var(--glow-cyan, rgba(8, 145, 178, 0.15));
 }
 #optsect_logs .log-pills a.active,
 #optsect_logs .log-pills a.active:visited,
@@ -1283,36 +1284,85 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
 #optsect_logs .log-pills a.active:focus {
   background: linear-gradient(135deg, var(--accent-cyan, #0891b2) 0%, var(--accent-cyan-light, #06b6d4) 100%) !important;
   color: #ffffff !important;
-  box-shadow: 0 2px 8px var(--glow-cyan, rgba(8, 145, 178, 0.25));
+  box-shadow: 0 0 12px var(--glow-cyan, rgba(8, 145, 178, 0.35));
   border-color: transparent;
 }
 
-/* Filter bar */
+/* Action badges — sharp corners */
+#optsect_logs .label {
+  border-radius: 2px !important;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  letter-spacing: 0.3px;
+}
+
+/* Pagination — dark mode fix */
+#optsect_logs .pagination { margin: 8px 0; }
+#optsect_logs .pagination > li > a,
+#optsect_logs .pagination > li > span {
+  background: var(--bg-secondary, #f8f9fa);
+  color: var(--text-primary, #1f2937);
+  border-color: var(--bg-tertiary, #e9ecef);
+  border-radius: 2px !important;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+}
+#optsect_logs .pagination > li > a:hover {
+  background: var(--bg-tertiary, #e9ecef);
+  color: var(--accent-cyan, #0891b2);
+  border-color: var(--accent-cyan, #0891b2);
+}
+#optsect_logs .pagination > .active > span,
+#optsect_logs .pagination > .active > span:hover {
+  background: linear-gradient(135deg, var(--accent-cyan, #0891b2) 0%, #06b6d4 100%);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 0 8px var(--glow-cyan, rgba(8, 145, 178, 0.25));
+}
+#optsect_logs .pagination > .disabled > span {
+  background: var(--bg-secondary, #f8f9fa);
+  color: var(--text-muted, #6b7280);
+  border-color: var(--bg-tertiary, #e9ecef);
+}
+
+/* Filter buttons — sharp corners */
+#optsect_logs .log-filters .btn {
+  border-radius: 2px !important;
+}
+
+/* Filter bar — single line, compact */
 #optsect_logs .log-filters {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 4px;
+  flex-wrap: nowrap;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 #optsect_logs .log-filters select,
 #optsect_logs .log-filters input[type="text"],
 #optsect_logs .log-filters input[type="date"],
 #optsect_logs .log-filters input[type="number"] {
-  height: 32px;
-  font-size: 12px;
+  height: 28px;
+  font-size: 11px;
   font-family: var(--font-mono, monospace);
-  border-radius: 4px;
+  border-radius: 2px;
   border: 1px solid var(--bg-tertiary, #d1d5db);
   background: var(--bg-secondary, #f8f9fa);
   color: var(--text-primary, #1f2937);
-  padding: 4px 8px;
-  flex: 1 1 auto;
+  padding: 2px 6px;
+  flex: 0 1 auto;
   min-width: 0;
 }
-#optsect_logs .log-filters select { max-width: 160px; }
-#optsect_logs .log-filters input[type="text"] { max-width: 150px; }
-#optsect_logs .log-filters input[type="date"] { max-width: 140px; }
+#optsect_logs .log-filters select { max-width: 130px; }
+#optsect_logs .log-filters input[type="text"] { max-width: 120px; }
+#optsect_logs .log-filters input[type="date"] { max-width: 130px; }
+#optsect_logs .log-filters .btn-sm {
+  height: 28px;
+  font-size: 11px;
+  padding: 2px 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 
 /* Ensure tables fill full width */
 #optsect_logs .table { width: 100% !important; table-layout: auto; }
@@ -1342,34 +1392,73 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
   background: var(--bg-tertiary, #1a1a2e);
   color: var(--text-primary, #e0e0e0);
   padding: 12px;
-  border-radius: 6px;
+  border-radius: 2px;
   border: 1px solid var(--bg-elevated, #2a2a2a);
   line-height: 1.5;
 }
 
-/* Retention section */
-#optsect_logs .retention-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--bg-tertiary, #e9ecef); }
-#optsect_logs .retention-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+/* Retention section — modern card style, sharp corners */
+#optsect_logs .retention-section {
+  padding: 20px;
+  background: var(--bg-secondary, #f8f9fa);
+  border: 1px solid var(--bg-tertiary, #e9ecef);
+  border-radius: 2px;
+  max-width: 600px;
+}
+#optsect_logs .retention-section h5 {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted, #6b7280);
+  margin: 0 0 4px 0;
+}
+#optsect_logs .retention-section .log-subtitle {
+  font-size: 11px;
+  margin-bottom: 14px !important;
+}
+#optsect_logs .retention-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
 #optsect_logs .retention-field label {
   display: block;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
   color: var(--text-muted, #6b7280);
   margin-bottom: 4px;
   font-family: var(--font-mono, monospace);
 }
 #optsect_logs .retention-field input {
-  width: 120px;
-  height: 32px;
-  font-size: 12px;
+  width: 100px;
+  height: 28px;
+  font-size: 11px;
   font-family: var(--font-mono, monospace);
-  border-radius: 4px;
+  border-radius: 2px;
   border: 1px solid var(--bg-tertiary, #d1d5db);
-  background: var(--bg-secondary, #f8f9fa);
+  background: var(--bg-elevated, #fff);
   color: var(--text-primary, #1f2937);
-  padding: 4px 8px;
+  padding: 2px 8px;
+}
+#optsect_logs .retention-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+#optsect_logs .retention-actions .btn {
+  height: 28px;
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 14px;
+  border-radius: 2px !important;
 }
 
 /* Checkbox label */
@@ -1397,6 +1486,7 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
   <a id="logtab_apiaccess" onclick="LogsUI.switchLogTab('apiaccess')">API Access</a>
   <a id="logtab_requests" onclick="LogsUI.switchLogTab('requests')">HTTP Requests</a>
   <a id="logtab_system" onclick="LogsUI.switchLogTab('system')">System</a>
+  <a id="logtab_options" onclick="LogsUI.switchLogTab('options')">Options</a>
 </div>
 
 <!-- ===== User Activity (system-level, no scan-linked entries) ===== -->
@@ -1408,8 +1498,8 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
     <input type="date" id="log-filter-datefrom" title="From date">
     <input type="date" id="log-filter-dateto" title="To date">
 
-    <button class="btn btn-primary btn-sm" onclick="LogsUI.loadAuditLog(0)">Filter</button>
-    <button class="btn btn-default btn-sm" onclick="LogsUI.exportLogCSV('audit')" title="Export CSV"><i class="glyphicon glyphicon-download-alt"></i> CSV</button>
+    <button type="button" class="btn btn-primary btn-sm" onclick="LogsUI.loadAuditLog(0)">Filter</button>
+    <button type="button" class="btn btn-default btn-sm" onclick="LogsUI.exportLogCSV('audit')" title="Export CSV"><i class="glyphicon glyphicon-download-alt"></i> CSV</button>
   </div>
   <div class="log-meta">Total: <strong><span id="audit-log-count">0</span></strong> entries</div>
   <table class="table table-striped table-condensed">
@@ -1447,8 +1537,8 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
     </select>
     <input type="text" id="scanlog-filter-search" placeholder="Search details...">
 
-    <button class="btn btn-primary btn-sm" onclick="LogsUI.loadScanLogs(0)">Filter</button>
-    <button class="btn btn-default btn-sm" onclick="LogsUI.exportLogCSV('scanlogs')" title="Export CSV"><i class="glyphicon glyphicon-download-alt"></i> CSV</button>
+    <button type="button" class="btn btn-primary btn-sm" onclick="LogsUI.loadScanLogs(0)">Filter</button>
+    <button type="button" class="btn btn-default btn-sm" onclick="LogsUI.exportLogCSV('scanlogs')" title="Export CSV"><i class="glyphicon glyphicon-download-alt"></i> CSV</button>
   </div>
   <div class="log-meta">Total: <strong><span id="scanlog-count">0</span></strong> entries</div>
   <table class="table table-striped table-condensed">
@@ -1485,10 +1575,10 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
 <div id="logpane_requests" style="display:none">
   <div class="log-filters">
     <input type="text" id="reqlog-filter-user" placeholder="Username...">
-    <input type="text" id="reqlog-filter-path" placeholder="Path filter..." style="min-width:200px;">
+    <input type="text" id="reqlog-filter-path" placeholder="Path filter...">
 
-    <button class="btn btn-primary btn-sm" onclick="LogsUI.loadRequestLog(0)">Filter</button>
-    <button class="btn btn-default btn-sm" onclick="LogsUI.exportLogCSV('requests')" title="Export CSV"><i class="glyphicon glyphicon-download-alt"></i> CSV</button>
+    <button type="button" class="btn btn-primary btn-sm" onclick="LogsUI.loadRequestLog(0)">Filter</button>
+    <button type="button" class="btn btn-default btn-sm" onclick="LogsUI.exportLogCSV('requests')" title="Export CSV"><i class="glyphicon glyphicon-download-alt"></i> CSV</button>
   </div>
   <div class="log-meta">Total: <strong><span id="reqlog-count">0</span></strong> entries</div>
   <table class="table table-striped table-condensed">
@@ -1514,7 +1604,7 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
       <option value="error">error.log</option>
     </select>
     <input type="number" id="syslog-lines" value="200" min="50" max="2000" style="width:80px;" title="Lines to show">
-    <button class="btn btn-primary btn-sm" onclick="LogsUI.loadSystemLog($('#syslog-select').val())">Load</button>
+    <button type="button" class="btn btn-primary btn-sm" onclick="LogsUI.loadSystemLog($('#syslog-select').val())">Load</button>
     <label class="check-label">
       <input type="checkbox" id="syslog-autorefresh" onchange="LogsUI.toggleAutoRefresh(this.checked)"> Auto-refresh (10s)
     </label>
@@ -1523,31 +1613,33 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
   <pre id="syslog-content"></pre>
 </div>
 
-<!-- ===== Log Retention ===== -->
-<div class="retention-section">
-  <h5>Log Retention</h5>
-  <div class="log-subtitle" style="margin-bottom:12px;">
-    Configure how long log entries are retained. Old entries are automatically purged on server startup.
-  </div>
-  <div class="retention-row">
-    <div class="retention-field">
-      <label>Audit Log (days)</label>
-      <input type="number" id="retention-audit-days" value="365" min="7">
+<!-- ===== Options (Log Retention & Config) ===== -->
+<div id="logpane_options" style="display:none">
+  <div class="retention-section">
+    <h5>Log Retention</h5>
+    <div class="log-subtitle">
+      Configure how long log entries are retained. Old entries are automatically purged on server startup.
     </div>
-    <div class="retention-field">
-      <label>Scan Logs (days)</label>
-      <input type="number" id="retention-scan-days" value="90" min="7">
+    <div class="retention-row">
+      <div class="retention-field">
+        <label>Audit (days)</label>
+        <input type="number" id="retention-audit-days" value="365" min="7" class="retention-input">
+      </div>
+      <div class="retention-field">
+        <label>Scan (days)</label>
+        <input type="number" id="retention-scan-days" value="90" min="7" class="retention-input">
+      </div>
+      <div class="retention-field">
+        <label>Requests (days)</label>
+        <input type="number" id="retention-request-days" value="30" min="7" class="retention-input">
+      </div>
     </div>
-    <div class="retention-field">
-      <label>Request Log (days)</label>
-      <input type="number" id="retention-request-days" value="30" min="7">
+    <div class="retention-actions">
+      <button type="button" class="btn btn-primary btn-sm" onclick="LogsUI.saveRetentionSettings()">Save Settings</button>
+      <button type="button" class="btn btn-danger btn-sm" onclick="LogsUI.purgeLogsManual()">Purge Now</button>
     </div>
+    <div id="retention-result" style="display:none; margin-top: 10px; font-size: 11px; font-family: var(--font-mono, monospace);"></div>
   </div>
-  <div style="display: flex; gap: 10px; align-items: center;">
-    <button class="btn btn-primary btn-sm" onclick="LogsUI.saveRetentionSettings()">Save Retention Settings</button>
-    <button class="btn btn-danger btn-sm" onclick="LogsUI.purgeLogsManual()">Purge Now</button>
-  </div>
-  <div id="retention-result" style="display:none; margin-top: 8px;"></div>
 </div>
 
 <script>
