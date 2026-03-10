@@ -13017,32 +13017,32 @@
                     return;
                 }
                 var actionStyles = {
-                    'RESULT_FP_CHANGE': {icon: 'glyphicon-flag', cls: 'label-warning'},
-                    'RESULT_TRACKING': {icon: 'glyphicon-transfer', cls: 'label-primary'},
-                    'ANALYST_COMMENT': {icon: 'glyphicon-comment', cls: 'label-info'},
-                    'ANALYST_NOTE': {icon: 'glyphicon-edit', cls: 'label-info'},
-                    'SCAN_VIEW': {icon: 'glyphicon-eye-open', cls: 'label-default'},
-                    'DATA_EXPORT': {icon: 'glyphicon-export', cls: 'label-primary'},
-                    'DATA_IMPORT': {icon: 'glyphicon-import', cls: 'label-info'},
-                    'DATA_MODIFY': {icon: 'glyphicon-wrench', cls: 'label-warning'},
-                    'SCAN_START': {icon: 'glyphicon-play', cls: 'label-success'},
-                    'SCAN_STOP': {icon: 'glyphicon-stop', cls: 'label-danger'},
-                    'SCAN_DELETE': {icon: 'glyphicon-trash', cls: 'label-danger'},
-                    'SCAN_STATUS_OVERRIDE': {icon: 'glyphicon-cog', cls: 'label-warning'},
-                    'FP_ADD': {icon: 'glyphicon-plus', cls: 'label-warning'},
-                    'FP_REMOVE': {icon: 'glyphicon-minus', cls: 'label-default'},
-                    'DB_MAINTENANCE': {icon: 'glyphicon-hdd', cls: 'label-default'}
+                    'RESULT_FP_CHANGE': {icon: 'glyphicon-flag', bg: '#7c3aed'},        // purple
+                    'RESULT_TRACKING':  {icon: 'glyphicon-transfer', bg: '#2563eb'},     // blue
+                    'ANALYST_COMMENT':  {icon: 'glyphicon-comment', bg: '#0891b2'},      // cyan
+                    'ANALYST_NOTE':     {icon: 'glyphicon-edit', bg: '#0d9488'},          // teal
+                    'SCAN_VIEW':        {icon: 'glyphicon-eye-open', bg: '#6b7280'},     // gray
+                    'DATA_EXPORT':      {icon: 'glyphicon-export', bg: '#4f46e5'},       // indigo
+                    'DATA_IMPORT':      {icon: 'glyphicon-import', bg: '#059669'},       // emerald
+                    'DATA_MODIFY':      {icon: 'glyphicon-wrench', bg: '#c026d3'},       // fuchsia
+                    'SCAN_START':       {icon: 'glyphicon-play', bg: '#16a34a'},         // green
+                    'SCAN_STOP':        {icon: 'glyphicon-stop', bg: '#d97706'},         // amber
+                    'SCAN_DELETE':      {icon: 'glyphicon-trash', bg: '#dc2626'},        // red
+                    'SCAN_STATUS_OVERRIDE': {icon: 'glyphicon-cog', bg: '#ea580c'},      // orange
+                    'FP_ADD':           {icon: 'glyphicon-plus', bg: '#b45309'},         // dark amber
+                    'FP_REMOVE':        {icon: 'glyphicon-minus', bg: '#9ca3af'},        // light gray
+                    'DB_MAINTENANCE':   {icon: 'glyphicon-hdd', bg: '#6b7280'}           // gray
                 };
                 var html = '<table class="table table-condensed" style="font-size:13px;margin:0">';
-                html += '<thead><tr><th style="width:155px">Time</th><th style="width:90px">User</th><th style="width:150px">Action</th><th>Details</th></tr></thead><tbody>';
+                html += '<thead><tr><th style="width:155px">Time</th><th style="width:90px">User</th><th style="width:180px">Action</th><th>Details</th></tr></thead><tbody>';
                 var entries = data.entries;
                 for (var i = 0; i < entries.length; i++) {
                     var e = entries[i];
-                    var style = actionStyles[e.action] || {icon: 'glyphicon-record', cls: 'label-default'};
+                    var style = actionStyles[e.action] || {icon: 'glyphicon-record', bg: '#6b7280'};
                     html += '<tr>';
                     html += '<td style="color:var(--text-muted,#888)">' + sf.escapeHtml(e.time_str || '') + '</td>';
                     html += '<td><strong>' + sf.escapeHtml(e.username || '') + '</strong></td>';
-                    html += '<td><span class="label ' + style.cls + '"><i class="glyphicon ' + style.icon + '"></i> ' + sf.escapeHtml(e.action) + '</span></td>';
+                    html += '<td><span style="display:inline-block;padding:3px 8px;border-radius:3px;font-size:11px;font-weight:600;font-family:var(--font-mono,monospace);color:#fff;background:' + style.bg + '"><i class="glyphicon ' + style.icon + '"></i> ' + sf.escapeHtml(e.action) + '</span></td>';
                     html += '<td>' + sf.escapeHtml(e.detail || '') + '</td>';
                     html += '</tr>';
                 }

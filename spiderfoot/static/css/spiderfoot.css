@@ -1631,7 +1631,8 @@ svg text {
 }
 
 .label-default {
-  background: var(--bg-elevated);
+  background: var(--bg-tertiary);
+  color: var(--text-primary) !important;
 }
 
 .label-primary {

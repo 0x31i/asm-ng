@@ -10,7 +10,7 @@ var LogsUI = (function() {
     // --- Sub-tab toggling ---
     function switchLogTab(tab) {
         currentLogTab = tab;
-        var tabs = ['activity', 'scanlogs', 'apiaccess', 'system', 'requests'];
+        var tabs = ['activity', 'scanlogs', 'apiaccess', 'system', 'requests', 'options'];
         for (var i = 0; i < tabs.length; i++) {
             var el = document.getElementById('logpane_' + tabs[i]);
             var tabEl = document.getElementById('logtab_' + tabs[i]);
@@ -122,19 +122,27 @@ var LogsUI = (function() {
         $.getJSON(docroot + '/auditlogapi?' + params, function(data) {
             var rows = '';
             var entries = data.entries || [];
-            var actionClasses = {
-                'SCAN_START': 'label-primary', 'SCAN_STOP': 'label-warning',
-                'SCAN_DELETE': 'label-danger', 'SCAN_VIEW': 'label-default',
-                'SCAN_STATUS_OVERRIDE': 'label-warning',
-                'RESULT_FP_CHANGE': 'label-info', 'RESULT_TRACKING': 'label-info',
-                'ANALYST_COMMENT': 'label-info', 'ANALYST_NOTE': 'label-info',
-                'FP_ADD': 'label-warning', 'FP_REMOVE': 'label-default',
-                'DATA_EXPORT': 'label-primary', 'DATA_IMPORT': 'label-primary',
-                'DATA_MODIFY': 'label-warning'
+            // Distinct badge colors per action category
+            var actionColors = {
+                'SCAN_START':    {bg: '#16a34a', text: '#fff'},  // green
+                'SCAN_STOP':     {bg: '#d97706', text: '#fff'},  // amber
+                'SCAN_DELETE':   {bg: '#dc2626', text: '#fff'},  // red
+                'SCAN_VIEW':     {bg: '#6b7280', text: '#fff'},  // gray
+                'SCAN_STATUS_OVERRIDE': {bg: '#ea580c', text: '#fff'},  // orange
+                'RESULT_FP_CHANGE':  {bg: '#7c3aed', text: '#fff'},  // purple
+                'RESULT_TRACKING':   {bg: '#2563eb', text: '#fff'},  // blue
+                'ANALYST_COMMENT':   {bg: '#0891b2', text: '#fff'},  // cyan
+                'ANALYST_NOTE':      {bg: '#0d9488', text: '#fff'},  // teal
+                'FP_ADD':        {bg: '#b45309', text: '#fff'},  // dark amber
+                'FP_REMOVE':     {bg: '#9ca3af', text: '#fff'},  // light gray
+                'DATA_EXPORT':   {bg: '#4f46e5', text: '#fff'},  // indigo
+                'DATA_IMPORT':   {bg: '#059669', text: '#fff'},  // emerald
+                'DATA_MODIFY':   {bg: '#c026d3', text: '#fff'}   // fuchsia
             };
+            var defaultColor = {bg: '#6b7280', text: '#fff'};
             for (var i = 0; i < entries.length; i++) {
                 var e = entries[i];
-                var cls = actionClasses[e.action] || 'label-default';
+                var ac = actionColors[e.action] || defaultColor;
                 var scanLabel = escHtml(e.scan_name || '');
                 if (e.scan_target && e.scan_name) scanLabel = escHtml(e.scan_name) + ' <span class="text-muted">(' + escHtml(e.scan_target) + ')</span>';
                 else if (e.scan_id) scanLabel = scanLabel || '<code>' + escHtml(e.scan_id).substring(0, 8) + '</code>';
@@ -142,7 +150,7 @@ var LogsUI = (function() {
                     '<td><span class="text-muted">' + escHtml(e.time_str || '') + '</span></td>' +
                     '<td><strong>' + escHtml(e.username) + '</strong></td>' +
                     '<td>' + scanLabel + '</td>' +
-                    '<td><span class="label ' + cls + '">' + escHtml(e.action) + '</span></td>' +
+                    '<td><span style="display:inline-block;padding:3px 8px;border-radius:2px;font-size:11px;font-weight:600;font-family:var(--font-mono,monospace);background:' + ac.bg + ';color:' + ac.text + '">' + escHtml(e.action) + '</span></td>' +
                     '<td>' + escHtml(e.detail || '') + '</td>' +
                     '</tr>';
             }
@@ -366,6 +374,7 @@ var LogsUI = (function() {
             success: function(data) {
                 if (data.success) {
                     $('#retention-result').attr('class', 'alert alert-success').html('<strong>Saved!</strong> Retention settings updated.').show();
+                    $(document).trigger('retention-saved');
                 } else {
                     $('#retention-result').attr('class', 'alert alert-danger').html('<strong>Error:</strong> ' + (data.error || 'Unknown')).show();
                 }
