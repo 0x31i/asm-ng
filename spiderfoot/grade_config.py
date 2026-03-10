@@ -1133,16 +1133,16 @@ def get_grade_for_score(score: float, thresholds: list = None) -> dict:
         thresholds = DEFAULT_GRADE_THRESHOLDS
 
     for t in thresholds:
-        if score >= t['min']:
+        if score >= t.get('min', 0):
             return {
-                'grade': t['grade'],
-                'color': t['color'],
+                'grade': t.get('grade', 'F'),
+                'color': t.get('color', '#6b7280'),
                 'bg': t.get('bg', '#ffffff'),
             }
 
     # Fallback
     last = thresholds[-1] if thresholds else {'grade': 'F', 'color': '#dc2626', 'bg': '#fee2e2'}
-    return {'grade': last['grade'], 'color': last['color'], 'bg': last.get('bg', '#ffffff')}
+    return {'grade': last.get('grade', 'F'), 'color': last.get('color', '#dc2626'), 'bg': last.get('bg', '#ffffff')}
 
 
 def calculate_category_score(event_type_counts: dict, grading_rules: dict,
@@ -1359,7 +1359,14 @@ def load_grade_config_overrides(config: dict) -> dict:
     thresholds_str = config.get('_grade_thresholds', '')
     if thresholds_str and isinstance(thresholds_str, str) and thresholds_str.strip():
         try:
-            overrides['thresholds'] = json.loads(thresholds_str)
+            parsed = json.loads(thresholds_str)
+            # Validate: must be a list of dicts with at least 'min' and 'grade'
+            if isinstance(parsed, list) and all(
+                isinstance(t, dict) and 'min' in t and 'grade' in t for t in parsed
+            ):
+                overrides['thresholds'] = parsed
+            else:
+                log.warning("Invalid _grade_thresholds structure, using defaults")
         except (json.JSONDecodeError, ValueError) as e:
             log.warning(f"Invalid _grade_thresholds JSON: {e}")
 
