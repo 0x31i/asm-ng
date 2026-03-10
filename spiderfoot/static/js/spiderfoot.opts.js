@@ -5,6 +5,11 @@ function saveSettings() {
     $(":input").each(function(i) {
         var id = $(this).attr('id');
         if (id && id.indexOf('tune-') === 0) return; // skip tune resources inputs
+        if (id && id.indexOf('log-filter-') === 0) return; // skip log tab inputs
+        if (id && id.indexOf('scanlog-filter-') === 0) return;
+        if (id && id.indexOf('reqlog-filter-') === 0) return;
+        if (id && id.indexOf('retention-') === 0) return;
+        if (id && id.indexOf('syslog-') === 0) return;
         retarr[id] = $(this).val();
     });
 
@@ -46,6 +51,13 @@ var originalValues = {};
 var saveConfirmPending = false;
 var discardConfirmPending = false;
 
+function isLogTabInput(id) {
+    if (!id) return false;
+    return id.indexOf('log-filter-') === 0 || id.indexOf('scanlog-filter-') === 0 ||
+           id.indexOf('reqlog-filter-') === 0 || id.indexOf('retention-') === 0 ||
+           id.indexOf('syslog-') === 0;
+}
+
 function captureOriginalValues() {
     var form = document.getElementById('savesettingsform');
     if (!form) return;
@@ -53,6 +65,7 @@ function captureOriginalValues() {
     elements.forEach(function(el) {
         if (!el.id || el.id === 'allopts' || el.id === 'token') return;
         if (el.id.indexOf('tune-') === 0) return; // skip tune resources inputs
+        if (isLogTabInput(el.id)) return; // skip log tab inputs
         originalValues[el.id] = el.value;
     });
 }
@@ -65,6 +78,7 @@ function checkForChanges() {
     elements.forEach(function(el) {
         if (!el.id || el.id === 'allopts' || el.id === 'token') return;
         if (el.id.indexOf('tune-') === 0) return; // skip tune resources inputs
+        if (isLogTabInput(el.id)) return; // skip log tab inputs
         if (originalValues.hasOwnProperty(el.id) && el.value !== originalValues[el.id]) {
             hasChanges = true;
         }
@@ -312,25 +326,22 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!form) return;
 
     form.addEventListener('submit', function (e) {
-        // Collect all input and select values
+        // Collect all input and select values as strings.
+        // IMPORTANT: Use .val() string values, NOT JS booleans.
+        // configUnserialize expects "1"/"0" for booleans, not "True"/"False".
+        // Also skip Logs tab inputs which are not settings.
         var opts = {};
         var elements = form.querySelectorAll('input, select');
         elements.forEach(function (el) {
             if (!el.id || el.id === 'allopts' || el.id === 'token' || el.type === 'file') return;
             if (el.id.indexOf('tune-') === 0) return; // skip tune resources inputs
-            if (el.type === 'checkbox') {
-                opts[el.id] = el.checked;
-            } else if (el.tagName.toLowerCase() === 'select') {
-                // For bool selects, convert to boolean
-                if (el.options.length === 2 &&
-                    el.options[0].value === "1" && el.options[1].value === "0") {
-                    opts[el.id] = el.value === "1";
-                } else {
-                    opts[el.id] = el.value;
-                }
-            } else {
-                opts[el.id] = el.value;
-            }
+            if (el.id.indexOf('log-filter-') === 0) return; // skip log filter inputs
+            if (el.id.indexOf('scanlog-filter-') === 0) return;
+            if (el.id.indexOf('reqlog-filter-') === 0) return;
+            if (el.id.indexOf('retention-') === 0) return;
+            if (el.id.indexOf('syslog-') === 0) return;
+            // Always use string values — configUnserialize expects "1"/"0" for booleans
+            opts[el.id] = el.value;
         });
         // Set the JSON string to the hidden allopts field
         document.getElementById('allopts').value = JSON.stringify(opts);
