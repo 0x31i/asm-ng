@@ -6913,6 +6913,10 @@ table.discovery-path-table > tbody > tr:nth-child(even):hover > td {
   text-shadow: 0 0 6px rgba(59, 130, 246, 0.4);
 }
 
+.assets-known-row-client > td:first-child {
+  border-left: 2px solid rgba(59, 130, 246, 0.6);
+}
+
 .assets-source-analyst {
   background: rgba(245, 158, 11, 0.15);
   color: #fbbf24;

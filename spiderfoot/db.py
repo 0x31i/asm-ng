@@ -4888,18 +4888,35 @@ class SpiderFootDb:
                     for row in self.dbh.fetchall():
                         matches.append(self._matchRow(row, row[8], 'ip_exact'))
 
-                # 2. Domain matches — fetch domain-type rows, match in Python
+                # 2. Domain matches — SQL exact + SQL suffix (LIKE ANY for PostgreSQL)
                 if assets['domain']:
+                    domain_list = list(assets['domain'])
+                    # 2a. Exact domain matches via SQL
+                    ph = ','.join(['?'] * len(domain_list))
                     qry = f"SELECT {columns} FROM tbl_scan_results " \
                           f"WHERE scan_instance_id = ? AND type IN " \
                           f"('DOMAIN_NAME','INTERNET_NAME','AFFILIATE_INTERNET_NAME'," \
-                          f"'CO_HOSTED_SITE','SIMILARDOMAIN','INTERNET_NAME_UNRESOLVED')"
-                    self.dbh.execute(qry, [scanId])
+                          f"'CO_HOSTED_SITE','SIMILARDOMAIN','INTERNET_NAME_UNRESOLVED') " \
+                          f"AND LOWER(data) IN ({ph})"
+                    self.dbh.execute(qry, [scanId] + domain_list)
+                    exact_domain_hashes = set()
                     for row in self.dbh.fetchall():
-                        data_lower = (row[8] or '').lower().strip()
-                        if data_lower in assets['domain']:
-                            matches.append(self._matchRow(row, row[8], 'domain_exact'))
-                        else:
+                        exact_domain_hashes.add(row[1])
+                        matches.append(self._matchRow(row, row[8], 'domain_exact'))
+
+                    # 2b. Subdomain suffix matches — use LIKE ANY (PostgreSQL)
+                    if domain_suffixes:
+                        like_patterns = ['%' + sfx for sfx in domain_suffixes]  # e.g. '%.example.com'
+                        qry = f"SELECT {columns} FROM tbl_scan_results " \
+                              f"WHERE scan_instance_id = ? AND type IN " \
+                              f"('DOMAIN_NAME','INTERNET_NAME','AFFILIATE_INTERNET_NAME'," \
+                              f"'CO_HOSTED_SITE','SIMILARDOMAIN','INTERNET_NAME_UNRESOLVED') " \
+                              f"AND LOWER(data) LIKE ANY(ARRAY[" + ','.join(['?'] * len(like_patterns)) + "])"
+                        self.dbh.execute(qry, [scanId] + like_patterns)
+                        for row in self.dbh.fetchall():
+                            if row[1] in exact_domain_hashes:
+                                continue  # already matched as exact
+                            data_lower = (row[8] or '').lower().strip()
                             for sfx in domain_suffixes:
                                 if data_lower.endswith(sfx):
                                     matches.append(self._matchRow(row, sfx[1:], 'domain_subdomain'))
@@ -4932,48 +4949,54 @@ class SpiderFootDb:
                                 if prefix in email_prefix_map:
                                     matches.append(self._matchRow(row, email_prefix_map[prefix], 'email_prefix'))
 
-                # 4. Human name + username partial matches
-                partial_types = "('HUMAN_NAME','USERNAME','SOCIAL_MEDIA')"
+                # 4. Human name + username partial matches — push ILIKE into SQL
                 if assets['human_name'] or assets['username']:
-                    qry = f"SELECT {columns} FROM tbl_scan_results " \
-                          f"WHERE scan_instance_id = ? AND type IN {partial_types}"
-                    self.dbh.execute(qry, [scanId])
-                    hn_types = {'HUMAN_NAME'}
-                    un_types = {'USERNAME', 'SOCIAL_MEDIA'}
-                    for row in self.dbh.fetchall():
-                        event_type = row[2]
-                        data_lower = (row[8] or '').lower().strip()
-                        matched_asset = None
-                        match_type = None
+                    # Build LIKE conditions for all name/username values
+                    all_partial_values = list(assets.get('human_name', set())) + list(assets.get('username', set()))
+                    if all_partial_values:
+                        like_conditions = ' OR '.join(['LOWER(data) LIKE ?' for _ in all_partial_values])
+                        like_params = ['%' + v + '%' for v in all_partial_values]
+                        qry = f"SELECT {columns} FROM tbl_scan_results " \
+                              f"WHERE scan_instance_id = ? AND type IN ('HUMAN_NAME','USERNAME','SOCIAL_MEDIA') " \
+                              f"AND ({like_conditions})"
+                        self.dbh.execute(qry, [scanId] + like_params)
 
-                        # Primary match by type
-                        if event_type in hn_types and assets['human_name']:
-                            for name in assets['human_name']:
-                                if name in data_lower:
-                                    matched_asset, match_type = name, 'human_name_partial'
-                                    break
-                        elif event_type in un_types and assets['username']:
-                            for uname in assets['username']:
-                                if uname in data_lower:
-                                    matched_asset, match_type = uname, 'username_partial'
-                                    break
+                        hn_types = {'HUMAN_NAME'}
+                        un_types = {'USERNAME', 'SOCIAL_MEDIA'}
+                        for row in self.dbh.fetchall():
+                            event_type = row[2]
+                            data_lower = (row[8] or '').lower().strip()
+                            matched_asset = None
+                            match_type = None
 
-                        # Cross-match: username events vs human_name assets
-                        if not matched_asset and event_type in un_types and assets['human_name']:
-                            for name in assets['human_name']:
-                                if name in data_lower:
-                                    matched_asset, match_type = name, 'human_name_partial'
-                                    break
+                            # Primary match by type
+                            if event_type in hn_types and assets['human_name']:
+                                for name in assets['human_name']:
+                                    if name in data_lower:
+                                        matched_asset, match_type = name, 'human_name_partial'
+                                        break
+                            elif event_type in un_types and assets['username']:
+                                for uname in assets['username']:
+                                    if uname in data_lower:
+                                        matched_asset, match_type = uname, 'username_partial'
+                                        break
 
-                        # Cross-match: human_name events vs username assets
-                        if not matched_asset and event_type in hn_types and assets['username']:
-                            for uname in assets['username']:
-                                if uname in data_lower:
-                                    matched_asset, match_type = uname, 'username_partial'
-                                    break
+                            # Cross-match: username events vs human_name assets
+                            if not matched_asset and event_type in un_types and assets['human_name']:
+                                for name in assets['human_name']:
+                                    if name in data_lower:
+                                        matched_asset, match_type = name, 'human_name_partial'
+                                        break
 
-                        if matched_asset:
-                            matches.append(self._matchRow(row, matched_asset, match_type))
+                            # Cross-match: human_name events vs username assets
+                            if not matched_asset and event_type in hn_types and assets['username']:
+                                for uname in assets['username']:
+                                    if uname in data_lower:
+                                        matched_asset, match_type = uname, 'username_partial'
+                                        break
+
+                            if matched_asset:
+                                matches.append(self._matchRow(row, matched_asset, match_type))
 
             except DatabaseError as e:
                 raise IOError("SQL error encountered when matching known assets") from e

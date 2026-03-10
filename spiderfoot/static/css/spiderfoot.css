@@ -6724,6 +6724,7 @@ i.glyphicon-white,
 
 .assets-source-client { background: rgba(59,130,246,0.1); color: #2563eb; border: 1px solid rgba(59,130,246,0.2); }
 .assets-source-analyst { background: rgba(245,158,11,0.1); color: #d97706; border: 1px solid rgba(245,158,11,0.2); }
+.assets-known-row-client > td:first-child { border-left: 2px solid rgba(59,130,246,0.5); }
 
 .assets-affinity-badge {
   display: inline-block;
