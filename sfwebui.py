@@ -200,6 +200,36 @@ def _write_backup_csv(zf, filename, headers, rows, manifest, count_key):
     manifest[count_key] = count
 
 
+# ---- Caches for expensive endpoints ----
+# Matches cache: {(scan_id, target): {'data': [...], 'ts': time.time()}}
+_matches_cache = {}
+_MATCHES_CACHE_TTL = 60
+
+# Scan lookup cache: {(scan_id, target): {'targetFps': ..., 'targetValidated': ..., 'knownAssets': ..., 'rowNotes': ..., 'ts': time.time()}}
+_scan_lookup_cache = {}
+_SCAN_LOOKUP_TTL = 30
+
+
+def _invalidate_matches_cache(scan_id=None, target=None):
+    """Invalidate matches cache entries. If scan_id given, remove that specific entry.
+    If target given, remove all entries for that target. If neither, clear all."""
+    if scan_id and target:
+        _matches_cache.pop((scan_id, target), None)
+    elif target:
+        keys_to_remove = [k for k in _matches_cache if k[1] == target]
+        for k in keys_to_remove:
+            del _matches_cache[k]
+    else:
+        _matches_cache.clear()
+    # Also clear scan lookup cache
+    if target:
+        keys_to_remove = [k for k in _scan_lookup_cache if k[1] == target]
+        for k in keys_to_remove:
+            del _scan_lookup_cache[k]
+    else:
+        _scan_lookup_cache.clear()
+
+
 class SpiderFootWebUi:
     """SpiderFoot web interface."""
 
@@ -6089,20 +6119,25 @@ class SpiderFootWebUi:
                                   status='CONFIRMED', entryMethod='MANUAL')
                 if not inserted:
                     return json.dumps(["DUPLICATE", "This asset already exists."]).encode('utf-8')
+                _invalidate_matches_cache(target=target)
                 return json.dumps(["SUCCESS", ""]).encode('utf-8')
             except Exception as e:
                 return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
     @cherrypy.expose
-    def knownassetremove(self: 'SpiderFootWebUi', id: str = None, ids: str = None) -> str:
+    def knownassetremove(self: 'SpiderFootWebUi', id: str = None, ids: str = None, force: str = None) -> str:
         """Remove known asset(s) by ID.
 
         For SYNC_VERIFIED / VERIFY_MATCH entries, also propagates FP status
         back to the scan data so the entry won't be re-imported on next sync.
 
+        CLIENT_PROVIDED assets require force=1 to remove (protection against
+        accidental deletion of client-provided known assets).
+
         Args:
             id: single asset ID
             ids: JSON array of IDs for bulk removal
+            force: set to '1' to allow removing CLIENT_PROVIDED assets
 
         Returns:
             str: JSON status
@@ -6159,20 +6194,51 @@ class SpiderFootWebUi:
                         except Exception:
                             pass  # best-effort
 
+        force_remove = (force == '1')
+
         with SpiderFootDb(self.config) as dbh:
             try:
                 if ids:
                     id_list = json.loads(ids)
                     # Look up assets before deletion to propagate FP
                     assets = dbh.knownAssetGetBulk(id_list)
-                    _propagate_fp(dbh, assets)
-                    count = dbh.knownAssetRemoveBulk(id_list)
-                    return json.dumps(["SUCCESS", f"Removed {count} assets."]).encode('utf-8')
+
+                    # Separate CLIENT_PROVIDED from ANALYST_CONFIRMED
+                    client_ids = [a[0] for a in assets if a[4] == 'CLIENT_PROVIDED']
+                    analyst_assets = [a for a in assets if a[4] != 'CLIENT_PROVIDED']
+                    analyst_ids = [a[0] for a in analyst_assets]
+
+                    # Get target for cache invalidation
+                    _target = assets[0][1] if assets else None
+
+                    if client_ids and not force_remove:
+                        # Skip CLIENT_PROVIDED, only remove ANALYST_CONFIRMED
+                        if analyst_assets:
+                            _propagate_fp(dbh, analyst_assets)
+                            count = dbh.knownAssetRemoveBulk(analyst_ids)
+                            if _target:
+                                _invalidate_matches_cache(target=_target)
+                            return json.dumps(["SUCCESS", f"Removed {count} assets. Skipped {len(client_ids)} client-provided assets (protected)."]).encode('utf-8')
+                        else:
+                            return json.dumps(["ERROR", f"All {len(client_ids)} selected assets are client-provided. Use individual removal with confirmation to remove them."]).encode('utf-8')
+                    else:
+                        _propagate_fp(dbh, assets)
+                        if client_ids:
+                            self.log.warning(f"Force-removing {len(client_ids)} CLIENT_PROVIDED known assets")
+                        count = dbh.knownAssetRemoveBulk(id_list)
+                        if _target:
+                            _invalidate_matches_cache(target=_target)
+                        return json.dumps(["SUCCESS", f"Removed {count} assets."]).encode('utf-8')
                 elif id:
                     # Look up asset before deletion to propagate FP
                     asset = dbh.knownAssetGet(int(id))
+                    if asset and asset[4] == 'CLIENT_PROVIDED' and not force_remove:
+                        return json.dumps(["PROTECTED", "This is a client-provided asset. Confirm removal to proceed."]).encode('utf-8')
                     if asset:
+                        if asset[4] == 'CLIENT_PROVIDED':
+                            self.log.warning(f"Force-removing CLIENT_PROVIDED known asset id={id}")
                         _propagate_fp(dbh, [asset])
+                        _invalidate_matches_cache(target=asset[1])
                     dbh.knownAssetRemove(assetId=int(id))
                     return json.dumps(["SUCCESS", ""]).encode('utf-8')
                 else:
@@ -6494,78 +6560,98 @@ class SpiderFootWebUi:
                 return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
     @cherrypy.expose
-    def knownassetmatches(self: 'SpiderFootWebUi', id: str = None) -> str:
+    def knownassetmatches(self: 'SpiderFootWebUi', id: str = None, limit: str = None, offset: str = None) -> str:
         """Find scan results that match known assets (Potential Matches).
 
         Args:
             id: scan instance ID
+            limit: optional pagination limit
+            offset: optional pagination offset
 
         Returns:
-            str: JSON list of matches
+            str: JSON with items, total, and pending_count (or flat list for backwards compat)
         """
         cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
 
         if not id:
-            return json.dumps([]).encode('utf-8')
+            return json.dumps({'items': [], 'total': 0, 'pending_count': 0}).encode('utf-8')
+
+        pg_limit = int(limit) if limit is not None else None
+        pg_offset = int(offset) if offset is not None else None
 
         with SpiderFootDb(self.config) as dbh:
             try:
                 # Get scan target
                 scan_info = dbh.scanInstanceGet(id)
                 if not scan_info:
-                    return json.dumps([]).encode('utf-8')
+                    return json.dumps({'items': [], 'total': 0, 'pending_count': 0}).encode('utf-8')
                 target = scan_info[1]  # seed_target
 
-                # Get target-level FP/validated status
-                targetFps = dbh.targetFalsePositivesForTarget(target)
-                targetValidated = dbh.targetValidatedForTarget(target)
+                # Check cache
+                cache_key = (id, target)
+                cached = _matches_cache.get(cache_key)
+                if cached and (time.time() - cached['ts']) < _MATCHES_CACHE_TTL:
+                    matches = cached['data']
+                else:
+                    # Get target-level FP/validated status
+                    targetFps = dbh.targetFalsePositivesForTarget(target)
+                    targetValidated = dbh.targetValidatedForTarget(target)
 
-                matches = dbh.knownAssetMatchScanResults(id, target)
+                    matches = dbh.knownAssetMatchScanResults(id, target)
 
-                # Enrich matches with target-level status
-                for m in matches:
-                    m['isTargetFp'] = 0
-                    m['isTargetValidated'] = 0
-                    m['isPendingAsset'] = False
-                    # Check target-level status
-                    for fp_tuple in targetFps:
-                        if fp_tuple[0] == m['type'] and fp_tuple[1] == m['data']:
-                            m['isTargetFp'] = 1
-                            break
-                    for val_tuple in targetValidated:
-                        if val_tuple[0] == m['type'] and val_tuple[1] == m['data']:
-                            m['isTargetValidated'] = 1
-                            break
+                    # Build O(1) lookup sets for FP/validated enrichment
+                    fpSet = {(t[0], t[1]) for t in targetFps}
+                    valSet = {(t[0], t[1]) for t in targetValidated}
 
-                # Append PENDING assets as rows in the potential matches list
-                pendingAssets = dbh.knownAssetList(target, status='PENDING')
-                for pa in pendingAssets:
-                    raw = pa[11] if len(pa) > 11 else None
-                    display = parseAssetDisplay(raw or pa[3], pa[2])
-                    matches.append({
-                        'hash': f'pending-asset-{pa[0]}',
-                        'type': pa[2].upper(),
-                        'data': pa[3],
-                        'module': pa[4],
-                        'matched_asset': pa[3],
-                        'match_type': 'pending_import',
-                        'confidence': 100,
-                        'false_positive': 0,
-                        'isTargetFp': 0,
-                        'isTargetValidated': 0,
-                        'isPendingAsset': True,
-                        'pendingAssetId': pa[0],
-                        'source': pa[4],
-                        'affinity': pa[9] if len(pa) > 9 else 'DIRECT',
-                        'added_by': pa[7],
-                        'notes': pa[8],
-                        'date_added': pa[6],
-                        'display': display,
-                    })
+                    # Enrich matches with target-level status
+                    for m in matches:
+                        key = (m['type'], m['data'])
+                        m['isTargetFp'] = 1 if key in fpSet else 0
+                        m['isTargetValidated'] = 1 if key in valSet else 0
+                        m['isPendingAsset'] = False
 
-                return json.dumps(matches).encode('utf-8')
+                    # Append PENDING assets as rows in the potential matches list
+                    pendingAssets = dbh.knownAssetList(target, status='PENDING')
+                    for pa in pendingAssets:
+                        raw = pa[11] if len(pa) > 11 else None
+                        display = parseAssetDisplay(raw or pa[3], pa[2])
+                        matches.append({
+                            'hash': f'pending-asset-{pa[0]}',
+                            'type': pa[2].upper(),
+                            'data': pa[3],
+                            'module': pa[4],
+                            'matched_asset': pa[3],
+                            'match_type': 'pending_import',
+                            'confidence': 100,
+                            'false_positive': 0,
+                            'isTargetFp': 0,
+                            'isTargetValidated': 0,
+                            'isPendingAsset': True,
+                            'pendingAssetId': pa[0],
+                            'source': pa[4],
+                            'affinity': pa[9] if len(pa) > 9 else 'DIRECT',
+                            'added_by': pa[7],
+                            'notes': pa[8],
+                            'date_added': pa[6],
+                            'display': display,
+                        })
+
+                    # Store in cache
+                    _matches_cache[cache_key] = {'data': matches, 'ts': time.time()}
+
+                total = len(matches)
+                pending_count = sum(1 for m in matches if m.get('isPendingAsset'))
+
+                # Apply pagination if requested
+                if pg_limit is not None:
+                    start = pg_offset or 0
+                    items = matches[start:start + pg_limit]
+                else:
+                    items = matches
+
+                return json.dumps({'items': items, 'total': total, 'pending_count': pending_count}).encode('utf-8')
             except Exception as e:
-                return json.dumps([]).encode('utf-8')
+                return json.dumps({'items': [], 'total': 0, 'pending_count': 0}).encode('utf-8')
 
     @cherrypy.expose
     def knownassetcount(self: 'SpiderFootWebUi', target: str = None) -> str:
@@ -6816,13 +6902,14 @@ class SpiderFootWebUi:
                 except Exception:
                     pass
 
-                # Single batch insert for all collected items
+                # Single batch insert for all collected items — as PENDING for manual review
                 if batch_items:
                     dbh.knownAssetAddBatch(target, batch_items,
                                            source='ANALYST_CONFIRMED', addedBy=current_user,
-                                           status='CONFIRMED', entryMethod='SYNC_VERIFIED')
+                                           status='PENDING', entryMethod='SYNC_VERIFIED')
+                    _invalidate_matches_cache(target=target)
 
-                return json.dumps(["SUCCESS", f"Synced {len(batch_items)} verified entries to known assets."]).encode('utf-8')
+                return json.dumps(["SUCCESS", f"Synced {len(batch_items)} verified entries to potential matches for review."]).encode('utf-8')
             except Exception as e:
                 return json.dumps(["ERROR", str(e)]).encode('utf-8')
 
@@ -7018,6 +7105,7 @@ class SpiderFootWebUi:
                                               entryMethod='VERIFY_MATCH',
                                               eventType=event_type)
 
+                    _invalidate_matches_cache(target=target)
                     return json.dumps(["SUCCESS", f"Verified {len(hashes)} items."]).encode('utf-8')
 
                 elif action == 'fp':
@@ -7033,6 +7121,7 @@ class SpiderFootWebUi:
                             dbh.targetValidatedRemove(target, ev[4], ev[1], ev[2])
                             dbh.syncFalsePositiveAcrossScans(target, ev[4], ev[1], ev[2], 1)
 
+                    _invalidate_matches_cache(target=target)
                     return json.dumps(["SUCCESS", f"Marked {len(hashes)} as false positive."]).encode('utf-8')
 
                 elif action == 'reset':
@@ -7072,6 +7161,7 @@ class SpiderFootWebUi:
                             dbh.knownAssetRemove(target=target, assetType=asset_type,
                                                  assetValue=clean_val, source='ANALYST_CONFIRMED')
 
+                    _invalidate_matches_cache(target=target)
                     return json.dumps(["SUCCESS", f"Reset {len(hashes)} items to pending."]).encode('utf-8')
 
                 elif action == 'dismiss':
@@ -10799,31 +10889,47 @@ class SpiderFootWebUi:
             scanInfo = dbh.scanInstanceGet(id)
             target = scanInfo[1] if scanInfo else None
 
-            # Get all target-level false positives and validated entries for fast lookup
-            targetFps = set()
-            targetValidated = set()
-            knownAssets = {'ip': set(), 'domain': set(), 'email': set(), 'human_name': set()}
-            if target:
-                try:
-                    targetFps = dbh.targetFalsePositivesForTarget(target)
-                except Exception:
-                    pass  # Table may not exist in older databases
-                try:
-                    targetValidated = dbh.targetValidatedForTarget(target)
-                except Exception:
-                    pass  # Table may not exist in older databases
-                try:
-                    knownAssets = dbh.knownAssetValues(target)
-                except Exception:
-                    pass  # Table may not exist in older databases
+            # Check scan lookup cache for expensive lookups (30s TTL)
+            _lookup_cache_key = (id, target) if target else None
+            _cached_lookup = _scan_lookup_cache.get(_lookup_cache_key) if _lookup_cache_key else None
+            if _cached_lookup and (time.time() - _cached_lookup['ts']) < _SCAN_LOOKUP_TTL:
+                targetFps = _cached_lookup['targetFps']
+                targetValidated = _cached_lookup['targetValidated']
+                knownAssets = _cached_lookup['knownAssets']
+                rowNotes = _cached_lookup.get('rowNotes', {}).get(eventType, {})
+            else:
+                # Get all target-level false positives and validated entries for fast lookup
+                targetFps = set()
+                targetValidated = set()
+                knownAssets = {'ip': set(), 'domain': set(), 'email': set(), 'human_name': set()}
+                if target:
+                    try:
+                        targetFps = dbh.targetFalsePositivesForTarget(target)
+                    except Exception:
+                        pass  # Table may not exist in older databases
+                    try:
+                        targetValidated = dbh.targetValidatedForTarget(target)
+                    except Exception:
+                        pass  # Table may not exist in older databases
+                    try:
+                        knownAssets = dbh.knownAssetValues(target)
+                    except Exception:
+                        pass  # Table may not exist in older databases
 
-            # Bulk load analyst row notes for this target+type
-            rowNotes = {}
-            if target:
-                try:
-                    rowNotes = dbh.rowNotesForTarget(target, eventType)
-                except Exception:
-                    pass  # Table may not exist in older databases
+                # Bulk load analyst row notes for this target+type
+                rowNotes = {}
+                if target:
+                    try:
+                        rowNotes = dbh.rowNotesForTarget(target, eventType)
+                    except Exception:
+                        pass  # Table may not exist in older databases
+
+                # Store in cache
+                if _lookup_cache_key:
+                    if _lookup_cache_key not in _scan_lookup_cache:
+                        _scan_lookup_cache[_lookup_cache_key] = {'targetFps': targetFps, 'targetValidated': targetValidated, 'knownAssets': knownAssets, 'rowNotes': {}, 'ts': time.time()}
+                    _scan_lookup_cache[_lookup_cache_key]['rowNotes'][eventType] = rowNotes
+                    _scan_lookup_cache[_lookup_cache_key]['ts'] = time.time()
 
             # Pre-compute known asset matching sets
             ip_match_types = {'IP_ADDRESS', 'IPV6_ADDRESS', 'AFFILIATE_IPADDR'}
