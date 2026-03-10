@@ -1920,11 +1920,16 @@
             var baseTitle = pageTitles[currentSection] || currentSection.replace("btn-", "").toUpperCase();
             if (subDirectory && subDirectory !== "All" && subDirectory !== "ALL") {
                 var decodedSubDir = decodeURIComponent(subDirectory);
-                $("#page-title-text").text(baseTitle + " / " + decodedSubDir.toUpperCase());
-                // Show action buttons on DATA type detail pages
+                // Make the base title a clickable link back to the parent view
                 if (currentSection === 'btn-data') {
+                    $("#page-title-text").html(
+                        "<a href='javascript:void(0)' onclick='dataEventList(\"" + _instanceId + "\")' class='page-title-link'>" + baseTitle + "</a>" +
+                        " / " + decodedSubDir.toUpperCase()
+                    );
                     $("#page-title-actions").addClass('visible');
                     updateInfoButtonStates();
+                } else {
+                    $("#page-title-text").text(baseTitle + " / " + decodedSubDir.toUpperCase());
                 }
             } else {
                 $("#page-title-text").text(baseTitle);
@@ -12121,14 +12126,6 @@
             updateExportCurrentType(eventTypeLabel);
             updatePageTitle(currentTypeName);
             pushViewState('btn-data', {dataType: eventType, dataTypeName: eventTypeLabel, dataFormat: format});
-
-            // Add breadcrumb navigation bar
-            var breadcrumb = "<div id='breadcrumbs' style='padding:8px 16px;font-family:var(--font-mono, monospace);font-size:11px;letter-spacing:1px;color:var(--text-secondary, #94a3b8);'>" +
-                "<a href='javascript:void(0)' onclick='dataEventList(\"" + instanceId + "\")' style='color:#67e8f9;text-decoration:none;text-transform:uppercase;'>" +
-                "<i class='glyphicon glyphicon-th-list' style='font-size:10px;'></i>&nbsp;&nbsp;DATA</a>" +
-                "<span style='margin:0 8px;opacity:0.4;'>&rsaquo;</span>" +
-                "<span style='text-transform:uppercase;color:var(--text-primary, #e2e8f0);'>" + $('<span>').text(eventTypeLabel).html() + "</span></div>";
-            $("#mainbody").prepend(breadcrumb);
             refresh = function() { dataEventData(instanceId, eventTypeLabel, eventType, format, filterFP, filterValidated, filterImportedEntries); }
             dataUpdate = function(newformat) { dataEventData(instanceId, eventTypeLabel, eventType, newformat, filterFP, filterValidated, filterImportedEntries); }
             currentDataFormat = format;
