@@ -5773,17 +5773,19 @@
 
         function knownKebabAffinity() {
             if (!knownKebabActiveId) return;
-            var $row = $("tr.assets-known-row[data-asset-id='" + knownKebabActiveId + "']");
+            var id = knownKebabActiveId;
+            var $row = $("tr.assets-known-row[data-asset-id='" + id + "']");
             var currentAffinity = $row.data('asset-affinity') || 'DIRECT';
             var newAffinity = (currentAffinity === 'DIRECT') ? 'ASSOCIATED' : 'DIRECT';
             knownCloseKebab();
-            knownUpdateAssetProperty(knownKebabActiveId, 'affinity', newAffinity);
+            knownUpdateAssetProperty(id, 'affinity', newAffinity);
         }
 
         function knownKebabSetTag(tagValue) {
             if (!knownKebabActiveId) return;
+            var id = knownKebabActiveId;
             knownCloseKebab();
-            knownUpdateAssetProperty(knownKebabActiveId, 'tag', tagValue);
+            knownUpdateAssetProperty(id, 'tag', tagValue);
         }
 
         function knownKebabFp() {
