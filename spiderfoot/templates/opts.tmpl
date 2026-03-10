@@ -1291,10 +1291,11 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
 #optsect_logs .log-filters {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   margin-bottom: 12px;
 }
+#optsect_logs .log-filters .btn { flex-shrink: 0; }
 #optsect_logs .log-filters select,
 #optsect_logs .log-filters input[type="text"],
 #optsect_logs .log-filters input[type="date"],
@@ -1427,7 +1428,7 @@ Modules with <code>api_key</code> fields. Click <code>CONFIGURE</code> to jump t
 <!-- ===== Scan Audit (all scan-linked activity) ===== -->
 <div id="logpane_scanlogs" style="display:none">
   <div class="log-filters">
-    <select id="scanlog-filter-scan" style="min-width:220px;"><option value="">All Scans</option></select>
+    <select id="scanlog-filter-scan" style="min-width:160px;max-width:260px;"><option value="">All Scans</option></select>
     <select id="scanlog-filter-action">
       <option value="">All Actions</option>
       <option value="SCAN_START">Scan Started</option>
