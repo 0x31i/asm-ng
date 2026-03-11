@@ -458,6 +458,33 @@ class SpiderFootScanner():
             self.__moduleInstances = OrderedDict(
                 sorted(self.__moduleInstances.items(), key=lambda m: m[-1]._priority))
 
+            # Persist module weight and category metadata for progress tracking
+            try:
+                import json as _json
+                _moduleweights = {}
+                _modulecategories = {}
+                for mName, mInst in self.__moduleInstances.items():
+                    meta = getattr(mInst, 'meta', {})
+                    flags = meta.get('flags', [])
+                    cats = meta.get('categories', [])
+                    # Weight: 10 for slow modules, 3 for apikey, 1 otherwise
+                    if 'slow' in flags:
+                        _moduleweights[mName] = 10
+                    elif 'apikey' in flags:
+                        _moduleweights[mName] = 3
+                    else:
+                        _moduleweights[mName] = 1
+                    _modulecategories[mName] = cats
+                self.__dbh.scanConfigSet(self.__scanId, {
+                    '_moduleweights': _json.dumps(_moduleweights),
+                    '_modulecategories': _json.dumps(_modulecategories),
+                })
+                self.__sf.debug(
+                    f"Scan [{self.__scanId}] persisted weights for {len(_moduleweights)} modules "
+                    f"(total weight: {sum(_moduleweights.values())})")
+            except Exception as e:
+                self.__sf.error(f"Failed to persist module weights: {e}")
+
             # Pre-load target-level false positives for suppression
             try:
                 fpSet = self.__dbh.targetFalsePositivesForTarget(self.__targetValue)

@@ -190,6 +190,7 @@ var sfMonitor = (function() {
 
         var cards = [
             { value: (progress.modulesWithResults || 0) + '/' + (progress.modulesTotal || 0), label: 'MODULES' },
+            { value: (progress.weightedProgressPercent || 0) + '%', label: 'WEIGHTED' },
             { value: progress.modulesRunning || 0, label: 'RUNNING' },
             { value: formatNum(progress.eventsQueued), label: 'QUEUED' },
             { value: formatNum(progress.totalEvents), label: 'EVENTS' },
@@ -242,14 +243,131 @@ var sfMonitor = (function() {
         renderRecentDiscoveries('#' + idPrefix + '-col-recent', recentEvents);
     }
 
+    /**
+     * Format seconds into a long elapsed string including days.
+     * Returns "4d 2h" / "1h 23m" / "45m" / "--"
+     */
+    function formatElapsedLong(seconds) {
+        if (!seconds || seconds <= 0) return '--';
+        seconds = Math.floor(seconds);
+        var d = Math.floor(seconds / 86400);
+        var h = Math.floor((seconds % 86400) / 3600);
+        var m = Math.floor((seconds % 3600) / 60);
+        if (d > 0) return d + 'd ' + h + 'h';
+        if (h > 0) return h + 'h ' + m + 'm';
+        if (m > 0) return m + 'm';
+        return seconds + 's';
+    }
+
+    /**
+     * Render the dual-bar progress panel.
+     * container: selector string or DOM element
+     * progress: object from scanProgress() with new enriched fields
+     */
+    function renderProgressPanel(container, progress) {
+        if (!container) return;
+        var el = (typeof container === 'string') ? document.querySelector(container) : container;
+        if (!el) return;
+
+        var done = progress.modulesWithResults || 0;
+        var total = progress.modulesTotal || 0;
+        var weightedPct = progress.weightedProgressPercent || 0;
+        var rate = progress.eventsPerSecond || 0;
+        var phase = progress.currentPhase || '';
+        var phaseNum = progress.phaseNumber || 0;
+        var pace = progress.modulePace || 0;
+        var prevDur = progress.previousScanDuration || 0;
+        var status = progress.status || '';
+
+        // Fallback: use simple module ratio if no weighted data
+        var barPct = weightedPct;
+        if (!barPct && total > 0) {
+            barPct = Math.round((done / total) * 100);
+        }
+
+        // Terminal states
+        var isTerminal = (status === 'FINISHED' || status === 'ABORTED' || status === 'ERROR-FAILED');
+        if (isTerminal) {
+            barPct = 100;
+            phase = 'Complete';
+            phaseNum = 3;
+        }
+
+        // Activity bar: log2(rate+1)*15, capped at 100
+        var activityPct = rate > 0 ? Math.min(100, Math.round(Math.log2(rate + 1) * 15)) : 0;
+        var activityClass = rate > 0 ? 'activity-alive' : 'activity-idle';
+        if (isTerminal) {
+            activityPct = 0;
+            activityClass = 'activity-idle';
+        }
+
+        var html = '<div class="progress-dual">';
+        // Bar 1: Modules (weighted)
+        html += '<div class="progress-bar-row">';
+        html += '<span class="progress-label">MODULES</span>';
+        html += '<div class="progress-slim"><div class="progress-bar" style="width: ' + barPct + '%;"></div></div>';
+        html += '<span class="progress-fraction">' + done + ' / ' + total + '</span>';
+        html += '</div>';
+        // Bar 2: Activity
+        html += '<div class="progress-bar-row">';
+        html += '<span class="progress-label">ACTIVITY</span>';
+        html += '<div class="progress-slim progress-activity ' + activityClass + '"><div class="progress-bar" style="width: ' + activityPct + '%;"></div></div>';
+        html += '<span class="progress-fraction">' + rate + '/s</span>';
+        html += '</div>';
+        html += '</div>';
+
+        // Info row
+        html += '<div class="progress-info-row">';
+        if (phase) {
+            var dotClass = 'phase-dot phase-' + phaseNum;
+            html += '<span class="progress-phase"><span class="' + dotClass + '"></span>';
+            if (phaseNum > 0 && !isTerminal) {
+                html += 'Phase ' + phaseNum + ': ';
+            }
+            html += phase + '</span>';
+        }
+
+        // Elapsed
+        if (progress.scanStarted && progress.scanStarted > 0) {
+            var nowSec = Math.floor(Date.now() / 1000);
+            var elapsed = formatElapsedLong(nowSec - progress.scanStarted);
+            html += '<span class="progress-info-sep">|</span>';
+            html += '<span class="progress-elapsed">Elapsed: ' + elapsed + '</span>';
+        }
+
+        // Modules done
+        if (done > 0) {
+            html += '<span class="progress-info-sep">|</span>';
+            html += '<span class="progress-elapsed">' + done + ' modules done</span>';
+        }
+
+        // Pace
+        if (pace > 0 && !isTerminal) {
+            html += '<span class="progress-info-sep">|</span>';
+            html += '<span class="progress-elapsed">~' + Math.round(pace) + ' modules/day</span>';
+        }
+
+        // Historical reference
+        if (prevDur > 0) {
+            html += '<span class="progress-info-sep">|</span>';
+            html += '<span class="progress-historical">Previous scan: ' + formatElapsedLong(prevDur) + '</span>';
+        }
+
+        html += '</div>';
+
+        el.innerHTML = html;
+    }
+
     // Public API
     return {
         formatNum: formatNum,
         formatElapsed: formatElapsed,
+        formatElapsedLong: formatElapsedLong,
         renderModulePipeline: renderModulePipeline,
         renderEventTypeGrid: renderEventTypeGrid,
         renderRecentDiscoveries: renderRecentDiscoveries,
         renderStatCards: renderStatCards,
+        renderProgressPanel: renderProgressPanel,
         buildDashboardHTML: buildDashboardHTML,
         updateDashboard: updateDashboard
     };
