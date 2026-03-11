@@ -338,11 +338,18 @@ function updateScanListProgress() {
                 return;
             }
 
-            var pct = data.progressPercent || 0;
-            bar.css('width', pct + '%').text(pct + '%');
+            var pct = data.weightedProgressPercent || data.progressPercent || 0;
+            var done = data.modulesWithResults || 0;
+            var total = data.modulesTotal || 0;
+            bar.css('width', pct + '%').text(done + '/' + total);
             var ql = sfMonitor.formatNum(data.eventsQueued);
             var tl = sfMonitor.formatNum(data.totalEvents);
-            info.html(data.modulesRunning + ' running &middot; ' + ql + ' queued &middot; ' + tl + ' events &middot; ' + data.eventsPerSecond + '/s');
+            var pace = data.modulePace || 0;
+            var infoText = data.modulesRunning + ' running &middot; ' + ql + ' queued &middot; ' + tl + ' events &middot; ' + data.eventsPerSecond + '/s';
+            if (pace > 0) {
+                infoText += ' | ~' + Math.round(pace) + ' mods/day';
+            }
+            info.html(infoText);
         });
     });
 
@@ -373,6 +380,7 @@ function toggleMonitorPanel(scanId) {
     var panelHtml = '<tr id="monitor-panel-' + scanId + '" class="scanlist-monitor-panel tablesorter-childRow">';
     panelHtml += '<td colspan="10" style="padding: 0 !important;">';
     panelHtml += '<div style="padding: 10px;">';
+    panelHtml += '<div id="monitor-progress-panel-' + scanId + '" style="margin-bottom: 8px;"></div>';
     panelHtml += '<div class="monitor-progress-thin"><div class="progress-bar progress-bar-striped active" id="monitor-bar-' + scanId + '" style="width: 0%;"></div></div>';
     panelHtml += '<div class="monitor-summary-line" id="monitor-summary-' + scanId + '"></div>';
     panelHtml += '<div class="monitor-columns">';
@@ -413,20 +421,29 @@ function fetchMonitorData(scanId) {
         var progress = resp.progress || {};
         var status = progress.status;
 
+        // Render dual-bar progress panel
+        sfMonitor.renderProgressPanel('#monitor-progress-panel-' + scanId, progress);
+
         // Update the thin progress bar
-        var pct = progress.progressPercent || 0;
+        var pct = progress.weightedProgressPercent || progress.progressPercent || 0;
         $('#monitor-bar-' + scanId).css('width', pct + '%');
 
         // Summary line
         var running = progress.modulesRunning || 0;
         var idle = progress.modulesIdle || 0;
         var errors = progress.modulesErrored || 0;
+        var done = progress.modulesWithResults || 0;
+        var modTotal = progress.modulesTotal || 0;
         var queued = sfMonitor.formatNum(progress.eventsQueued);
         var total = sfMonitor.formatNum(progress.totalEvents);
         var rate = progress.eventsPerSecond || 0;
-        var summary = running + ' running / ' + idle + ' idle / ' + errors + ' errors';
+        var phase = progress.currentPhase || '';
+        var summary = done + '/' + modTotal + ' modules | ' + running + ' running / ' + idle + ' idle / ' + errors + ' errors';
         summary += ' | ' + queued + ' queued | ' + total + ' events | ' + rate + '/s';
-        $('#monitor-summary-' + scanId).text(pct + '% — ' + summary);
+        if (phase) summary = phase + ' — ' + summary;
+        var prevDur = progress.previousScanDuration || 0;
+        if (prevDur > 0) summary += ' | Prev: ' + sfMonitor.formatElapsedLong(prevDur);
+        $('#monitor-summary-' + scanId).text(summary);
 
         // 3-column dashboard
         sfMonitor.renderModulePipeline('#monitor-col-modules-' + scanId, resp.modules || {});

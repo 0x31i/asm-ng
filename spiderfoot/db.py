@@ -2406,6 +2406,14 @@ class SpiderFootDb:
             'eventsPerSecond': 0.0,
             'progressPercent': 0,
             'scanStarted': 0,
+            # New enriched fields for progress panel
+            'modulePace': 0.0,
+            'weightedProgressPercent': 0,
+            'totalWeight': 0,
+            'completedWeight': 0,
+            'currentPhase': '',
+            'phaseNumber': 0,
+            'previousScanDuration': 0,
         }
 
         with self.dbhLock:
@@ -2436,6 +2444,26 @@ class SpiderFootDb:
                     result['modulesWithResults'] = result['modulesTotal']
                     result['modulesIdle'] = result['modulesTotal']
                     result['progressPercent'] = 100
+                    result['weightedProgressPercent'] = 100
+                    result['currentPhase'] = 'Complete'
+                    result['phaseNumber'] = 3
+                    # Read weights for totalWeight/completedWeight
+                    self.dbh.execute(
+                        "SELECT val FROM tbl_scan_config WHERE scan_instance_id = ? "
+                        "AND component = 'GLOBAL' AND opt = '_moduleweights'",
+                        [instanceId])
+                    wrow = self.dbh.fetchone()
+                    if wrow and wrow[0]:
+                        try:
+                            weights = _json.loads(wrow[0])
+                            tw = sum(weights.values())
+                            result['totalWeight'] = tw
+                            result['completedWeight'] = tw
+                        except (ValueError, KeyError):
+                            pass
+                    # Previous scan duration
+                    result['previousScanDuration'] = self._scanPreviousDuration(
+                        instanceId, scan_started)
                     return result
 
                 # --- Module count from config ---
@@ -2454,13 +2482,16 @@ class SpiderFootDb:
                 if modules_total == 0:
                     return result
 
-                # --- Modules that have produced results ---
+                # --- Modules that have produced results (need the set for weighted calc) ---
                 self.dbh.execute(
-                    "SELECT COUNT(DISTINCT module) FROM tbl_scan_results "
+                    "SELECT DISTINCT module FROM tbl_scan_results "
                     "WHERE scan_instance_id = ?",
                     [instanceId])
-                countrow = self.dbh.fetchone()
-                modules_with_results = countrow[0] if countrow else 0
+                completed_modules = set()
+                for r in self.dbh.fetchall():
+                    if r[0]:
+                        completed_modules.add(r[0])
+                modules_with_results = len(completed_modules)
                 result['modulesWithResults'] = modules_with_results
 
                 # --- Total events produced ---
@@ -2510,22 +2541,88 @@ class SpiderFootDb:
                 # Expose per-module snapshot for monitoring dashboard
                 result['_snapshot_modules'] = snap.get('modules', {})
 
-                # --- Composite progress estimate ---
-                # 80% module reporting — most reliable signal; monotonically
-                # increases as each module produces its first result.
+                # --- Read module weights for weighted progress ---
+                self.dbh.execute(
+                    "SELECT val FROM tbl_scan_config WHERE scan_instance_id = ? "
+                    "AND component = 'GLOBAL' AND opt = '_moduleweights'",
+                    [instanceId])
+                wrow = self.dbh.fetchone()
+                module_weights = {}
+                if wrow and wrow[0]:
+                    try:
+                        module_weights = _json.loads(wrow[0])
+                    except (ValueError, KeyError):
+                        pass
+
+                # Calculate weighted progress
+                total_weight = sum(module_weights.get(m, 1) for m in enabled_modules)
+                completed_weight = sum(module_weights.get(m, 1) for m in completed_modules
+                                       if m in enabled_modules or m in module_weights)
+                result['totalWeight'] = total_weight
+                result['completedWeight'] = completed_weight
+                if total_weight > 0:
+                    wpct = int((completed_weight / total_weight) * 100)
+                    result['weightedProgressPercent'] = max(0, min(95, wpct))
+
+                # --- Read module categories for phase detection ---
+                self.dbh.execute(
+                    "SELECT val FROM tbl_scan_config WHERE scan_instance_id = ? "
+                    "AND component = 'GLOBAL' AND opt = '_modulecategories'",
+                    [instanceId])
+                crow = self.dbh.fetchone()
+                module_categories = {}
+                if crow and crow[0]:
+                    try:
+                        module_categories = _json.loads(crow[0])
+                    except (ValueError, KeyError):
+                        pass
+
+                # Determine current phase from active modules
+                if module_categories:
+                    _PHASE1_CATS = {
+                        'Search Engines', 'Reputation Systems', 'Passive DNS',
+                        'Social Media', 'Leaks, Dumps and Breaches',
+                        'Public Registries', 'Real World'
+                    }
+                    _PHASE2_CATS = {
+                        'Crawling and Scanning', 'DNS',
+                        'Content Analysis', 'Secondary Networks'
+                    }
+                    snap_modules = snap.get('modules', {})
+                    # A module is "active" if it's running or has queued events
+                    active_cats = set()
+                    for mName in enabled_modules:
+                        ms = snap_modules.get(mName, {})
+                        if ms.get('r') or ms.get('q', 0) > 0:
+                            for cat in module_categories.get(mName, []):
+                                active_cats.add(cat)
+                    if active_cats & _PHASE2_CATS:
+                        result['currentPhase'] = 'Active Enumeration'
+                        result['phaseNumber'] = 2
+                    elif active_cats & _PHASE1_CATS:
+                        result['currentPhase'] = 'Passive Recon'
+                        result['phaseNumber'] = 1
+                    elif not active_cats and modules_with_results > 0:
+                        result['currentPhase'] = 'Correlation & Grading'
+                        result['phaseNumber'] = 3
+
+                # --- Module pace (modules completed per day) ---
+                import time as _time
+                elapsed_sec = _time.time() - scan_started if scan_started > 0 else 0
+                if elapsed_sec > 60 and modules_with_results > 0:
+                    result['modulePace'] = round(
+                        (modules_with_results / elapsed_sec) * 86400, 1)
+
+                # --- Previous scan duration ---
+                result['previousScanDuration'] = self._scanPreviousDuration(
+                    instanceId, scan_started)
+
+                # --- Composite progress estimate (legacy progressPercent) ---
                 module_report_pct = (modules_with_results / modules_total) * 100
 
-                # 20% logarithmic queue drain — secondary signal.
-                # NOTE: modulesIdle was previously included here but removed:
-                # at t=0 all module queues are empty so idle≈total, inflating
-                # progress to ~30% before any real work has happened.
-                # Queue drain also has a cold-start problem: with 0 events queued
-                # at t=0 it would report 100% "drained" — so we only activate it
-                # once the scan has actually produced some events.
                 queued = result['eventsQueued']
                 total_ev = result['totalEvents']
                 if total_ev == 0:
-                    # Scan hasn't produced results yet; queue signal is noise
                     queue_drain_pct = 0.0
                 elif queued <= 0:
                     queue_drain_pct = 100.0
@@ -2549,6 +2646,36 @@ class SpiderFootDb:
             except DatabaseError as e:
                 raise IOError(
                     "SQL error encountered when fetching scan progress") from e
+
+    def _scanPreviousDuration(self, instanceId: str, scan_started: float) -> int:
+        """Get the duration (seconds) of the last FINISHED scan for the same target.
+
+        Args:
+            instanceId: current scan instance ID (excluded from results)
+            scan_started: start time of current scan (unused but kept for future)
+
+        Returns:
+            int: duration in seconds, or 0 if no previous scan found
+        """
+        try:
+            self.dbh.execute(
+                "SELECT seed_target FROM tbl_scan_instance WHERE guid = ?",
+                [instanceId])
+            trow = self.dbh.fetchone()
+            if not trow or not trow[0]:
+                return 0
+            self.dbh.execute(
+                "SELECT (ended - started) / 1000 FROM tbl_scan_instance "
+                "WHERE seed_target = ? AND guid != ? AND status = 'FINISHED' "
+                "AND ended > 0 AND started > 0 "
+                "ORDER BY ended DESC LIMIT 1",
+                [trow[0], instanceId])
+            drow = self.dbh.fetchone()
+            if drow and drow[0] and drow[0] > 0:
+                return int(drow[0])
+        except Exception:
+            pass
+        return 0
 
     def scanCorrelationSummary(self, instanceId: str, by: str = "rule") -> list:
         """Obtain a summary of the correlations, filtered by rule or risk.
