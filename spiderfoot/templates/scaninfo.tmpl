@@ -13489,6 +13489,9 @@
         if ("${status}" == "CREATED" || "${status}" == "RUNNING" || "${status}" == "STARTING" || "${status}" == "STARTED" || "${status}" == "INITIALIZING") {
             updateScanProgress();
             progressInterval = setInterval(updateScanProgress, 5000);
+        } else if ("${status}" == "FINISHED" || "${status}" == "ABORTED" || "${status}" == "ERROR-FAILED") {
+            // Render final progress snapshot once for completed scans
+            updateScanProgress();
         }
 
         // Check if this scan is the latest for its target and handle auto-import

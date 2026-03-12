@@ -8040,17 +8040,17 @@ class SpiderFootWebUi:
                         # Sort by count descending, take top 30
                         evt_list.sort(key=lambda x: x['count'], reverse=True)
                         result['eventTypes'] = evt_list[:30]
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        self.log.debug(f"scanmonitor: event types failed for scan={id}: {e}")
 
                 # 3. Recent events feed (latest 100, most recent first)
                 try:
                     result['recentEvents'] = dbh.scanRecentEvents(id, 100)
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.log.debug(f"scanmonitor: recent events failed for scan={id}: {e}")
 
-            except Exception:
-                pass
+            except Exception as e:
+                self.log.error(f"scanmonitor: failed for scan={id}: {e}", exc_info=True)
 
         return result
 
