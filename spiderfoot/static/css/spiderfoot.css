@@ -76,6 +76,7 @@
 /* Always show scrollbar to prevent layout shift when toolbar shows/hides */
 html {
   overflow-y: scroll;
+  overflow-x: clip;
 }
 
 body {
@@ -278,14 +279,34 @@ a:hover {
   margin-right: auto !important;
   padding-left: 15px;
   padding-right: 15px;
-  overflow: visible !important; /* Required for sticky positioning to work */
+  /* clip (not hidden/auto) contains overflow WITHOUT breaking position:sticky */
+  overflow-x: clip !important;
+  overflow-y: visible !important;
 }
 
 #mainbody {
   padding-top: 20px;
   margin-left: auto !important;
   margin-right: auto !important;
-  overflow: visible !important; /* Required for sticky positioning to work */
+  overflow-x: clip !important;
+  overflow-y: visible !important;
+}
+
+/* Scan list content — scroll wide tables instead of overflowing the page */
+#scancontent {
+  overflow-x: auto;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Scanlist table — cells truncate instead of pushing wider */
+#scanlist td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#scanlist td.text-center {
+  white-space: normal;
 }
 
 /* ============================================
@@ -684,10 +705,9 @@ input[type="checkbox"] {
   font-size: 14px;
   font-family: var(--font-sans);
   border: 1px solid rgba(0, 0, 0, 0.2) !important;
-  padding: 14px 12px;
+  padding: 10px 8px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
+  letter-spacing: 0.3px;
   vertical-align: middle;
   /* Sticky table headers - at top since main nav is not sticky */
   position: sticky !important;
@@ -695,10 +715,9 @@ input[type="checkbox"] {
   z-index: 100 !important;
 }
 
-/* Widen columns that tend to wrap */
-.table th:nth-child(1),
+/* Widen Scan ID column (2nd col); checkbox col stays narrow */
 .table th:nth-child(2) {
-  min-width: 160px;
+  min-width: 140px;
 }
 
 .table > tbody > tr {
@@ -715,7 +734,7 @@ input[type="checkbox"] {
   border-color: var(--glass-border) !important;
   border-top: none !important;
   color: var(--text-primary);
-  padding: 12px;
+  padding: 8px;
   vertical-align: middle;
   font-family: var(--font-mono);
   font-size: 13px;
@@ -4747,7 +4766,8 @@ div[id*="Help"].alert-info {
 body {
   padding-top: 0 !important;
   padding-bottom: 40px;
-  /* overflow-x: auto/hidden both break position:sticky — leave at default (visible) */
+  /* clip (not hidden) prevents horizontal overflow without breaking position:sticky */
+  overflow-x: clip;
 }
 
 /* Logo container - full width */
