@@ -531,7 +531,8 @@ function showlisttable(types, filter, data) {
             targetScanCounts[target] = (targetScanCounts[target] || 0) + 1;
         }
 
-        var table = "<table id='scanlist' class='table table-bordered table-striped'>";
+        var table = "<table id='scanlist' class='table table-bordered table-striped' style='table-layout:fixed;width:100%'>";
+        table += "<colgroup><col style='width:36px'><col style='width:100px'><col><col><col style='width:82px'><col style='width:82px'><col style='width:18%'><col style='width:60px'><col style='width:90px'><col style='width:55px'></colgroup>";
         table += "<thead><tr><th class='sorter-false text-center'><input id='checkall' type='checkbox'></th> <th>Scan ID</th> <th>Name</th> <th>Target</th> <th>Started</th> <th >Finished</th> <th class='text-center'>Status</th> <th class='text-center'>Elements</th><th class='text-center'>Correlations</th><th class='sorter-false text-center'>Action</th> </tr></thead><tbody>";
         filtered = 0;
         for (var i = 0; i < data.length; i++) {
@@ -545,7 +546,7 @@ function showlisttable(types, filter, data) {
             var latestBadge = isLatest ? " <span class='badge' style='background-color: #3b82f6; font-size: 9px; margin-left: 4px;'>LATEST</span>" : "";
 
             table += "<tr><td class='text-center'><input type='checkbox' id='cb_" + data[i][0] + "'></td>"
-            table += "<td><code style='font-size: 11px; background: #f5f5f5; padding: 2px 4px; cursor: pointer; border: 1px solid #ddd; border-radius: 3px;' onclick='copyToClipboard(\"" + data[i][0] + "\")' title='Click to copy scan ID'>" + data[i][0] + " <i class='glyphicon glyphicon-copy' style='font-size: 10px; margin-left: 2px;'></i></code></td>";
+            table += "<td style='overflow:hidden;text-overflow:ellipsis'><code style='font-size: 11px; background: #f5f5f5; padding: 2px 4px; cursor: pointer; border: 1px solid #ddd; border-radius: 3px;' onclick='copyToClipboard(\"" + data[i][0] + "\")' title='Click to copy scan ID'>" + data[i][0] + " <i class='glyphicon glyphicon-copy' style='font-size: 10px; margin-left: 2px;'></i></code></td>";
             var scanLink = docroot + "/scaninfo?id=" + data[i][0];
             var clickableStyle = "cursor: pointer;";
             table += "<td style='" + clickableStyle + "' onclick='window.location.href=\"" + scanLink + "\"'><a href=" + scanLink + ">" + data[i][1] + "</a>" + latestBadge + "</td>";
@@ -572,7 +573,7 @@ function showlisttable(types, filter, data) {
                 table += "<div class='progress' style='height: 10px; margin-bottom: 0; min-width: 80px;'>";
                 table += "<div class='progress-bar progress-bar-striped active' role='progressbar' style='width: 0%; font-size: 9px; line-height: 10px;'>0%</div>";
                 table += "</div>";
-                table += "<div class='scanlist-progress-info' style='font-size: 9px; color: #888; margin-top: 2px; white-space: nowrap;'></div>";
+                table += "<div class='scanlist-progress-info' style='font-size: 9px; color: #888; margin-top: 2px; overflow:hidden; text-overflow:ellipsis;'></div>";
                 table += "<a class='scanlist-monitor-toggle' id='monitor-toggle-" + data[i][0] + "' onclick='event.stopPropagation(); toggleMonitorPanel(\"" + data[i][0] + "\"); return false;'>MONITOR</a>";
                 table += "</div>";
             }
@@ -621,7 +622,8 @@ function showlisttable(types, filter, data) {
 
         $("#loader").fadeOut(500);
         $("#scancontent-wrapper").remove();
-        $("#scancontent").append("<div id='scancontent-wrapper'> " + buttons + table + "</div>");
+        $("#scancontent").css({"overflow-x": "auto", "max-width": "100%"});
+        $("#scancontent").append("<div id='scancontent-wrapper' style='max-width:100%;overflow:hidden'> " + buttons + table + "</div>");
         sf.updateTooltips();
         
         // Add error handling around tablesorter initialization
@@ -683,6 +685,8 @@ function showlisttable(types, filter, data) {
 
 // Initialize when document is ready
 $(document).ready(function() {
+    // Force container to clip overflow (overrides any inline style from template cache)
+    $("#mainbody").css({"overflow-x": "clip", "overflow": ""});
     try {
         // Call showlist to populate data
         showlist();
