@@ -10967,6 +10967,117 @@ a.data-type-btn:hover {
 }
 
 /* =====================================================================
+   PROGRESS PANEL — Dual-bar progress with phase detection (Dark Theme)
+   ===================================================================== */
+
+.progress-dual {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progress-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  min-width: 58px;
+  letter-spacing: 0.5px;
+}
+
+.progress-slim {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--bg-tertiary);
+}
+
+.progress-slim .progress-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  background: var(--accent-primary, #3b82f6);
+}
+
+.progress-fraction {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--text-primary);
+  min-width: 55px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.progress-activity .progress-bar {
+  background: linear-gradient(90deg, #10b981, #06b6d4);
+}
+
+.activity-alive .progress-bar {
+  animation: activity-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes activity-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.activity-idle .progress-bar {
+  background: var(--text-muted);
+  opacity: 0.4;
+}
+
+.progress-info-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.progress-phase {
+  font-weight: bold;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.phase-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.phase-dot.phase-1 { background: #3b82f6; }
+.phase-dot.phase-2 { background: #eab308; }
+.phase-dot.phase-3 { background: #10b981; }
+
+.progress-elapsed {
+  color: var(--text-muted);
+}
+
+.progress-historical {
+  color: #06b6d4;
+}
+
+.progress-info-sep {
+  color: var(--text-muted);
+  opacity: 0.4;
+}
+
+/* =====================================================================
    SEARCH OVERHAUL — Enhanced Search Styles (Dark Theme)
    ===================================================================== */
 
