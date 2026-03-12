@@ -37,7 +37,7 @@ requests = ">=2.32.0,<3"
 secure = ">=0.3.0,<2"
 jsonschema = ">=4.0.0,<5"
 pillow = ">=10.3.0,<13"
-setuptools = ">=78.1.1,<81"
+setuptools = ">=78.1.1,<83"
 uvicorn = {version = ">=0.30.0,<1", extras = ["standard"]}
 zipp = ">=3.19.1,<4"
 python-jose = ">=3.3.0,<4"
