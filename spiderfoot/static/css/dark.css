@@ -12000,3 +12000,55 @@ a.btn.ob-btn-view:focus {
   border-color: rgba(139, 92, 246, 0.2);
   font-size: 12px;
 }
+
+/* --- Priority Badges (dark theme) --- */
+.priority-badge {
+  display: inline-block;
+  min-width: 24px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  text-align: center;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+.priority-badge:hover { transform: scale(1.1); opacity: 0.9; }
+.priority-none { color: #64748b; border-color: #334155; background: transparent; }
+.priority-low { color: #94a3b8; background: rgba(148, 163, 184, 0.08); border-color: #334155; }
+.priority-high { color: #f59e0b; background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.4); text-shadow: 0 0 6px rgba(245, 158, 11, 0.3); }
+.priority-critical { color: #ef4444; background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.4); text-shadow: 0 0 6px rgba(239, 68, 68, 0.3); }
+.col-data-priority { width: 60px; }
+
+/* Priority detail section (dark) */
+.detail-priority-section { padding: 8px 0; border-bottom: 1px solid #1e293b; }
+.priority-assignment-container { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.detail-priority-label, .detail-assign-label { font-size: 12px; color: #94a3b8; font-weight: 600; }
+.priority-select, .assign-select { padding: 2px 6px; border-radius: 4px; border: 1px solid #475569; font-size: 12px; background: #0f172a; color: #e2e8f0; }
+.detail-assigned-to { font-size: 12px; color: #a78bfa; font-weight: 600; }
+
+/* Priority toolbar buttons (dark) */
+.btn-priority-critical { color: #ef4444 !important; border-color: #ef4444 !important; }
+.btn-priority-high { color: #f59e0b !important; border-color: #f59e0b !important; }
+.btn-priority-medium { color: #94a3b8 !important; border-color: #94a3b8 !important; }
+.btn-priority-clear { color: #64748b !important; }
+.btn-assign { color: #a78bfa !important; border-color: #a78bfa !important; }
+.toolbar-assign-select { padding: 4px 8px; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; font-size: 11px; }
+
+/* Filter buttons (dark) */
+.filter-btn-high-priority { color: #ef4444 !important; border-color: #ef4444 !important; }
+.filter-btn-my-tasks { color: #a78bfa !important; border-color: #a78bfa !important; }
+
+/* My Tasks nav badge (dark) */
+.mytasks-badge {
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 8px;
+  margin-left: 4px;
+  vertical-align: middle;
+}

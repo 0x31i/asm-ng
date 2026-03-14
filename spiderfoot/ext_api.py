@@ -374,6 +374,7 @@ class ExtFinding(BaseModel):
     data: str
     source_data: Optional[str] = None
     status: str
+    priority: int = 0
 
 
 class ExtTargetSummary(BaseModel):
@@ -393,6 +394,7 @@ class ExtScanResult(BaseModel):
     risk: int
     confidence: int
     generated: int
+    priority: int = 0
     # Excluded: scan_instance_id, hash, false_positive, tracking, visibility
 
 
@@ -647,6 +649,12 @@ async def ext_target_findings(
     except Exception as e:
         raise HTTPException(500, f"DB error fetching findings: {e}")
 
+    # Load priorities for this target
+    try:
+        priorities = dbh.findingPrioritiesForTarget(target)
+    except Exception:
+        priorities = {}
+
     results = []
     for row in validated_rows[offset:offset + limit]:
         # targetValidatedListFull: id[0], target[1], event_type[2],
@@ -654,12 +662,14 @@ async def ext_target_findings(
         from spiderfoot.event_type_mapping import translate_event_type
         event_type = row[2]
         label = translate_event_type(event_type) if event_type else event_type
+        prio = priorities.get((event_type, row[3], row[4]), 0)
         results.append(ExtFinding(
             event_type=event_type,
             event_type_label=label or event_type,
             data=row[3],
             source_data=row[4],
             status="validated",
+            priority=prio,
         ))
 
     return results
@@ -728,6 +738,12 @@ async def ext_target_results(
     except Exception as e:
         raise HTTPException(500, f"DB error: {e}")
 
+    # Load priorities for this target
+    try:
+        priorities = dbh.findingPrioritiesForTarget(target)
+    except Exception:
+        priorities = {}
+
     from spiderfoot.event_type_mapping import translate_event_type
     results = []
     for row in rows:
@@ -738,6 +754,7 @@ async def ext_target_results(
         # fp[13], parent_fp[14], imported_from_scan[15], tracking[16]
         event_type = row[4]
         label = row[10] or translate_event_type(event_type) or event_type
+        prio = priorities.get((event_type, str(row[1]), str(row[2])), 0)
         results.append(ExtScanResult(
             event_type=event_type,
             event_type_label=label,
@@ -747,8 +764,63 @@ async def ext_target_results(
             risk=int(row[7] or 0),
             confidence=int(row[5] or 0),
             generated=int(row[0] or 0),
+            priority=prio,
         ))
     return results
+
+
+class ExtPrioritizedFinding(BaseModel):
+    event_type: str
+    event_type_label: str
+    data: str
+    source_data: Optional[str] = None
+    priority: int
+    ai_priority: Optional[int] = None
+    ai_reason: Optional[str] = None
+    set_by: str
+
+
+@ext_router.get("/targets/{target}/priorities", response_model=List[ExtPrioritizedFinding])
+async def ext_target_priorities(
+    target: str,
+    min_priority: int = Query(1, ge=1, le=10),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    client: dict = Depends(get_ext_client),
+):
+    """Prioritized findings for a target, sorted by priority DESC.
+
+    Useful for vendor dashboards that want a 'top issues' view.
+    Requires scope: findings:read
+    """
+    require_scope(client, "findings:read")
+    require_target_access(client, target)
+
+    dbh = _get_db()
+    try:
+        full_priorities = dbh.findingPrioritiesFullForTarget(target)
+    except Exception as e:
+        raise HTTPException(500, f"DB error: {e}")
+
+    from spiderfoot.event_type_mapping import translate_event_type
+
+    items = []
+    for (etype, edata, sdata), pdata in full_priorities.items():
+        if pdata['priority'] >= min_priority:
+            label = translate_event_type(etype) or etype
+            items.append(ExtPrioritizedFinding(
+                event_type=etype,
+                event_type_label=label,
+                data=edata or "",
+                source_data=sdata,
+                priority=pdata['priority'],
+                ai_priority=pdata.get('ai_priority'),
+                ai_reason=pdata.get('ai_reason'),
+                set_by=pdata.get('set_by', 'MANUAL'),
+            ))
+
+    items.sort(key=lambda x: x.priority, reverse=True)
+    return items[offset:offset + limit]
 
 
 @ext_router.get("/targets/{target}/results/lookup", response_model=List[ExtScanResult])

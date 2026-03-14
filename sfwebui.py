@@ -1281,6 +1281,33 @@ class SpiderFootWebUi:
                     notes_rows, manifest['row_counts'], 'analyst_row_notes'
                 )
 
+                # --- FINDING_PRIORITIES.csv ---
+                try:
+                    prio_dict = dbh.findingPrioritiesFullForTarget(target)
+                    prio_rows = [(k[0], k[1], k[2], v['priority'], v['ai_priority'],
+                                  v['ai_reason'], v['set_by'], v['date_modified'])
+                                 for k, v in prio_dict.items()]
+                except Exception:
+                    prio_rows = []
+                _write_backup_csv(
+                    zf, 'FINDING_PRIORITIES.csv',
+                    ['event_type', 'event_data', 'source_data', 'priority',
+                     'ai_priority', 'ai_reason', 'set_by', 'date_modified'],
+                    prio_rows, manifest['row_counts'], 'finding_priorities'
+                )
+
+                # --- FINDING_ASSIGNMENTS.csv ---
+                try:
+                    assign_rows = dbh.findingAssignmentsFullForTarget(target)
+                except Exception:
+                    assign_rows = []
+                _write_backup_csv(
+                    zf, 'FINDING_ASSIGNMENTS.csv',
+                    ['event_type', 'event_data', 'source_data', 'assigned_to',
+                     'assigned_by', 'status', 'note', 'date_assigned', 'date_updated'],
+                    assign_rows, manifest['row_counts'], 'finding_assignments'
+                )
+
                 # --- KNOWN_ASSETS/*.csv ---
                 asset_type_map = {
                     'ip': 'IPs', 'domain': 'DOMAINS', 'email': 'EMAILS',
@@ -1554,15 +1581,20 @@ class SpiderFootWebUi:
             if export_mode == "analysis_correlations":
                 filetype = "excel"
 
-            # Get target-level false positives for this scan
+            # Get target-level false positives and priorities for this scan
             scanInfo = dbh.scanInstanceGet(id)
             target = scanInfo[1] if scanInfo else None
             targetFps = set()
+            exportPriorities = {}
             if target:
                 try:
                     targetFps = dbh.targetFalsePositivesForTarget(target)
                 except Exception:
                     pass  # Table may not exist in older databases
+                try:
+                    exportPriorities = dbh.findingPrioritiesForTarget(target)
+                except Exception:
+                    pass
 
             # Build prepend sheets for analysis_correlations mode (Findings + Correlations)
             prepend_sheets = None
@@ -1627,8 +1659,9 @@ class SpiderFootWebUi:
                     tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
                     event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
                     tracking_label = tracking_labels.get(row[16], 'OPEN')
+                    prio = exportPriorities.get((str(row[4]), str(row[1]), str(row[2])), 0)
                     rows.append([lastseen, event_type, str(row[3]),
-                                str(row[2]), fp_flag, tracking_label, datafield])
+                                str(row[2]), fp_flag, tracking_label, prio, datafield])
 
                 _scan_name = scanInfo[0] if scanInfo else ''
                 if export_mode == "analysis_correlations":
@@ -1642,7 +1675,7 @@ class SpiderFootWebUi:
                 cherrypy.response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 cherrypy.response.headers['Pragma'] = "no-cache"
                 return self.buildExcel(rows, ["Updated", "Type", "Module", "Source",
-                                       "F/P", "Tracking", "Data"], sheetNameIndex=1,
+                                       "F/P", "Tracking", "Priority", "Data"], sheetNameIndex=1,
                                        prepend_sheets=prepend_sheets)
 
             if filetype.lower() == 'csv':
@@ -1652,10 +1685,10 @@ class SpiderFootWebUi:
                 if export_mode == "full_scored":
                     parser.writerow(
                         ["Updated", "Type", "Module", "Source", "F/P", "Tracking",
-                         "Confidence", "Visibility", "Risk", "Data"])
+                         "Priority", "Confidence", "Visibility", "Risk", "Data"])
                 else:
                     parser.writerow(
-                        ["Updated", "Type", "Module", "Source", "F/P", "Tracking", "Data"])
+                        ["Updated", "Type", "Module", "Source", "F/P", "Tracking", "Priority", "Data"])
                 for row in data:
                     if row[4] == "ROOT":
                         continue
@@ -1668,14 +1701,15 @@ class SpiderFootWebUi:
                         "<SFURL>", "").replace("</SFURL>", "").replace("\x00", "")
                     event_type = translate_event_type(str(row[4]), use_legacy=use_legacy)
                     tracking_label = tracking_labels.get(row[16], 'OPEN')
+                    prio = exportPriorities.get((str(row[4]), str(row[1]), str(row[2])), 0)
                     if export_mode == "full_scored":
                         parser.writerow([lastseen, event_type, str(row[3]),
                                          str(row[2]), fp_flag, tracking_label,
-                                         row[5], row[6], row[7],
+                                         prio, row[5], row[6], row[7],
                                          datafield])
                     else:
                         parser.writerow([lastseen, event_type, str(
-                            row[3]), str(row[2]), fp_flag, tracking_label, datafield])
+                            row[3]), str(row[2]), fp_flag, tracking_label, prio, datafield])
 
                 _scan_name = scanInfo[0] if scanInfo else ''
                 if export_mode == "full_scored":
@@ -1741,6 +1775,7 @@ class SpiderFootWebUi:
                     <th>Source</th>
                     <th>F/P</th>
                     <th>Tracking</th>
+                    <th>Priority</th>
                     <th>Data</th>
                 </tr>
             </thead>
@@ -1760,6 +1795,7 @@ class SpiderFootWebUi:
                 fp_display = '<span class="fp-yes">Yes</span>' if fp_flag else '<span class="fp-no">No</span>'
                 tracking_val = row[16] if row[16] else 0
                 tracking_display = f'<span class="{tracking_classes.get(tracking_val, "tracking-open")}">{tracking_labels.get(tracking_val, "OPEN")}</span>'
+                prio = exportPriorities.get((str(row[4]), str(row[1]), str(row[2])), 0)
 
                 html_content += f"""                <tr>
                     <td class="timestamp">{lastseen}</td>
@@ -1768,6 +1804,7 @@ class SpiderFootWebUi:
                     <td>{row[2]}</td>
                     <td>{fp_display}</td>
                     <td>{tracking_display}</td>
+                    <td>{prio if prio else '-'}</td>
                     <td class="data-cell">{datafield}</td>
                 </tr>
 """
@@ -2373,6 +2410,14 @@ class SpiderFootWebUi:
                     continue
 
                 scan_name = scan[0]
+                scan_target = scan[1]
+                # Load priorities for this scan's target
+                _json_priorities = {}
+                if scan_target:
+                    try:
+                        _json_priorities = dbh.findingPrioritiesForTarget(scan_target)
+                    except Exception:
+                        pass
 
                 for row in dbh.scanResultEvent(id):
                     lastseen = time.strftime(
@@ -2389,6 +2434,7 @@ class SpiderFootWebUi:
 
                     tracking_labels = {0: 'OPEN', 1: 'CLOSED', 2: 'TICKETED'}
                     tracking_label = tracking_labels.get(row[16], 'OPEN')
+                    prio = _json_priorities.get((event_type, str(row[1]), str(row[2])), 0)
                     scaninfo.append({
                         "data": event_data,
                         "event_type": event_type,
@@ -2396,9 +2442,10 @@ class SpiderFootWebUi:
                         "source_data": source_data,
                         "false_positive": false_positive,
                         "tracking": tracking_label,
+                        "priority": prio,
                         "last_seen": lastseen,
                         "scan_name": scan_name,
-                        "scan_target": scan[1]
+                        "scan_target": scan_target
                     })
 
             _name = scan_name if scan_name and len(ids.split(',')) == 1 else 'Multi-Scan'
@@ -3980,6 +4027,59 @@ class SpiderFootWebUi:
                 errors.append(f"Note row {count + 1}: {e}")
         return count, errors
 
+    def _restore_finding_priorities(self, dbh, zf, target):
+        """Restore FINDING_PRIORITIES.csv."""
+        try:
+            raw = zf.read('FINDING_PRIORITIES.csv').decode('utf-8', errors='replace')
+        except KeyError:
+            return 0, []
+        reader = csv.DictReader(StringIO(raw))
+        count = 0
+        errors = []
+        for row in reader:
+            try:
+                ai_p = row.get('ai_priority')
+                dbh.findingPrioritySet(
+                    target=target,
+                    eventType=row.get('event_type', ''),
+                    eventData=row.get('event_data', ''),
+                    sourceData=row.get('source_data') or None,
+                    priority=int(row.get('priority', 0)),
+                    setBy=row.get('set_by', 'RESTORE'),
+                    aiPriority=int(ai_p) if ai_p and ai_p != '' else None,
+                    aiReason=row.get('ai_reason') or None,
+                )
+                count += 1
+            except Exception as e:
+                errors.append(f"Priority row {count + 1}: {e}")
+        return count, errors
+
+    def _restore_finding_assignments(self, dbh, zf, target):
+        """Restore FINDING_ASSIGNMENTS.csv."""
+        try:
+            raw = zf.read('FINDING_ASSIGNMENTS.csv').decode('utf-8', errors='replace')
+        except KeyError:
+            return 0, []
+        reader = csv.DictReader(StringIO(raw))
+        count = 0
+        errors = []
+        for row in reader:
+            try:
+                dbh.findingAssignmentSet(
+                    target=target,
+                    eventType=row.get('event_type', ''),
+                    eventData=row.get('event_data', ''),
+                    sourceData=row.get('source_data') or None,
+                    assignedTo=row.get('assigned_to', '*'),
+                    assignedBy=row.get('assigned_by', 'RESTORE'),
+                    note=row.get('note') or None,
+                    status=row.get('status', 'OPEN'),
+                )
+                count += 1
+            except Exception as e:
+                errors.append(f"Assignment row {count + 1}: {e}")
+        return count, errors
+
     def _restore_known_assets(self, dbh, zf, target):
         """Restore KNOWN_ASSETS/*.csv files (adds new, ignores duplicates)."""
         asset_type_map = {
@@ -4210,6 +4310,14 @@ class SpiderFootWebUi:
             stats['row_notes'] = c
             all_errors.extend(e)
 
+            c, e = self._restore_finding_priorities(dbh, zf, target)
+            stats['finding_priorities'] = c
+            all_errors.extend(e)
+
+            c, e = self._restore_finding_assignments(dbh, zf, target)
+            stats['finding_assignments'] = c
+            all_errors.extend(e)
+
             c, e = self._restore_known_assets(dbh, zf, target)
             stats['known_assets'] = c
             all_errors.extend(e)
@@ -4283,7 +4391,8 @@ class SpiderFootWebUi:
 
         # Target-scoped types don't need scan_id
         target_scoped = {'target_fps', 'target_validated', 'type_comments',
-                         'row_notes', 'known_assets', 'asset_tags'}
+                         'row_notes', 'known_assets', 'asset_tags',
+                         'priorities', 'assignments'}
 
         try:
             raw_bytes = importfile.file.read()
@@ -4346,6 +4455,8 @@ class SpiderFootWebUi:
                 'asset_tags': 'ASSET_TAGS.csv',
                 'grade_snapshots': 'GRADE_SNAPSHOT.csv',
                 'scan_config': 'SCAN_CONFIG.csv',
+                'priorities': 'FINDING_PRIORITIES.csv',
+                'assignments': 'FINDING_ASSIGNMENTS.csv',
             }
 
             # For known_assets, write to KNOWN_ASSETS/ directory based on content
@@ -4394,6 +4505,8 @@ class SpiderFootWebUi:
                 'asset_tags': lambda: self._restore_asset_tags(dbh, zf, target),
                 'grade_snapshots': lambda: self._restore_grade_snapshots(dbh, zf, target),
                 'scan_config': lambda: self._restore_scan_config(dbh, zf, scan_id),
+                'priorities': lambda: self._restore_finding_priorities(dbh, zf, target),
+                'assignments': lambda: self._restore_finding_assignments(dbh, zf, target),
             }
 
             handler = restore_map.get(import_type)
@@ -9688,6 +9801,290 @@ class SpiderFootWebUi:
                 self.log.error(f"Error saving row note for scan {id}, hash {resultHash}: {e}", exc_info=True)
                 return {'success': False, 'message': str(e)}
 
+    # ------------------------------------------------------------------
+    # Finding Priority endpoints
+    # ------------------------------------------------------------------
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def findingpriorityset(self: 'SpiderFootWebUi', id: str, resultHash: str, priority: str) -> dict:
+        """Set priority on a single finding.
+
+        Args:
+            id (str): scan instance ID
+            resultHash (str): event hash
+            priority (str): 0-10
+
+        Returns:
+            dict: {success: True}
+        """
+        try:
+            priority_val = int(priority)
+            if priority_val < 0 or priority_val > 10:
+                return {'success': False, 'message': 'Priority must be 0-10'}
+        except ValueError:
+            return {'success': False, 'message': 'Invalid priority value'}
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                scanInfo = dbh.scanInstanceGet(id)
+                target = scanInfo[1] if scanInfo else None
+                if not target:
+                    return {'success': False, 'message': 'Scan not found'}
+                eventDetails = dbh.scanEventResultByHash(id, resultHash)
+                if not eventDetails:
+                    return {'success': False, 'message': 'Event not found'}
+                dbh.findingPrioritySet(target, eventDetails[0], eventDetails[1],
+                                       eventDetails[2], priority_val,
+                                       setBy=self.currentUser() or 'MANUAL')
+                # Invalidate cache
+                _lookup_cache_key = (id, target)
+                if _lookup_cache_key in _scan_lookup_cache:
+                    del _scan_lookup_cache[_lookup_cache_key]
+                return {'success': True}
+            except Exception as e:
+                self.log.error(f"Error setting priority: {e}", exc_info=True)
+                return {'success': False, 'message': str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def findingprioritybulkset(self: 'SpiderFootWebUi', id: str, hashes: str, priority: str) -> dict:
+        """Bulk set priority from toolbar.
+
+        Args:
+            id (str): scan instance ID
+            hashes (str): comma-separated event hashes
+            priority (str): 0-10
+
+        Returns:
+            dict: {success: True, count: N}
+        """
+        try:
+            priority_val = int(priority)
+            if priority_val < 0 or priority_val > 10:
+                return {'success': False, 'message': 'Priority must be 0-10'}
+        except ValueError:
+            return {'success': False, 'message': 'Invalid priority value'}
+
+        hash_list = [h.strip() for h in hashes.split(',') if h.strip()]
+        if not hash_list:
+            return {'success': False, 'message': 'No hashes provided'}
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                scanInfo = dbh.scanInstanceGet(id)
+                target = scanInfo[1] if scanInfo else None
+                if not target:
+                    return {'success': False, 'message': 'Scan not found'}
+                count = 0
+                for h in hash_list:
+                    eventDetails = dbh.scanEventResultByHash(id, h)
+                    if eventDetails:
+                        dbh.findingPrioritySet(target, eventDetails[0], eventDetails[1],
+                                               eventDetails[2], priority_val,
+                                               setBy=self.currentUser() or 'MANUAL')
+                        count += 1
+                # Invalidate cache
+                _lookup_cache_key = (id, target)
+                if _lookup_cache_key in _scan_lookup_cache:
+                    del _scan_lookup_cache[_lookup_cache_key]
+                return {'success': True, 'count': count}
+            except Exception as e:
+                self.log.error(f"Error bulk setting priority: {e}", exc_info=True)
+                return {'success': False, 'message': str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def findingpriorityget(self: 'SpiderFootWebUi', id: str, resultHash: str) -> dict:
+        """Get full priority details for a finding (for detail expand)."""
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                scanInfo = dbh.scanInstanceGet(id)
+                target = scanInfo[1] if scanInfo else None
+                if not target:
+                    return {'success': False, 'message': 'Scan not found'}
+                eventDetails = dbh.scanEventResultByHash(id, resultHash)
+                if not eventDetails:
+                    return {'success': False, 'message': 'Event not found'}
+                pdata = dbh.findingPriorityGet(target, eventDetails[0], eventDetails[1], eventDetails[2])
+                return {'success': True, 'priority': pdata}
+            except Exception as e:
+                return {'success': False, 'message': str(e)}
+
+    # ------------------------------------------------------------------
+    # Finding Assignment endpoints
+    # ------------------------------------------------------------------
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def findingassign(self: 'SpiderFootWebUi', id: str, resultHash: str,
+                      assignTo: str, note: str = None) -> dict:
+        """Assign a single finding to a user.
+
+        Args:
+            id (str): scan instance ID
+            resultHash (str): event hash
+            assignTo (str): username or '*' for all-users
+            note (str): optional instruction
+        """
+        if not assignTo:
+            return {'success': False, 'message': 'assignTo is required'}
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                scanInfo = dbh.scanInstanceGet(id)
+                target = scanInfo[1] if scanInfo else None
+                if not target:
+                    return {'success': False, 'message': 'Scan not found'}
+                eventDetails = dbh.scanEventResultByHash(id, resultHash)
+                if not eventDetails:
+                    return {'success': False, 'message': 'Event not found'}
+                dbh.findingAssignmentSet(target, eventDetails[0], eventDetails[1],
+                                         eventDetails[2], assignTo,
+                                         assignedBy=self.currentUser() or 'system',
+                                         note=note)
+                _lookup_cache_key = (id, target)
+                if _lookup_cache_key in _scan_lookup_cache:
+                    del _scan_lookup_cache[_lookup_cache_key]
+                return {'success': True}
+            except Exception as e:
+                self.log.error(f"Error assigning finding: {e}", exc_info=True)
+                return {'success': False, 'message': str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def findingassignbulk(self: 'SpiderFootWebUi', id: str, hashes: str,
+                          assignTo: str, note: str = None) -> dict:
+        """Bulk assign findings from toolbar."""
+        if not assignTo:
+            return {'success': False, 'message': 'assignTo is required'}
+        hash_list = [h.strip() for h in hashes.split(',') if h.strip()]
+        if not hash_list:
+            return {'success': False, 'message': 'No hashes provided'}
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                scanInfo = dbh.scanInstanceGet(id)
+                target = scanInfo[1] if scanInfo else None
+                if not target:
+                    return {'success': False, 'message': 'Scan not found'}
+                count = 0
+                for h in hash_list:
+                    eventDetails = dbh.scanEventResultByHash(id, h)
+                    if eventDetails:
+                        dbh.findingAssignmentSet(target, eventDetails[0], eventDetails[1],
+                                                 eventDetails[2], assignTo,
+                                                 assignedBy=self.currentUser() or 'system',
+                                                 note=note)
+                        count += 1
+                _lookup_cache_key = (id, target)
+                if _lookup_cache_key in _scan_lookup_cache:
+                    del _scan_lookup_cache[_lookup_cache_key]
+                return {'success': True, 'count': count}
+            except Exception as e:
+                return {'success': False, 'message': str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def findingassignstatus(self: 'SpiderFootWebUi', id: str, resultHash: str,
+                            assignedTo: str, status: str) -> dict:
+        """Update assignment status (OPEN/IN_PROGRESS/DONE)."""
+        if status not in ('OPEN', 'IN_PROGRESS', 'DONE'):
+            return {'success': False, 'message': 'Invalid status'}
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                scanInfo = dbh.scanInstanceGet(id)
+                target = scanInfo[1] if scanInfo else None
+                if not target:
+                    return {'success': False, 'message': 'Scan not found'}
+                eventDetails = dbh.scanEventResultByHash(id, resultHash)
+                if not eventDetails:
+                    return {'success': False, 'message': 'Event not found'}
+                dbh.findingAssignmentUpdateStatus(target, eventDetails[0], eventDetails[1],
+                                                  eventDetails[2], assignedTo, status)
+                return {'success': True}
+            except Exception as e:
+                return {'success': False, 'message': str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def findingassignments(self: 'SpiderFootWebUi', id: str = None, user: str = None,
+                           count_only: str = None) -> object:
+        """List assignments for a scan or user.
+
+        Args:
+            id (str): scan ID (filter by scan)
+            user (str): username (filter by user)
+            count_only (str): if '1', return only counts
+        """
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                if count_only == '1':
+                    username = user or self.currentUser() or 'system'
+                    counts = dbh.findingAssignmentCounts(username)
+                    return {'success': True, 'counts': counts}
+
+                if user:
+                    assignments = dbh.findingAssignmentsForUser(user)
+                elif id:
+                    scanInfo = dbh.scanInstanceGet(id)
+                    target = scanInfo[1] if scanInfo else None
+                    if not target:
+                        return {'success': False, 'message': 'Scan not found'}
+                    raw = dbh.findingAssignmentsFullForTarget(target)
+                    assignments = [{'event_type': r[0], 'event_data': r[1], 'source_data': r[2],
+                                    'assigned_to': r[3], 'assigned_by': r[4], 'status': r[5],
+                                    'note': r[6], 'date_assigned': r[7], 'date_updated': r[8]}
+                                   for r in raw]
+                else:
+                    username = self.currentUser() or 'system'
+                    assignments = dbh.findingAssignmentsForUser(username)
+
+                return {'success': True, 'assignments': assignments}
+            except Exception as e:
+                return {'success': False, 'message': str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def mytasks(self: 'SpiderFootWebUi') -> dict:
+        """My Tasks data endpoint — returns assignments with priority info."""
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                username = self.currentUser() or 'system'
+                assignments = dbh.findingAssignmentsForUser(username)
+                counts = dbh.findingAssignmentCounts(username)
+
+                # Enrich with priority data
+                for a in assignments:
+                    try:
+                        pdata = dbh.findingPriorityGet(a['target'], a['event_type'],
+                                                       a['event_data'], a['source_data'])
+                        a['priority'] = pdata['priority'] if pdata else 0
+                    except Exception:
+                        a['priority'] = 0
+
+                # Sort by priority DESC
+                assignments.sort(key=lambda x: x.get('priority', 0), reverse=True)
+
+                return {
+                    'success': True,
+                    'assignments': assignments,
+                    'counts': counts,
+                }
+            except Exception as e:
+                return {'success': False, 'message': str(e)}
+
+    @cherrypy.expose
+    def mytaskspage(self: 'SpiderFootWebUi') -> str:
+        """Render the My Tasks page."""
+        templ = Template(filename='spiderfoot/templates/mytasks.tmpl', lookup=self.lookup)
+        return templ.render(
+            pageid='MYTASKS',
+            docroot=self.docroot,
+            user_role=self.currentUserRole(),
+            user=self.currentUser(),
+            version=__version__,
+        )
+
     @cherrypy.expose
     def scanfindingsexport(self: 'SpiderFootWebUi', id: str, filetype: str = "xlsx", report: str = "basic") -> str:
         """Export findings and correlations from a scan.
@@ -10897,6 +11294,8 @@ class SpiderFootWebUi:
                 targetValidated = _cached_lookup['targetValidated']
                 knownAssets = _cached_lookup['knownAssets']
                 rowNotes = _cached_lookup.get('rowNotes', {}).get(eventType, {})
+                findingPriorities = _cached_lookup.get('findingPriorities', {})
+                findingAssignments = _cached_lookup.get('findingAssignments', {})
             else:
                 # Get all target-level false positives and validated entries for fast lookup
                 targetFps = set()
@@ -10924,11 +11323,29 @@ class SpiderFootWebUi:
                     except Exception:
                         pass  # Table may not exist in older databases
 
+                # Bulk load finding priorities for this target
+                findingPriorities = {}
+                if target:
+                    try:
+                        findingPriorities = dbh.findingPrioritiesForTarget(target)
+                    except Exception:
+                        pass
+
+                # Bulk load finding assignments for this target
+                findingAssignments = {}
+                if target:
+                    try:
+                        findingAssignments = dbh.findingAssignmentsForTarget(target)
+                    except Exception:
+                        pass
+
                 # Store in cache
                 if _lookup_cache_key:
                     if _lookup_cache_key not in _scan_lookup_cache:
-                        _scan_lookup_cache[_lookup_cache_key] = {'targetFps': targetFps, 'targetValidated': targetValidated, 'knownAssets': knownAssets, 'rowNotes': {}, 'ts': time.time()}
+                        _scan_lookup_cache[_lookup_cache_key] = {'targetFps': targetFps, 'targetValidated': targetValidated, 'knownAssets': knownAssets, 'rowNotes': {}, 'findingPriorities': {}, 'findingAssignments': {}, 'ts': time.time()}
                     _scan_lookup_cache[_lookup_cache_key]['rowNotes'][eventType] = rowNotes
+                    _scan_lookup_cache[_lookup_cache_key]['findingPriorities'] = findingPriorities
+                    _scan_lookup_cache[_lookup_cache_key]['findingAssignments'] = findingAssignments
                     _scan_lookup_cache[_lookup_cache_key]['ts'] = time.time()
 
             # Pre-compute known asset matching sets
@@ -11010,6 +11427,11 @@ class SpiderFootWebUi:
                 # Look up analyst row note
                 rowNote = rowNotes.get((eventTypeRaw, eventDataRaw, sourceDataRaw), None)
 
+                # Look up finding priority and assignments
+                rowPriority = findingPriorities.get((eventTypeRaw, eventDataRaw, sourceDataRaw), 0)
+                rowAssignees = findingAssignments.get((eventTypeRaw, eventDataRaw, sourceDataRaw), None)
+                assignedToStr = ','.join(rowAssignees) if rowAssignees else None
+
                 retdata.append([
                     lastseen,
                     html.escape(row[1]),
@@ -11027,7 +11449,9 @@ class SpiderFootWebUi:
                     row[15],  # Index 13: imported_from_scan (scan ID if imported, None otherwise)
                     isKnownAsset,  # Index 14: known asset match (0=no, 1=match)
                     row[16] if len(row) > 16 else 0,  # Index 15: tracking (0=OPEN, 1=CLOSED, 2=TICKETED)
-                    rowNote  # Index 16: analyst row note (text or null)
+                    rowNote,  # Index 16: analyst row note (text or null)
+                    rowPriority,  # Index 17: finding priority (0-10)
+                    assignedToStr  # Index 18: comma-separated assignees, '*', or null
                 ])
 
             self.log.info(f"Event results: scan={id} type={eventType} rows={len(retdata)}")
@@ -12454,6 +12878,12 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             except Exception:
                 known_assets = {}
 
+            # Fetch priorities for this target
+            try:
+                triagePriorities = dbh.findingPrioritiesForTarget(target)
+            except Exception:
+                triagePriorities = {}
+
             # Build the triage package
             package = build_triage_export(
                 scan_id=id,
@@ -12462,6 +12892,7 @@ This is a placeholder MCP report. Integration with actual MCP server required.
                 seed_targets=[target],
                 known_assets=known_assets,
                 results=results,
+                priorities=triagePriorities,
             )
 
         # Return as downloadable JSON file
@@ -12743,6 +13174,12 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             except Exception:
                 type_comments_raw = []
 
+            # Get existing priorities
+            try:
+                existing_priorities = dbh.findingPrioritiesFullForTarget(target)
+            except Exception:
+                existing_priorities = {}
+
             # Build discovery paths for high-risk findings (risk >= 2)
             discovery_paths = {}
             for row in results:
@@ -12811,6 +13248,7 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             is_fp = (event_type, event_data) in fp_set
             is_validated = (event_type, event_data) in val_set
 
+            prio_data = existing_priorities.get((event_type, event_data, row[2]))
             finding = {
                 "type": event_type,
                 "type_name": row[10] if len(row) > 10 else event_type,
@@ -12824,6 +13262,7 @@ This is a placeholder MCP report. Integration with actual MCP server required.
                 "is_false_positive": is_fp,
                 "is_validated": is_validated,
                 "has_existing_note": (event_type, event_data, row[2]) in existing_notes,
+                "existing_priority": prio_data['priority'] if prio_data else None,
             }
 
             # Attach discovery path if available
@@ -12856,6 +13295,10 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             },
             "correlations": correlations_serial,
             "analyst_type_comments": type_comments,
+            "existing_priorities": {
+                f"{k[0]}|{k[1]}|{k[2]}": v['priority']
+                for k, v in existing_priorities.items()
+            } if existing_priorities else {},
             "grade": {
                 "current": {
                     "overall_score": current_grade['overall_score'],
@@ -12946,18 +13389,34 @@ This is a placeholder MCP report. Integration with actual MCP server required.
         lines.append("Write your output to `enrichments.json` with this exact structure:\n")
         lines.append("```json")
         lines.append('{')
-        lines.append('  "enrichment_version": "1.0",')
+        lines.append('  "enrichment_version": "1.1",')
         lines.append(f'  "scan_id": "{scan_id}",')
         lines.append('  "enrichments": [')
         lines.append('    {')
         lines.append('      "type": "EVENT_TYPE",')
         lines.append('      "data": "the exact event data value",')
         lines.append('      "source": "the exact source data value",')
-        lines.append('      "note": "Your insight here"')
+        lines.append('      "note": "Your insight here",')
+        lines.append('      "priority": 7,')
+        lines.append('      "priority_reason": "Brief justification for the score"')
         lines.append('    }')
         lines.append('  ]')
         lines.append('}')
         lines.append("```\n")
+        lines.append("## Priority Scoring Guide\n")
+        lines.append("For each finding, assign a `priority` score (1-10) and a brief `priority_reason`:\n")
+        lines.append("| Score | Meaning | Examples |")
+        lines.append("|-------|---------|----------|")
+        lines.append("| **10** | Active exploitation / credential exposure / unauth admin | Leaked API keys, exposed admin panels with default creds |")
+        lines.append("| **8-9** | Known CVE with exploit / exposed database / leaked secrets | Open MongoDB, CVE with public exploit, cloud keys in repo |")
+        lines.append("| **6-7** | Validated security issue / notable exposure | Misconfigured CORS, exposed internal services, weak TLS |")
+        lines.append("| **4-5** | Worth investigating / possible misconfiguration | Unusual open ports, outdated software, DNS misconfig |")
+        lines.append("| **1-3** | Informational / minimal risk | WHOIS records, standard DNS entries, passive data |")
+        lines.append("")
+        lines.append("**Scoring factors:** correlation risk level, event type severity, confidence score,")
+        lines.append("known asset match (higher if affecting confirmed infrastructure), position in attack chain")
+        lines.append("(findings that enable further exploitation score higher).\n")
+        lines.append("Skip `priority` for findings marked `is_false_positive: true`.\n")
         lines.append("**IMPORTANT**: The `type`, `data`, and `source` fields must match the finding EXACTLY")
         lines.append("(they are used as keys to store the note). Copy them verbatim from findings.json.\n")
         lines.append("## Batching\n")
@@ -13120,17 +13579,46 @@ This is a placeholder MCP report. Integration with actual MCP server required.
                 'errors': 0,
             }
 
+            stats['priorities_set'] = 0
+
             for entry in enrich_data['enrichments']:
                 event_type = entry.get('type', '')
                 event_data = entry.get('data', '')
                 source_data = entry.get('source', '')
                 note = (entry.get('note') or '').strip()
 
-                if not note or not event_type or not event_data:
+                if not event_type or not event_data:
                     stats['errors'] += 1
                     continue
 
                 key = (event_type, event_data, source_data if source_data else None)
+
+                # Process priority if present
+                ai_priority = entry.get('priority')
+                ai_reason = entry.get('priority_reason', '')
+                if ai_priority is not None:
+                    try:
+                        ai_priority_val = int(ai_priority)
+                        if 1 <= ai_priority_val <= 10:
+                            # Only set if no manual override exists
+                            existing_p = dbh.findingPriorityGet(
+                                target, event_type, event_data,
+                                source_data if source_data else None)
+                            if not existing_p or existing_p['set_by'] == 'AI':
+                                dbh.findingPrioritySet(
+                                    target, event_type, event_data,
+                                    source_data if source_data else None,
+                                    ai_priority_val, setBy='AI',
+                                    aiPriority=ai_priority_val, aiReason=ai_reason)
+                                stats['priorities_set'] += 1
+                    except (ValueError, Exception):
+                        pass
+
+                if not note:
+                    if ai_priority is None:
+                        stats['errors'] += 1
+                    continue
+
                 has_existing = key in existing_notes
 
                 if has_existing and not overwrite:
@@ -13331,8 +13819,13 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             # ── Build scan_results.csv (full_scored, FPs excluded) ──
             results = dbh.scanResultEvent(id, 'ALL')
             targetFps = set()
+            analysisPriorities = {}
             try:
                 targetFps = dbh.targetFalsePositivesForTarget(target)
+            except Exception:
+                pass
+            try:
+                analysisPriorities = dbh.findingPrioritiesForTarget(target)
             except Exception:
                 pass
 
@@ -13341,7 +13834,7 @@ This is a placeholder MCP report. Integration with actual MCP server required.
             writer = csv.writer(csv_buf, dialect='excel')
             writer.writerow([
                 "Updated", "Type", "Module", "Source", "F/P", "Tracking",
-                "Confidence", "Visibility", "Risk", "Data"
+                "Priority", "Confidence", "Visibility", "Risk", "Data"
             ])
             result_count = 0
             for row in (results or []):
@@ -13354,9 +13847,10 @@ This is a placeholder MCP report. Integration with actual MCP server required.
                 datafield = str(row[1]).replace("<SFURL>", "").replace("</SFURL>", "").replace("\x00", "")
                 event_type = translate_event_type(str(row[4]))
                 tracking_label = tracking_labels.get(row[16], 'OPEN')
+                prio = analysisPriorities.get((str(row[4]), str(row[1]), str(row[2])), 0)
                 writer.writerow([
                     lastseen, event_type, str(row[3]), str(row[2]),
-                    fp_flag, tracking_label, row[5], row[6], row[7], datafield
+                    fp_flag, tracking_label, prio, row[5], row[6], row[7], datafield
                 ])
                 result_count += 1
 
