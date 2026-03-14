@@ -59,7 +59,7 @@ TRIAGE_INSTRUCTIONS = {
 
 
 def build_triage_export(scan_id, scan_name, scan_target, seed_targets,
-                        known_assets, results, event_types=None):
+                        known_assets, results, event_types=None, priorities=None):
     """Build the triage export JSON package.
 
     Args:
@@ -89,6 +89,9 @@ def build_triage_export(scan_id, scan_name, scan_target, seed_targets,
         # 9=source_event_hash, 10=event_descr, 11=event_type,
         # 12=scan_instance_id, 13=false_positive, 14=parent_fp,
         # 15=imported_from_scan, 16=tracking
+        prio = 0
+        if priorities:
+            prio = priorities.get((row[4], str(row[1]), str(row[2])), 0)
         formatted_results.append({
             "id": row[8],               # hash (unique identifier)
             "module": row[3],           # generating module
@@ -101,6 +104,7 @@ def build_triage_export(scan_id, scan_name, scan_target, seed_targets,
             "visibility": row[6],       # visibility 0-100
             "risk": row[7],             # risk 0-100
             "fp_status": row[13],       # current FP flag (0=unreviewed, 1=FP, 2=validated)
+            "priority": prio,           # existing priority score (0-10)
         })
 
     instructions = dict(TRIAGE_INSTRUCTIONS)

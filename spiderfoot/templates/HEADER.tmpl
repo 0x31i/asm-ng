@@ -105,6 +105,17 @@
         <span class="nav-text">Workspaces</span>
       </a>
     </li>
+    <li
+% if pageid == "MYTASKS":
+    class="active"
+% endif
+    >
+      <a id="nav-link-mytasks" href="${docroot}/mytaskspage">
+        <i class="glyphicon glyphicon-tasks nav-icon"></i>
+        <span class="nav-text">My Tasks</span>
+        <span class="badge mytasks-badge" id="mytasks-badge" style="display:none"></span>
+      </a>
+    </li>
 % if user_role == 'admin':
     <li
 % if pageid == "IMPORT":
@@ -159,6 +170,23 @@
     <script src='${docroot}/static/node_modules/tablesorter/dist/js/jquery.tablesorter.widgets.min.js'></script>
     <script src="${docroot}/static/node_modules/d3/d3.min.js"></script>
     <script type='text/javascript' hash="sha256-0kTZzWMEh3cdgCMVytlY1E8rg7oO13eyLa+kvyAhRmo=">sf.updateTooltips();</script>
+    <script type='text/javascript'>
+    // Load My Tasks badge count
+    (function() {
+        try {
+            sf.fetchData('${docroot}/findingassignments', {count_only: '1'}, function(data) {
+                if (data && data.success && data.counts) {
+                    var open = (data.counts.OPEN || 0) + (data.counts.IN_PROGRESS || 0);
+                    var badge = document.getElementById('mytasks-badge');
+                    if (badge && open > 0) {
+                        badge.textContent = open;
+                        badge.style.display = 'inline-block';
+                    }
+                }
+            });
+        } catch(e) {}
+    })();
+    </script>
 
     <div class="container" id="mainbody" style='padding-bottom: 50px;'>
 

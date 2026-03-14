@@ -413,6 +413,38 @@ class SpiderFootDb:
             classifications TEXT \
         )",
         "CREATE INDEX idx_triage_history_target ON tbl_triage_history (seed_target)",
+        "CREATE TABLE IF NOT EXISTS tbl_finding_priority ( \
+            id              INTEGER PRIMARY KEY AUTOINCREMENT, \
+            target          VARCHAR NOT NULL, \
+            event_type      VARCHAR NOT NULL, \
+            event_data      VARCHAR NOT NULL, \
+            source_data     VARCHAR, \
+            priority        INT NOT NULL DEFAULT 0, \
+            ai_priority     INT, \
+            ai_reason       VARCHAR, \
+            set_by          VARCHAR NOT NULL DEFAULT 'MANUAL', \
+            date_modified   INT NOT NULL, \
+            UNIQUE(target, event_type, event_data, source_data) \
+        )",
+        "CREATE INDEX idx_finding_priority_target ON tbl_finding_priority (target)",
+        "CREATE INDEX idx_finding_priority_lookup ON tbl_finding_priority (target, event_type, event_data, source_data)",
+        "CREATE TABLE IF NOT EXISTS tbl_finding_assignments ( \
+            id              INTEGER PRIMARY KEY AUTOINCREMENT, \
+            target          VARCHAR NOT NULL, \
+            event_type      VARCHAR NOT NULL, \
+            event_data      VARCHAR NOT NULL, \
+            source_data     VARCHAR, \
+            assigned_to     VARCHAR NOT NULL, \
+            assigned_by     VARCHAR NOT NULL, \
+            status          VARCHAR NOT NULL DEFAULT 'OPEN', \
+            note            VARCHAR, \
+            date_assigned   INT NOT NULL, \
+            date_updated    INT NOT NULL, \
+            UNIQUE(target, event_type, event_data, source_data, assigned_to) \
+        )",
+        "CREATE INDEX idx_finding_assignments_target ON tbl_finding_assignments (target)",
+        "CREATE INDEX idx_finding_assignments_user ON tbl_finding_assignments (assigned_to, status)",
+        "CREATE INDEX idx_finding_assignments_lookup ON tbl_finding_assignments (target, event_type, event_data, source_data)",
     ]
 
     eventDetails = [
@@ -1383,6 +1415,34 @@ class SpiderFootDb:
                             self.dbh.execute(qry)
                     self.conn.commit()
                     _log.info("Created tbl_triage_history table")
+                except DatabaseError:
+                    pass
+
+            # Migration: Create tbl_finding_priority table
+            try:
+                self.dbh.execute("SELECT COUNT(*) FROM tbl_finding_priority")
+            except DatabaseError:
+                try:
+                    schema = get_pg_schema_queries(self.createSchemaQueries)
+                    for qry in schema:
+                        if "tbl_finding_priority" in qry:
+                            self.dbh.execute(qry)
+                    self.conn.commit()
+                    _log.info("Created tbl_finding_priority table")
+                except DatabaseError:
+                    pass
+
+            # Migration: Create tbl_finding_assignments table
+            try:
+                self.dbh.execute("SELECT COUNT(*) FROM tbl_finding_assignments")
+            except DatabaseError:
+                try:
+                    schema = get_pg_schema_queries(self.createSchemaQueries)
+                    for qry in schema:
+                        if "tbl_finding_assignments" in qry:
+                            self.dbh.execute(qry)
+                    self.conn.commit()
+                    _log.info("Created tbl_finding_assignments table")
                 except DatabaseError:
                     pass
 
@@ -5988,6 +6048,33 @@ class SpiderFootDb:
                 raise IOError(
                     "Unable to create correlation result in database") from e
 
+        # Auto-priority from correlations (Enhancement #1):
+        # CRITICAL → priority 9, HIGH → priority 7 (only upgrades, never downgrades)
+        auto_prio = 0
+        if ruleRisk and ruleRisk.upper() == 'CRITICAL':
+            auto_prio = 9
+        elif ruleRisk and ruleRisk.upper() == 'HIGH':
+            auto_prio = 7
+        if auto_prio > 0:
+            try:
+                scanInfo = self.scanInstanceGet(instanceId)
+                target = scanInfo[1] if scanInfo else None
+                if target and eventHashes:
+                    for eh in eventHashes:
+                        try:
+                            evt = self.scanEventResultByHash(instanceId, eh)
+                            if evt:
+                                existing = self.findingPriorityGet(target, evt[0], evt[1], evt[2])
+                                if not existing or existing['priority'] < auto_prio:
+                                    self.findingPrioritySet(
+                                        target, evt[0], evt[1], evt[2],
+                                        auto_prio, setBy='CORRELATION',
+                                        aiReason=f"Auto-set from {ruleRisk} correlation: {correlationTitle}")
+                        except Exception:
+                            pass
+            except Exception:
+                pass  # Non-critical
+
         return str(correlation_id)
 
     def deleteCorrelationsByRule(self, instanceId: str, ruleId: str) -> int:
@@ -8796,3 +8883,279 @@ class SpiderFootDb:
             'scan': self.logPurge('tbl_scan_log', scan_days, time_column='generated'),
             'request': self.logPurge('tbl_request_log', request_days),
         }
+
+    # ------------------------------------------------------------------
+    # Finding Priority CRUD
+    # ------------------------------------------------------------------
+
+    def findingPrioritySet(self, target: str, eventType: str, eventData: str,
+                           sourceData: str, priority: int, setBy: str = 'MANUAL',
+                           aiPriority: int = None, aiReason: str = None) -> bool:
+        """Upsert a finding priority. Priority 0 deletes the entry.
+
+        If priority >= 8 and no assignment exists, auto-creates a '*' (all-users) assignment.
+        """
+        if priority == 0:
+            if sourceData is None:
+                qry = "DELETE FROM tbl_finding_priority WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+                params = (target, eventType, eventData)
+            else:
+                qry = "DELETE FROM tbl_finding_priority WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ?"
+                params = (target, eventType, eventData, sourceData)
+            with self.dbhLock:
+                try:
+                    self.dbh.execute(qry, params)
+                    self.conn.commit()
+                except DatabaseError as e:
+                    raise IOError("SQL error deleting finding priority") from e
+            return True
+
+        now = int(time.time() * 1000)
+        with self.dbhLock:
+            try:
+                # Delete then insert (handles NULL source_data correctly)
+                if sourceData is None:
+                    del_qry = "DELETE FROM tbl_finding_priority WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+                    self.dbh.execute(del_qry, (target, eventType, eventData))
+                else:
+                    del_qry = "DELETE FROM tbl_finding_priority WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ?"
+                    self.dbh.execute(del_qry, (target, eventType, eventData, sourceData))
+                ins_qry = "INSERT INTO tbl_finding_priority (target, event_type, event_data, source_data, priority, ai_priority, ai_reason, set_by, date_modified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                self.dbh.execute(ins_qry, (target, eventType, eventData, sourceData, priority, aiPriority, aiReason, setBy, now))
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error saving finding priority") from e
+
+        # Auto-queue: if priority >= 8, create all-users assignment if none exists
+        if priority >= 8:
+            try:
+                existing = self.findingAssignmentsForFinding(target, eventType, eventData, sourceData)
+                if not existing:
+                    self.findingAssignmentSet(target, eventType, eventData, sourceData,
+                                              assignedTo='*', assignedBy='SYSTEM')
+            except Exception:
+                pass  # Non-critical
+
+        return True
+
+    def findingPriorityGet(self, target: str, eventType: str, eventData: str, sourceData: str) -> dict:
+        """Load a single finding priority record."""
+        if sourceData is None:
+            qry = "SELECT priority, ai_priority, ai_reason, set_by, date_modified FROM tbl_finding_priority WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+            params = (target, eventType, eventData)
+        else:
+            qry = "SELECT priority, ai_priority, ai_reason, set_by, date_modified FROM tbl_finding_priority WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ?"
+            params = (target, eventType, eventData, sourceData)
+
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, params)
+                row = self.dbh.fetchone()
+                if not row:
+                    return None
+                return {
+                    'priority': row[0], 'ai_priority': row[1], 'ai_reason': row[2],
+                    'set_by': row[3], 'date_modified': row[4]
+                }
+            except DatabaseError as e:
+                raise IOError("SQL error fetching finding priority") from e
+
+    def findingPrioritiesForTarget(self, target: str) -> dict:
+        """Bulk load all finding priorities for a target.
+
+        Returns:
+            dict: {(event_type, event_data, source_data): priority_int}
+        """
+        qry = "SELECT event_type, event_data, source_data, priority FROM tbl_finding_priority WHERE target = ?"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target,))
+                rows = self.dbh.fetchall()
+                return {(r[0], r[1], r[2]): r[3] for r in rows}
+            except DatabaseError as e:
+                raise IOError("SQL error fetching priorities for target") from e
+
+    def findingPrioritiesFullForTarget(self, target: str) -> dict:
+        """Bulk load full priority records for a target (for backup/export).
+
+        Returns:
+            dict: {(event_type, event_data, source_data): {priority, ai_priority, ai_reason, set_by, date_modified}}
+        """
+        qry = "SELECT event_type, event_data, source_data, priority, ai_priority, ai_reason, set_by, date_modified FROM tbl_finding_priority WHERE target = ?"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target,))
+                rows = self.dbh.fetchall()
+                return {(r[0], r[1], r[2]): {
+                    'priority': r[3], 'ai_priority': r[4], 'ai_reason': r[5],
+                    'set_by': r[6], 'date_modified': r[7]
+                } for r in rows}
+            except DatabaseError as e:
+                raise IOError("SQL error fetching full priorities for target") from e
+
+    def findingPriorityClearAI(self, target: str) -> int:
+        """Delete all AI-generated finding priorities for a target."""
+        qry = "DELETE FROM tbl_finding_priority WHERE target = ? AND set_by = 'AI'"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target,))
+                count = self.dbh.rowcount
+                self.conn.commit()
+                return count
+            except DatabaseError as e:
+                raise IOError("SQL error clearing AI priorities") from e
+
+    def findingPriorityBulkSet(self, target: str, items: list, setBy: str = 'MANUAL') -> int:
+        """Bulk set priorities. items = [(eventType, eventData, sourceData, priority), ...]"""
+        count = 0
+        for eventType, eventData, sourceData, priority in items:
+            try:
+                self.findingPrioritySet(target, eventType, eventData, sourceData, priority, setBy=setBy)
+                count += 1
+            except Exception:
+                pass
+        return count
+
+    # ------------------------------------------------------------------
+    # Finding Assignment CRUD
+    # ------------------------------------------------------------------
+
+    def findingAssignmentSet(self, target: str, eventType: str, eventData: str,
+                             sourceData: str, assignedTo: str, assignedBy: str,
+                             note: str = None, status: str = 'OPEN') -> bool:
+        """Create or update a finding assignment."""
+        now = int(time.time() * 1000)
+        with self.dbhLock:
+            try:
+                # Delete then insert (handles NULL source_data)
+                if sourceData is None:
+                    del_qry = "DELETE FROM tbl_finding_assignments WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL AND assigned_to = ?"
+                    self.dbh.execute(del_qry, (target, eventType, eventData, assignedTo))
+                else:
+                    del_qry = "DELETE FROM tbl_finding_assignments WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ? AND assigned_to = ?"
+                    self.dbh.execute(del_qry, (target, eventType, eventData, sourceData, assignedTo))
+                ins_qry = "INSERT INTO tbl_finding_assignments (target, event_type, event_data, source_data, assigned_to, assigned_by, status, note, date_assigned, date_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                self.dbh.execute(ins_qry, (target, eventType, eventData, sourceData, assignedTo, assignedBy, status, note, now, now))
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error saving finding assignment") from e
+        return True
+
+    def findingAssignmentRemove(self, target: str, eventType: str, eventData: str,
+                                sourceData: str, assignedTo: str) -> bool:
+        """Remove a specific assignment."""
+        if sourceData is None:
+            qry = "DELETE FROM tbl_finding_assignments WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL AND assigned_to = ?"
+            params = (target, eventType, eventData, assignedTo)
+        else:
+            qry = "DELETE FROM tbl_finding_assignments WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ? AND assigned_to = ?"
+            params = (target, eventType, eventData, sourceData, assignedTo)
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, params)
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error removing finding assignment") from e
+        return True
+
+    def findingAssignmentsForTarget(self, target: str) -> dict:
+        """Bulk load all assignments for a target.
+
+        Returns:
+            dict: {(event_type, event_data, source_data): [assigned_to, ...]}
+        """
+        qry = "SELECT event_type, event_data, source_data, assigned_to FROM tbl_finding_assignments WHERE target = ? AND status != 'DONE'"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target,))
+                rows = self.dbh.fetchall()
+                result = {}
+                for r in rows:
+                    key = (r[0], r[1], r[2])
+                    result.setdefault(key, []).append(r[3])
+                return result
+            except DatabaseError as e:
+                raise IOError("SQL error fetching assignments for target") from e
+
+    def findingAssignmentsForFinding(self, target: str, eventType: str, eventData: str, sourceData: str) -> list:
+        """Get all assignments for a specific finding."""
+        if sourceData is None:
+            qry = "SELECT assigned_to, assigned_by, status, note, date_assigned, date_updated FROM tbl_finding_assignments WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
+            params = (target, eventType, eventData)
+        else:
+            qry = "SELECT assigned_to, assigned_by, status, note, date_assigned, date_updated FROM tbl_finding_assignments WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ?"
+            params = (target, eventType, eventData, sourceData)
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, params)
+                rows = self.dbh.fetchall()
+                return [{'assigned_to': r[0], 'assigned_by': r[1], 'status': r[2],
+                         'note': r[3], 'date_assigned': r[4], 'date_updated': r[5]} for r in rows]
+            except DatabaseError as e:
+                raise IOError("SQL error fetching assignments for finding") from e
+
+    def findingAssignmentsForUser(self, assignedTo: str, status: str = None) -> list:
+        """Get all assignments for a user (or '*' for all-users queue).
+
+        Returns list of dicts with target, event_type, event_data, source_data, etc.
+        """
+        if status:
+            qry = "SELECT target, event_type, event_data, source_data, assigned_to, assigned_by, status, note, date_assigned, date_updated FROM tbl_finding_assignments WHERE (assigned_to = ? OR assigned_to = '*') AND status = ? ORDER BY date_assigned DESC"
+            params = (assignedTo, status)
+        else:
+            qry = "SELECT target, event_type, event_data, source_data, assigned_to, assigned_by, status, note, date_assigned, date_updated FROM tbl_finding_assignments WHERE (assigned_to = ? OR assigned_to = '*') ORDER BY date_assigned DESC"
+            params = (assignedTo,)
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, params)
+                rows = self.dbh.fetchall()
+                return [{'target': r[0], 'event_type': r[1], 'event_data': r[2],
+                         'source_data': r[3], 'assigned_to': r[4], 'assigned_by': r[5],
+                         'status': r[6], 'note': r[7], 'date_assigned': r[8],
+                         'date_updated': r[9]} for r in rows]
+            except DatabaseError as e:
+                raise IOError("SQL error fetching assignments for user") from e
+
+    def findingAssignmentUpdateStatus(self, target: str, eventType: str, eventData: str,
+                                      sourceData: str, assignedTo: str, status: str) -> bool:
+        """Update status of a finding assignment (OPEN/IN_PROGRESS/DONE)."""
+        if status not in ('OPEN', 'IN_PROGRESS', 'DONE'):
+            raise ValueError(f"Invalid status: {status}")
+        now = int(time.time() * 1000)
+        if sourceData is None:
+            qry = "UPDATE tbl_finding_assignments SET status = ?, date_updated = ? WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL AND assigned_to = ?"
+            params = (status, now, target, eventType, eventData, assignedTo)
+        else:
+            qry = "UPDATE tbl_finding_assignments SET status = ?, date_updated = ? WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ? AND assigned_to = ?"
+            params = (status, now, target, eventType, eventData, sourceData, assignedTo)
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, params)
+                self.conn.commit()
+            except DatabaseError as e:
+                raise IOError("SQL error updating assignment status") from e
+        return True
+
+    def findingAssignmentCounts(self, assignedTo: str) -> dict:
+        """Get assignment counts by status for a user."""
+        qry = "SELECT status, COUNT(*) FROM tbl_finding_assignments WHERE (assigned_to = ? OR assigned_to = '*') GROUP BY status"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (assignedTo,))
+                rows = self.dbh.fetchall()
+                counts = {'OPEN': 0, 'IN_PROGRESS': 0, 'DONE': 0}
+                for r in rows:
+                    counts[r[0]] = r[1]
+                return counts
+            except DatabaseError as e:
+                raise IOError("SQL error fetching assignment counts") from e
+
+    def findingAssignmentsFullForTarget(self, target: str) -> list:
+        """Get all assignment records for a target (for backup/export)."""
+        qry = "SELECT event_type, event_data, source_data, assigned_to, assigned_by, status, note, date_assigned, date_updated FROM tbl_finding_assignments WHERE target = ? ORDER BY date_assigned DESC"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target,))
+                return self.dbh.fetchall()
+            except DatabaseError as e:
+                raise IOError("SQL error fetching full assignments for target") from e
