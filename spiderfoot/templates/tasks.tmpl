@@ -828,27 +828,64 @@ function autoAssign(reset) {
 function autoRankTypes() {
     var overlay = document.getElementById('rank-overlay');
     var body = document.getElementById('rank-body');
-    body.innerHTML = 'ANALYZING EVENT TYPES...';
     overlay.classList.add('visible');
-    sf.fetchData('${docroot}/typeassignairank', {target: _currentTarget}, function(data) {
-        if (!data || !data.success) {
-            body.innerHTML = '<div style="color:#ef4444;text-shadow:0 0 8px rgba(239,68,68,0.5)">FAILED: ' + (data ? sf.escapeHtml(data.message) : 'ERROR') + '</div>';
-            return;
-        }
-        var ranked = data.ranked_types || [];
-        var html = '';
-        for (var i = 0; i < ranked.length; i++) {
-            var r = ranked[i];
-            html += '<div class="rank-row">';
-            html += '<span class="rank-num">#' + r.rank + '</span>';
-            html += '<span class="rank-type">' + sf.escapeHtml(r.event_type) + '</span>';
-            html += '<span class="rank-cat">' + sf.escapeHtml(r.category) + '</span>';
-            html += '</div>';
-            html += '<div style="padding:0 0 6px 48px"><span class="rank-reason">' + sf.escapeHtml(r.reason) + '</span></div>';
-        }
-        if (!html) html = '<div class="tasks-empty" style="padding:20px">NO TYPES TO RANK</div>';
-        body.innerHTML = html;
-    });
+
+    if (!_typeSummary || !_typeSummary.length) {
+        body.innerHTML = '<div style="color:#ef4444;text-shadow:0 0 8px rgba(239,68,68,0.5)">NO SCAN DATA LOADED — SELECT A TARGET FIRST</div>';
+        return;
+    }
+
+    // Category weights (mirrors grade_config)
+    var CAT_WEIGHTS = {
+        'Network Security': 1.0, 'Web App Security': 1.0, 'AI Security': 0.9,
+        'Information Leakage': 0.85, 'General Health': 0.7, 'External Account Exposure': 0.6,
+        'DNS Health': 0.5, 'IP Reputation': 0.8, 'Information / Reference': 0.2
+    };
+
+    // Severity rank defaults per category (1=critical, 5=info)
+    var CAT_DEFAULT_RANK = {
+        'Network Security': 2, 'Web App Security': 2, 'AI Security': 2,
+        'Information Leakage': 3, 'IP Reputation': 2, 'General Health': 4,
+        'External Account Exposure': 3, 'DNS Health': 4, 'Information / Reference': 5
+    };
+
+    var ranked = [];
+    for (var i = 0; i < _typeSummary.length; i++) {
+        var row = _typeSummary[i];
+        var et = row[0];
+        var count = row[3] || 0;
+        var cat = (row.length > 6 && row[6]) ? row[6] : getTypeCategory(et);
+        var catWeight = CAT_WEIGHTS[cat] || 0.2;
+        var rank = CAT_DEFAULT_RANK[cat] || 5;
+
+        // Higher-severity types within categories
+        if (et.indexOf('CRITICAL') !== -1 || et.indexOf('VULNS') !== -1) rank = 1;
+        else if (et.indexOf('HIGH') !== -1 || et === 'EXTERNAL_VULNERABILITIES') rank = 1;
+        else if (et.indexOf('COMPROMISED') !== -1 || et.indexOf('MALICIOUS') !== -1) rank = 1;
+        else if (et.indexOf('BLACKLISTED') !== -1) rank = 2;
+
+        var score = (catWeight * 100) + ((6 - rank) * 10) + Math.min(count, 50);
+        ranked.push({
+            event_type: et, category: cat, count: count,
+            rank: rank, score: Math.round(score * 10) / 10,
+            reason: count + ' findings in ' + cat + ' (severity ' + rank + ', weight ' + catWeight + ')'
+        });
+    }
+
+    ranked.sort(function(a, b) { return b.score - a.score; });
+
+    var html = '';
+    for (var i = 0; i < ranked.length; i++) {
+        var r = ranked[i];
+        html += '<div class="rank-row">';
+        html += '<span class="rank-num">#' + (i + 1) + '</span>';
+        html += '<span class="rank-type">' + sf.escapeHtml(r.event_type) + '</span>';
+        html += '<span class="rank-cat">' + sf.escapeHtml(r.category) + '</span>';
+        html += '</div>';
+        html += '<div style="padding:0 0 6px 48px"><span class="rank-reason">' + sf.escapeHtml(r.reason) + '</span></div>';
+    }
+    if (!html) html = '<div class="tasks-empty" style="padding:20px">NO TYPES TO RANK</div>';
+    body.innerHTML = html;
 }
 
 // Category mapping (client-side, mirrors grade_config)
