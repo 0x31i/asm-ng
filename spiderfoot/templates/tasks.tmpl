@@ -605,32 +605,42 @@ function loadAdminBoard() {
     document.getElementById('admin-toolbar').style.display = 'flex';
     document.getElementById('admin-content').style.display = 'flex';
 
-    // Load assignments for this target
+    // Load assignments (independent — failure here should not block scan data)
     sf.fetchData('${docroot}/typeassignments', {target: target}, function(data) {
         _assignments = (data && data.success) ? (data.assignments || {}) : {};
-        // Load scan result summary for this target
-        sf.fetchData('${docroot}/scanlist', {}, function(scanData) {
-            if (!scanData) return;
-            // Find latest scan for this target
-            var latestScan = null;
-            for (var i = 0; i < scanData.length; i++) {
-                if (scanData[i][1] === target) {
-                    if (!latestScan || scanData[i][0] > latestScan) latestScan = scanData[i][0];
-                }
-            }
-            if (latestScan) {
-                sf.fetchData('${docroot}/scansummary', {id: latestScan, by: 'type'}, function(summary) {
-                    _typeSummary = summary || [];
-                    renderTypeBoard();
-                    renderAnalystSidebar();
-                });
-            } else {
-                _typeSummary = [];
-                renderTypeBoard();
-                renderAnalystSidebar();
-            }
-        });
+        _tryRenderBoard();
     });
+
+    // Load scan data (independent of assignments)
+    sf.fetchData('${docroot}/scanlist', {}, function(scanData) {
+        if (!scanData) {
+            _typeSummary = [];
+            _tryRenderBoard();
+            return;
+        }
+        var latestScan = null;
+        for (var i = 0; i < scanData.length; i++) {
+            if (scanData[i][1] === target) {
+                if (!latestScan || scanData[i][0] > latestScan) latestScan = scanData[i][0];
+            }
+        }
+        if (latestScan) {
+            sf.fetchData('${docroot}/scansummary', {id: latestScan, by: 'type'}, function(summary) {
+                _typeSummary = summary || [];
+                _tryRenderBoard();
+            });
+        } else {
+            _typeSummary = [];
+            _tryRenderBoard();
+        }
+    });
+}
+
+var _boardReady = {assignments: false, summary: false};
+function _tryRenderBoard() {
+    // Render whenever we have data (don't wait for both)
+    renderTypeBoard();
+    renderAnalystSidebar();
 }
 
 function renderTypeBoard() {
@@ -825,24 +835,15 @@ function autoAssign(reset) {
     });
 }
 
-function autoRankTypes() {
-    var overlay = document.getElementById('rank-overlay');
+function _renderRanking(data) {
     var body = document.getElementById('rank-body');
-    overlay.classList.add('visible');
+    if (!body) return;
 
-    if (!_typeSummary || !_typeSummary.length) {
-        body.innerHTML = '<div style="color:#ef4444;text-shadow:0 0 8px rgba(239,68,68,0.5)">NO SCAN DATA LOADED — SELECT A TARGET FIRST</div>';
-        return;
-    }
-
-    // Category weights (mirrors grade_config)
     var CAT_WEIGHTS = {
         'Network Security': 1.0, 'Web App Security': 1.0, 'AI Security': 0.9,
         'Information Leakage': 0.85, 'General Health': 0.7, 'External Account Exposure': 0.6,
         'DNS Health': 0.5, 'IP Reputation': 0.8, 'Information / Reference': 0.2
     };
-
-    // Severity rank defaults per category (1=critical, 5=info)
     var CAT_DEFAULT_RANK = {
         'Network Security': 2, 'Web App Security': 2, 'AI Security': 2,
         'Information Leakage': 3, 'IP Reputation': 2, 'General Health': 4,
@@ -850,15 +851,14 @@ function autoRankTypes() {
     };
 
     var ranked = [];
-    for (var i = 0; i < _typeSummary.length; i++) {
-        var row = _typeSummary[i];
+    for (var i = 0; i < data.length; i++) {
+        var row = data[i];
         var et = row[0];
         var count = row[3] || 0;
         var cat = (row.length > 6 && row[6]) ? row[6] : getTypeCategory(et);
         var catWeight = CAT_WEIGHTS[cat] || 0.2;
         var rank = CAT_DEFAULT_RANK[cat] || 5;
 
-        // Higher-severity types within categories
         if (et.indexOf('CRITICAL') !== -1 || et.indexOf('VULNS') !== -1) rank = 1;
         else if (et.indexOf('HIGH') !== -1 || et === 'EXTERNAL_VULNERABILITIES') rank = 1;
         else if (et.indexOf('COMPROMISED') !== -1 || et.indexOf('MALICIOUS') !== -1) rank = 1;
@@ -884,8 +884,62 @@ function autoRankTypes() {
         html += '</div>';
         html += '<div style="padding:0 0 6px 48px"><span class="rank-reason">' + sf.escapeHtml(r.reason) + '</span></div>';
     }
-    if (!html) html = '<div class="tasks-empty" style="padding:20px">NO TYPES TO RANK</div>';
+    if (!html) html = '<div style="padding:20px;color:#6b7280">NO TYPES TO RANK</div>';
     body.innerHTML = html;
+}
+
+function autoRankTypes() {
+    var overlay = document.getElementById('rank-overlay');
+    var body = document.getElementById('rank-body');
+    if (overlay) overlay.classList.add('visible');
+    if (!body) return;
+    body.innerHTML = 'RANKING...';
+
+    // If we already have scan data, render immediately
+    if (_typeSummary && _typeSummary.length > 0) {
+        _renderRanking(_typeSummary);
+        return;
+    }
+
+    // Otherwise, fetch it directly (loadAdminBoard may have failed)
+    if (!_currentTarget) {
+        body.innerHTML = '<div style="color:#ef4444">SELECT A TARGET FIRST</div>';
+        return;
+    }
+
+    // Direct fetch: get scan list, find latest scan, get summary
+    $.ajax({
+        type: 'POST', url: '${docroot}/scanlist', data: {}, dataType: 'json', timeout: 15000
+    }).done(function(scanData) {
+        if (!scanData || !scanData.length) {
+            body.innerHTML = '<div style="color:#ef4444">NO SCANS FOUND</div>';
+            return;
+        }
+        var latestScan = null;
+        for (var i = 0; i < scanData.length; i++) {
+            if (scanData[i][1] === _currentTarget) {
+                if (!latestScan || scanData[i][0] > latestScan) latestScan = scanData[i][0];
+            }
+        }
+        if (!latestScan) {
+            body.innerHTML = '<div style="color:#ef4444">NO SCAN FOR THIS TARGET</div>';
+            return;
+        }
+        $.ajax({
+            type: 'POST', url: '${docroot}/scansummary', data: {id: latestScan, by: 'type'}, dataType: 'json', timeout: 30000
+        }).done(function(summary) {
+            if (!summary || !summary.length) {
+                body.innerHTML = '<div style="color:#ef4444">NO SCAN RESULTS</div>';
+                return;
+            }
+            _typeSummary = summary;
+            _renderRanking(summary);
+        }).fail(function(xhr, status) {
+            body.innerHTML = '<div style="color:#ef4444">SCAN SUMMARY FAILED: ' + status + '</div>';
+        });
+    }).fail(function(xhr, status) {
+        body.innerHTML = '<div style="color:#ef4444">SCAN LIST FAILED: ' + status + '</div>';
+    });
 }
 
 // Category mapping (client-side, mirrors grade_config)
