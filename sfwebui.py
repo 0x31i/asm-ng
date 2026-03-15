@@ -1298,13 +1298,13 @@ class SpiderFootWebUi:
 
                 # --- FINDING_ASSIGNMENTS.csv ---
                 try:
-                    assign_rows = dbh.findingAssignmentsFullForTarget(target)
+                    assign_rows = dbh.typeAssignmentsFullForTarget(target)
                 except Exception:
                     assign_rows = []
                 _write_backup_csv(
                     zf, 'FINDING_ASSIGNMENTS.csv',
-                    ['event_type', 'event_data', 'source_data', 'assigned_to',
-                     'assigned_by', 'status', 'note', 'date_assigned', 'date_updated'],
+                    ['event_type', 'assigned_to', 'assigned_by', 'status',
+                     'note', 'date_assigned', 'date_updated'],
                     assign_rows, manifest['row_counts'], 'finding_assignments'
                 )
 
@@ -4055,7 +4055,7 @@ class SpiderFootWebUi:
         return count, errors
 
     def _restore_finding_assignments(self, dbh, zf, target):
-        """Restore FINDING_ASSIGNMENTS.csv."""
+        """Restore FINDING_ASSIGNMENTS.csv (type-level assignments)."""
         try:
             raw = zf.read('FINDING_ASSIGNMENTS.csv').decode('utf-8', errors='replace')
         except KeyError:
@@ -4065,12 +4065,14 @@ class SpiderFootWebUi:
         errors = []
         for row in reader:
             try:
-                dbh.findingAssignmentSet(
+                # Skip old finding-level rows (have event_data column)
+                if 'event_data' in row and 'event_data' in reader.fieldnames:
+                    self.log.warning("Skipping old finding-level assignment row during restore")
+                    continue
+                dbh.typeAssignmentSet(
                     target=target,
                     eventType=row.get('event_type', ''),
-                    eventData=row.get('event_data', ''),
-                    sourceData=row.get('source_data') or None,
-                    assignedTo=row.get('assigned_to', '*'),
+                    assignedTo=row.get('assigned_to', 'unknown'),
                     assignedBy=row.get('assigned_by', 'RESTORE'),
                     note=row.get('note') or None,
                     status=row.get('status', 'OPEN'),
@@ -9917,173 +9919,274 @@ class SpiderFootWebUi:
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
-    def findingassign(self: 'SpiderFootWebUi', id: str, resultHash: str,
-                      assignTo: str, note: str = None) -> dict:
-        """Assign a single finding to a user.
-
-        Args:
-            id (str): scan instance ID
-            resultHash (str): event hash
-            assignTo (str): username or '*' for all-users
-            note (str): optional instruction
-        """
-        if not assignTo:
-            return {'success': False, 'message': 'assignTo is required'}
+    def typeassign(self: 'SpiderFootWebUi', target: str, eventType: str,
+                   assignTo: str, note: str = None) -> dict:
+        """Assign a single event type to an analyst for a target."""
+        if not assignTo or not target or not eventType:
+            return {'success': False, 'message': 'target, eventType, and assignTo are required'}
         with SpiderFootDb(self.config) as dbh:
             try:
-                scanInfo = dbh.scanInstanceGet(id)
-                target = scanInfo[1] if scanInfo else None
-                if not target:
-                    return {'success': False, 'message': 'Scan not found'}
-                eventDetails = dbh.scanEventResultByHash(id, resultHash)
-                if not eventDetails:
-                    return {'success': False, 'message': 'Event not found'}
-                dbh.findingAssignmentSet(target, eventDetails[0], eventDetails[1],
-                                         eventDetails[2], assignTo,
-                                         assignedBy=self.currentUser() or 'system',
-                                         note=note)
-                _lookup_cache_key = (id, target)
-                if _lookup_cache_key in _scan_lookup_cache:
-                    del _scan_lookup_cache[_lookup_cache_key]
+                dbh.typeAssignmentSet(target, eventType, assignTo,
+                                      assignedBy=self.currentUser() or 'system',
+                                      note=note)
+                # Invalidate any cached lookups for this target
+                for k in list(_scan_lookup_cache.keys()):
+                    if k[1] == target:
+                        del _scan_lookup_cache[k]
                 return {'success': True}
             except Exception as e:
-                self.log.error(f"Error assigning finding: {e}", exc_info=True)
+                self.log.error(f"Error assigning type: {e}", exc_info=True)
                 return {'success': False, 'message': str(e)}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
-    def findingassignbulk(self: 'SpiderFootWebUi', id: str, hashes: str,
-                          assignTo: str, note: str = None) -> dict:
-        """Bulk assign findings from toolbar."""
-        if not assignTo:
-            return {'success': False, 'message': 'assignTo is required'}
-        hash_list = [h.strip() for h in hashes.split(',') if h.strip()]
-        if not hash_list:
-            return {'success': False, 'message': 'No hashes provided'}
-
+    def typeassignbulk(self: 'SpiderFootWebUi', target: str, assignments: str) -> dict:
+        """Bulk assign event types. assignments is JSON: [{eventType, assignedTo, note?}, ...]"""
+        if not target or not assignments:
+            return {'success': False, 'message': 'target and assignments are required'}
+        import json as _json
+        try:
+            items = _json.loads(assignments)
+        except Exception:
+            return {'success': False, 'message': 'Invalid JSON for assignments'}
         with SpiderFootDb(self.config) as dbh:
             try:
-                scanInfo = dbh.scanInstanceGet(id)
-                target = scanInfo[1] if scanInfo else None
-                if not target:
-                    return {'success': False, 'message': 'Scan not found'}
-                count = 0
-                for h in hash_list:
-                    eventDetails = dbh.scanEventResultByHash(id, h)
-                    if eventDetails:
-                        dbh.findingAssignmentSet(target, eventDetails[0], eventDetails[1],
-                                                 eventDetails[2], assignTo,
-                                                 assignedBy=self.currentUser() or 'system',
-                                                 note=note)
-                        count += 1
-                _lookup_cache_key = (id, target)
-                if _lookup_cache_key in _scan_lookup_cache:
-                    del _scan_lookup_cache[_lookup_cache_key]
+                count = dbh.typeAssignmentBulkSet(target, items,
+                                                   assignedBy=self.currentUser() or 'system')
+                for k in list(_scan_lookup_cache.keys()):
+                    if k[1] == target:
+                        del _scan_lookup_cache[k]
                 return {'success': True, 'count': count}
             except Exception as e:
                 return {'success': False, 'message': str(e)}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
-    def findingassignstatus(self: 'SpiderFootWebUi', id: str, resultHash: str,
-                            assignedTo: str, status: str) -> dict:
-        """Update assignment status (OPEN/IN_PROGRESS/DONE)."""
-        if status not in ('OPEN', 'IN_PROGRESS', 'DONE'):
-            return {'success': False, 'message': 'Invalid status'}
+    def typeassignremove(self: 'SpiderFootWebUi', target: str, eventType: str,
+                         assignedTo: str) -> dict:
+        """Remove a type assignment."""
+        if not target or not eventType or not assignedTo:
+            return {'success': False, 'message': 'target, eventType, and assignedTo are required'}
         with SpiderFootDb(self.config) as dbh:
             try:
-                scanInfo = dbh.scanInstanceGet(id)
-                target = scanInfo[1] if scanInfo else None
-                if not target:
-                    return {'success': False, 'message': 'Scan not found'}
-                eventDetails = dbh.scanEventResultByHash(id, resultHash)
-                if not eventDetails:
-                    return {'success': False, 'message': 'Event not found'}
-                dbh.findingAssignmentUpdateStatus(target, eventDetails[0], eventDetails[1],
-                                                  eventDetails[2], assignedTo, status)
+                dbh.typeAssignmentRemove(target, eventType, assignedTo)
+                for k in list(_scan_lookup_cache.keys()):
+                    if k[1] == target:
+                        del _scan_lookup_cache[k]
                 return {'success': True}
             except Exception as e:
                 return {'success': False, 'message': str(e)}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
-    def findingassignments(self: 'SpiderFootWebUi', id: str = None, user: str = None,
-                           count_only: str = None) -> object:
-        """List assignments for a scan or user.
-
-        Args:
-            id (str): scan ID (filter by scan)
-            user (str): username (filter by user)
-            count_only (str): if '1', return only counts
-        """
+    def typeassignstatus(self: 'SpiderFootWebUi', target: str, eventType: str,
+                         assignedTo: str, status: str) -> dict:
+        """Update type assignment status (OPEN/IN_PROGRESS/DONE)."""
+        if status not in ('OPEN', 'IN_PROGRESS', 'DONE'):
+            return {'success': False, 'message': 'Invalid status'}
+        if not target or not eventType or not assignedTo:
+            return {'success': False, 'message': 'target, eventType, and assignedTo are required'}
         with SpiderFootDb(self.config) as dbh:
             try:
-                if count_only == '1':
-                    username = user or self.currentUser() or 'system'
-                    counts = dbh.findingAssignmentCounts(username)
-                    return {'success': True, 'counts': counts}
-
-                if user:
-                    assignments = dbh.findingAssignmentsForUser(user)
-                elif id:
-                    scanInfo = dbh.scanInstanceGet(id)
-                    target = scanInfo[1] if scanInfo else None
-                    if not target:
-                        return {'success': False, 'message': 'Scan not found'}
-                    raw = dbh.findingAssignmentsFullForTarget(target)
-                    assignments = [{'event_type': r[0], 'event_data': r[1], 'source_data': r[2],
-                                    'assigned_to': r[3], 'assigned_by': r[4], 'status': r[5],
-                                    'note': r[6], 'date_assigned': r[7], 'date_updated': r[8]}
-                                   for r in raw]
-                else:
-                    username = self.currentUser() or 'system'
-                    assignments = dbh.findingAssignmentsForUser(username)
-
-                return {'success': True, 'assignments': assignments}
+                dbh.typeAssignmentUpdateStatus(target, eventType, assignedTo, status)
+                return {'success': True}
             except Exception as e:
                 return {'success': False, 'message': str(e)}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
-    def mytasks(self: 'SpiderFootWebUi') -> dict:
-        """My Tasks data endpoint — returns assignments with priority info."""
+    def typeassignments(self: 'SpiderFootWebUi', target: str = None, user: str = None,
+                        count_only: str = None) -> object:
+        """Get type assignments (by target, user, or count_only)."""
         with SpiderFootDb(self.config) as dbh:
             try:
-                username = self.currentUser() or 'system'
-                assignments = dbh.findingAssignmentsForUser(username)
-                counts = dbh.findingAssignmentCounts(username)
+                if count_only == '1':
+                    username = user or self.currentUser() or 'system'
+                    counts = dbh.typeAssignmentCounts(username)
+                    return {'success': True, 'counts': counts}
 
-                # Enrich with priority data
-                for a in assignments:
-                    try:
-                        pdata = dbh.findingPriorityGet(a['target'], a['event_type'],
-                                                       a['event_data'], a['source_data'])
-                        a['priority'] = pdata['priority'] if pdata else 0
-                    except Exception:
-                        a['priority'] = 0
-
-                # Sort by priority DESC
-                assignments.sort(key=lambda x: x.get('priority', 0), reverse=True)
-
-                return {
-                    'success': True,
-                    'assignments': assignments,
-                    'counts': counts,
-                }
+                if target:
+                    assignments = dbh.typeAssignmentsForTarget(target)
+                    return {'success': True, 'assignments': assignments}
+                elif user:
+                    assignments = dbh.typeAssignmentsForUser(user)
+                    return {'success': True, 'assignments': assignments}
+                else:
+                    username = self.currentUser() or 'system'
+                    assignments = dbh.typeAssignmentsForUser(username)
+                    return {'success': True, 'assignments': assignments}
             except Exception as e:
                 return {'success': False, 'message': str(e)}
 
     @cherrypy.expose
-    def mytaskspage(self: 'SpiderFootWebUi') -> str:
-        """Render the My Tasks page."""
-        templ = Template(filename='spiderfoot/templates/mytasks.tmpl', lookup=self.lookup)
+    @cherrypy.tools.json_out()
+    def typeassignauto(self: 'SpiderFootWebUi', target: str, reset: str = '0') -> dict:
+        """Auto-assign unassigned event types evenly across analysts."""
+        if not target:
+            return {'success': False, 'message': 'target is required'}
+        if self.currentUserRole() != 'admin':
+            return {'success': False, 'message': 'Admin only'}
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                # Get analyst users
+                users = dbh.userList()
+                analysts = [u['username'] for u in users if u['role'] == 'analyst' and u['active']]
+                if not analysts:
+                    return {'success': False, 'message': 'No active analyst users'}
+
+                # Reset if requested
+                if reset == '1':
+                    dbh.typeAssignmentBulkClear(target)
+
+                # Get existing assignments
+                existing = dbh.typeAssignmentsForTarget(target)
+                assigned_types = set(existing.keys())
+
+                # Get all event types for this target from scan results
+                # Find scans for this target
+                scans = dbh.scanInstanceList()
+                target_types = set()
+                for scan in scans:
+                    if scan[1] == target:
+                        summary = dbh.scanResultSummary(scan[0], by='type')
+                        for row in summary:
+                            target_types.add(row[0])
+
+                # Unassigned types
+                unassigned = sorted(target_types - assigned_types)
+                if not unassigned:
+                    return {'success': True, 'count': 0, 'message': 'All types already assigned'}
+
+                # Category weight ordering for distribution
+                from spiderfoot.grade_config import DEFAULT_EVENT_TYPE_GRADING, DEFAULT_GRADE_CATEGORIES
+                cat_weights = {cat: info['weight'] for cat, info in DEFAULT_GRADE_CATEGORIES.items()}
+
+                def type_weight(et):
+                    grading = DEFAULT_EVENT_TYPE_GRADING.get(et, {})
+                    cat = grading.get('category', 'Information / Reference')
+                    return cat_weights.get(cat, 0.0)
+
+                # Sort by category weight DESC
+                unassigned.sort(key=type_weight, reverse=True)
+
+                # Round-robin distribute
+                assignments = []
+                for i, et in enumerate(unassigned):
+                    analyst = analysts[i % len(analysts)]
+                    assignments.append({'eventType': et, 'assignedTo': analyst})
+
+                count = dbh.typeAssignmentBulkSet(target, assignments,
+                                                   assignedBy=self.currentUser() or 'system')
+
+                for k in list(_scan_lookup_cache.keys()):
+                    if k[1] == target:
+                        del _scan_lookup_cache[k]
+
+                return {'success': True, 'count': count, 'analysts': len(analysts)}
+            except Exception as e:
+                self.log.error(f"Auto-assign error: {e}", exc_info=True)
+                return {'success': False, 'message': str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def typeassignairank(self: 'SpiderFootWebUi', target: str) -> dict:
+        """AI-rank event types by importance for a target."""
+        if not target:
+            return {'success': False, 'message': 'target is required'}
+        if self.currentUserRole() != 'admin':
+            return {'success': False, 'message': 'Admin only'}
+
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                # Gather event type summary data across scans for this target
+                scans = dbh.scanInstanceList()
+                type_counts = {}
+                for scan in scans:
+                    if scan[1] == target:
+                        summary = dbh.scanResultSummary(scan[0], by='type')
+                        for row in summary:
+                            et = row[0]
+                            count = row[3] if len(row) > 3 else 0
+                            type_counts[et] = type_counts.get(et, 0) + count
+
+                if not type_counts:
+                    return {'success': False, 'message': 'No scan results for this target'}
+
+                # Build context for AI ranking
+                from spiderfoot.grade_config import DEFAULT_EVENT_TYPE_GRADING, DEFAULT_GRADE_CATEGORIES
+                ranked = []
+                for et, count in type_counts.items():
+                    grading = DEFAULT_EVENT_TYPE_GRADING.get(et, {})
+                    cat = grading.get('category', 'Information / Reference')
+                    cat_weight = DEFAULT_GRADE_CATEGORIES.get(cat, {}).get('weight', 0.0)
+                    rank = grading.get('rank', 5)
+                    points = abs(grading.get('points', 0))
+                    # Score: higher weight + lower rank number + more findings + more points = more important
+                    score = (cat_weight * 100) + ((6 - rank) * 10) + (min(count, 50)) + (points * 2)
+                    ranked.append({
+                        'event_type': et,
+                        'category': cat,
+                        'finding_count': count,
+                        'severity_rank': rank,
+                        'score': round(score, 1),
+                        'reason': f"{count} findings in {cat} (severity rank {rank}, weight {cat_weight})"
+                    })
+
+                ranked.sort(key=lambda x: x['score'], reverse=True)
+                for i, item in enumerate(ranked):
+                    item['rank'] = i + 1
+
+                return {'success': True, 'ranked_types': ranked}
+            except Exception as e:
+                self.log.error(f"AI rank error: {e}", exc_info=True)
+                return {'success': False, 'message': str(e)}
+
+    @cherrypy.expose
+    def taskspage(self: 'SpiderFootWebUi') -> str:
+        """Render the TASKS page."""
+        templ = Template(filename='spiderfoot/templates/tasks.tmpl', lookup=self.lookup)
         return templ.render(
-            pageid='MYTASKS',
+            pageid='TASKS',
             docroot=self.docroot,
             user_role=self.currentUserRole(),
             user=self.currentUser(),
             version=__version__,
         )
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def tasks(self: 'SpiderFootWebUi', target: str = None) -> dict:
+        """TASKS data endpoint."""
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                username = self.currentUser() or 'system'
+                role = self.currentUserRole()
+                counts = dbh.typeAssignmentCounts(username)
+
+                if role == 'admin' and target:
+                    # Admin view: all assignments for a target
+                    assignments = dbh.typeAssignmentsForTarget(target)
+                    return {'success': True, 'assignments': assignments, 'counts': counts}
+                else:
+                    # Analyst view: own assignments across targets
+                    assignments = dbh.typeAssignmentsForUser(username)
+                    return {'success': True, 'assignments': assignments, 'counts': counts}
+            except Exception as e:
+                return {'success': False, 'message': str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def analysts(self: 'SpiderFootWebUi') -> dict:
+        """List analyst users (for assignment dropdowns)."""
+        with SpiderFootDb(self.config) as dbh:
+            try:
+                users = dbh.userList()
+                analyst_list = [{'username': u['username'], 'display_name': u['display_name']}
+                                for u in users if u['role'] == 'analyst' and u['active']]
+                return {'success': True, 'analysts': analyst_list}
+            except Exception as e:
+                return {'success': False, 'message': str(e)}
 
     @cherrypy.expose
     def scanfindingsexport(self: 'SpiderFootWebUi', id: str, filetype: str = "xlsx", report: str = "basic") -> str:
@@ -11331,11 +11434,14 @@ class SpiderFootWebUi:
                     except Exception:
                         pass
 
-                # Bulk load finding assignments for this target
+                # Bulk load type-level assignments for this target
                 findingAssignments = {}
                 if target:
                     try:
-                        findingAssignments = dbh.findingAssignmentsForTarget(target)
+                        typeAssigns = dbh.typeAssignmentsForTarget(target)
+                        # Convert to simple {event_type: [usernames]} for row lookup
+                        for et, assigns in typeAssigns.items():
+                            findingAssignments[et] = [a['assigned_to'] for a in assigns if a['status'] != 'DONE']
                     except Exception:
                         pass
 
@@ -11427,9 +11533,9 @@ class SpiderFootWebUi:
                 # Look up analyst row note
                 rowNote = rowNotes.get((eventTypeRaw, eventDataRaw, sourceDataRaw), None)
 
-                # Look up finding priority and assignments
+                # Look up finding priority and type-level assignments
                 rowPriority = findingPriorities.get((eventTypeRaw, eventDataRaw, sourceDataRaw), 0)
-                rowAssignees = findingAssignments.get((eventTypeRaw, eventDataRaw, sourceDataRaw), None)
+                rowAssignees = findingAssignments.get(eventTypeRaw, None)
                 assignedToStr = ','.join(rowAssignees) if rowAssignees else None
 
                 retdata.append([

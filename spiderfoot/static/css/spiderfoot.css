@@ -11417,8 +11417,8 @@ a.btn.ob-btn-view:focus {
 .filter-btn-high-priority { color: #ef4444 !important; border-color: #ef4444 !important; }
 .filter-btn-my-tasks { color: #8b5cf6 !important; border-color: #8b5cf6 !important; }
 
-/* My Tasks nav badge */
-.mytasks-badge {
+/* TASKS nav badge */
+.tasks-badge {
   background: #ef4444;
   color: #fff;
   font-size: 10px;

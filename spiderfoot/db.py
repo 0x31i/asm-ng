@@ -432,19 +432,17 @@ class SpiderFootDb:
             id              INTEGER PRIMARY KEY AUTOINCREMENT, \
             target          VARCHAR NOT NULL, \
             event_type      VARCHAR NOT NULL, \
-            event_data      VARCHAR NOT NULL, \
-            source_data     VARCHAR, \
             assigned_to     VARCHAR NOT NULL, \
             assigned_by     VARCHAR NOT NULL, \
             status          VARCHAR NOT NULL DEFAULT 'OPEN', \
             note            VARCHAR, \
             date_assigned   INT NOT NULL, \
             date_updated    INT NOT NULL, \
-            UNIQUE(target, event_type, event_data, source_data, assigned_to) \
+            UNIQUE(target, event_type, assigned_to) \
         )",
         "CREATE INDEX idx_finding_assignments_target ON tbl_finding_assignments (target)",
         "CREATE INDEX idx_finding_assignments_user ON tbl_finding_assignments (assigned_to, status)",
-        "CREATE INDEX idx_finding_assignments_lookup ON tbl_finding_assignments (target, event_type, event_data, source_data)",
+        "CREATE INDEX idx_finding_assignments_type ON tbl_finding_assignments (target, event_type)",
     ]
 
     eventDetails = [
@@ -1432,9 +1430,26 @@ class SpiderFootDb:
                 except DatabaseError:
                     pass
 
-            # Migration: Create tbl_finding_assignments table
+            # Migration: Create or upgrade tbl_finding_assignments table (type-level)
             try:
                 self.dbh.execute("SELECT COUNT(*) FROM tbl_finding_assignments")
+                # Table exists — check if it has the old finding-level schema (event_data column)
+                try:
+                    self.dbh.execute("SELECT event_data FROM tbl_finding_assignments LIMIT 1")
+                    # Old schema detected — drop and recreate with type-level schema
+                    _log.info("Migrating tbl_finding_assignments from finding-level to type-level schema")
+                    self.dbh.execute("DROP TABLE tbl_finding_assignments")
+                    self.dbh.execute("DROP INDEX IF EXISTS idx_finding_assignments_target")
+                    self.dbh.execute("DROP INDEX IF EXISTS idx_finding_assignments_user")
+                    self.dbh.execute("DROP INDEX IF EXISTS idx_finding_assignments_lookup")
+                    schema = get_pg_schema_queries(self.createSchemaQueries)
+                    for qry in schema:
+                        if "tbl_finding_assignments" in qry:
+                            self.dbh.execute(qry)
+                    self.conn.commit()
+                    _log.info("Recreated tbl_finding_assignments with type-level schema")
+                except DatabaseError:
+                    pass  # No event_data column = already type-level schema
             except DatabaseError:
                 try:
                     schema = get_pg_schema_queries(self.createSchemaQueries)
@@ -8926,16 +8941,6 @@ class SpiderFootDb:
             except DatabaseError as e:
                 raise IOError("SQL error saving finding priority") from e
 
-        # Auto-queue: if priority >= 8, create all-users assignment if none exists
-        if priority >= 8:
-            try:
-                existing = self.findingAssignmentsForFinding(target, eventType, eventData, sourceData)
-                if not existing:
-                    self.findingAssignmentSet(target, eventType, eventData, sourceData,
-                                              assignedTo='*', assignedBy='SYSTEM')
-            except Exception:
-                pass  # Non-critical
-
         return True
 
     def findingPriorityGet(self, target: str, eventType: str, eventData: str, sourceData: str) -> dict:
@@ -9017,145 +9022,138 @@ class SpiderFootDb:
         return count
 
     # ------------------------------------------------------------------
-    # Finding Assignment CRUD
+    # Type-Level Assignment CRUD
     # ------------------------------------------------------------------
 
-    def findingAssignmentSet(self, target: str, eventType: str, eventData: str,
-                             sourceData: str, assignedTo: str, assignedBy: str,
-                             note: str = None, status: str = 'OPEN') -> bool:
-        """Create or update a finding assignment."""
+    def typeAssignmentSet(self, target: str, eventType: str, assignedTo: str,
+                          assignedBy: str, note: str = None, status: str = 'OPEN') -> bool:
+        """Assign an event type to an analyst for a target."""
         now = int(time.time() * 1000)
         with self.dbhLock:
             try:
-                # Delete then insert (handles NULL source_data)
-                if sourceData is None:
-                    del_qry = "DELETE FROM tbl_finding_assignments WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL AND assigned_to = ?"
-                    self.dbh.execute(del_qry, (target, eventType, eventData, assignedTo))
-                else:
-                    del_qry = "DELETE FROM tbl_finding_assignments WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ? AND assigned_to = ?"
-                    self.dbh.execute(del_qry, (target, eventType, eventData, sourceData, assignedTo))
-                ins_qry = "INSERT INTO tbl_finding_assignments (target, event_type, event_data, source_data, assigned_to, assigned_by, status, note, date_assigned, date_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                self.dbh.execute(ins_qry, (target, eventType, eventData, sourceData, assignedTo, assignedBy, status, note, now, now))
+                del_qry = "DELETE FROM tbl_finding_assignments WHERE target = ? AND event_type = ? AND assigned_to = ?"
+                self.dbh.execute(del_qry, (target, eventType, assignedTo))
+                ins_qry = "INSERT INTO tbl_finding_assignments (target, event_type, assigned_to, assigned_by, status, note, date_assigned, date_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                self.dbh.execute(ins_qry, (target, eventType, assignedTo, assignedBy, status, note, now, now))
                 self.conn.commit()
             except DatabaseError as e:
-                raise IOError("SQL error saving finding assignment") from e
+                raise IOError("SQL error saving type assignment") from e
         return True
 
-    def findingAssignmentRemove(self, target: str, eventType: str, eventData: str,
-                                sourceData: str, assignedTo: str) -> bool:
-        """Remove a specific assignment."""
-        if sourceData is None:
-            qry = "DELETE FROM tbl_finding_assignments WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL AND assigned_to = ?"
-            params = (target, eventType, eventData, assignedTo)
-        else:
-            qry = "DELETE FROM tbl_finding_assignments WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ? AND assigned_to = ?"
-            params = (target, eventType, eventData, sourceData, assignedTo)
+    def typeAssignmentRemove(self, target: str, eventType: str, assignedTo: str) -> bool:
+        """Remove a type assignment."""
+        qry = "DELETE FROM tbl_finding_assignments WHERE target = ? AND event_type = ? AND assigned_to = ?"
         with self.dbhLock:
             try:
-                self.dbh.execute(qry, params)
+                self.dbh.execute(qry, (target, eventType, assignedTo))
                 self.conn.commit()
             except DatabaseError as e:
-                raise IOError("SQL error removing finding assignment") from e
+                raise IOError("SQL error removing type assignment") from e
         return True
 
-    def findingAssignmentsForTarget(self, target: str) -> dict:
-        """Bulk load all assignments for a target.
+    def typeAssignmentBulkSet(self, target: str, assignments: list, assignedBy: str) -> int:
+        """Bulk assign types. assignments = [{eventType, assignedTo, note?}, ...]"""
+        count = 0
+        for item in assignments:
+            try:
+                self.typeAssignmentSet(
+                    target, item['eventType'], item['assignedTo'],
+                    assignedBy, note=item.get('note'))
+                count += 1
+            except Exception:
+                pass
+        return count
+
+    def typeAssignmentBulkClear(self, target: str) -> int:
+        """Clear all assignments for a target (for auto-assign reset)."""
+        qry = "DELETE FROM tbl_finding_assignments WHERE target = ?"
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, (target,))
+                count = self.dbh.rowcount
+                self.conn.commit()
+                return count
+            except DatabaseError as e:
+                raise IOError("SQL error clearing type assignments") from e
+
+    def typeAssignmentsForTarget(self, target: str) -> dict:
+        """All assignments for a target.
 
         Returns:
-            dict: {(event_type, event_data, source_data): [assigned_to, ...]}
+            dict: {event_type: [{assigned_to, assigned_by, status, note, date_assigned, date_updated}, ...]}
         """
-        qry = "SELECT event_type, event_data, source_data, assigned_to FROM tbl_finding_assignments WHERE target = ? AND status != 'DONE'"
+        qry = "SELECT event_type, assigned_to, assigned_by, status, note, date_assigned, date_updated FROM tbl_finding_assignments WHERE target = ? ORDER BY event_type, date_assigned DESC"
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, (target,))
                 rows = self.dbh.fetchall()
                 result = {}
                 for r in rows:
-                    key = (r[0], r[1], r[2])
-                    result.setdefault(key, []).append(r[3])
+                    result.setdefault(r[0], []).append({
+                        'assigned_to': r[1], 'assigned_by': r[2], 'status': r[3],
+                        'note': r[4], 'date_assigned': r[5], 'date_updated': r[6]
+                    })
                 return result
             except DatabaseError as e:
-                raise IOError("SQL error fetching assignments for target") from e
+                raise IOError("SQL error fetching type assignments for target") from e
 
-    def findingAssignmentsForFinding(self, target: str, eventType: str, eventData: str, sourceData: str) -> list:
-        """Get all assignments for a specific finding."""
-        if sourceData is None:
-            qry = "SELECT assigned_to, assigned_by, status, note, date_assigned, date_updated FROM tbl_finding_assignments WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL"
-            params = (target, eventType, eventData)
-        else:
-            qry = "SELECT assigned_to, assigned_by, status, note, date_assigned, date_updated FROM tbl_finding_assignments WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ?"
-            params = (target, eventType, eventData, sourceData)
-        with self.dbhLock:
-            try:
-                self.dbh.execute(qry, params)
-                rows = self.dbh.fetchall()
-                return [{'assigned_to': r[0], 'assigned_by': r[1], 'status': r[2],
-                         'note': r[3], 'date_assigned': r[4], 'date_updated': r[5]} for r in rows]
-            except DatabaseError as e:
-                raise IOError("SQL error fetching assignments for finding") from e
+    def typeAssignmentsForUser(self, username: str, status: str = None) -> list:
+        """All assignments for a user across targets.
 
-    def findingAssignmentsForUser(self, assignedTo: str, status: str = None) -> list:
-        """Get all assignments for a user (or '*' for all-users queue).
-
-        Returns list of dicts with target, event_type, event_data, source_data, etc.
+        Returns list of dicts with target, event_type, assigned_to, etc.
         """
         if status:
-            qry = "SELECT target, event_type, event_data, source_data, assigned_to, assigned_by, status, note, date_assigned, date_updated FROM tbl_finding_assignments WHERE (assigned_to = ? OR assigned_to = '*') AND status = ? ORDER BY date_assigned DESC"
-            params = (assignedTo, status)
+            qry = "SELECT target, event_type, assigned_to, assigned_by, status, note, date_assigned, date_updated FROM tbl_finding_assignments WHERE assigned_to = ? AND status = ? ORDER BY date_assigned DESC"
+            params = (username, status)
         else:
-            qry = "SELECT target, event_type, event_data, source_data, assigned_to, assigned_by, status, note, date_assigned, date_updated FROM tbl_finding_assignments WHERE (assigned_to = ? OR assigned_to = '*') ORDER BY date_assigned DESC"
-            params = (assignedTo,)
+            qry = "SELECT target, event_type, assigned_to, assigned_by, status, note, date_assigned, date_updated FROM tbl_finding_assignments WHERE assigned_to = ? ORDER BY date_assigned DESC"
+            params = (username,)
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, params)
                 rows = self.dbh.fetchall()
-                return [{'target': r[0], 'event_type': r[1], 'event_data': r[2],
-                         'source_data': r[3], 'assigned_to': r[4], 'assigned_by': r[5],
-                         'status': r[6], 'note': r[7], 'date_assigned': r[8],
-                         'date_updated': r[9]} for r in rows]
+                return [{'target': r[0], 'event_type': r[1], 'assigned_to': r[2],
+                         'assigned_by': r[3], 'status': r[4], 'note': r[5],
+                         'date_assigned': r[6], 'date_updated': r[7]} for r in rows]
             except DatabaseError as e:
-                raise IOError("SQL error fetching assignments for user") from e
+                raise IOError("SQL error fetching type assignments for user") from e
 
-    def findingAssignmentUpdateStatus(self, target: str, eventType: str, eventData: str,
-                                      sourceData: str, assignedTo: str, status: str) -> bool:
-        """Update status of a finding assignment (OPEN/IN_PROGRESS/DONE)."""
+    def typeAssignmentUpdateStatus(self, target: str, eventType: str,
+                                   assignedTo: str, status: str) -> bool:
+        """Update status of a type assignment (OPEN/IN_PROGRESS/DONE)."""
         if status not in ('OPEN', 'IN_PROGRESS', 'DONE'):
             raise ValueError(f"Invalid status: {status}")
         now = int(time.time() * 1000)
-        if sourceData is None:
-            qry = "UPDATE tbl_finding_assignments SET status = ?, date_updated = ? WHERE target = ? AND event_type = ? AND event_data = ? AND source_data IS NULL AND assigned_to = ?"
-            params = (status, now, target, eventType, eventData, assignedTo)
-        else:
-            qry = "UPDATE tbl_finding_assignments SET status = ?, date_updated = ? WHERE target = ? AND event_type = ? AND event_data = ? AND source_data = ? AND assigned_to = ?"
-            params = (status, now, target, eventType, eventData, sourceData, assignedTo)
+        qry = "UPDATE tbl_finding_assignments SET status = ?, date_updated = ? WHERE target = ? AND event_type = ? AND assigned_to = ?"
         with self.dbhLock:
             try:
-                self.dbh.execute(qry, params)
+                self.dbh.execute(qry, (status, now, target, eventType, assignedTo))
                 self.conn.commit()
             except DatabaseError as e:
-                raise IOError("SQL error updating assignment status") from e
+                raise IOError("SQL error updating type assignment status") from e
         return True
 
-    def findingAssignmentCounts(self, assignedTo: str) -> dict:
+    def typeAssignmentCounts(self, username: str) -> dict:
         """Get assignment counts by status for a user."""
-        qry = "SELECT status, COUNT(*) FROM tbl_finding_assignments WHERE (assigned_to = ? OR assigned_to = '*') GROUP BY status"
+        qry = "SELECT status, COUNT(*) FROM tbl_finding_assignments WHERE assigned_to = ? GROUP BY status"
         with self.dbhLock:
             try:
-                self.dbh.execute(qry, (assignedTo,))
+                self.dbh.execute(qry, (username,))
                 rows = self.dbh.fetchall()
                 counts = {'OPEN': 0, 'IN_PROGRESS': 0, 'DONE': 0}
                 for r in rows:
-                    counts[r[0]] = r[1]
+                    if r[0] in counts:
+                        counts[r[0]] = r[1]
                 return counts
             except DatabaseError as e:
-                raise IOError("SQL error fetching assignment counts") from e
+                raise IOError("SQL error fetching type assignment counts") from e
 
-    def findingAssignmentsFullForTarget(self, target: str) -> list:
+    def typeAssignmentsFullForTarget(self, target: str) -> list:
         """Get all assignment records for a target (for backup/export)."""
-        qry = "SELECT event_type, event_data, source_data, assigned_to, assigned_by, status, note, date_assigned, date_updated FROM tbl_finding_assignments WHERE target = ? ORDER BY date_assigned DESC"
+        qry = "SELECT event_type, assigned_to, assigned_by, status, note, date_assigned, date_updated FROM tbl_finding_assignments WHERE target = ? ORDER BY date_assigned DESC"
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, (target,))
                 return self.dbh.fetchall()
             except DatabaseError as e:
-                raise IOError("SQL error fetching full assignments for target") from e
+                raise IOError("SQL error fetching full type assignments for target") from e

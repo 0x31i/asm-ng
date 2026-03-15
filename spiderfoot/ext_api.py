@@ -395,6 +395,7 @@ class ExtScanResult(BaseModel):
     confidence: int
     generated: int
     priority: int = 0
+    assigned_to: Optional[str] = None
     # Excluded: scan_instance_id, hash, false_positive, tracking, visibility
 
 
@@ -744,6 +745,17 @@ async def ext_target_results(
     except Exception:
         priorities = {}
 
+    # Load type-level assignments for this target
+    type_assigns = {}
+    try:
+        raw_assigns = dbh.typeAssignmentsForTarget(target)
+        for et, assigns in raw_assigns.items():
+            names = [a['assigned_to'] for a in assigns if a['status'] != 'DONE']
+            if names:
+                type_assigns[et] = ','.join(names)
+    except Exception:
+        pass
+
     from spiderfoot.event_type_mapping import translate_event_type
     results = []
     for row in rows:
@@ -765,6 +777,7 @@ async def ext_target_results(
             confidence=int(row[5] or 0),
             generated=int(row[0] or 0),
             priority=prio,
+            assigned_to=type_assigns.get(event_type),
         ))
     return results
 
@@ -861,6 +874,17 @@ async def ext_target_results_lookup(
     except Exception as e:
         raise HTTPException(500, f"DB error: {e}")
 
+    # Load type-level assignments
+    type_assigns = {}
+    try:
+        raw_assigns = dbh.typeAssignmentsForTarget(target)
+        for et, assigns in raw_assigns.items():
+            names = [a['assigned_to'] for a in assigns if a['status'] != 'DONE']
+            if names:
+                type_assigns[et] = ','.join(names)
+    except Exception:
+        pass
+
     from spiderfoot.event_type_mapping import translate_event_type
     results = []
     seen_hashes = set()
@@ -880,6 +904,7 @@ async def ext_target_results_lookup(
             risk=int(row[7] or 0),
             confidence=int(row[5] or 0),
             generated=int(row[0] or 0),
+            assigned_to=type_assigns.get(event_type),
         ))
     return results
 
