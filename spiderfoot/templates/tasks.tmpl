@@ -6,95 +6,484 @@
 .tasks-main { flex: 1; min-width: 0; }
 .tasks-sidebar { width: 280px; flex-shrink: 0; }
 
-/* Summary cards */
-.tasks-summary { display: flex; gap: 12px; margin-bottom: 16px; }
-.tasks-card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px 20px; text-align: center; min-width: 100px; flex: 1; }
-.tasks-card .card-count { font-size: 24px; font-weight: 700; color: #e2e8f0; }
-.tasks-card .card-label { font-size: 10px; text-transform: uppercase; color: #94a3b8; letter-spacing: 1px; }
-.tasks-card.open .card-count { color: #60a5fa; }
-.tasks-card.inprogress .card-count { color: #f59e0b; }
-.tasks-card.done .card-count { color: #22c55e; }
+/* Summary cards — sharp, glowing stat cards */
+.tasks-summary { display: flex; gap: 8px; margin-bottom: 20px; }
+.tasks-card {
+  background: var(--bg-secondary, #151515);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  padding: 14px 20px;
+  text-align: center;
+  flex: 1;
+}
+.tasks-card .card-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 32px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+  line-height: 1.2;
+}
+.tasks-card .card-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-muted, #6b7280);
+  letter-spacing: 1.5px;
+  margin-top: 2px;
+}
+.tasks-card.open .card-count { color: #3b82f6; text-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+.tasks-card.inprogress .card-count { color: #f97316; text-shadow: 0 0 20px rgba(249, 115, 22, 0.5); }
+.tasks-card.done .card-count { color: #22c55e; text-shadow: 0 0 20px rgba(34, 197, 94, 0.5); }
 
-/* Target selector */
-.tasks-target-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 10px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; }
-.tasks-target-bar label { font-size: 12px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
-.tasks-target-bar select { flex: 1; padding: 6px 10px; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; font-size: 13px; }
+/* Target selector — sharp, monospace */
+.tasks-target-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: var(--bg-secondary, #151515);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+}
+.tasks-target-bar label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #ffffff;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  white-space: nowrap;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+.tasks-target-bar select {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-primary, #0c0c0c);
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+.tasks-target-bar select:focus {
+  border-color: #22c55e;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+  outline: none;
+}
 
-/* Toolbar */
-.tasks-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.tasks-toolbar .btn-task { padding: 5px 12px; border: 1px solid #475569; border-radius: 4px; background: transparent; color: #94a3b8; cursor: pointer; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-.tasks-toolbar .btn-task:hover { background: #334155; color: #e2e8f0; }
-.tasks-toolbar .btn-task.btn-ai { border-color: #8b5cf6; color: #8b5cf6; }
-.tasks-toolbar .btn-task.btn-ai:hover { background: #8b5cf622; }
-.tasks-toolbar .btn-task.btn-auto { border-color: #22c55e; color: #22c55e; }
-.tasks-toolbar .btn-task.btn-auto:hover { background: #22c55e22; }
-.toolbar-assign-select { padding: 5px 8px; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; font-size: 11px; }
-.toolbar-sep { width: 1px; height: 20px; background: #334155; margin: 0 4px; }
+/* Toolbar — sharp buttons with glow */
+.tasks-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  flex-wrap: wrap;
+}
+.tasks-toolbar label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #ffffff;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+}
+.tasks-toolbar .btn-task {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+}
+.tasks-toolbar .btn-task:hover {
+  transform: translateY(-1px);
+}
+.tasks-toolbar .btn-task.btn-assign-action {
+  background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.4);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+}
+.tasks-toolbar .btn-task.btn-assign-action:hover {
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.6), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+.tasks-toolbar .btn-task.btn-rank {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+}
+.tasks-toolbar .btn-task.btn-rank:hover {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.6), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+.tasks-toolbar .btn-task.btn-auto {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+}
+.tasks-toolbar .btn-task.btn-auto:hover {
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.6), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+.tasks-toolbar .btn-task.btn-reset {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.4);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+}
+.tasks-toolbar .btn-task.btn-reset:hover {
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.6), 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+.toolbar-assign-select {
+  padding: 6px 10px;
+  border-radius: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-primary, #0c0c0c);
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+.toolbar-assign-select:focus {
+  border-color: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+  outline: none;
+}
+.toolbar-sep { width: 1px; height: 24px; background: rgba(255, 255, 255, 0.1); margin: 0 6px; }
 
 /* Category group */
-.cat-group { margin-bottom: 16px; }
-.cat-header { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #0f172a; border-radius: 6px; margin-bottom: 4px; cursor: pointer; }
-.cat-color { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
-.cat-name { font-size: 12px; font-weight: 700; color: #e2e8f0; text-transform: uppercase; letter-spacing: 0.5px; }
-.cat-count { font-size: 11px; color: #64748b; margin-left: auto; }
+.cat-group { margin-bottom: 12px; }
+.cat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-primary, #0c0c0c);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.cat-header:hover { background: var(--bg-tertiary, #1e1e1e); }
+.cat-color { width: 8px; height: 8px; border-radius: 0; flex-shrink: 0; box-shadow: 0 0 6px currentColor; }
+.cat-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+.cat-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted, #6b7280);
+  margin-left: auto;
+  letter-spacing: 0.5px;
+}
 
 /* Type rows */
-.type-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px 6px 28px; border-bottom: 1px solid #1e293b; font-size: 13px; }
-.type-row:hover { background: #1e293b; }
-.type-row .type-cb { width: 14px; height: 14px; accent-color: #8b5cf6; cursor: pointer; }
-.type-row .type-name { flex: 1; color: #e2e8f0; font-family: monospace; font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.type-row .type-findings { color: #64748b; font-size: 11px; min-width: 50px; text-align: right; }
-.type-row .assign-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; background: #8b5cf622; color: #a78bfa; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid #8b5cf644; min-width: 70px; justify-content: center; }
-.type-row .assign-chip.unassigned { background: #47556922; color: #64748b; border-color: #47556944; }
-.type-row .assign-chip:hover { background: #8b5cf644; }
-.type-row .assign-dropdown { padding: 2px 6px; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; font-size: 11px; display: none; }
+.type-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px 7px 30px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background 0.15s ease;
+}
+.type-row:hover { background: rgba(255, 255, 255, 0.03); }
+.type-row .type-cb { width: 13px; height: 13px; accent-color: #22c55e; cursor: pointer; }
+.type-row .type-name {
+  flex: 1;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+.type-row .type-findings {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted, #6b7280);
+  font-size: 10px;
+  min-width: 45px;
+  text-align: right;
+  letter-spacing: 0.5px;
+}
+.type-row .assign-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 0;
+  background: rgba(139, 92, 246, 0.1);
+  color: #a78bfa;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  min-width: 70px;
+  justify-content: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.15s ease;
+}
+.type-row .assign-chip.unassigned {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted, #6b7280);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.type-row .assign-chip:hover {
+  background: rgba(139, 92, 246, 0.2);
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+}
+.type-row .assign-dropdown {
+  padding: 3px 8px;
+  border-radius: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-primary, #0c0c0c);
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  display: none;
+}
+.type-row .assign-dropdown:focus {
+  border-color: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+  outline: none;
+}
 .type-row .assign-dropdown.visible { display: inline-block; }
-.type-row .status-badge { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; }
-.status-badge.s-open { background: #60a5fa22; color: #60a5fa; }
-.status-badge.s-in_progress { background: #f59e0b22; color: #f59e0b; }
-.status-badge.s-done { background: #22c55e22; color: #22c55e; }
+.type-row .status-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.status-badge.s-open { background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); }
+.status-badge.s-in_progress { background: rgba(249, 115, 22, 0.15); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.3); }
+.status-badge.s-done { background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); }
 
 /* Analyst sidebar */
-.analyst-card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
-.analyst-card .analyst-name { font-size: 13px; font-weight: 700; color: #e2e8f0; }
-.analyst-card .analyst-stats { display: flex; gap: 12px; margin-top: 6px; font-size: 11px; color: #94a3b8; }
-.analyst-card .analyst-stat { display: flex; align-items: center; gap: 3px; }
-.analyst-card .stat-dot { width: 6px; height: 6px; border-radius: 50%; }
-.analyst-card .stat-dot.open { background: #60a5fa; }
-.analyst-card .stat-dot.inprogress { background: #f59e0b; }
-.analyst-card .stat-dot.done { background: #22c55e; }
-.sidebar-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; font-weight: 700; margin-bottom: 8px; }
-.sidebar-summary { font-size: 12px; color: #94a3b8; margin-bottom: 12px; padding: 8px; background: #0f172a; border-radius: 6px; }
+.analyst-card {
+  background: var(--bg-secondary, #151515);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  padding: 12px 14px;
+  margin-bottom: 6px;
+  transition: border-color 0.15s ease;
+}
+.analyst-card:hover { border-color: rgba(255, 255, 255, 0.2); }
+.analyst-card .analyst-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+.analyst-card .analyst-stats {
+  display: flex;
+  gap: 14px;
+  margin-top: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted, #6b7280);
+  letter-spacing: 0.5px;
+}
+.analyst-card .analyst-stat { display: flex; align-items: center; gap: 4px; }
+.analyst-card .stat-dot { width: 6px; height: 6px; border-radius: 0; }
+.analyst-card .stat-dot.open { background: #3b82f6; box-shadow: 0 0 6px rgba(59, 130, 246, 0.5); }
+.analyst-card .stat-dot.inprogress { background: #f97316; box-shadow: 0 0 6px rgba(249, 115, 22, 0.5); }
+.analyst-card .stat-dot.done { background: #22c55e; box-shadow: 0 0 6px rgba(34, 197, 94, 0.5); }
+.sidebar-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #ffffff;
+  font-weight: 700;
+  margin-bottom: 10px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+.sidebar-summary {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted, #6b7280);
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: var(--bg-primary, #0c0c0c);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0;
+  letter-spacing: 0.5px;
+}
 
 /* Analyst view table */
 .analyst-tasks-table { width: 100%; border-collapse: collapse; }
-.analyst-tasks-table th { background: #1e293b; color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 8px 12px; border-bottom: 1px solid #334155; text-align: left; }
-.analyst-tasks-table td { padding: 8px 12px; border-bottom: 1px solid #1e293b; color: #e2e8f0; font-size: 13px; }
-.analyst-tasks-table tr:hover { background: #1e293b; }
-.task-target { color: #8b5cf6; font-family: monospace; font-size: 12px; }
-.task-status-btn { padding: 3px 10px; border: 1px solid #475569; border-radius: 4px; background: transparent; color: #94a3b8; cursor: pointer; font-size: 11px; margin-right: 4px; }
-.task-status-btn:hover { background: #334155; }
-.task-status-btn.active-open { border-color: #60a5fa; color: #60a5fa; }
-.task-status-btn.active-inprogress { border-color: #f59e0b; color: #f59e0b; }
-.task-status-btn.active-done { border-color: #22c55e; color: #22c55e; }
+.analyst-tasks-table th {
+  background: rgba(0, 0, 0, 0.85);
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: left;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+.analyst-tasks-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+.analyst-tasks-table tr:hover { background: rgba(255, 255, 255, 0.03); }
+.task-target {
+  color: #22c55e;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-shadow: 0 0 8px rgba(34, 197, 94, 0.3);
+}
+.task-status-btn {
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted, #6b7280);
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 4px;
+  transition: all 0.15s ease;
+}
+.task-status-btn:hover { background: rgba(255, 255, 255, 0.05); color: #ffffff; }
+.task-status-btn.active-open { border-color: #3b82f6; color: #3b82f6; box-shadow: 0 0 8px rgba(59, 130, 246, 0.3); }
+.task-status-btn.active-inprogress { border-color: #f97316; color: #f97316; box-shadow: 0 0 8px rgba(249, 115, 22, 0.3); }
+.task-status-btn.active-done { border-color: #22c55e; color: #22c55e; box-shadow: 0 0 8px rgba(34, 197, 94, 0.3); }
 
-/* AI Rank modal */
-.ai-rank-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center; }
-.ai-rank-overlay.visible { display: flex; }
-.ai-rank-panel { background: #1e293b; border: 1px solid #475569; border-radius: 12px; padding: 24px; width: 600px; max-height: 80vh; overflow-y: auto; }
-.ai-rank-title { font-size: 16px; font-weight: 700; color: #e2e8f0; margin-bottom: 16px; }
-.ai-rank-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #334155; font-size: 13px; }
-.ai-rank-num { font-size: 16px; font-weight: 700; color: #8b5cf6; min-width: 30px; text-align: center; }
-.ai-rank-type { font-family: monospace; color: #e2e8f0; flex: 1; }
-.ai-rank-cat { font-size: 11px; color: #94a3b8; }
-.ai-rank-reason { font-size: 11px; color: #64748b; }
-.ai-rank-close { padding: 6px 16px; border: 1px solid #475569; border-radius: 4px; background: transparent; color: #94a3b8; cursor: pointer; font-size: 12px; margin-top: 16px; }
-.ai-rank-close:hover { background: #334155; color: #e2e8f0; }
+/* Rank overlay — sharp panel with glow */
+.rank-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+}
+.rank-overlay.visible { display: flex; }
+.rank-panel {
+  background: var(--bg-secondary, #151515);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0;
+  padding: 24px;
+  width: 640px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 0 40px rgba(139, 92, 246, 0.2), 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.rank-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 20px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5), 0 0 20px rgba(255, 255, 255, 0.3);
+}
+.rank-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.rank-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: #8b5cf6;
+  min-width: 36px;
+  text-align: center;
+  text-shadow: 0 0 8px rgba(139, 92, 246, 0.5);
+}
+.rank-type {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #ffffff;
+  flex: 1;
+  letter-spacing: 0.3px;
+}
+.rank-cat {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.rank-reason {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted, #6b7280);
+  letter-spacing: 0.3px;
+}
+.rank-close {
+  padding: 8px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 20px;
+  transition: all 0.15s ease;
+}
+.rank-close:hover {
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+}
 
-.tasks-empty { text-align: center; color: #64748b; padding: 40px; font-size: 14px; }
+.tasks-empty {
+  text-align: center;
+  color: var(--text-muted, #6b7280);
+  padding: 60px 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
 </style>
 
-<h4>TASKS</h4>
+<h4 style="font-family:'JetBrains Mono',monospace;font-weight:700;text-transform:uppercase;letter-spacing:2px;text-shadow:0 0 10px rgba(255,255,255,0.5),0 0 20px rgba(255,255,255,0.3);">TASKS</h4>
 
 <!-- Summary cards -->
 <div class="tasks-summary" id="task-summary">
@@ -108,43 +497,43 @@
 
 <!-- Target selector -->
 <div class="tasks-target-bar">
-  <label>Target:</label>
+  <label>TARGET:</label>
   <select id="target-select" onchange="loadAdminBoard()">
-    <option value="">Select a target...</option>
+    <option value="">SELECT A TARGET...</option>
   </select>
 </div>
 
 <!-- Toolbar -->
 <div class="tasks-toolbar" id="admin-toolbar" style="display:none">
-  <input type="checkbox" id="select-all-cb" onchange="toggleSelectAll(this.checked)" title="Select all">
-  <label for="select-all-cb" style="font-size:11px;color:#94a3b8;cursor:pointer">SELECT ALL</label>
+  <input type="checkbox" id="select-all-cb" onchange="toggleSelectAll(this.checked)" title="Select all" style="accent-color:#22c55e">
+  <label for="select-all-cb">SELECT ALL</label>
   <div class="toolbar-sep"></div>
-  <label style="font-size:11px;color:#94a3b8">Assign to:</label>
+  <label>ASSIGN TO:</label>
   <select id="bulk-assign-analyst" class="toolbar-assign-select"></select>
-  <button class="btn-task" onclick="bulkAssignSelected()">ASSIGN</button>
+  <button class="btn-task btn-assign-action" onclick="bulkAssignSelected()">ASSIGN</button>
   <div class="toolbar-sep"></div>
-  <button class="btn-task btn-ai" onclick="aiRankTypes()">AI RANK</button>
+  <button class="btn-task btn-rank" onclick="autoRankTypes()">AUTO RANK</button>
   <button class="btn-task btn-auto" onclick="autoAssign(false)">AUTO ASSIGN</button>
-  <button class="btn-task btn-auto" onclick="autoAssign(true)" style="border-style:dashed">RESET & REASSIGN</button>
+  <button class="btn-task btn-reset" onclick="autoAssign(true)">RESET &amp; REASSIGN</button>
 </div>
 
 <!-- Two-panel layout -->
 <div class="tasks-container" id="admin-content" style="display:none">
   <div class="tasks-main" id="type-board">
-    <div class="tasks-empty">Select a target to view event types</div>
+    <div class="tasks-empty">SELECT A TARGET TO VIEW EVENT TYPES</div>
   </div>
   <div class="tasks-sidebar" id="analyst-sidebar">
-    <div class="sidebar-title">Analysts</div>
+    <div class="sidebar-title">ANALYSTS</div>
     <div id="analyst-list"></div>
   </div>
 </div>
 
-<!-- AI Rank overlay -->
-<div class="ai-rank-overlay" id="ai-rank-overlay">
-  <div class="ai-rank-panel">
-    <div class="ai-rank-title">AI Type Ranking</div>
-    <div id="ai-rank-body">Loading...</div>
-    <button class="ai-rank-close" onclick="document.getElementById('ai-rank-overlay').classList.remove('visible')">CLOSE</button>
+<!-- Rank overlay -->
+<div class="rank-overlay" id="rank-overlay">
+  <div class="rank-panel">
+    <div class="rank-title">AUTO RANK &mdash; TYPE PRIORITY</div>
+    <div id="rank-body" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6b7280">ANALYZING...</div>
+    <button class="rank-close" onclick="document.getElementById('rank-overlay').classList.remove('visible')">CLOSE</button>
   </div>
 </div>
 
@@ -247,18 +636,19 @@ function loadAdminBoard() {
 function renderTypeBoard() {
     var board = document.getElementById('type-board');
     if (!_typeSummary.length) {
-        board.innerHTML = '<div class="tasks-empty">No scan results for this target</div>';
+        board.innerHTML = '<div class="tasks-empty">NO SCAN RESULTS FOR THIS TARGET</div>';
         return;
     }
 
-    // Group types by category (using known mappings)
+    // Group types by category
     var catGroups = {};
     for (var i = 0; i < _typeSummary.length; i++) {
         var row = _typeSummary[i];
         var et = row[0];
         var descr = row[1];
         var count = row[3] || 0;
-        var cat = getTypeCategory(et);
+        // Use category from scansummary data (index 6) if available
+        var cat = (row.length > 6 && row[6]) ? row[6] : getTypeCategory(et);
         if (!catGroups[cat]) catGroups[cat] = [];
         catGroups[cat].push({eventType: et, descr: descr, count: count});
     }
@@ -285,9 +675,9 @@ function renderCatGroup(cat, types) {
     var color = CAT_COLORS[cat] || '#6b7280';
     var html = '<div class="cat-group">';
     html += '<div class="cat-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
-    html += '<span class="cat-color" style="background:' + color + '"></span>';
+    html += '<span class="cat-color" style="background:' + color + ';box-shadow:0 0 6px ' + color + '"></span>';
     html += '<span class="cat-name">' + sf.escapeHtml(cat) + '</span>';
-    html += '<span class="cat-count">' + types.length + ' types</span>';
+    html += '<span class="cat-count">' + types.length + ' TYPES</span>';
     html += '</div>';
     html += '<div class="cat-types">';
     for (var i = 0; i < types.length; i++) {
@@ -301,7 +691,7 @@ function renderCatGroup(cat, types) {
                 statusClass = 's-' + assigns[j].status.toLowerCase();
             }
         }
-        var chipText = assignNames.length ? assignNames.join(', ') : 'Unassigned';
+        var chipText = assignNames.length ? assignNames.join(', ') : 'UNASSIGNED';
         var chipClass = assignNames.length ? 'assign-chip' : 'assign-chip unassigned';
 
         html += '<div class="type-row">';
@@ -317,7 +707,6 @@ function renderCatGroup(cat, types) {
 }
 
 function showAssignDropdown(chip, eventType) {
-    // Create inline dropdown
     var existing = chip.parentNode.querySelector('.assign-dropdown.visible');
     if (existing) { existing.remove(); return; }
 
@@ -325,7 +714,7 @@ function showAssignDropdown(chip, eventType) {
     sel.className = 'assign-dropdown visible';
     var optNone = document.createElement('option');
     optNone.value = '';
-    optNone.textContent = '-- Remove --';
+    optNone.textContent = '-- REMOVE --';
     sel.appendChild(optNone);
     for (var i = 0; i < _analysts.length; i++) {
         var opt = document.createElement('option');
@@ -336,7 +725,6 @@ function showAssignDropdown(chip, eventType) {
     sel.onchange = function() {
         var user = sel.value;
         if (!user) {
-            // Remove all assignments for this type
             var assigns = _assignments[eventType] || [];
             for (var i = 0; i < assigns.length; i++) {
                 sf.fetchData('${docroot}/typeassignremove', {target: _currentTarget, eventType: eventType, assignedTo: assigns[i].assigned_to}, function() {});
@@ -345,13 +733,11 @@ function showAssignDropdown(chip, eventType) {
         } else {
             sf.fetchData('${docroot}/typeassign', {target: _currentTarget, eventType: eventType, assignTo: user}, function(data) {
                 if (data && data.success) {
-                    if (!_assignments[eventType]) _assignments[eventType] = [];
                     _assignments[eventType] = [{assigned_to: user, status: 'OPEN', assigned_by: '${user}'}];
                 }
             });
         }
         sel.remove();
-        // Refresh after a beat
         setTimeout(function() { renderTypeBoard(); renderAnalystSidebar(); }, 300);
     };
     chip.parentNode.appendChild(sel);
@@ -361,10 +747,9 @@ function showAssignDropdown(chip, eventType) {
 function renderAnalystSidebar() {
     var container = document.getElementById('analyst-list');
     if (!_analysts.length) {
-        container.innerHTML = '<div style="color:#64748b;font-size:12px">No analyst users</div>';
+        container.innerHTML = '<div class="tasks-empty" style="padding:20px">NO ANALYST USERS</div>';
         return;
     }
-    // Count assignments per analyst
     var analystCounts = {};
     for (var i = 0; i < _analysts.length; i++) {
         analystCounts[_analysts[i].username] = {open: 0, inprogress: 0, done: 0, total: 0};
@@ -381,10 +766,9 @@ function renderAnalystSidebar() {
         }
     }
 
-    // Summary
     var totalTypes = _typeSummary.length;
     var assignedTypes = Object.keys(_assignments).length;
-    var html = '<div class="sidebar-summary">' + assignedTypes + ' / ' + totalTypes + ' types assigned</div>';
+    var html = '<div class="sidebar-summary">' + assignedTypes + ' / ' + totalTypes + ' TYPES ASSIGNED</div>';
 
     for (var i = 0; i < _analysts.length; i++) {
         var a = _analysts[i];
@@ -392,9 +776,9 @@ function renderAnalystSidebar() {
         html += '<div class="analyst-card">';
         html += '<div class="analyst-name">' + sf.escapeHtml(a.display_name || a.username) + '</div>';
         html += '<div class="analyst-stats">';
-        html += '<span class="analyst-stat"><span class="stat-dot open"></span>' + c.open + ' open</span>';
-        html += '<span class="analyst-stat"><span class="stat-dot inprogress"></span>' + c.inprogress + ' wip</span>';
-        html += '<span class="analyst-stat"><span class="stat-dot done"></span>' + c.done + ' done</span>';
+        html += '<span class="analyst-stat"><span class="stat-dot open"></span>' + c.open + ' OPEN</span>';
+        html += '<span class="analyst-stat"><span class="stat-dot inprogress"></span>' + c.inprogress + ' WIP</span>';
+        html += '<span class="analyst-stat"><span class="stat-dot done"></span>' + c.done + ' DONE</span>';
         html += '</div></div>';
     }
     container.innerHTML = html;
@@ -441,36 +825,34 @@ function autoAssign(reset) {
     });
 }
 
-function aiRankTypes() {
-    var overlay = document.getElementById('ai-rank-overlay');
-    var body = document.getElementById('ai-rank-body');
-    body.innerHTML = 'Analyzing event types...';
+function autoRankTypes() {
+    var overlay = document.getElementById('rank-overlay');
+    var body = document.getElementById('rank-body');
+    body.innerHTML = 'ANALYZING EVENT TYPES...';
     overlay.classList.add('visible');
     sf.fetchData('${docroot}/typeassignairank', {target: _currentTarget}, function(data) {
         if (!data || !data.success) {
-            body.innerHTML = '<div style="color:#ef4444">Failed: ' + (data ? sf.escapeHtml(data.message) : 'Error') + '</div>';
+            body.innerHTML = '<div style="color:#ef4444;text-shadow:0 0 8px rgba(239,68,68,0.5)">FAILED: ' + (data ? sf.escapeHtml(data.message) : 'ERROR') + '</div>';
             return;
         }
         var ranked = data.ranked_types || [];
         var html = '';
         for (var i = 0; i < ranked.length; i++) {
             var r = ranked[i];
-            html += '<div class="ai-rank-row">';
-            html += '<span class="ai-rank-num">#' + r.rank + '</span>';
-            html += '<span class="ai-rank-type">' + sf.escapeHtml(r.event_type) + '</span>';
-            html += '<span class="ai-rank-cat">' + sf.escapeHtml(r.category) + '</span>';
+            html += '<div class="rank-row">';
+            html += '<span class="rank-num">#' + r.rank + '</span>';
+            html += '<span class="rank-type">' + sf.escapeHtml(r.event_type) + '</span>';
+            html += '<span class="rank-cat">' + sf.escapeHtml(r.category) + '</span>';
             html += '</div>';
-            html += '<div style="padding:0 0 6px 40px"><span class="ai-rank-reason">' + sf.escapeHtml(r.reason) + '</span></div>';
+            html += '<div style="padding:0 0 6px 48px"><span class="rank-reason">' + sf.escapeHtml(r.reason) + '</span></div>';
         }
-        if (!html) html = '<div style="color:#64748b">No types to rank</div>';
+        if (!html) html = '<div class="tasks-empty" style="padding:20px">NO TYPES TO RANK</div>';
         body.innerHTML = html;
     });
 }
 
-// Rough category mapping (client-side, mirrors grade_config categories)
-var TYPE_CATEGORY_MAP = null;
+// Category mapping (client-side, mirrors grade_config)
 function getTypeCategory(eventType) {
-    // Common mappings
     var netTypes = ['EXTERNAL_VULNERABILITIES','VULNERABILITY_CVE_CRITICAL','VULNERABILITY_CVE_HIGH','VULNERABILITY_CVE_MEDIUM','VULNERABILITY_CVE_LOW','VULNERABILITY_GENERAL','TCP_PORT_OPEN','TCP_PORT_OPEN_BANNER','UDP_PORT_OPEN','UDP_PORT_OPEN_INFO','OPEN_TCP_PORT_HAS_VULNS','OPEN_TCP_PORT_HAS_VULNS_LOW','WEBSERVER_BANNER','WEBSERVER_HTTPHEADERS','WEBSERVER_TECHNOLOGY','OPERATING_SYSTEM','INTERNAL_IP_ADDRESS','IP_ADDRESS'];
     var webTypes = ['HTTP_CODE','URL_FORM','URL_UPLOAD','URL_JAVASCRIPT','URL_JAVA_APPLET','URL_FLASH','URL_WEB_FRAMEWORK','URL_STATIC_PARAM','URL_PASSWORD','WEBSERVER_STRANGEHEADER','CONTENT_INTERESTING_SUBDIR'];
     var dnsTypes = ['DNS_SPF','DNS_TEXT','DNS_SRV','DOMAIN_NAME','DOMAIN_NAME_PARENT','DOMAIN_REGISTRAR','DOMAIN_WHOIS','INTERNET_NAME','INTERNET_NAME_UNRESOLVED','PROVIDER_DNS','AFFILIATE_INTERNET_NAME','DNS_PASSIVE','DOMAIN_IMPERSONATION'];
@@ -506,10 +888,9 @@ function getTypeCategory(eventType) {
         var tasks = data.assignments || [];
         var tbody = document.getElementById('analyst-tasks-body');
         if (!tasks.length) {
-            tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;color:#64748b'>No tasks assigned</td></tr>";
+            tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;color:#6b7280;font-family:JetBrains Mono,monospace;font-size:11px;text-transform:uppercase;letter-spacing:1px'>NO TASKS ASSIGNED</td></tr>";
             return;
         }
-        // Group by target
         var byTarget = {};
         for (var i = 0; i < tasks.length; i++) {
             var t = tasks[i];
@@ -548,7 +929,6 @@ function updateTaskStatus(target, eventType, assignedTo, status, btn) {
         target: target, eventType: eventType, assignedTo: assignedTo, status: status
     }, function(data) {
         if (data && data.success) {
-            // Update UI
             var row = btn.closest('tr');
             row.querySelectorAll('.task-status-btn').forEach(function(b) {
                 b.className = 'task-status-btn';
@@ -562,15 +942,15 @@ function updateTaskStatus(target, eventType, assignedTo, status, btn) {
 <table class="analyst-tasks-table" id="analyst-tasks">
   <thead>
     <tr>
-      <th>Target</th>
-      <th>Event Type</th>
-      <th>Status</th>
-      <th>Assigned By</th>
-      <th>Date</th>
+      <th>TARGET</th>
+      <th>EVENT TYPE</th>
+      <th>STATUS</th>
+      <th>ASSIGNED BY</th>
+      <th>DATE</th>
     </tr>
   </thead>
   <tbody id="analyst-tasks-body">
-    <tr><td colspan="5" style="text-align:center;color:#64748b">Loading...</td></tr>
+    <tr><td colspan="5" style="text-align:center;color:#6b7280;font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:1px">LOADING...</td></tr>
   </tbody>
 </table>
 
