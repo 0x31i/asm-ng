@@ -210,6 +210,18 @@ _scan_lookup_cache = {}
 _SCAN_LOOKUP_TTL = 30
 
 
+def _get_latest_scan_for_target(dbh, target: str):
+    """Find the latest scan ID for a target (fast direct query)."""
+    try:
+        dbh.dbh.execute(
+            "SELECT guid FROM tbl_scan_instance WHERE name = ? ORDER BY started DESC LIMIT 1",
+            (target,))
+        row = dbh.dbh.fetchone()
+        return row[0] if row else None
+    except Exception:
+        return None
+
+
 def _invalidate_matches_cache(scan_id=None, target=None):
     """Invalidate matches cache entries. If scan_id given, remove that specific entry.
     If target given, remove all entries for that target. If neither, clear all."""
@@ -10043,15 +10055,13 @@ class SpiderFootWebUi:
                 existing = dbh.typeAssignmentsForTarget(target)
                 assigned_types = set(existing.keys())
 
-                # Get all event types for this target from scan results
-                # Find scans for this target
-                scans = dbh.scanInstanceList()
+                # Get all event types for this target from latest scan
+                latest_scan = _get_latest_scan_for_target(dbh, target)
                 target_types = set()
-                for scan in scans:
-                    if scan[1] == target:
-                        summary = dbh.scanResultSummary(scan[0], by='type')
-                        for row in summary:
-                            target_types.add(row[0])
+                if latest_scan:
+                    summary = dbh.scanResultSummary(latest_scan, by='type')
+                    for row in summary:
+                        target_types.add(row[0])
 
                 # Unassigned types
                 unassigned = sorted(target_types - assigned_types)
@@ -10091,7 +10101,12 @@ class SpiderFootWebUi:
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def typeassignairank(self: 'SpiderFootWebUi', target: str) -> dict:
-        """AI-rank event types by importance for a target."""
+        """AI-rank event types by importance for a target.
+
+        Uses the grade_config scoring rules to rank types by operational
+        importance. Does not require AI triage to have been run — works
+        purely from category weights, severity ranks, and finding counts.
+        """
         if not target:
             return {'success': False, 'message': 'target is required'}
         if self.currentUserRole() != 'admin':
@@ -10099,21 +10114,23 @@ class SpiderFootWebUi:
 
         with SpiderFootDb(self.config) as dbh:
             try:
-                # Gather event type summary data across scans for this target
-                scans = dbh.scanInstanceList()
-                type_counts = {}
-                for scan in scans:
-                    if scan[1] == target:
-                        summary = dbh.scanResultSummary(scan[0], by='type')
-                        for row in summary:
-                            et = row[0]
-                            count = row[3] if len(row) > 3 else 0
-                            type_counts[et] = type_counts.get(et, 0) + count
+                # Find the latest scan for this target (fast query)
+                latest_scan = _get_latest_scan_for_target(dbh, target)
+                if not latest_scan:
+                    return {'success': False, 'message': 'No scans found for this target'}
 
-                if not type_counts:
+                # Get type summary for that scan only
+                summary = dbh.scanResultSummary(latest_scan, by='type')
+                if not summary:
                     return {'success': False, 'message': 'No scan results for this target'}
 
-                # Build context for AI ranking
+                type_counts = {}
+                for row in summary:
+                    et = row[0]
+                    count = row[3] if len(row) > 3 else 0
+                    type_counts[et] = count
+
+                # Build ranking from grade_config scoring rules
                 from spiderfoot.grade_config import DEFAULT_EVENT_TYPE_GRADING, DEFAULT_GRADE_CATEGORIES
                 ranked = []
                 for et, count in type_counts.items():
