@@ -542,6 +542,7 @@ var _analysts = [];
 var _assignments = {};
 var _typeSummary = [];
 var _currentTarget = '';
+var _scanListCache = null;
 
 // Category colors from grade_config
 var CAT_COLORS = {
@@ -560,6 +561,7 @@ var CAT_COLORS = {
 (function() {
     sf.fetchData('${docroot}/scanlist', {}, function(data) {
         if (!data || !data.length) return;
+        _scanListCache = data;
         var sel = document.getElementById('target-select');
         var seen = {};
         for (var i = 0; i < data.length; i++) {
@@ -594,6 +596,17 @@ var CAT_COLORS = {
     });
 })();
 
+function _findLatestScan(target) {
+    if (!_scanListCache) return null;
+    var latest = null;
+    for (var i = 0; i < _scanListCache.length; i++) {
+        if (_scanListCache[i][1] === target) {
+            if (!latest || _scanListCache[i][0] > latest) latest = _scanListCache[i][0];
+        }
+    }
+    return latest;
+}
+
 function loadAdminBoard() {
     var target = document.getElementById('target-select').value;
     if (!target) {
@@ -605,42 +618,26 @@ function loadAdminBoard() {
     document.getElementById('admin-toolbar').style.display = 'flex';
     document.getElementById('admin-content').style.display = 'flex';
 
-    // Load assignments (independent — failure here should not block scan data)
+    // Load assignments (independent)
     sf.fetchData('${docroot}/typeassignments', {target: target}, function(data) {
         _assignments = (data && data.success) ? (data.assignments || {}) : {};
-        _tryRenderBoard();
+        renderTypeBoard();
+        renderAnalystSidebar();
     });
 
-    // Load scan data (independent of assignments)
-    sf.fetchData('${docroot}/scanlist', {}, function(scanData) {
-        if (!scanData) {
-            _typeSummary = [];
-            _tryRenderBoard();
-            return;
-        }
-        var latestScan = null;
-        for (var i = 0; i < scanData.length; i++) {
-            if (scanData[i][1] === target) {
-                if (!latestScan || scanData[i][0] > latestScan) latestScan = scanData[i][0];
-            }
-        }
-        if (latestScan) {
-            sf.fetchData('${docroot}/scansummary', {id: latestScan, by: 'type'}, function(summary) {
-                _typeSummary = summary || [];
-                _tryRenderBoard();
-            });
-        } else {
-            _typeSummary = [];
-            _tryRenderBoard();
-        }
-    });
-}
-
-var _boardReady = {assignments: false, summary: false};
-function _tryRenderBoard() {
-    // Render whenever we have data (don't wait for both)
-    renderTypeBoard();
-    renderAnalystSidebar();
+    // Use cached scanlist (already loaded at page init) — no extra request
+    var latestScan = _findLatestScan(target);
+    if (latestScan) {
+        sf.fetchData('${docroot}/scansummary', {id: latestScan, by: 'type'}, function(summary) {
+            _typeSummary = summary || [];
+            renderTypeBoard();
+            renderAnalystSidebar();
+        });
+    } else {
+        _typeSummary = [];
+        renderTypeBoard();
+        renderAnalystSidebar();
+    }
 }
 
 function renderTypeBoard() {
@@ -893,53 +890,60 @@ function autoRankTypes() {
     var body = document.getElementById('rank-body');
     if (overlay) overlay.classList.add('visible');
     if (!body) return;
-    body.innerHTML = 'RANKING...';
 
-    // If we already have scan data, render immediately
+    // If we already have scan data, render immediately (no network needed)
     if (_typeSummary && _typeSummary.length > 0) {
         _renderRanking(_typeSummary);
         return;
     }
 
-    // Otherwise, fetch it directly (loadAdminBoard may have failed)
     if (!_currentTarget) {
         body.innerHTML = '<div style="color:#ef4444">SELECT A TARGET FIRST</div>';
         return;
     }
 
-    // Direct fetch: get scan list, find latest scan, get summary
-    $.ajax({
-        type: 'POST', url: '${docroot}/scanlist', data: {}, dataType: 'json', timeout: 15000
-    }).done(function(scanData) {
-        if (!scanData || !scanData.length) {
-            body.innerHTML = '<div style="color:#ef4444">NO SCANS FOUND</div>';
-            return;
-        }
-        var latestScan = null;
-        for (var i = 0; i < scanData.length; i++) {
-            if (scanData[i][1] === _currentTarget) {
-                if (!latestScan || scanData[i][0] > latestScan) latestScan = scanData[i][0];
-            }
-        }
-        if (!latestScan) {
-            body.innerHTML = '<div style="color:#ef4444">NO SCAN FOR THIS TARGET</div>';
-            return;
-        }
-        $.ajax({
-            type: 'POST', url: '${docroot}/scansummary', data: {id: latestScan, by: 'type'}, dataType: 'json', timeout: 30000
-        }).done(function(summary) {
+    // Use cached scanlist to find latest scan ID (no network call)
+    var latestScan = _findLatestScan(_currentTarget);
+    if (!latestScan) {
+        body.innerHTML = '<div style="color:#ef4444">NO SCAN FOUND FOR THIS TARGET</div>';
+        return;
+    }
+
+    body.innerHTML = 'LOADING SCAN DATA...';
+
+    // Use fetch() with AbortController for reliable timeout (not affected by jQuery retry queue)
+    try {
+        var controller = new AbortController();
+        var timeoutId = setTimeout(function() { controller.abort(); }, 20000);
+        var formData = new FormData();
+        formData.append('id', latestScan);
+        formData.append('by', 'type');
+
+        fetch('${docroot}/scansummary', {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal
+        }).then(function(response) {
+            clearTimeout(timeoutId);
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        }).then(function(summary) {
             if (!summary || !summary.length) {
-                body.innerHTML = '<div style="color:#ef4444">NO SCAN RESULTS</div>';
+                body.innerHTML = '<div style="color:#ef4444">NO SCAN RESULTS FOR THIS TARGET</div>';
                 return;
             }
             _typeSummary = summary;
             _renderRanking(summary);
-        }).fail(function(xhr, status) {
-            body.innerHTML = '<div style="color:#ef4444">SCAN SUMMARY FAILED: ' + status + '</div>';
+        }).catch(function(err) {
+            if (err.name === 'AbortError') {
+                body.innerHTML = '<div style="color:#ef4444">TIMEOUT - SCAN DATA TOOK TOO LONG</div>';
+            } else {
+                body.innerHTML = '<div style="color:#ef4444">ERROR: ' + err.message + '</div>';
+            }
         });
-    }).fail(function(xhr, status) {
-        body.innerHTML = '<div style="color:#ef4444">SCAN LIST FAILED: ' + status + '</div>';
-    });
+    } catch(e) {
+        body.innerHTML = '<div style="color:#ef4444">ERROR: ' + e.message + '</div>';
+    }
 }
 
 // Category mapping (client-side, mirrors grade_config)
