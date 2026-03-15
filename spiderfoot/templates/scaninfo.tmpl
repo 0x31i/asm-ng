@@ -264,13 +264,9 @@
           Clear
         </button>
         <span class="toolbar-divider"></span>
-        <span class="toolbar-section-label">ASSIGN</span>
-        <select id="bulk-assign-user" class="toolbar-assign-select" onclick="event.stopPropagation()">
-          <option value="*">All Users</option>
-        </select>
-        <button class="btn btn-assign" onclick="bulkAssign()" title="Assign selected to user">
-          Assign
-        </button>
+        <a href="${docroot}/taskspage" class="btn btn-assign" title="Manage type assignments on TASKS page" style="text-decoration:none">
+          TASKS
+        </a>
         <span class="toolbar-divider"></span>
         <button class="btn btn-clear" onclick="clearSelection()">
           Clear
@@ -974,11 +970,8 @@
             html += "</select>";
             html += "<span id='priority-save-status-" + sf.escapeHtml(eventHash) + "' class='note-save-status'></span>";
             html += "<span class='detail-assign-label'> Assigned: </span>";
-            html += "<span class='detail-assigned-to'>" + (assigned ? sf.escapeHtml(assigned == '*' ? 'ALL USERS' : assigned) : 'None') + "</span>";
-            html += "<select id='detail-assign-" + sf.escapeHtml(eventHash) + "' class='assign-select' onclick='event.stopPropagation()'>";
-            html += "<option value='*'>All Users</option>";
-            html += "</select>";
-            html += "<button class='btn-save-note' onclick='event.stopPropagation(); assignFinding(\"" + sf.escapeHtml(eventHash) + "\")'>Assign</button>";
+            html += "<span class='detail-assigned-to'>" + (assigned ? sf.escapeHtml(assigned) : 'None') + "</span>";
+            if (assigned) html += " <span style='font-size:10px;color:#64748b'>(type-level)</span>";
             html += "</div></div>";
             // Analyst Note section
             html += "<div class='detail-analyst-note'>";
@@ -4366,50 +4359,13 @@
             });
         }
 
+        // Assignment is now type-level — managed from TASKS page
         function assignFinding(eventHash) {
-            var sel = document.getElementById('detail-assign-' + eventHash);
-            if (!sel) return;
-            var user = sel.value;
-            sf.fetchData('${docroot}/findingassign', {id: '${id}', resultHash: eventHash, assignTo: user}, function(data) {
-                if (data && data.success) {
-                    // Update in-memory
-                    if (currentViewData) {
-                        for (var i = 0; i < currentViewData.length; i++) {
-                            if (currentViewData[i][7] === eventHash) {
-                                var existing = currentViewData[i][18] || '';
-                                if (existing && existing.indexOf(user) === -1) {
-                                    currentViewData[i][18] = existing + ',' + user;
-                                } else {
-                                    currentViewData[i][18] = user;
-                                }
-                                break;
-                            }
-                        }
-                    }
-                    var label = document.querySelector('#detail-assign-' + eventHash).closest('.priority-assignment-container').querySelector('.detail-assigned-to');
-                    if (label) label.textContent = user === '*' ? 'ALL USERS' : user;
-                }
-            });
+            alert('Assignment is now managed at the type level. Use the TASKS page to assign event types to analysts.');
         }
 
         function bulkAssign() {
-            var hashes = getSelectedHashes();
-            if (!hashes.length) return;
-            var sel = document.getElementById('bulk-assign-user');
-            var user = sel ? sel.value : '*';
-            sf.fetchData('${docroot}/findingassignbulk', {id: '${id}', hashes: hashes.join(','), assignTo: user}, function(data) {
-                if (data && data.success) {
-                    var hashSet = {};
-                    hashes.forEach(function(h) { hashSet[h] = true; });
-                    if (currentViewData) {
-                        for (var i = 0; i < currentViewData.length; i++) {
-                            if (hashSet[currentViewData[i][7]]) {
-                                currentViewData[i][18] = user;
-                            }
-                        }
-                    }
-                }
-            });
+            alert('Assignment is now managed at the type level. Use the TASKS page to assign event types to analysts.');
         }
 
         // --- Priority/Assignment Filters ---
@@ -4771,6 +4727,8 @@
             grid += "<span class='vuln-btn-sub'>BURP SUITE PRO</span>";
             grid += "</button>";
             grid += "</div>";
+            // Type-level assignment badges for vulnerability types
+            grid += "<div id='vuln-assign-badges' style='padding:6px 12px;font-size:11px;color:#94a3b8'></div>";
             grid += "<div class='vuln-content'>";
             grid += "<div id='vuln-nessus-content' class='vuln-panel'></div>";
             grid += "<div id='vuln-burp-content' class='vuln-panel' style='display:none'></div>";
@@ -4778,6 +4736,24 @@
 
             $("#mainbody").append(grid);
             $("#loader").hide();
+
+            // Load vulnerability type assignments
+            sf.fetchData('${docroot}/typeassignments', {target: '${seedtarget}'}, function(data) {
+                if (!data || !data.success) return;
+                var assigns = data.assignments || {};
+                var badges = '';
+                var nessusAssign = assigns['EXTERNAL_VULNERABILITIES'];
+                var burpAssign = assigns['WEBAPP_VULNERABILITIES'];
+                if (nessusAssign && nessusAssign.length) {
+                    var names = nessusAssign.map(function(a) { return a.assigned_to; }).join(', ');
+                    badges += '<span style="margin-right:12px"><b>EXTERNAL_VULNERABILITIES</b> assigned to: <span style="color:#a78bfa;font-weight:600">' + sf.escapeHtml(names) + '</span></span>';
+                }
+                if (burpAssign && burpAssign.length) {
+                    var names = burpAssign.map(function(a) { return a.assigned_to; }).join(', ');
+                    badges += '<span><b>WEBAPP_VULNERABILITIES</b> assigned to: <span style="color:#a78bfa;font-weight:600">' + sf.escapeHtml(names) + '</span></span>';
+                }
+                if (badges) document.getElementById('vuln-assign-badges').innerHTML = badges;
+            });
 
             // Load Nessus data for default tab
             loadNessusData(instanceId);
@@ -12183,9 +12159,17 @@
                 if (_dataListSort === 'group' && category !== lastCategory) {
                     lastCategory = category;
                     html += "<tr class='data-list-group-header'>";
-                    html += "<td colspan='4' style='border-left: 4px solid " + color + "; padding: 8px 12px;'>";
+                    html += "<td colspan='5' style='border-left: 4px solid " + color + "; padding: 8px 12px;'>";
                     html += "<span style='color: " + color + "; font-weight: 700; font-family: var(--font-mono); font-size: 12px; letter-spacing: 1px; text-transform: uppercase;'>" + category + "</span>";
                     html += "</td></tr>";
+                }
+
+                // Look up type-level assignment
+                var typeAssigns = (window._dataTypeAssignments || {})[row[0]] || [];
+                var assignStr = '';
+                for (var ai = 0; ai < typeAssigns.length; ai++) {
+                    if (assignStr) assignStr += ', ';
+                    assignStr += typeAssigns[ai].assigned_to;
                 }
 
                 html += "<tr>";
@@ -12196,6 +12180,7 @@
                 html += "<td>" + row[4] + "</td>";
                 html += "<td>" + row[3] + "</td>";
                 html += "<td>" + row[2] + "</td>";
+                html += "<td style='font-size:11px;color:#a78bfa;font-weight:600'>" + (assignStr ? sf.escapeHtml(assignStr) : '<span style=\"color:#64748b\">-</span>') + "</td>";
                 html += "</tr>";
             }
             $('#data-list-tbody').html(html);
@@ -12288,8 +12273,13 @@
 
                             // --- Data table ---
                             var table = "<table id='scansummary-content' class='table table-bordered data-list-table'>";
-                            table += "<thead><tr><th>Type</th><th>Unique Data Elements</th><th>Total Data Elements</th><th>Last Data Element</th></tr></thead>";
+                            table += "<thead><tr><th>Type</th><th>Unique Data Elements</th><th>Total Data Elements</th><th>Last Data Element</th><th>Assigned</th></tr></thead>";
                             table += "<tbody id='data-list-tbody'></tbody></table>";
+
+                            // Load type assignments for this target
+                            sf.fetchData('${docroot}/typeassignments', {target: '${seedtarget}'}, function(aData) {
+                                window._dataTypeAssignments = (aData && aData.success) ? (aData.assignments || {}) : {};
+                            });
 
                             if (data.length < 1) {
                                 table = "<div id='scansummary-content' class='alert alert-warning'><h4>No data.</h4>If the scan is still running please try again soon.</div>";
@@ -12495,7 +12485,7 @@
 
                             // My Tasks filter
                             if (stats.myTasks > 0) {
-                                statsBar += "<button class='filter-btn filter-btn-my-tasks' onclick=\"togglePriorityFilter('mytasks')\">" + stats.myTasks + " MY TASKS</button>";
+                                statsBar += "<button class='filter-btn filter-btn-my-tasks' onclick=\"togglePriorityFilter('mytasks')\">" + stats.myTasks + " ASSIGNED</button>";
                             }
 
                             statsBar += "</div>";

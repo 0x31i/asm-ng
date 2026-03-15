@@ -1,0 +1,579 @@
+<%include file="HEADER.tmpl"/>
+
+<style>
+/* TASKS page layout */
+.tasks-container { display: flex; gap: 20px; min-height: 600px; }
+.tasks-main { flex: 1; min-width: 0; }
+.tasks-sidebar { width: 280px; flex-shrink: 0; }
+
+/* Summary cards */
+.tasks-summary { display: flex; gap: 12px; margin-bottom: 16px; }
+.tasks-card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px 20px; text-align: center; min-width: 100px; flex: 1; }
+.tasks-card .card-count { font-size: 24px; font-weight: 700; color: #e2e8f0; }
+.tasks-card .card-label { font-size: 10px; text-transform: uppercase; color: #94a3b8; letter-spacing: 1px; }
+.tasks-card.open .card-count { color: #60a5fa; }
+.tasks-card.inprogress .card-count { color: #f59e0b; }
+.tasks-card.done .card-count { color: #22c55e; }
+
+/* Target selector */
+.tasks-target-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 10px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; }
+.tasks-target-bar label { font-size: 12px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+.tasks-target-bar select { flex: 1; padding: 6px 10px; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; font-size: 13px; }
+
+/* Toolbar */
+.tasks-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.tasks-toolbar .btn-task { padding: 5px 12px; border: 1px solid #475569; border-radius: 4px; background: transparent; color: #94a3b8; cursor: pointer; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.tasks-toolbar .btn-task:hover { background: #334155; color: #e2e8f0; }
+.tasks-toolbar .btn-task.btn-ai { border-color: #8b5cf6; color: #8b5cf6; }
+.tasks-toolbar .btn-task.btn-ai:hover { background: #8b5cf622; }
+.tasks-toolbar .btn-task.btn-auto { border-color: #22c55e; color: #22c55e; }
+.tasks-toolbar .btn-task.btn-auto:hover { background: #22c55e22; }
+.toolbar-assign-select { padding: 5px 8px; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; font-size: 11px; }
+.toolbar-sep { width: 1px; height: 20px; background: #334155; margin: 0 4px; }
+
+/* Category group */
+.cat-group { margin-bottom: 16px; }
+.cat-header { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #0f172a; border-radius: 6px; margin-bottom: 4px; cursor: pointer; }
+.cat-color { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.cat-name { font-size: 12px; font-weight: 700; color: #e2e8f0; text-transform: uppercase; letter-spacing: 0.5px; }
+.cat-count { font-size: 11px; color: #64748b; margin-left: auto; }
+
+/* Type rows */
+.type-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px 6px 28px; border-bottom: 1px solid #1e293b; font-size: 13px; }
+.type-row:hover { background: #1e293b; }
+.type-row .type-cb { width: 14px; height: 14px; accent-color: #8b5cf6; cursor: pointer; }
+.type-row .type-name { flex: 1; color: #e2e8f0; font-family: monospace; font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.type-row .type-findings { color: #64748b; font-size: 11px; min-width: 50px; text-align: right; }
+.type-row .assign-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; background: #8b5cf622; color: #a78bfa; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid #8b5cf644; min-width: 70px; justify-content: center; }
+.type-row .assign-chip.unassigned { background: #47556922; color: #64748b; border-color: #47556944; }
+.type-row .assign-chip:hover { background: #8b5cf644; }
+.type-row .assign-dropdown { padding: 2px 6px; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; font-size: 11px; display: none; }
+.type-row .assign-dropdown.visible { display: inline-block; }
+.type-row .status-badge { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; }
+.status-badge.s-open { background: #60a5fa22; color: #60a5fa; }
+.status-badge.s-in_progress { background: #f59e0b22; color: #f59e0b; }
+.status-badge.s-done { background: #22c55e22; color: #22c55e; }
+
+/* Analyst sidebar */
+.analyst-card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+.analyst-card .analyst-name { font-size: 13px; font-weight: 700; color: #e2e8f0; }
+.analyst-card .analyst-stats { display: flex; gap: 12px; margin-top: 6px; font-size: 11px; color: #94a3b8; }
+.analyst-card .analyst-stat { display: flex; align-items: center; gap: 3px; }
+.analyst-card .stat-dot { width: 6px; height: 6px; border-radius: 50%; }
+.analyst-card .stat-dot.open { background: #60a5fa; }
+.analyst-card .stat-dot.inprogress { background: #f59e0b; }
+.analyst-card .stat-dot.done { background: #22c55e; }
+.sidebar-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; font-weight: 700; margin-bottom: 8px; }
+.sidebar-summary { font-size: 12px; color: #94a3b8; margin-bottom: 12px; padding: 8px; background: #0f172a; border-radius: 6px; }
+
+/* Analyst view table */
+.analyst-tasks-table { width: 100%; border-collapse: collapse; }
+.analyst-tasks-table th { background: #1e293b; color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 8px 12px; border-bottom: 1px solid #334155; text-align: left; }
+.analyst-tasks-table td { padding: 8px 12px; border-bottom: 1px solid #1e293b; color: #e2e8f0; font-size: 13px; }
+.analyst-tasks-table tr:hover { background: #1e293b; }
+.task-target { color: #8b5cf6; font-family: monospace; font-size: 12px; }
+.task-status-btn { padding: 3px 10px; border: 1px solid #475569; border-radius: 4px; background: transparent; color: #94a3b8; cursor: pointer; font-size: 11px; margin-right: 4px; }
+.task-status-btn:hover { background: #334155; }
+.task-status-btn.active-open { border-color: #60a5fa; color: #60a5fa; }
+.task-status-btn.active-inprogress { border-color: #f59e0b; color: #f59e0b; }
+.task-status-btn.active-done { border-color: #22c55e; color: #22c55e; }
+
+/* AI Rank modal */
+.ai-rank-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center; }
+.ai-rank-overlay.visible { display: flex; }
+.ai-rank-panel { background: #1e293b; border: 1px solid #475569; border-radius: 12px; padding: 24px; width: 600px; max-height: 80vh; overflow-y: auto; }
+.ai-rank-title { font-size: 16px; font-weight: 700; color: #e2e8f0; margin-bottom: 16px; }
+.ai-rank-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #334155; font-size: 13px; }
+.ai-rank-num { font-size: 16px; font-weight: 700; color: #8b5cf6; min-width: 30px; text-align: center; }
+.ai-rank-type { font-family: monospace; color: #e2e8f0; flex: 1; }
+.ai-rank-cat { font-size: 11px; color: #94a3b8; }
+.ai-rank-reason { font-size: 11px; color: #64748b; }
+.ai-rank-close { padding: 6px 16px; border: 1px solid #475569; border-radius: 4px; background: transparent; color: #94a3b8; cursor: pointer; font-size: 12px; margin-top: 16px; }
+.ai-rank-close:hover { background: #334155; color: #e2e8f0; }
+
+.tasks-empty { text-align: center; color: #64748b; padding: 40px; font-size: 14px; }
+</style>
+
+<h4>TASKS</h4>
+
+<!-- Summary cards -->
+<div class="tasks-summary" id="task-summary">
+  <div class="tasks-card open"><div class="card-count" id="count-open">-</div><div class="card-label">Open</div></div>
+  <div class="tasks-card inprogress"><div class="card-count" id="count-inprogress">-</div><div class="card-label">In Progress</div></div>
+  <div class="tasks-card done"><div class="card-count" id="count-done">-</div><div class="card-label">Done</div></div>
+</div>
+
+% if user_role == 'admin':
+<!-- ============ ADMIN VIEW ============ -->
+
+<!-- Target selector -->
+<div class="tasks-target-bar">
+  <label>Target:</label>
+  <select id="target-select" onchange="loadAdminBoard()">
+    <option value="">Select a target...</option>
+  </select>
+</div>
+
+<!-- Toolbar -->
+<div class="tasks-toolbar" id="admin-toolbar" style="display:none">
+  <input type="checkbox" id="select-all-cb" onchange="toggleSelectAll(this.checked)" title="Select all">
+  <label for="select-all-cb" style="font-size:11px;color:#94a3b8;cursor:pointer">SELECT ALL</label>
+  <div class="toolbar-sep"></div>
+  <label style="font-size:11px;color:#94a3b8">Assign to:</label>
+  <select id="bulk-assign-analyst" class="toolbar-assign-select"></select>
+  <button class="btn-task" onclick="bulkAssignSelected()">ASSIGN</button>
+  <div class="toolbar-sep"></div>
+  <button class="btn-task btn-ai" onclick="aiRankTypes()">AI RANK</button>
+  <button class="btn-task btn-auto" onclick="autoAssign(false)">AUTO ASSIGN</button>
+  <button class="btn-task btn-auto" onclick="autoAssign(true)" style="border-style:dashed">RESET & REASSIGN</button>
+</div>
+
+<!-- Two-panel layout -->
+<div class="tasks-container" id="admin-content" style="display:none">
+  <div class="tasks-main" id="type-board">
+    <div class="tasks-empty">Select a target to view event types</div>
+  </div>
+  <div class="tasks-sidebar" id="analyst-sidebar">
+    <div class="sidebar-title">Analysts</div>
+    <div id="analyst-list"></div>
+  </div>
+</div>
+
+<!-- AI Rank overlay -->
+<div class="ai-rank-overlay" id="ai-rank-overlay">
+  <div class="ai-rank-panel">
+    <div class="ai-rank-title">AI Type Ranking</div>
+    <div id="ai-rank-body">Loading...</div>
+    <button class="ai-rank-close" onclick="document.getElementById('ai-rank-overlay').classList.remove('visible')">CLOSE</button>
+  </div>
+</div>
+
+<script>
+var _analysts = [];
+var _assignments = {};
+var _typeSummary = [];
+var _currentTarget = '';
+
+// Category colors from grade_config
+var CAT_COLORS = {
+    'Network Security': '#dc2626',
+    'Web App Security': '#ea580c',
+    'Information Leakage': '#eab308',
+    'General Health': '#3b82f6',
+    'External Account Exposure': '#06b6d4',
+    'DNS Health': '#22c55e',
+    'IP Reputation': '#d946ef',
+    'AI Security': '#8b5cf6',
+    'Information / Reference': '#6b7280'
+};
+
+// Load targets
+(function() {
+    sf.fetchData('${docroot}/scanlist', {}, function(data) {
+        if (!data || !data.length) return;
+        var sel = document.getElementById('target-select');
+        var seen = {};
+        for (var i = 0; i < data.length; i++) {
+            var t = data[i][1];
+            if (!t || seen[t]) continue;
+            seen[t] = true;
+            var opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            sel.appendChild(opt);
+        }
+    });
+    // Load analysts
+    sf.fetchData('${docroot}/analysts', {}, function(data) {
+        if (!data || !data.success) return;
+        _analysts = data.analysts || [];
+        var sel = document.getElementById('bulk-assign-analyst');
+        for (var i = 0; i < _analysts.length; i++) {
+            var opt = document.createElement('option');
+            opt.value = _analysts[i].username;
+            opt.textContent = _analysts[i].display_name || _analysts[i].username;
+            sel.appendChild(opt);
+        }
+    });
+    // Load counts
+    sf.fetchData('${docroot}/typeassignments', {count_only: '1'}, function(data) {
+        if (data && data.success && data.counts) {
+            document.getElementById('count-open').textContent = data.counts.OPEN || 0;
+            document.getElementById('count-inprogress').textContent = data.counts.IN_PROGRESS || 0;
+            document.getElementById('count-done').textContent = data.counts.DONE || 0;
+        }
+    });
+})();
+
+function loadAdminBoard() {
+    var target = document.getElementById('target-select').value;
+    if (!target) {
+        document.getElementById('admin-toolbar').style.display = 'none';
+        document.getElementById('admin-content').style.display = 'none';
+        return;
+    }
+    _currentTarget = target;
+    document.getElementById('admin-toolbar').style.display = 'flex';
+    document.getElementById('admin-content').style.display = 'flex';
+
+    // Load assignments for this target
+    sf.fetchData('${docroot}/typeassignments', {target: target}, function(data) {
+        _assignments = (data && data.success) ? (data.assignments || {}) : {};
+        // Load scan result summary for this target
+        sf.fetchData('${docroot}/scanlist', {}, function(scanData) {
+            if (!scanData) return;
+            // Find latest scan for this target
+            var latestScan = null;
+            for (var i = 0; i < scanData.length; i++) {
+                if (scanData[i][1] === target) {
+                    if (!latestScan || scanData[i][0] > latestScan) latestScan = scanData[i][0];
+                }
+            }
+            if (latestScan) {
+                sf.fetchData('${docroot}/scansummary', {id: latestScan, by: 'type'}, function(summary) {
+                    _typeSummary = summary || [];
+                    renderTypeBoard();
+                    renderAnalystSidebar();
+                });
+            } else {
+                _typeSummary = [];
+                renderTypeBoard();
+                renderAnalystSidebar();
+            }
+        });
+    });
+}
+
+function renderTypeBoard() {
+    var board = document.getElementById('type-board');
+    if (!_typeSummary.length) {
+        board.innerHTML = '<div class="tasks-empty">No scan results for this target</div>';
+        return;
+    }
+
+    // Group types by category (using known mappings)
+    var catGroups = {};
+    for (var i = 0; i < _typeSummary.length; i++) {
+        var row = _typeSummary[i];
+        var et = row[0];
+        var descr = row[1];
+        var count = row[3] || 0;
+        var cat = getTypeCategory(et);
+        if (!catGroups[cat]) catGroups[cat] = [];
+        catGroups[cat].push({eventType: et, descr: descr, count: count});
+    }
+
+    // Sort categories by weight
+    var catOrder = ['Network Security', 'Web App Security', 'AI Security', 'Information Leakage',
+                    'General Health', 'External Account Exposure', 'DNS Health', 'IP Reputation', 'Information / Reference'];
+    var html = '';
+    for (var ci = 0; ci < catOrder.length; ci++) {
+        var cat = catOrder[ci];
+        var types = catGroups[cat];
+        if (!types || !types.length) continue;
+        delete catGroups[cat];
+        html += renderCatGroup(cat, types);
+    }
+    // Any remaining categories
+    for (var cat in catGroups) {
+        html += renderCatGroup(cat, catGroups[cat]);
+    }
+    board.innerHTML = html;
+}
+
+function renderCatGroup(cat, types) {
+    var color = CAT_COLORS[cat] || '#6b7280';
+    var html = '<div class="cat-group">';
+    html += '<div class="cat-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
+    html += '<span class="cat-color" style="background:' + color + '"></span>';
+    html += '<span class="cat-name">' + sf.escapeHtml(cat) + '</span>';
+    html += '<span class="cat-count">' + types.length + ' types</span>';
+    html += '</div>';
+    html += '<div class="cat-types">';
+    for (var i = 0; i < types.length; i++) {
+        var t = types[i];
+        var assigns = _assignments[t.eventType] || [];
+        var assignNames = [];
+        var statusClass = '';
+        for (var j = 0; j < assigns.length; j++) {
+            assignNames.push(assigns[j].assigned_to);
+            if (!statusClass && assigns[j].status !== 'DONE') {
+                statusClass = 's-' + assigns[j].status.toLowerCase();
+            }
+        }
+        var chipText = assignNames.length ? assignNames.join(', ') : 'Unassigned';
+        var chipClass = assignNames.length ? 'assign-chip' : 'assign-chip unassigned';
+
+        html += '<div class="type-row">';
+        html += '<input type="checkbox" class="type-cb" value="' + sf.escapeHtml(t.eventType) + '">';
+        html += '<span class="type-name" title="' + sf.escapeHtml(t.descr) + '">' + sf.escapeHtml(t.eventType) + '</span>';
+        html += '<span class="type-findings">' + t.count + '</span>';
+        if (statusClass) html += '<span class="status-badge ' + statusClass + '">' + (statusClass === 's-open' ? 'OPEN' : statusClass === 's-in_progress' ? 'WIP' : 'DONE') + '</span>';
+        html += '<span class="' + chipClass + '" onclick="showAssignDropdown(this, \'' + sf.escapeHtml(t.eventType) + '\')">' + sf.escapeHtml(chipText) + '</span>';
+        html += '</div>';
+    }
+    html += '</div></div>';
+    return html;
+}
+
+function showAssignDropdown(chip, eventType) {
+    // Create inline dropdown
+    var existing = chip.parentNode.querySelector('.assign-dropdown.visible');
+    if (existing) { existing.remove(); return; }
+
+    var sel = document.createElement('select');
+    sel.className = 'assign-dropdown visible';
+    var optNone = document.createElement('option');
+    optNone.value = '';
+    optNone.textContent = '-- Remove --';
+    sel.appendChild(optNone);
+    for (var i = 0; i < _analysts.length; i++) {
+        var opt = document.createElement('option');
+        opt.value = _analysts[i].username;
+        opt.textContent = _analysts[i].display_name || _analysts[i].username;
+        sel.appendChild(opt);
+    }
+    sel.onchange = function() {
+        var user = sel.value;
+        if (!user) {
+            // Remove all assignments for this type
+            var assigns = _assignments[eventType] || [];
+            for (var i = 0; i < assigns.length; i++) {
+                sf.fetchData('${docroot}/typeassignremove', {target: _currentTarget, eventType: eventType, assignedTo: assigns[i].assigned_to}, function() {});
+            }
+            delete _assignments[eventType];
+        } else {
+            sf.fetchData('${docroot}/typeassign', {target: _currentTarget, eventType: eventType, assignTo: user}, function(data) {
+                if (data && data.success) {
+                    if (!_assignments[eventType]) _assignments[eventType] = [];
+                    _assignments[eventType] = [{assigned_to: user, status: 'OPEN', assigned_by: '${user}'}];
+                }
+            });
+        }
+        sel.remove();
+        // Refresh after a beat
+        setTimeout(function() { renderTypeBoard(); renderAnalystSidebar(); }, 300);
+    };
+    chip.parentNode.appendChild(sel);
+    sel.focus();
+}
+
+function renderAnalystSidebar() {
+    var container = document.getElementById('analyst-list');
+    if (!_analysts.length) {
+        container.innerHTML = '<div style="color:#64748b;font-size:12px">No analyst users</div>';
+        return;
+    }
+    // Count assignments per analyst
+    var analystCounts = {};
+    for (var i = 0; i < _analysts.length; i++) {
+        analystCounts[_analysts[i].username] = {open: 0, inprogress: 0, done: 0, total: 0};
+    }
+    for (var et in _assignments) {
+        var assigns = _assignments[et];
+        for (var j = 0; j < assigns.length; j++) {
+            var u = assigns[j].assigned_to;
+            if (!analystCounts[u]) analystCounts[u] = {open: 0, inprogress: 0, done: 0, total: 0};
+            analystCounts[u].total++;
+            if (assigns[j].status === 'OPEN') analystCounts[u].open++;
+            else if (assigns[j].status === 'IN_PROGRESS') analystCounts[u].inprogress++;
+            else if (assigns[j].status === 'DONE') analystCounts[u].done++;
+        }
+    }
+
+    // Summary
+    var totalTypes = _typeSummary.length;
+    var assignedTypes = Object.keys(_assignments).length;
+    var html = '<div class="sidebar-summary">' + assignedTypes + ' / ' + totalTypes + ' types assigned</div>';
+
+    for (var i = 0; i < _analysts.length; i++) {
+        var a = _analysts[i];
+        var c = analystCounts[a.username] || {open:0, inprogress:0, done:0, total:0};
+        html += '<div class="analyst-card">';
+        html += '<div class="analyst-name">' + sf.escapeHtml(a.display_name || a.username) + '</div>';
+        html += '<div class="analyst-stats">';
+        html += '<span class="analyst-stat"><span class="stat-dot open"></span>' + c.open + ' open</span>';
+        html += '<span class="analyst-stat"><span class="stat-dot inprogress"></span>' + c.inprogress + ' wip</span>';
+        html += '<span class="analyst-stat"><span class="stat-dot done"></span>' + c.done + ' done</span>';
+        html += '</div></div>';
+    }
+    container.innerHTML = html;
+}
+
+function toggleSelectAll(checked) {
+    var cbs = document.querySelectorAll('.type-cb');
+    for (var i = 0; i < cbs.length; i++) cbs[i].checked = checked;
+}
+
+function getSelectedTypes() {
+    var cbs = document.querySelectorAll('.type-cb:checked');
+    var types = [];
+    for (var i = 0; i < cbs.length; i++) types.push(cbs[i].value);
+    return types;
+}
+
+function bulkAssignSelected() {
+    var types = getSelectedTypes();
+    if (!types.length) { alert('Select event types first'); return; }
+    var analyst = document.getElementById('bulk-assign-analyst').value;
+    if (!analyst) { alert('Select an analyst'); return; }
+    var items = [];
+    for (var i = 0; i < types.length; i++) {
+        items.push({eventType: types[i], assignedTo: analyst});
+    }
+    sf.fetchData('${docroot}/typeassignbulk', {target: _currentTarget, assignments: JSON.stringify(items)}, function(data) {
+        if (data && data.success) {
+            loadAdminBoard();
+        }
+    });
+}
+
+function autoAssign(reset) {
+    var msg = reset ? 'Clear ALL existing assignments and redistribute evenly?' : 'Distribute unassigned types evenly across analysts?';
+    if (!confirm(msg)) return;
+    sf.fetchData('${docroot}/typeassignauto', {target: _currentTarget, reset: reset ? '1' : '0'}, function(data) {
+        if (data && data.success) {
+            alert('Assigned ' + data.count + ' types across ' + data.analysts + ' analysts');
+            loadAdminBoard();
+        } else {
+            alert(data ? data.message : 'Auto-assign failed');
+        }
+    });
+}
+
+function aiRankTypes() {
+    var overlay = document.getElementById('ai-rank-overlay');
+    var body = document.getElementById('ai-rank-body');
+    body.innerHTML = 'Analyzing event types...';
+    overlay.classList.add('visible');
+    sf.fetchData('${docroot}/typeassignairank', {target: _currentTarget}, function(data) {
+        if (!data || !data.success) {
+            body.innerHTML = '<div style="color:#ef4444">Failed: ' + (data ? sf.escapeHtml(data.message) : 'Error') + '</div>';
+            return;
+        }
+        var ranked = data.ranked_types || [];
+        var html = '';
+        for (var i = 0; i < ranked.length; i++) {
+            var r = ranked[i];
+            html += '<div class="ai-rank-row">';
+            html += '<span class="ai-rank-num">#' + r.rank + '</span>';
+            html += '<span class="ai-rank-type">' + sf.escapeHtml(r.event_type) + '</span>';
+            html += '<span class="ai-rank-cat">' + sf.escapeHtml(r.category) + '</span>';
+            html += '</div>';
+            html += '<div style="padding:0 0 6px 40px"><span class="ai-rank-reason">' + sf.escapeHtml(r.reason) + '</span></div>';
+        }
+        if (!html) html = '<div style="color:#64748b">No types to rank</div>';
+        body.innerHTML = html;
+    });
+}
+
+// Rough category mapping (client-side, mirrors grade_config categories)
+var TYPE_CATEGORY_MAP = null;
+function getTypeCategory(eventType) {
+    // Common mappings
+    var netTypes = ['EXTERNAL_VULNERABILITIES','VULNERABILITY_CVE_CRITICAL','VULNERABILITY_CVE_HIGH','VULNERABILITY_CVE_MEDIUM','VULNERABILITY_CVE_LOW','VULNERABILITY_GENERAL','TCP_PORT_OPEN','TCP_PORT_OPEN_BANNER','UDP_PORT_OPEN','UDP_PORT_OPEN_INFO','OPEN_TCP_PORT_HAS_VULNS','OPEN_TCP_PORT_HAS_VULNS_LOW','WEBSERVER_BANNER','WEBSERVER_HTTPHEADERS','WEBSERVER_TECHNOLOGY','OPERATING_SYSTEM','INTERNAL_IP_ADDRESS','IP_ADDRESS'];
+    var webTypes = ['HTTP_CODE','URL_FORM','URL_UPLOAD','URL_JAVASCRIPT','URL_JAVA_APPLET','URL_FLASH','URL_WEB_FRAMEWORK','URL_STATIC_PARAM','URL_PASSWORD','WEBSERVER_STRANGEHEADER','CONTENT_INTERESTING_SUBDIR'];
+    var dnsTypes = ['DNS_SPF','DNS_TEXT','DNS_SRV','DOMAIN_NAME','DOMAIN_NAME_PARENT','DOMAIN_REGISTRAR','DOMAIN_WHOIS','INTERNET_NAME','INTERNET_NAME_UNRESOLVED','PROVIDER_DNS','AFFILIATE_INTERNET_NAME','DNS_PASSIVE','DOMAIN_IMPERSONATION'];
+    var infoLeakTypes = ['EMAILADDR','EMAIL_COMPROMISED','DARKNET_MENTION_CONTENT','LEAKSITE_CONTENT','PASSWORD_COMPROMISED','PHONE_NUMBER','PHYSICAL_ADDRESS','HUMAN_NAME','PGP_KEY','CREDENTIAL_SET','BASE64_DATA'];
+    var ipRepTypes = ['MALICIOUS_IPADDR','MALICIOUS_AFFILIATE_IPADDR','MALICIOUS_SUBNET','MALICIOUS_INTERNET_NAME','MALICIOUS_EMAILADDR','BLACKLISTED_IPADDR','BLACKLISTED_AFFILIATE_IPADDR','BLACKLISTED_SUBNET','BLACKLISTED_NETBLOCK'];
+    var aiTypes = ['AI_ENDPOINT','AI_MODEL_LEAK','AI_TRAINING_DATA','MCP_SERVER','AI_INFRASTRUCTURE'];
+
+    if (netTypes.indexOf(eventType) !== -1) return 'Network Security';
+    if (webTypes.indexOf(eventType) !== -1) return 'Web App Security';
+    if (dnsTypes.indexOf(eventType) !== -1) return 'DNS Health';
+    if (infoLeakTypes.indexOf(eventType) !== -1) return 'Information Leakage';
+    if (ipRepTypes.indexOf(eventType) !== -1) return 'IP Reputation';
+    if (aiTypes.indexOf(eventType) !== -1) return 'AI Security';
+    if (eventType.indexOf('ACCOUNT_EXTERNAL') !== -1 || eventType.indexOf('SOCIAL_MEDIA') !== -1) return 'External Account Exposure';
+    if (eventType.indexOf('SSL_CERTIFICATE') !== -1 || eventType.indexOf('GEOINFO') !== -1 || eventType.indexOf('SOFTWARE_USED') !== -1) return 'General Health';
+    if (eventType.indexOf('WEBAPP_VULNERABILITIES') !== -1) return 'Web App Security';
+    return 'Information / Reference';
+}
+</script>
+
+% else:
+<!-- ============ ANALYST VIEW ============ -->
+
+<script>
+(function() {
+    sf.fetchData('${docroot}/tasks', {}, function(data) {
+        if (!data || !data.success) return;
+        var counts = data.counts || {};
+        document.getElementById('count-open').textContent = counts.OPEN || 0;
+        document.getElementById('count-inprogress').textContent = counts.IN_PROGRESS || 0;
+        document.getElementById('count-done').textContent = counts.DONE || 0;
+
+        var tasks = data.assignments || [];
+        var tbody = document.getElementById('analyst-tasks-body');
+        if (!tasks.length) {
+            tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;color:#64748b'>No tasks assigned</td></tr>";
+            return;
+        }
+        // Group by target
+        var byTarget = {};
+        for (var i = 0; i < tasks.length; i++) {
+            var t = tasks[i];
+            if (!byTarget[t.target]) byTarget[t.target] = [];
+            byTarget[t.target].push(t);
+        }
+        var html = '';
+        for (var target in byTarget) {
+            var items = byTarget[target];
+            for (var i = 0; i < items.length; i++) {
+                var t = items[i];
+                var statusBtns = '';
+                ['OPEN','IN_PROGRESS','DONE'].forEach(function(s) {
+                    var cls = t.status === s ? ('active-' + s.toLowerCase().replace('_','')) : '';
+                    var label = s === 'IN_PROGRESS' ? 'IN PROGRESS' : s;
+                    statusBtns += "<button class='task-status-btn " + cls + "' onclick='updateTaskStatus(\"" +
+                        sf.escapeHtml(t.target) + "\",\"" + sf.escapeHtml(t.event_type) + "\",\"" +
+                        sf.escapeHtml(t.assigned_to) + "\",\"" + s + "\",this)'>" + label + "</button>";
+                });
+                var dateStr = t.date_assigned ? new Date(t.date_assigned).toLocaleDateString() : '';
+                html += '<tr>';
+                html += '<td class="task-target">' + sf.escapeHtml(target) + '</td>';
+                html += '<td>' + sf.escapeHtml(t.event_type) + '</td>';
+                html += '<td>' + statusBtns + '</td>';
+                html += '<td>' + sf.escapeHtml(t.assigned_by || '') + '</td>';
+                html += '<td>' + dateStr + '</td>';
+                html += '</tr>';
+            }
+        }
+        tbody.innerHTML = html;
+    });
+})();
+
+function updateTaskStatus(target, eventType, assignedTo, status, btn) {
+    sf.fetchData('${docroot}/typeassignstatus', {
+        target: target, eventType: eventType, assignedTo: assignedTo, status: status
+    }, function(data) {
+        if (data && data.success) {
+            // Update UI
+            var row = btn.closest('tr');
+            row.querySelectorAll('.task-status-btn').forEach(function(b) {
+                b.className = 'task-status-btn';
+            });
+            btn.classList.add('active-' + status.toLowerCase().replace('_', ''));
+        }
+    });
+}
+</script>
+
+<table class="analyst-tasks-table" id="analyst-tasks">
+  <thead>
+    <tr>
+      <th>Target</th>
+      <th>Event Type</th>
+      <th>Status</th>
+      <th>Assigned By</th>
+      <th>Date</th>
+    </tr>
+  </thead>
+  <tbody id="analyst-tasks-body">
+    <tr><td colspan="5" style="text-align:center;color:#64748b">Loading...</td></tr>
+  </tbody>
+</table>
+
+% endif
+
+<%include file="FOOTER.tmpl"/>
